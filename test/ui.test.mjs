@@ -284,3 +284,51 @@ test("shoving junk is reported as a fold", async () => {
   assert.match(text, /Shoving loses/, "72o at 15BB should not be a shove: " + text.slice(0, 300));
   noErrors();
 });
+
+test("a drill session tracks EV earned, not only EV lost", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-n button");
+  await page.click('#dr-n button[data-n="5"]');
+  await page.click("#dr-go");
+
+  const picked = [];
+  for (let i = 0; i < 5; i++) {
+    await page.waitForSelector(".dopt", { timeout: 60000 });
+    // vary the pick so the session is not all folds
+    const n = await page.$$eval(".dopt", (b) => b.length);
+    await page.click(`.dopt:nth-of-type(${(i % n) + 1})`);
+    await page.waitForSelector("#dr-next", { timeout: 60000 });
+
+    // the header must report both, and earned must be signed
+    const header = await page.$eval(".dprog", (e) => e.innerText);
+    assert.match(header, /Earned so far\s*[+-]/, "header lost the earned total: " + header);
+    assert.match(header, /Lost so far/, "header lost the loss total: " + header);
+
+    // remember what this pick was worth
+    const mine = await page.$eval(".recbox .ra", (e) => e.innerText);
+    picked.push(parseFloat(mine.match(/([+-][\d.]+)\s*BB/)[1]));
+    await page.click("#dr-next");
+  }
+
+  await page.waitForSelector("#dr-again", { timeout: 60000 });
+  const kpis = await page.$$eval(".kpi .k", (ks) => ks.map((k) => k.innerText.replace(/\n/g, "|")));
+  const find = (label) => {
+    const row = kpis.find((k) => k.startsWith(label));
+    assert.ok(row, `no "${label}" tile: ${kpis.join(" / ")}`);
+    return parseFloat(row.split("|")[1]);
+  };
+  const earned = find("EV earned"), best = find("Perfect play"), lost = find("Total EV lost");
+
+  // earned is exactly the sum of what the player actually picked
+  const expected = picked.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(earned - expected) < 0.03,
+    `earned ${earned} should equal the sum of picks ${expected.toFixed(2)}`);
+  // and the three numbers have to be consistent with each other
+  assert.ok(best >= earned - 1e-6, `perfect play (${best}) cannot be below what was earned (${earned})`);
+  assert.ok(Math.abs((best - earned) - Math.abs(lost)) < 0.05,
+    `best - earned (${(best - earned).toFixed(2)}) should equal EV lost (${Math.abs(lost).toFixed(2)})`);
+  noErrors();
+});

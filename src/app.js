@@ -761,7 +761,7 @@ function makeDrillSpot(cfg, stack) {
 }
 function startDrill(cfg) {
   STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, stack: setupStack(),
-    i: 0, evLost: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
+    i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
   loadSpot();
 }
 function loadSpot() {
@@ -785,6 +785,8 @@ function answerSpot(i) {
   const span = best - worst;
   const capture = span > 1e-9 ? (mine.ev - worst) / span : 1;
   D.evLost += lost;
+  D.evEarned += mine.ev;     // what your decisions were actually worth
+  D.evBest += best;          // what perfect play would have been worth
   D.evCaptured += capture;
   if (lost < 0.02) D.correct++;
   D.log.push({
@@ -803,7 +805,8 @@ function saveDrill() {
   const D = STATE.drill;
   const hist = DB.get("drills", []);
   hist.unshift({ at: Date.now(), n: D.i, vt: D.vt, diff: D.diff,
-    evLost: D.evLost, capture: D.i ? D.evCaptured / D.i : 0, correct: D.correct,
+    evLost: D.evLost, evEarned: D.evEarned, evBest: D.evBest,
+    capture: D.i ? D.evCaptured / D.i : 0, correct: D.correct,
     log: D.log });
   DB.set("drills", hist.slice(0, 100));
 }
@@ -850,10 +853,12 @@ function renderDrill() {
 
   const sp = D.cur;
   const streetName = t("common." + ["flop", "turn", "river"][sp.street]);
-  const runLost = D.evLost;
+  const runLost = D.evLost, runEarned = D.evEarned;
   let h = '<div class="card">' +
     '<div class="dprog"><span class="small muted">' + esc(t("drill.progress", { i: D.i + 1, n: D.n })) + "</span>" +
     '<div class="bar"><i style="width:' + Math.round(D.i / D.n * 100) + '%"></i></div>' +
+    '<span class="small muted">' + esc(t("drill.runningEarned")) + ' <b style="color:' +
+      (runEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(runEarned) + "BB</b></span>" +
     '<span class="small muted">' + esc(t("drill.runningLost")) + ' <b style="color:' +
       (runLost < 0.02 ? "var(--good)" : "var(--bad)") + '">' + lossText(runLost) + "BB</b></span></div>" +
     '<div class="stmeta">' +
@@ -929,6 +934,7 @@ function renderDrillEnd(v) {
   const n = Math.max(1, D.i);
   const perSpot = D.evLost / n;
   const capture = D.evCaptured / n;
+  const earned = D.evEarned, bestPossible = D.evBest;
   const grade = gradeOf(perSpot);
   // leak detection
   const counts = { passive: 0, aggro: 0, overfold: 0, calldown: 0, sizing: 0 };
@@ -951,10 +957,16 @@ function renderDrillEnd(v) {
     '<div class="small dim">' + esc(t("drill.endAccuracy")) + "</div></div></div>" +
     '<div class="kpi">' +
       '<div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + D.i + "</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
+        (earned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(earned) + "</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t("drill.endBest")) + '</div><div class="kv">' + signed(bestPossible) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endEvLost")) + '</div><div class="kv">' + lossText(D.evLost) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endPerSpot")) + '</div><div class="kv">' + lossText(perSpot) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endCapture")) + '</div><div class="kv">' + Math.round(capture * 100) + "%</div></div>" +
     "</div>" +
+    '<div class="blk hi" style="margin-top:14px"><p style="margin:0">' +
+      t(D.evLost < 0.02 ? "drill.sessionPerfect" : "drill.sessionEarned",
+        { earned: signed(earned), best: signed(bestPossible) }) + "</p></div>" +
     '<div class="blk warn" style="margin-top:14px"><div class="t">' + esc(t("drill.endLeak")) + "</div><p>" + esc(leakText) + "</p></div>";
   // per-spot review
   h += '<div class="blk sumcard"><div class="t">' + esc(t("drill.endByAction")) + "</div>" +
@@ -974,9 +986,12 @@ function drillHistoryHTML() {
   if (!hist.length) return "";
   return '<div class="card"><h3>' + esc(t("drill.history")) + "</h3>" +
     '<div class="scrollx"><table class="tstack"><tr><th>' + esc(t("stats.date")) + "</th><th>" +
-    esc(t("drill.endSpots")) + "</th><th>" + esc(t("drill.endCapture")) + "</th><th>" + esc(t("drill.endEvLost")) + "</th></tr>" +
+    esc(t("drill.endSpots")) + "</th><th>" + esc(t("drill.endEarned")) + "</th><th>" +
+    esc(t("drill.endCapture")) + "</th><th>" + esc(t("drill.endEvLost")) + "</th></tr>" +
     hist.slice(0, 8).map((d) => "<tr><td data-l=\"" + esc(t("stats.date")) + "\">" + new Date(d.at).toLocaleDateString() + "</td>" +
       '<td data-l="' + esc(t("drill.endSpots")) + '">' + d.n + "</td>" +
+      '<td data-l="' + esc(t("drill.endEarned")) + '">' +
+        (d.evEarned === undefined ? "—" : '<span style="color:' + (d.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(d.evEarned) + "BB</span>") + "</td>" +
       '<td data-l="' + esc(t("drill.endCapture")) + '">' + Math.round((d.capture || 0) * 100) + "%</td>" +
       '<td data-l="' + esc(t("drill.endEvLost")) + '">' + lossText(d.evLost) + "BB</td></tr>").join("") +
     "</table></div></div>";
@@ -1113,6 +1128,9 @@ function renderHome() {
     h += '<div class="card"><h3>' + esc(t("home.drillSummary")) + "</h3>" +
       '<div class="kpi"><div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + last.n + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endCapture")) + '</div><div class="kv">' + Math.round((last.capture || 0) * 100) + "%</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
+        (last.evEarned === undefined ? "" : last.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' +
+        (last.evEarned === undefined ? "—" : signed(last.evEarned)) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endPerSpot")) + '</div><div class="kv">' + lossText(last.evLost / Math.max(1, last.n)) + "</div></div></div></div>";
   }
   v.innerHTML = h;

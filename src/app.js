@@ -411,7 +411,9 @@ function nextTarget(from) {
   return from;
 }
 function paletteItems() {
-  return [{ k: "me", label: t("hand.paintMe") }, { k: "empty", label: t("hand.paintEmpty") }]
+  // No "empty" brush: tapping a seat that already holds the selected type
+  // clears it, and the button under the map empties the whole table.
+  return [{ k: "me", label: t("hand.paintMe") }]
     .concat(Object.keys(PE.VILLAIN_TYPES).map((k) => ({ k, label: vtName(k) })));
 }
 function seatedOpponents() {
@@ -469,8 +471,9 @@ function renderSeats() {
   el.querySelectorAll(".seat").forEach((b) => (b.onclick = () => {
     const p = b.dataset.p;
     if (HI.paint === "me") { delete HI.seated[p]; HI.pos = p; }
-    else if (HI.paint === "empty") { delete HI.seated[p]; }
-    else { if (HI.pos === p) return; HI.seated[p] = HI.paint; if (!HI.vpos) HI.vpos = p; }
+    else if (HI.pos === p) return;
+    else if (HI.seated[p] === HI.paint) { delete HI.seated[p]; }   // tap again to clear
+    else { HI.seated[p] = HI.paint; if (!HI.vpos) HI.vpos = p; }
     buildHandInputs();
   }));
   updateSeatHint();

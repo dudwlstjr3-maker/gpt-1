@@ -1745,9 +1745,9 @@ const ko = {
     goalPractice: "연습 · 복기 위주", goalProfit: "수익 목표", goalLeak: "특정 리크 교정",
     saveSetup: "세팅 저장", setupSaved: "세팅을 저장했습니다.",
     inputTitle: "핸드 입력",
-    step1: "자리 배치", step1sub: "성향을 고른 뒤 자리를 탭하세요 · 같은 성향을 여러 자리에 놓아도 됩니다",
+    step1: "자리 배치", step1sub: "성향을 고른 뒤 자리를 탭하세요 · 같은 자리를 다시 탭하면 비워집니다",
     step2: "이 핸드의 상대", step2sub: "여러 명을 앉혀도 계산은 지정한 상대 한 명 기준입니다",
-    paintMe: "나", paintEmpty: "빈자리",
+    paintMe: "나",
     clearSeats: "자리 모두 비우기", seatsCleared: "자리를 모두 비웠습니다.",
     seatedNone: "상대를 최소 한 명 앉혀주세요.",
     seatedCount: "{n}명 앉음",
@@ -2069,9 +2069,9 @@ const en = {
     goalPractice: "Practice / review", goalProfit: "Profit target", goalLeak: "Fix a specific leak",
     saveSetup: "Save setup", setupSaved: "Setup saved.",
     inputTitle: "Enter the hand",
-    step1: "Seat the table", step1sub: "Pick a type, then tap seats · the same type can go in several seats",
+    step1: "Seat the table", step1sub: "Pick a type, then tap seats · tap the same seat again to empty it",
     step2: "Opponent in this hand", step2sub: "Seat as many as you like — the maths uses the one you designate",
-    paintMe: "Me", paintEmpty: "Empty",
+    paintMe: "Me",
     clearSeats: "Clear all seats", seatsCleared: "All seats cleared.",
     seatedNone: "Seat at least one opponent.",
     seatedCount: "{n} seated",
@@ -3083,7 +3083,9 @@ function nextTarget(from) {
   return from;
 }
 function paletteItems() {
-  return [{ k: "me", label: t("hand.paintMe") }, { k: "empty", label: t("hand.paintEmpty") }]
+  // No "empty" brush: tapping a seat that already holds the selected type
+  // clears it, and the button under the map empties the whole table.
+  return [{ k: "me", label: t("hand.paintMe") }]
     .concat(Object.keys(PE.VILLAIN_TYPES).map((k) => ({ k, label: vtName(k) })));
 }
 function seatedOpponents() {
@@ -3141,8 +3143,9 @@ function renderSeats() {
   el.querySelectorAll(".seat").forEach((b) => (b.onclick = () => {
     const p = b.dataset.p;
     if (HI.paint === "me") { delete HI.seated[p]; HI.pos = p; }
-    else if (HI.paint === "empty") { delete HI.seated[p]; }
-    else { if (HI.pos === p) return; HI.seated[p] = HI.paint; if (!HI.vpos) HI.vpos = p; }
+    else if (HI.pos === p) return;
+    else if (HI.seated[p] === HI.paint) { delete HI.seated[p]; }   // tap again to clear
+    else { HI.seated[p] = HI.paint; if (!HI.vpos) HI.vpos = p; }
     buildHandInputs();
   }));
   updateSeatHint();

@@ -342,7 +342,8 @@ test("seats take an opponent type, duplicates allowed", async () => {
 
   // the palette offers "me", "empty" and every opponent type
   const palette = await page.$$eval("#seat-palette button", (b) => b.map((x) => x.dataset.k));
-  assert.ok(palette.includes("me") && palette.includes("empty"), "palette missing me/empty");
+  assert.ok(palette.includes("me"), "palette missing me");
+  assert.ok(!palette.includes("empty"), "the empty brush should be gone");
   assert.ok(palette.includes("station") && palette.includes("nit"), "palette missing types");
 
   // seat the SAME type in three seats — the duplicate case
@@ -370,8 +371,8 @@ test("seats take an opponent type, duplicates allowed", async () => {
   assert.ok(desc.length > 10, "no description for the designated opponent");
   assert.ok(await page.$(".seat.active"), "designated opponent is not marked on the table");
 
-  // clearing a seat removes it
-  await page.click('#seat-palette button[data-k="empty"]');
+  // tapping a seat again with the same type clears just that seat
+  await page.click('#seat-palette button[data-k="station"]');
   await page.click('.seat[data-p="UTG"]');
   await page.waitForTimeout(80);
   const cleared = await page.$$eval("#vt-chips button", (b) => b.map((x) => x.innerText));

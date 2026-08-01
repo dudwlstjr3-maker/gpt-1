@@ -806,9 +806,56 @@ function makeDrillSpot(cfg, stack) {
   return best || PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
 }
 function startDrill(cfg) {
-  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, stack: setupStack(),
+  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot", stack: setupStack(),
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
-  loadSpot();
+  if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
+}
+
+/* ---------------------------------------------------------- whole hand -- */
+function loadHand() {
+  const v = $("v-drill");
+  v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
+  setTimeout(() => {
+    const D = STATE.drill;
+    D.run = HandRun.start({ stack: D.stack, villainType: D.vt, seats: setupSeats() });
+    if (!D.run) { loadHand(); return; }
+    D.dec = HandRun.decision(D.run);
+    D.answered = null;
+    renderDrill();
+  }, 20);
+}
+function answerHand(i) {
+  const D = STATE.drill;
+  if (D.answered !== null) return;
+  const opt = D.dec.res.opts[i];
+  const evs = D.dec.res.opts.map((o) => o.ev);
+  const bestEv = Math.max.apply(null, evs), worst = Math.min.apply(null, evs);
+  const span = bestEv - worst;
+  D.evLost += bestEv - opt.ev;
+  D.evEarned += opt.ev;
+  D.evBest += bestEv;
+  D.evCaptured += span > 1e-9 ? (opt.ev - worst) / span : 1;
+  if (bestEv - opt.ev < 0.02) D.correct++;
+  D.decisions = (D.decisions || 0) + 1;
+  D.answered = i;
+  renderDrill();
+}
+function continueHand() {
+  const D = STATE.drill;
+  const opt = D.dec.res.opts[D.answered];
+  HandRun.choose(D.run, opt, D.dec);
+  D.answered = null;
+  if (D.run.done) { renderDrill(); return; }
+  const v = $("v-drill");
+  v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
+  setTimeout(() => { D.dec = HandRun.decision(D.run); renderDrill(); }, 20);
+}
+function nextHand() {
+  const D = STATE.drill;
+  D.i++;
+  D.log.push({ result: D.run.result, lost: D.run.log.reduce((a, l) => a + l.lost, 0),
+    street: D.run.street, mine: "hand", best: "hand", mineLabel: "", bestLabel: "" });
+  if (D.i >= D.n) { D.done = true; saveDrill(); renderDrill(); } else loadHand();
 }
 function loadSpot() {
   const v = $("v-drill");
@@ -882,7 +929,12 @@ function renderDrill() {
       '<div class="bg" id="dr-vt" style="display:flex">' +
         '<button data-k="random" class="' + (cfg.vt === "random" ? "on" : "") + '">' + esc(t("drill.randomVillain")) + "</button>" +
         Object.keys(PE.VILLAIN_TYPES).map((k) => '<button data-k="' + k + '" class="' + (cfg.vt === k ? "on" : "") + '">' + esc(vtName(k)) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">3</span>' + esc(t("drill.step3")) + "</div>" +
+      '<div class="step"><span class="num">3</span>' + esc(t("drill.mode")) + "</div>" +
+      '<div class="bg" id="dr-mode" style="display:flex">' +
+        [["spot", "drill.modeSpot"], ["hand", "drill.modeHand"]].map(([k, lbl]) =>
+          '<button data-k="' + k + '" class="' + ((cfg.mode || "spot") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin-top:5px">' + esc(t("drill.mode" + ((cfg.mode || "spot") === "hand" ? "Hand" : "Spot") + "D")) + "</div>" +
+      '<div class="step"><span class="num">4</span>' + esc(t("drill.step3")) + "</div>" +
       '<div class="bg" id="dr-diff" style="display:flex">' +
         Object.keys(DIFFICULTY).map((k) => '<button data-k="' + k + '" class="' + (cfg.diff === k ? "on" : "") + '">' +
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
@@ -892,10 +944,12 @@ function renderDrill() {
     v.querySelectorAll("#dr-n button").forEach((b) => (b.onclick = () => { cfg.n = +b.dataset.n; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-vt button").forEach((b) => (b.onclick = () => { cfg.vt = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-diff button").forEach((b) => (b.onclick = () => { cfg.diff = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-mode button").forEach((b) => (b.onclick = () => { cfg.mode = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
     return;
   }
   if (D.done) return renderDrillEnd(v);
+  if (D.mode === "hand") return renderHandDrill(v);
 
   const sp = D.cur;
   const streetName = t("common." + ["flop", "turn", "river"][sp.street]);
@@ -972,6 +1026,153 @@ function renderDrill() {
     $("dr-next").onclick = nextSpot;
   }
 }
+/* ---------------------------------------------- whole-hand rendering ---- */
+function streetName(i) { return (t("drill.streets") || [])[i] || ""; }
+
+function renderHandDrill(v) {
+  const D = STATE.drill, run = D.run;
+  if (run.done) return renderHandReport(v);
+  const dec = D.dec, res = dec.res;
+  const eff = Math.max(0, D.stack - run.heroInv);
+
+  let h = '<div class="card">' +
+    '<div class="dprog"><span class="small muted">' + esc(t("drill.progress", { i: D.i + 1, n: D.n })) + "</span>" +
+    '<div class="bar"><i style="width:' + Math.round(D.i / D.n * 100) + '%"></i></div>' +
+    '<span class="small muted">' + esc(t("drill.runningEarned")) + ' <b style="color:' +
+      (D.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(D.evEarned) + "BB</b></span></div>" +
+    '<div class="stmeta">' +
+      "<span>" + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
+      "<span>" + esc(vtName(run.vt.id)) + "</span>" +
+      "<span>" + esc(t("drill.potNow")) + " <b>" + nfmt(run.pot) + "BB</b></span>" +
+      "<span>" + esc(t("common.stack")) + " <b>" + nfmt(eff) + "BB</b></span>" +
+      "<span>" + esc(run.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+    "</div>";
+
+  // street rail — shows where in the hand you are
+  h += '<div class="rail">' + [0, 1, 2, 3].map((i) =>
+    '<span class="' + (i === run.street ? "on" : i < run.street ? "done" : "") + '">' + esc(streetName(i)) + "</span>").join("") + "</div>";
+
+  h += '<div class="dspot"><div class="dq">' + esc(streetName(run.street)) + " — " + esc(t("hand.myCards")) + "</div>" +
+    '<div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") + "</div>" +
+    (run.board.length ? '<div class="dq" style="margin-top:10px">' + esc(t("common.board")) + "</div>" +
+      '<div class="dh">' + run.board.map((c) => cardHTML(c)).join("") + "</div>" : "") +
+    '<div class="dvs">' + (run.street === 0
+      ? t(run.heroPos === "BB" ? "drill.youPostBB" : "drill.villainOpened", { size: nfmt(run.openSize) })
+      : run.facing ? t("drill.villainBet", { size: nfmt(run.facing.size) })
+                   : (run.ip ? t("drill.villainCheck") : t("drill.heroFirst"))) + "</div>" +
+    (run.facing ? '<div class="small muted" style="margin-top:6px">' + esc(t("drill.toCall")) + " " +
+      nfmt(run.facing.size) + "BB</div>" : "") + "</div>";
+
+  if (D.answered === null) {
+    h += res.opts.map((o, i) => '<button class="dopt" data-i="' + i + '"><span class="kn">' +
+      (i + 1) + '</span><span class="kk">' + esc(optLabel(o)) + "</span></button>").join("");
+    h += '<div class="small dim" style="margin:2px 0 8px">' + esc(t("drill.keyHint")) + "</div>";
+  } else {
+    const evs = res.opts.map((o) => o.ev);
+    const bestEv = Math.max.apply(null, evs);
+    const best = res.opts.find((o) => o.ev === bestEv);
+    const mine = res.opts[D.answered];
+    const lost = bestEv - mine.ev;
+    h += '<div class="recbox' + (lost < 0.02 ? " good" : "") + '"><div class="rl">' + esc(t("common.yourPick")) + "</div>" +
+      '<div class="ra">' + esc(optLabel(mine)) + ' <span style="font-size:15px;color:' +
+        (mine.ev >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(mine.ev) + " BB</span></div>" +
+      '<div class="rs">' + (lost < 0.02 ? t("drill.perfect")
+        : t("drill.lostEv", { v: nfmt(lost, 2), best: esc(optLabel(best)) })) + "</div></div>";
+    h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(res.opts, mine) + "</div>";
+    h += '<button class="btn" id="dr-cont">' + esc(t("common.next")) + "</button>";
+  }
+  v.innerHTML = h + "</div>";
+  if (D.answered === null) v.querySelectorAll(".dopt").forEach((b) => (b.onclick = () => answerHand(+b.dataset.i)));
+  else $("dr-cont").onclick = continueHand;
+}
+
+/* The report: what happened, what the villain could hold, what you looked like. */
+function renderHandReport(v) {
+  const D = STATE.drill, run = D.run;
+  const totalLost = run.log.reduce((a, l) => a + l.lost, 0);
+  const vr = HandRun.villainRange(run);
+  const likely = PE.topClasses(vr.combos, vr.weights, 8);
+  const made = run.board.length >= 3 ? PE.categoryBreakdown(vr.combos, vr.weights, run.board) : [];
+  const standing = HandRun.heroStanding(run);
+
+  let outcome = "";
+  if (run.result === "heroFold") outcome = t("drill.endedHeroFold");
+  else if (run.result === "villainFold") outcome = t("drill.endedVillainFold", { pot: nfmt(run.wonPot || run.pot) });
+  else if (run.result === "allin") outcome = t("drill.endedAllin");
+  else outcome = t("drill.endedShowdown");
+
+  let h = '<div class="card"><h2>' + esc(t("drill.reportTitle")) + "</h2>" +
+    '<div class="stmeta"><span>' + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
+    "<span>" + esc(vtName(run.vt.id)) + "</span>" +
+    "<span>" + esc(t("common.pot")) + " <b>" + nfmt(run.pot) + "BB</b></span></div>" +
+    '<div class="dspot"><div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") +
+      (run.board.length ? ' <span class="dim" style="margin:0 8px">|</span> ' + run.board.map((c) => cardHTML(c)).join("") : "") +
+    "</div><div class=\"dvs\" style=\"font-size:14px\">" + esc(outcome) + "</div></div>";
+
+  // showdown, if it got there
+  if (run.result === "showdown") {
+    const vh = HandRun.showdown(run);
+    if (vh) {
+      const mine = PE.evalHand(run.hole.concat(run.board));
+      const theirs = PE.evalHand([vh[0], vh[1]].concat(run.board));
+      const verdict = mine > theirs ? "showdownWin" : mine < theirs ? "showdownLose" : "showdownTie";
+      h += '<div class="blk ' + (mine > theirs ? "hi" : "warn") + '"><div class="t">' + esc(t("drill.villainShows")) + "</div>" +
+        "<p>" + vh.map((c) => cardHTML(c, true)).join("") + " — " + esc(catName(PE.catOf(theirs))) +
+        " · <b>" + esc(t("drill." + verdict)) + "</b></p>" +
+        '<div class="small dim">' + esc(t("drill.resultNote")) + "</div></div>";
+    }
+  }
+
+  // the line, street by street
+  h += '<div class="blk sumcard"><div class="t">' + esc(t("drill.reportLine")) + "</div>" +
+    run.log.map((l) => '<div class="sr"><span class="n">' + esc(streetName(l.street)) + "</span>" +
+      '<span class="a">' + esc(optLabel(l.mine)) +
+        (l.lost < 0.02 ? "" : " → <b>" + esc(optLabel(l.best)) + "</b>") +
+        ' <span class="dim">· ' + esc(t("common.equity")) + " " + pct(l.eq) + "</span></span>" +
+      '<span class="z" style="color:' + (l.lost < 0.02 ? "var(--good)" : "var(--bad)") + '">' +
+        signed(l.mine.ev) + "BB" + (l.lost < 0.02 ? " ✓" : " (" + lossText(l.lost) + ")") + "</span></div>").join("") +
+    '<div class="sr"><span class="n"></span><span class="a"><b>' + esc(t("drill.endEvLost")) + "</b></span>" +
+      '<span class="z" style="color:' + (totalLost < 0.02 ? "var(--good)" : "var(--bad)") + '">' + lossText(totalLost) + "BB</span></div></div>";
+
+  // villain's likely holdings
+  h += '<div class="blk vx"><div class="t">' + esc(t("drill.villainLikely")) + "</div>" +
+    '<div class="cbars">' + likely.map((x) =>
+      '<div class="cb"><span class="cn">' + esc(x.cls) + '</span><span class="cf"><i style="width:' +
+      Math.round(x.share / Math.max(0.0001, likely[0].share) * 100) + '%"></i></span>' +
+      '<span class="cv">' + (x.share * 100).toFixed(1) + "%</span></div>").join("") + "</div>";
+  if (made.length) {
+    h += '<div class="small muted" style="margin:10px 0 4px">' + esc(t("drill.villainMade")) + "</div>" +
+      '<div class="cbars">' + made.slice(0, 5).map((x) =>
+        '<div class="cb"><span class="cn">' + esc(x.key === "draw" ? drawNames(["oesd"])[0] || "draw" : catName(+x.key)) +
+        '</span><span class="cf"><i style="width:' + Math.round(x.share * 100) + '%"></i></span>' +
+        '<span class="cv">' + Math.round(x.share * 100) + "%</span></div>").join("") + "</div>";
+  }
+  h += "</div>";
+
+  // what hero's own line represented
+  if (standing) {
+    const rep = PE.topClasses(standing.perceived.combos, standing.perceived.weights, 8);
+    const band = standing.pct <= 0.33 ? "narrativeStrong" : standing.pct <= 0.66 ? "narrativeMid" : "narrativeWeak";
+    h += '<div class="blk"><div class="t">' + esc(t("drill.youRepresent")) + "</div>" +
+      '<p class="small muted">' + esc(t("drill.youRepresentNote")) + "</p>" +
+      '<div class="cbars">' + rep.map((x) =>
+        '<div class="cb"><span class="cn">' + esc(x.cls) + '</span><span class="cf"><i style="width:' +
+        Math.round(x.share / Math.max(0.0001, rep[0].share) * 100) + '%"></i></span>' +
+        '<span class="cv">' + (x.share * 100).toFixed(1) + "%</span></div>").join("") + "</div>" +
+      '<div class="blk hi" style="margin-top:10px"><div class="t">' + esc(t("drill.heroRank")) + "</div>" +
+      "<p>" + t("drill.heroRankVal", {
+        cat: esc(catName(PE.catOf(PE.evalHand(run.hole.concat(run.board))))),
+        p: Math.max(1, Math.round(standing.pct * 100)),
+        beat: Math.max(0, Math.round((1 - standing.pct) * 100))
+      }) + "</p><p>" + t("drill." + band) + "</p>" +
+      '<div class="small dim">' + t("drill.heroRankNote") + "</div></div></div>";
+  }
+
+  h += '<button class="btn" id="dr-nexthand">' + esc(D.i + 1 >= D.n ? t("drill.seeResult") : t("drill.next")) + "</button></div>";
+  v.innerHTML = h;
+  $("dr-nexthand").onclick = nextHand;
+}
+
 function storyText(s) {
   return t("drill.story." + s.k, { size: s.size !== undefined ? nfmt(s.size) : "" }) || "";
 }

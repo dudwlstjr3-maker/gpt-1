@@ -312,6 +312,18 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .notation{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
   line-height:1.7;word-break:break-word;color:var(--tx2)}
+/* whole-hand drill */
+.rail{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.rail span{flex:1 1 60px;text-align:center;font-size:11.5px;padding:5px 6px;border-radius:7px;
+  background:var(--bg2);color:var(--tx3);border:1px solid transparent}
+.rail span.done{color:var(--tx2)}
+.rail span.on{background:var(--ac);color:var(--bg);font-weight:800;border-color:var(--ac)}
+.cbars{display:flex;flex-direction:column;gap:4px}
+.cb{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.cb .cn{flex:0 0 46px;font-weight:700;font-variant-numeric:tabular-nums}
+.cb .cf{flex:1;height:8px;background:var(--bg2);border-radius:5px;overflow:hidden}
+.cb .cf i{display:block;height:100%;background:var(--ac2);border-radius:5px}
+.cb .cv{flex:0 0 46px;text-align:right;color:var(--tx2);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -1188,6 +1200,56 @@ SCENARIOS.push(
 );
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
 
+/* ------------------------------------------------ range read-out ---------
+ * Turning a weighted combo list back into something a human can read: which
+ * hands the villain most likely holds, and what your own line represents.  */
+function topClasses(combos, weights, limit) {
+  const byClass = {};
+  for (let i = 0; i < combos.length; i++) {
+    const w = weights ? weights[i] : 1;
+    if (w <= 0.001) continue;
+    const cl = handClass(combos[i][0], combos[i][1]);
+    byClass[cl] = (byClass[cl] || 0) + w;
+  }
+  const total = Object.keys(byClass).reduce((a, k) => a + byClass[k], 0) || 1;
+  return Object.keys(byClass)
+    .map((cl) => ({ cls: cl, weight: byClass[cl], share: byClass[cl] / total }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, limit || 8);
+}
+/** Group a weighted range by what it actually made on this board. */
+function categoryBreakdown(combos, weights, board) {
+  const buckets = {};
+  let total = 0;
+  for (let i = 0; i < combos.length; i++) {
+    const w = weights ? weights[i] : 1;
+    if (w <= 0.001) continue;
+    const c = combos[i];
+    const cat = board.length >= 3 ? catOf(evalHand([c[0], c[1]].concat(board))) : -1;
+    const dr = board.length >= 3 && board.length <= 4 ? drawInfo([c[0], c[1]], board) : null;
+    // a hand with a real draw and no made hand is its own bucket
+    const key = (cat <= 0 && dr && dr.quality >= 0.6) ? "draw" : String(cat);
+    buckets[key] = (buckets[key] || 0) + w;
+    total += w;
+  }
+  return Object.keys(buckets)
+    .map((k) => ({ key: k, weight: buckets[k], share: total ? buckets[k] / total : 0 }))
+    .sort((a, b) => b.weight - a.weight);
+}
+/** What your own line represents: your preflop range narrowed by what you did. */
+function perceivedRange(heroClasses, board, history, vt, dead) {
+  let combos = expandRange(heroClasses, dead || []);
+  combos = combos.filter((c) => board.indexOf(c[0]) < 0 && board.indexOf(c[1]) < 0);
+  if (!combos.length) return { combos, weights: new Float64Array(0) };
+  let weights = new Float64Array(combos.length).fill(1);
+  (history || []).forEach((h) => {
+    const live = h.board.filter((c) => true);
+    const rank = rankRange(combos, live);
+    weights = actionWeights(rank, h.action, h.size || 0, h.pot || 1, vt || VILLAIN_TYPES.unknown, weights);
+  });
+  return { combos, weights };
+}
+
 /* ------------------------------------------------- situational ranges ----
  * One accessor for every preflop spot the Range Lab shows, so the charts on
  * screen are the same objects the EV maths uses — a chart that disagrees with
@@ -1550,7 +1612,8 @@ return {
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
   preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
-  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange, fourBetRange, callVs4betRange,
+  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange,
+  topClasses, categoryBreakdown, perceivedRange, fourBetRange, callVs4betRange,
   // util
   mulberry32, seedFrom, round1
 };
@@ -1767,6 +1830,34 @@ const ko = {
     tipShouldCall: "승률 {eq}면 받아주는 게 맞습니다. 크기가 커 보여도 팟이 이미 큽니다.",
     tipSizing: "액션은 맞았으니 <b>얼마를 거는지</b>만 조정하면 됩니다.",
     keyHint: "키보드: 1–9 선택 · Enter 다음",
+    mode: "방식",
+    modeSpot: "스팟 단위", modeSpotD: "임의의 한 장면만 보고 판단합니다.",
+    modeHand: "핸드 전체", modeHandD: "프리플랍부터 리버까지 한 핸드를 끝까지 플레이합니다.",
+    streets: ["프리플랍", "플랍", "턴", "리버"],
+    handOver: "핸드 종료",
+    endedHeroFold: "당신이 폴드했습니다.",
+    endedVillainFold: "상대가 폴드했습니다. 팟 {pot}BB를 가져갑니다.",
+    endedShowdown: "쇼다운까지 갔습니다.",
+    endedAllin: "올인으로 끝났습니다.",
+    toCall: "콜 금액", potNow: "현재 팟",
+    villainOpened: "상대가 <b>{size}BB</b>로 오픈했습니다.",
+    youPostBB: "당신은 BB입니다. 상대가 <b>{size}BB</b>로 올렸습니다.",
+    reportTitle: "핸드 리포트",
+    reportLine: "라인 요약",
+    reportWhy: "왜 그랬어야 하는가",
+    villainLikely: "상대가 들고 있을 법한 핸드",
+    villainMade: "상대 레인지의 구성",
+    youRepresent: "상대 눈에 비친 내 레인지",
+    youRepresentNote: "내가 여기까지 온 액션으로 상대가 추론할 수 있는 내 핸드들입니다. 내 실제 핸드가 이 안에서 강한 쪽인지 약한 쪽인지가 블러프와 밸류를 가르는 기준입니다.",
+    narrativeStrong: "내가 대표하는 레인지에서 <b>위쪽</b>입니다. 콜을 받아도 대체로 이기니 밸류로 계속 키우는 자리입니다.",
+    narrativeMid: "내가 대표하는 레인지의 <b>중간</b>입니다. 상대가 접으면 좋지만 콜을 받으면 자주 집니다 — 팟을 키울수록 손해가 커집니다.",
+    narrativeWeak: "내가 대표하는 레인지의 <b>아래쪽</b>입니다. 콜을 받으면 대부분 지므로, 이 라인은 <b>상대가 접어줘야만</b> 성립합니다.",
+    heroRank: "내 핸드는 내 라인 안에서 어디쯤인가",
+    heroRankVal: "<b>{cat}</b> · 내가 대표하는 레인지의 상위 <b>{p}%</b> (이 레인지의 {beat}%를 이깁니다)",
+    heroRankNote: "내 실제 핸드가 아니라 <b>내 액션이 그리는 레인지</b>와 비교한 값입니다. 세 스트리트를 계속 쳤다면 강한 핸드만 대표하게 되므로, 좋은 핸드라도 순위가 낮게 나올 수 있습니다 — 그게 바로 상대가 나를 어떻게 보는지입니다.",
+    showdownWin: "쇼다운에서 이겼습니다.", showdownLose: "쇼다운에서 졌습니다.", showdownTie: "쇼다운 무승부입니다.",
+    villainShows: "상대 핸드",
+    resultNote: "한 판의 승패는 운입니다. 위의 EV가 실력이고, 이 결과는 참고용입니다.",
     story: {
       checkCheck: "체크–체크",
       villainBetHeroCall: "상대 {size}BB 벳 → 내가 콜",
@@ -2050,6 +2141,34 @@ const en = {
     tipShouldCall: "At {eq} equity you take this. The bet looks big because the pot already is.",
     tipSizing: "Action was right — only the <b>amount</b> needs adjusting.",
     keyHint: "Keyboard: 1–9 to pick · Enter for next",
+    mode: "Mode",
+    modeSpot: "Single spot", modeSpotD: "One random moment, judged on its own.",
+    modeHand: "Whole hand", modeHandD: "Play one hand right through from preflop to the river.",
+    streets: ["Preflop", "Flop", "Turn", "River"],
+    handOver: "Hand over",
+    endedHeroFold: "You folded.",
+    endedVillainFold: "Villain folded. You take the {pot}BB pot.",
+    endedShowdown: "It went to showdown.",
+    endedAllin: "It ended all-in.",
+    toCall: "To call", potNow: "Pot",
+    villainOpened: "Villain opens to <b>{size}BB</b>.",
+    youPostBB: "You are in the big blind. Villain raises to <b>{size}BB</b>.",
+    reportTitle: "Hand report",
+    reportLine: "The line",
+    reportWhy: "What it should have been",
+    villainLikely: "What villain most likely holds",
+    villainMade: "What that range is made of",
+    youRepresent: "What your line represents",
+    youRepresentNote: "The hands villain can infer from the way you played. Whether your actual hand sits at the strong or weak end of this is what separates a value bet from a bluff.",
+    narrativeStrong: "You are at the <b>top</b> of what you represent. You usually win when called, so keep building the pot.",
+    narrativeMid: "You are in the <b>middle</b> of what you represent. Fine when they fold, often behind when they call — every extra chip costs you.",
+    narrativeWeak: "You are at the <b>bottom</b> of what you represent. You lose most of the time you get called, so this line only works if they <b>fold</b>.",
+    heroRank: "Where your hand sits inside your own line",
+    heroRankVal: "<b>{cat}</b> · top <b>{p}%</b> of the range you represent (you beat {beat}% of it)",
+    heroRankNote: "This compares your hand to <b>the range your actions describe</b>, not to the villain. Betting three streets means you only represent strong hands, so even a good hand can rank low here — which is exactly how the villain sees you.",
+    showdownWin: "You won at showdown.", showdownLose: "You lost at showdown.", showdownTie: "Showdown was a tie.",
+    villainShows: "Villain had",
+    resultNote: "Winning one hand is luck. The EV above is the skill; treat this result as a footnote.",
     story: {
       checkCheck: "checked through",
       villainBetHeroCall: "villain bet {size}BB, you called",
@@ -2299,6 +2418,228 @@ function detect(locales) {
 
 return { LANGS, QUIZ, lookup, format, detect, codes: () => Object.keys(LANGS) };
 });
+</script>
+<script>/* =============================================================================
+ * handrun.js — "whole hand" drill: play one hand from preflop to the river.
+ *
+ * The single-spot drill judges one frozen moment. This plays the hand out:
+ * every street is a real decision scored on its own EV, and at the end you get
+ * the villain's likely holdings, what your own line represented, and why each
+ * decision should have gone the way it did.
+ *
+ * The villain is not an opponent AI holding cards — it is the range model
+ * acting at its own frequencies, so the ranges shown in the report are exactly
+ * the ones the EV maths used. Cards are only dealt to the villain at showdown,
+ * drawn from whatever range survived the betting.
+ *
+ * Money convention, used everywhere below:
+ *   run.pot         chips in the middle *before hero acts* (includes any bet
+ *                   hero is currently facing)
+ *   run.facing.size what hero must put in to continue
+ *   opt.amount      what hero commits this street with the chosen action
+ * So when hero raises to `amount` against a bet of `facing`, the villain has
+ * to add `amount - facing` to call, and the pot becomes
+ * `pot + amount + (amount - facing)`.
+ * ========================================================================== */
+"use strict";
+
+const HandRun = (function () {
+
+  const r1 = (x) => Math.round(x * 10) / 10;
+
+  function start(cfg) {
+    const seats = cfg.seats || 6;
+    const stack = cfg.stack || 100;
+    const seed = cfg.seed === undefined ? (Math.random() * 1e9) | 0 : cfg.seed;
+    const rnd = PE.mulberry32(PE.seedFrom(seed));
+    const pick = (a) => a[Math.floor(rnd() * a.length)];
+
+    const L = PE.posList(seats);
+    const openers = L.filter((p) => p !== "BB" && PE.rfiRange(seats, p).length);
+    const vilPos = pick(openers);
+    const later = L.filter((p) => L.indexOf(p) > L.indexOf(vilPos));
+    const heroPos = later.length ? pick(later) : "BB";
+
+    const vt = PE.VILLAIN_TYPES[cfg.villainType === "random" || !cfg.villainType
+      ? pick(Object.keys(PE.VILLAIN_TYPES)) : cfg.villainType] || PE.VILLAIN_TYPES.unknown;
+
+    const openSize = pick([2.2, 2.5, 3]);
+    const vilClasses = PE.openRange(seats, vilPos, vt);
+    const heroClasses = PE.flatRange(seats, heroPos, vilPos, PE.VILLAIN_TYPES.unknown);
+    const hole = PE.drawCombo(heroClasses.length ? heroClasses : PE.topPercentRange(35), [], rnd);
+    if (!hole) return null;
+
+    const deck = [];
+    for (let c = 0; c < 52; c++) if (c !== hole[0] && c !== hole[1]) deck.push(c);
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1)); const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+    }
+
+    const heroBlind = PE.blindOf(heroPos);
+    let dead = 0;
+    const live = [heroPos, vilPos];
+    if (live.indexOf("SB") < 0 && live.indexOf("BTN(SB)") < 0) dead += 0.5;
+    if (live.indexOf("BB") < 0) dead += 1;
+
+    return {
+      seed, seats, stack, rnd, vt, heroPos, vilPos, hole,
+      deck, board: [], street: 0, done: false,
+      heroClasses, vilClasses, openSize,
+      pot: r1(openSize + heroBlind + dead),
+      heroInv: heroBlind, vilInv: openSize,
+      facing: { size: r1(openSize - heroBlind) },
+      ip: PE.isInPosition(seats, heroPos, vilPos),
+      history: [],        // villain's actions — replayed to narrow the villain range
+      heroHistory: [],    // hero's actions — replayed to build the perceived range
+      log: [], result: null, villainHand: null, lastCtx: null
+    };
+  }
+
+  /** The decision facing hero right now, with an EV on every option. */
+  function decision(run) {
+    const eff = Math.max(0.5, run.stack - run.heroInv);
+    const ctx = PE.buildContext({
+      hole: run.hole, board: run.board, villainClasses: run.vilClasses, vt: run.vt,
+      ip: run.ip, pot: run.pot, effStack: eff, history: run.history, rnd: run.rnd,
+      budget: run.street === 0 ? 90000 : 260000
+    });
+    run.lastCtx = ctx;
+    return { ctx, res: PE.options(ctx, run.facing), eff };
+  }
+
+  function choose(run, opt, dec) {
+    const evs = dec.res.opts.map((o) => o.ev);
+    const bestEv = Math.max.apply(null, evs);
+    const bestOpt = dec.res.opts.find((o) => o.ev === bestEv);
+    const facing = run.facing ? run.facing.size : 0;
+
+    run.log.push({
+      street: run.street, board: run.board.slice(), pot: run.pot, facing,
+      mine: opt, best: bestOpt, lost: Math.max(0, bestEv - opt.ev), eq: dec.res.eq,
+      combos: dec.ctx.table.combos, weights: dec.ctx.weights
+    });
+
+    if (opt.key === "fold") { run.done = true; run.result = "heroFold"; return run; }
+
+    if (opt.label === "bet" || opt.label === "raise" || opt.key === "allin") {
+      const villainAdds = Math.max(0.5, opt.amount - facing);
+      const rank = dec.ctx.rank;
+      const contW = PE.actionWeights(rank, "call", villainAdds, run.pot, run.vt, dec.ctx.weights);
+      const before = PE.totalMass(dec.ctx.weights), after = PE.totalMass(contW);
+      const foldFreq = before > 0 ? Math.max(0, Math.min(0.97, 1 - after / before)) : 0;
+
+      run.heroHistory.push({ action: "bet", size: opt.amount, pot: run.pot, board: run.board.slice() });
+      if (run.rnd() < foldFreq) {
+        run.done = true; run.result = "villainFold";
+        run.wonPot = run.pot;                       // hero's own bet comes back
+        return run;
+      }
+      run.history.push({ action: "call", size: villainAdds, pot: run.pot, board: run.board.slice() });
+      run.pot = r1(run.pot + opt.amount + villainAdds);
+      run.heroInv += opt.amount;
+      run.vilInv += villainAdds;
+    } else if (opt.key === "call") {
+      run.heroHistory.push({ action: "call", size: facing, pot: run.pot, board: run.board.slice() });
+      // villain's bet is already in run.pot; record it so the range narrows right
+      run.history.push({ action: "bet", size: facing, pot: r1(run.pot - facing), board: run.board.slice() });
+      run.pot = r1(run.pot + facing);
+      run.heroInv += facing;
+    } else {
+      run.heroHistory.push({ action: "check", size: r1(run.pot * 0.5), pot: run.pot, board: run.board.slice() });
+      run.history.push({ action: "check", size: r1(run.pot * 0.5), pot: run.pot, board: run.board.slice() });
+    }
+    return nextStreet(run);
+  }
+
+  function nextStreet(run) {
+    if (run.street >= 3) { run.done = true; run.result = "showdown"; return run; }
+    const need = run.street === 0 ? 3 : 1;
+    for (let i = 0; i < need; i++) run.board.push(run.deck.shift());
+    run.street++;
+    run.facing = null;
+
+    const eff = Math.max(0, run.stack - run.heroInv);
+    if (eff <= 0.5) { run.done = true; run.result = "allin"; return run; }
+
+    // Villain acts first whenever hero has position.
+    if (run.ip) {
+      const combos = PE.expandRange(run.vilClasses, run.hole.concat(run.board));
+      if (!combos.length) return run;
+      let weights = new Float64Array(combos.length).fill(1);
+      run.history.forEach((h) => {
+        const rk = PE.rankRange(combos, h.board);
+        weights = PE.actionWeights(rk, h.action, h.size || 0, h.pot || 1, run.vt, weights);
+      });
+      const rank = PE.rankRange(combos, run.board);
+      const u = run.rnd();
+      const size = r1(run.pot * (u < 0.45 ? 0.33 : u < 0.8 ? 0.66 : 1));
+      const w = PE.actionWeights(rank, "bet", size, run.pot, run.vt, weights);
+      const before = PE.totalMass(weights);
+      const freq = before > 0 ? PE.totalMass(w) / before : 0;
+      if (run.rnd() < freq) {
+        const bet = Math.min(size, eff);
+        run.facing = { size: bet };
+        run.history.push({ action: "bet", size: bet, pot: run.pot, board: run.board.slice() });
+        run.pot = r1(run.pot + bet);
+        run.vilInv += bet;
+      }
+    }
+    return run;
+  }
+
+  /** The villain range as it stands now: combos plus their surviving weights. */
+  function villainRange(run) {
+    const combos = PE.expandRange(run.vilClasses, run.hole.concat(run.board));
+    if (!combos.length) return { combos, weights: new Float64Array(0) };
+    let weights = new Float64Array(combos.length).fill(1);
+    run.history.forEach((h) => {
+      const rk = PE.rankRange(combos, h.board);
+      weights = PE.actionWeights(rk, h.action, h.size || 0, h.pot || 1, run.vt, weights);
+    });
+    return { combos, weights };
+  }
+
+  /** Deal the villain a hand at showdown, sampled from the surviving range. */
+  function showdown(run) {
+    if (run.villainHand) return run.villainHand;
+    const { combos, weights } = villainRange(run);
+    if (!combos.length) return null;
+    let total = 0;
+    for (let i = 0; i < combos.length; i++) total += Math.max(0, weights[i]);
+    if (total <= 0) { run.villainHand = combos[0]; return run.villainHand; }
+    let roll = run.rnd() * total;
+    for (let i = 0; i < combos.length; i++) {
+      roll -= Math.max(0, weights[i]);
+      if (roll <= 0) { run.villainHand = combos[i]; break; }
+    }
+    if (!run.villainHand) run.villainHand = combos[combos.length - 1];
+    return run.villainHand;
+  }
+
+  /** Where hero's actual hand sits inside the range his own line represents. */
+  function heroStanding(run) {
+    const board = run.board;
+    if (board.length < 3) return null;
+    const per = PE.perceivedRange(run.heroClasses, board, run.heroHistory, run.vt, board);
+    if (!per.combos.length) return null;
+    const mine = PE.evalHand(run.hole.concat(board));
+    let below = 0, total = 0;
+    for (let i = 0; i < per.combos.length; i++) {
+      const w = per.weights[i];
+      if (w <= 0.001) continue;
+      total += w;
+      const sc = PE.evalHand([per.combos[i][0], per.combos[i][1]].concat(board));
+      // Ties count as half, as in equity. Without this, a hand that just plays
+      // the board reads as beating 0% of the range when it actually chops.
+      if (sc < mine) below += w;
+      else if (sc === mine) below += w * 0.5;
+    }
+    if (!total) return null;
+    return { pct: 1 - below / total, perceived: per };   // 0 = strongest in the range
+  }
+
+  return { start, decision, choose, nextStreet, villainRange, showdown, heroStanding };
+})();
 </script>
 <script>/* =============================================================================
  * app.js — UI layer. All poker maths lives in engine.js; all text in i18n.js.
@@ -3108,9 +3449,56 @@ function makeDrillSpot(cfg, stack) {
   return best || PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
 }
 function startDrill(cfg) {
-  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, stack: setupStack(),
+  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot", stack: setupStack(),
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
-  loadSpot();
+  if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
+}
+
+/* ---------------------------------------------------------- whole hand -- */
+function loadHand() {
+  const v = $("v-drill");
+  v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
+  setTimeout(() => {
+    const D = STATE.drill;
+    D.run = HandRun.start({ stack: D.stack, villainType: D.vt, seats: setupSeats() });
+    if (!D.run) { loadHand(); return; }
+    D.dec = HandRun.decision(D.run);
+    D.answered = null;
+    renderDrill();
+  }, 20);
+}
+function answerHand(i) {
+  const D = STATE.drill;
+  if (D.answered !== null) return;
+  const opt = D.dec.res.opts[i];
+  const evs = D.dec.res.opts.map((o) => o.ev);
+  const bestEv = Math.max.apply(null, evs), worst = Math.min.apply(null, evs);
+  const span = bestEv - worst;
+  D.evLost += bestEv - opt.ev;
+  D.evEarned += opt.ev;
+  D.evBest += bestEv;
+  D.evCaptured += span > 1e-9 ? (opt.ev - worst) / span : 1;
+  if (bestEv - opt.ev < 0.02) D.correct++;
+  D.decisions = (D.decisions || 0) + 1;
+  D.answered = i;
+  renderDrill();
+}
+function continueHand() {
+  const D = STATE.drill;
+  const opt = D.dec.res.opts[D.answered];
+  HandRun.choose(D.run, opt, D.dec);
+  D.answered = null;
+  if (D.run.done) { renderDrill(); return; }
+  const v = $("v-drill");
+  v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
+  setTimeout(() => { D.dec = HandRun.decision(D.run); renderDrill(); }, 20);
+}
+function nextHand() {
+  const D = STATE.drill;
+  D.i++;
+  D.log.push({ result: D.run.result, lost: D.run.log.reduce((a, l) => a + l.lost, 0),
+    street: D.run.street, mine: "hand", best: "hand", mineLabel: "", bestLabel: "" });
+  if (D.i >= D.n) { D.done = true; saveDrill(); renderDrill(); } else loadHand();
 }
 function loadSpot() {
   const v = $("v-drill");
@@ -3184,7 +3572,12 @@ function renderDrill() {
       '<div class="bg" id="dr-vt" style="display:flex">' +
         '<button data-k="random" class="' + (cfg.vt === "random" ? "on" : "") + '">' + esc(t("drill.randomVillain")) + "</button>" +
         Object.keys(PE.VILLAIN_TYPES).map((k) => '<button data-k="' + k + '" class="' + (cfg.vt === k ? "on" : "") + '">' + esc(vtName(k)) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">3</span>' + esc(t("drill.step3")) + "</div>" +
+      '<div class="step"><span class="num">3</span>' + esc(t("drill.mode")) + "</div>" +
+      '<div class="bg" id="dr-mode" style="display:flex">' +
+        [["spot", "drill.modeSpot"], ["hand", "drill.modeHand"]].map(([k, lbl]) =>
+          '<button data-k="' + k + '" class="' + ((cfg.mode || "spot") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin-top:5px">' + esc(t("drill.mode" + ((cfg.mode || "spot") === "hand" ? "Hand" : "Spot") + "D")) + "</div>" +
+      '<div class="step"><span class="num">4</span>' + esc(t("drill.step3")) + "</div>" +
       '<div class="bg" id="dr-diff" style="display:flex">' +
         Object.keys(DIFFICULTY).map((k) => '<button data-k="' + k + '" class="' + (cfg.diff === k ? "on" : "") + '">' +
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
@@ -3194,10 +3587,12 @@ function renderDrill() {
     v.querySelectorAll("#dr-n button").forEach((b) => (b.onclick = () => { cfg.n = +b.dataset.n; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-vt button").forEach((b) => (b.onclick = () => { cfg.vt = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-diff button").forEach((b) => (b.onclick = () => { cfg.diff = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-mode button").forEach((b) => (b.onclick = () => { cfg.mode = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
     return;
   }
   if (D.done) return renderDrillEnd(v);
+  if (D.mode === "hand") return renderHandDrill(v);
 
   const sp = D.cur;
   const streetName = t("common." + ["flop", "turn", "river"][sp.street]);
@@ -3274,6 +3669,153 @@ function renderDrill() {
     $("dr-next").onclick = nextSpot;
   }
 }
+/* ---------------------------------------------- whole-hand rendering ---- */
+function streetName(i) { return (t("drill.streets") || [])[i] || ""; }
+
+function renderHandDrill(v) {
+  const D = STATE.drill, run = D.run;
+  if (run.done) return renderHandReport(v);
+  const dec = D.dec, res = dec.res;
+  const eff = Math.max(0, D.stack - run.heroInv);
+
+  let h = '<div class="card">' +
+    '<div class="dprog"><span class="small muted">' + esc(t("drill.progress", { i: D.i + 1, n: D.n })) + "</span>" +
+    '<div class="bar"><i style="width:' + Math.round(D.i / D.n * 100) + '%"></i></div>' +
+    '<span class="small muted">' + esc(t("drill.runningEarned")) + ' <b style="color:' +
+      (D.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(D.evEarned) + "BB</b></span></div>" +
+    '<div class="stmeta">' +
+      "<span>" + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
+      "<span>" + esc(vtName(run.vt.id)) + "</span>" +
+      "<span>" + esc(t("drill.potNow")) + " <b>" + nfmt(run.pot) + "BB</b></span>" +
+      "<span>" + esc(t("common.stack")) + " <b>" + nfmt(eff) + "BB</b></span>" +
+      "<span>" + esc(run.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+    "</div>";
+
+  // street rail — shows where in the hand you are
+  h += '<div class="rail">' + [0, 1, 2, 3].map((i) =>
+    '<span class="' + (i === run.street ? "on" : i < run.street ? "done" : "") + '">' + esc(streetName(i)) + "</span>").join("") + "</div>";
+
+  h += '<div class="dspot"><div class="dq">' + esc(streetName(run.street)) + " — " + esc(t("hand.myCards")) + "</div>" +
+    '<div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") + "</div>" +
+    (run.board.length ? '<div class="dq" style="margin-top:10px">' + esc(t("common.board")) + "</div>" +
+      '<div class="dh">' + run.board.map((c) => cardHTML(c)).join("") + "</div>" : "") +
+    '<div class="dvs">' + (run.street === 0
+      ? t(run.heroPos === "BB" ? "drill.youPostBB" : "drill.villainOpened", { size: nfmt(run.openSize) })
+      : run.facing ? t("drill.villainBet", { size: nfmt(run.facing.size) })
+                   : (run.ip ? t("drill.villainCheck") : t("drill.heroFirst"))) + "</div>" +
+    (run.facing ? '<div class="small muted" style="margin-top:6px">' + esc(t("drill.toCall")) + " " +
+      nfmt(run.facing.size) + "BB</div>" : "") + "</div>";
+
+  if (D.answered === null) {
+    h += res.opts.map((o, i) => '<button class="dopt" data-i="' + i + '"><span class="kn">' +
+      (i + 1) + '</span><span class="kk">' + esc(optLabel(o)) + "</span></button>").join("");
+    h += '<div class="small dim" style="margin:2px 0 8px">' + esc(t("drill.keyHint")) + "</div>";
+  } else {
+    const evs = res.opts.map((o) => o.ev);
+    const bestEv = Math.max.apply(null, evs);
+    const best = res.opts.find((o) => o.ev === bestEv);
+    const mine = res.opts[D.answered];
+    const lost = bestEv - mine.ev;
+    h += '<div class="recbox' + (lost < 0.02 ? " good" : "") + '"><div class="rl">' + esc(t("common.yourPick")) + "</div>" +
+      '<div class="ra">' + esc(optLabel(mine)) + ' <span style="font-size:15px;color:' +
+        (mine.ev >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(mine.ev) + " BB</span></div>" +
+      '<div class="rs">' + (lost < 0.02 ? t("drill.perfect")
+        : t("drill.lostEv", { v: nfmt(lost, 2), best: esc(optLabel(best)) })) + "</div></div>";
+    h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(res.opts, mine) + "</div>";
+    h += '<button class="btn" id="dr-cont">' + esc(t("common.next")) + "</button>";
+  }
+  v.innerHTML = h + "</div>";
+  if (D.answered === null) v.querySelectorAll(".dopt").forEach((b) => (b.onclick = () => answerHand(+b.dataset.i)));
+  else $("dr-cont").onclick = continueHand;
+}
+
+/* The report: what happened, what the villain could hold, what you looked like. */
+function renderHandReport(v) {
+  const D = STATE.drill, run = D.run;
+  const totalLost = run.log.reduce((a, l) => a + l.lost, 0);
+  const vr = HandRun.villainRange(run);
+  const likely = PE.topClasses(vr.combos, vr.weights, 8);
+  const made = run.board.length >= 3 ? PE.categoryBreakdown(vr.combos, vr.weights, run.board) : [];
+  const standing = HandRun.heroStanding(run);
+
+  let outcome = "";
+  if (run.result === "heroFold") outcome = t("drill.endedHeroFold");
+  else if (run.result === "villainFold") outcome = t("drill.endedVillainFold", { pot: nfmt(run.wonPot || run.pot) });
+  else if (run.result === "allin") outcome = t("drill.endedAllin");
+  else outcome = t("drill.endedShowdown");
+
+  let h = '<div class="card"><h2>' + esc(t("drill.reportTitle")) + "</h2>" +
+    '<div class="stmeta"><span>' + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
+    "<span>" + esc(vtName(run.vt.id)) + "</span>" +
+    "<span>" + esc(t("common.pot")) + " <b>" + nfmt(run.pot) + "BB</b></span></div>" +
+    '<div class="dspot"><div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") +
+      (run.board.length ? ' <span class="dim" style="margin:0 8px">|</span> ' + run.board.map((c) => cardHTML(c)).join("") : "") +
+    "</div><div class=\"dvs\" style=\"font-size:14px\">" + esc(outcome) + "</div></div>";
+
+  // showdown, if it got there
+  if (run.result === "showdown") {
+    const vh = HandRun.showdown(run);
+    if (vh) {
+      const mine = PE.evalHand(run.hole.concat(run.board));
+      const theirs = PE.evalHand([vh[0], vh[1]].concat(run.board));
+      const verdict = mine > theirs ? "showdownWin" : mine < theirs ? "showdownLose" : "showdownTie";
+      h += '<div class="blk ' + (mine > theirs ? "hi" : "warn") + '"><div class="t">' + esc(t("drill.villainShows")) + "</div>" +
+        "<p>" + vh.map((c) => cardHTML(c, true)).join("") + " — " + esc(catName(PE.catOf(theirs))) +
+        " · <b>" + esc(t("drill." + verdict)) + "</b></p>" +
+        '<div class="small dim">' + esc(t("drill.resultNote")) + "</div></div>";
+    }
+  }
+
+  // the line, street by street
+  h += '<div class="blk sumcard"><div class="t">' + esc(t("drill.reportLine")) + "</div>" +
+    run.log.map((l) => '<div class="sr"><span class="n">' + esc(streetName(l.street)) + "</span>" +
+      '<span class="a">' + esc(optLabel(l.mine)) +
+        (l.lost < 0.02 ? "" : " → <b>" + esc(optLabel(l.best)) + "</b>") +
+        ' <span class="dim">· ' + esc(t("common.equity")) + " " + pct(l.eq) + "</span></span>" +
+      '<span class="z" style="color:' + (l.lost < 0.02 ? "var(--good)" : "var(--bad)") + '">' +
+        signed(l.mine.ev) + "BB" + (l.lost < 0.02 ? " ✓" : " (" + lossText(l.lost) + ")") + "</span></div>").join("") +
+    '<div class="sr"><span class="n"></span><span class="a"><b>' + esc(t("drill.endEvLost")) + "</b></span>" +
+      '<span class="z" style="color:' + (totalLost < 0.02 ? "var(--good)" : "var(--bad)") + '">' + lossText(totalLost) + "BB</span></div></div>";
+
+  // villain's likely holdings
+  h += '<div class="blk vx"><div class="t">' + esc(t("drill.villainLikely")) + "</div>" +
+    '<div class="cbars">' + likely.map((x) =>
+      '<div class="cb"><span class="cn">' + esc(x.cls) + '</span><span class="cf"><i style="width:' +
+      Math.round(x.share / Math.max(0.0001, likely[0].share) * 100) + '%"></i></span>' +
+      '<span class="cv">' + (x.share * 100).toFixed(1) + "%</span></div>").join("") + "</div>";
+  if (made.length) {
+    h += '<div class="small muted" style="margin:10px 0 4px">' + esc(t("drill.villainMade")) + "</div>" +
+      '<div class="cbars">' + made.slice(0, 5).map((x) =>
+        '<div class="cb"><span class="cn">' + esc(x.key === "draw" ? drawNames(["oesd"])[0] || "draw" : catName(+x.key)) +
+        '</span><span class="cf"><i style="width:' + Math.round(x.share * 100) + '%"></i></span>' +
+        '<span class="cv">' + Math.round(x.share * 100) + "%</span></div>").join("") + "</div>";
+  }
+  h += "</div>";
+
+  // what hero's own line represented
+  if (standing) {
+    const rep = PE.topClasses(standing.perceived.combos, standing.perceived.weights, 8);
+    const band = standing.pct <= 0.33 ? "narrativeStrong" : standing.pct <= 0.66 ? "narrativeMid" : "narrativeWeak";
+    h += '<div class="blk"><div class="t">' + esc(t("drill.youRepresent")) + "</div>" +
+      '<p class="small muted">' + esc(t("drill.youRepresentNote")) + "</p>" +
+      '<div class="cbars">' + rep.map((x) =>
+        '<div class="cb"><span class="cn">' + esc(x.cls) + '</span><span class="cf"><i style="width:' +
+        Math.round(x.share / Math.max(0.0001, rep[0].share) * 100) + '%"></i></span>' +
+        '<span class="cv">' + (x.share * 100).toFixed(1) + "%</span></div>").join("") + "</div>" +
+      '<div class="blk hi" style="margin-top:10px"><div class="t">' + esc(t("drill.heroRank")) + "</div>" +
+      "<p>" + t("drill.heroRankVal", {
+        cat: esc(catName(PE.catOf(PE.evalHand(run.hole.concat(run.board))))),
+        p: Math.max(1, Math.round(standing.pct * 100)),
+        beat: Math.max(0, Math.round((1 - standing.pct) * 100))
+      }) + "</p><p>" + t("drill." + band) + "</p>" +
+      '<div class="small dim">' + t("drill.heroRankNote") + "</div></div></div>";
+  }
+
+  h += '<button class="btn" id="dr-nexthand">' + esc(D.i + 1 >= D.n ? t("drill.seeResult") : t("drill.next")) + "</button></div>";
+  v.innerHTML = h;
+  $("dr-nexthand").onclick = nextHand;
+}
+
 function storyText(s) {
   return t("drill.story." + s.k, { size: s.size !== undefined ? nfmt(s.size) : "" }) || "";
 }

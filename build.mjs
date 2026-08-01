@@ -13,6 +13,7 @@ const parts = {
   "/*__CSS__*/": read("src/style.css"),
   "/*__ENGINE__*/": read("src/engine.js"),
   "/*__I18N__*/": read("src/i18n.js"),
+  "/*__HANDRUN__*/": read("src/handrun.js"),
   "/*__APP__*/": read("src/app.js")
 };
 

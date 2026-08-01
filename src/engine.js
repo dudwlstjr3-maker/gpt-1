@@ -806,6 +806,56 @@ SCENARIOS.push(
 );
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
 
+/* ------------------------------------------------ range read-out ---------
+ * Turning a weighted combo list back into something a human can read: which
+ * hands the villain most likely holds, and what your own line represents.  */
+function topClasses(combos, weights, limit) {
+  const byClass = {};
+  for (let i = 0; i < combos.length; i++) {
+    const w = weights ? weights[i] : 1;
+    if (w <= 0.001) continue;
+    const cl = handClass(combos[i][0], combos[i][1]);
+    byClass[cl] = (byClass[cl] || 0) + w;
+  }
+  const total = Object.keys(byClass).reduce((a, k) => a + byClass[k], 0) || 1;
+  return Object.keys(byClass)
+    .map((cl) => ({ cls: cl, weight: byClass[cl], share: byClass[cl] / total }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, limit || 8);
+}
+/** Group a weighted range by what it actually made on this board. */
+function categoryBreakdown(combos, weights, board) {
+  const buckets = {};
+  let total = 0;
+  for (let i = 0; i < combos.length; i++) {
+    const w = weights ? weights[i] : 1;
+    if (w <= 0.001) continue;
+    const c = combos[i];
+    const cat = board.length >= 3 ? catOf(evalHand([c[0], c[1]].concat(board))) : -1;
+    const dr = board.length >= 3 && board.length <= 4 ? drawInfo([c[0], c[1]], board) : null;
+    // a hand with a real draw and no made hand is its own bucket
+    const key = (cat <= 0 && dr && dr.quality >= 0.6) ? "draw" : String(cat);
+    buckets[key] = (buckets[key] || 0) + w;
+    total += w;
+  }
+  return Object.keys(buckets)
+    .map((k) => ({ key: k, weight: buckets[k], share: total ? buckets[k] / total : 0 }))
+    .sort((a, b) => b.weight - a.weight);
+}
+/** What your own line represents: your preflop range narrowed by what you did. */
+function perceivedRange(heroClasses, board, history, vt, dead) {
+  let combos = expandRange(heroClasses, dead || []);
+  combos = combos.filter((c) => board.indexOf(c[0]) < 0 && board.indexOf(c[1]) < 0);
+  if (!combos.length) return { combos, weights: new Float64Array(0) };
+  let weights = new Float64Array(combos.length).fill(1);
+  (history || []).forEach((h) => {
+    const live = h.board.filter((c) => true);
+    const rank = rankRange(combos, live);
+    weights = actionWeights(rank, h.action, h.size || 0, h.pot || 1, vt || VILLAIN_TYPES.unknown, weights);
+  });
+  return { combos, weights };
+}
+
 /* ------------------------------------------------- situational ranges ----
  * One accessor for every preflop spot the Range Lab shows, so the charts on
  * screen are the same objects the EV maths uses — a chart that disagrees with
@@ -1168,7 +1218,8 @@ return {
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
   preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
-  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange, fourBetRange, callVs4betRange,
+  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange,
+  topClasses, categoryBreakdown, perceivedRange, fourBetRange, callVs4betRange,
   // util
   mulberry32, seedFrom, round1
 };

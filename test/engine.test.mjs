@@ -389,3 +389,56 @@ test("all-in is offered postflop once the stack is short relative to the pot", (
     vt: PE.VILLAIN_TYPES.unknown, ip: true, pot: 5, effStack: 200, history: [] });
   assert.ok(!PE.options(deepCtx, null).opts.some((o) => o.key === "allin"), "all-in offered at SPR 40");
 });
+
+/* ------------------------------------------------ range read-out ---------- */
+test("a betting range reads back as value plus bluffs, not nuts only", () => {
+  const board = H("Ks 8d 3c");
+  const combos = PE.expandRange(PE.topPercentRange(30), board);
+  const rank = PE.rankRange(combos, board);
+  const w = PE.actionWeights(rank, "bet", 7, 10, PE.VILLAIN_TYPES.unknown, null);
+
+  const top = PE.topClasses(combos, w, 8);
+  assert.ok(top.length >= 5, "read-out should name several holdings");
+  top.forEach((x) => assert.ok(x.share > 0 && x.share <= 1, "bad share " + x.share));
+  const totalShare = PE.topClasses(combos, w, 999).reduce((a, x) => a + x.share, 0);
+  assert.ok(Math.abs(totalShare - 1) < 1e-6, "shares must sum to 1, got " + totalShare);
+
+  const made = PE.categoryBreakdown(combos, w, board);
+  const air = made.find((m) => m.key === "0");
+  assert.ok(air && air.share > 0.05, "a betting range with no air is the old bug back");
+  const pair = made.find((m) => m.key === "1");
+  assert.ok(pair && pair.share > 0.2, "a betting range should be mostly made hands");
+});
+
+test("hand rank inside the represented range is monotonic", () => {
+  const board = H("Kc 9d 4s 2h 7c");
+  const heroClasses = PE.flatRange(6, "BB", "CO", PE.VILLAIN_TYPES.unknown);
+  const history = [
+    { action: "call", size: 2, pot: 5, board: [] },
+    { action: "bet", size: 3, pot: 6, board: board.slice(0, 3) },
+    { action: "bet", size: 8, pot: 12, board: board.slice(0, 4) },
+    { action: "bet", size: 20, pot: 28, board: board.slice() }
+  ];
+  const per = PE.perceivedRange(heroClasses, board, history, PE.VILLAIN_TYPES.unknown, board);
+  assert.ok(per.combos.length > 50, "represented range collapsed to nothing");
+
+  const rankOf = (holeStr) => {
+    const mine = PE.evalHand(H(holeStr).concat(board));
+    let below = 0, total = 0;
+    for (let i = 0; i < per.combos.length; i++) {
+      const w = per.weights[i];
+      if (w <= 0.001) continue;
+      total += w;
+      const sc = PE.evalHand([per.combos[i][0], per.combos[i][1]].concat(board));
+      if (sc < mine) below += w; else if (sc === mine) below += w * 0.5;
+    }
+    return 1 - below / total;                 // 0 = top of the range
+  };
+  const order = ["Kh Kd", "9h 9s", "Kh 9h", "Ks Qs", "8h 8s", "Ah Qd", "5h 3d"].map(rankOf);
+  for (let i = 1; i < order.length; i++) {
+    assert.ok(order[i] >= order[i - 1] - 1e-9,
+      `stronger hand ranked worse: ${order[i - 1].toFixed(3)} then ${order[i].toFixed(3)}`);
+  }
+  assert.ok(order[0] < 0.05, "a set of kings should be at the very top, got " + order[0]);
+  assert.ok(order[order.length - 1] > 0.85, "air should be at the bottom, got " + order[order.length - 1]);
+});

@@ -1,7 +1,7 @@
 /* Inlines src/* into a single self-contained index.html.
  * No dependencies, no minifier — the output stays readable and auditable,
  * which matters for a tool people are asked to trust with maths.            */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -31,3 +31,14 @@ if (remote) throw new Error("external reference in build output: " + remote.join
 writeFileSync(join(root, "index.html"), out);
 const kb = (Buffer.byteLength(out) / 1024).toFixed(0);
 console.log(`built index.html — ${kb} KB, self-contained`);
+
+/* Second target: the Artifact host supplies its own doctype/html/head/body,
+ * so publish only what goes inside the body (plus the style block). Same
+ * sources, so the hosted page and the downloadable file never diverge.     */
+const inner = out
+  .slice(out.indexOf("<style>"), out.lastIndexOf("</body>"))
+  .replace(/<\/head>\s*<body>/i, "")
+  .trim();
+mkdirSync(join(root, "dist"), { recursive: true });
+writeFileSync(join(root, "dist", "artifact.html"), inner + "\n");
+console.log(`built dist/artifact.html — ${(Buffer.byteLength(inner) / 1024).toFixed(0)} KB, body-only`);

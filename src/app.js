@@ -67,7 +67,7 @@ function renderChrome() {
   $("langsel").innerHTML = codes.map((c) =>
     '<option value="' + c + '"' + (c === LANG ? " selected" : "") + ">" + esc(I18N.lookup(c, "meta.name")) + "</option>"
   ).join("");
-  $("themebtn").textContent = DB.get("theme", "dark") === "dark" ? "☀" : "☾";
+  applyTheme();
 }
 /** Fill the static markup in the hand-input form from the string table. */
 function renderStaticLabels() {
@@ -102,11 +102,28 @@ function renderView(v) {
   ({ home: renderHome, quiz: renderQuiz, hand: renderHand, stats: renderStats,
      drill: renderDrill, range: renderRange, help: renderHelp }[v] || (() => {}))();
 }
+/* Effective theme: the viewer's explicit choice if they made one, otherwise
+   whatever the OS asks for. Only an explicit choice stamps data-theme, which
+   is what lets the CSS media query take over by default. */
+function effectiveTheme() {
+  const stored = DB.get("theme", null);
+  if (stored) return stored;
+  return (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+}
+function applyTheme() {
+  const stored = DB.get("theme", null);
+  if (stored) document.documentElement.setAttribute("data-theme", stored);
+  else document.documentElement.removeAttribute("data-theme");
+  const btn = $("themebtn");
+  if (btn) {
+    const now = effectiveTheme();
+    btn.textContent = now === "dark" ? "☀" : "☾";
+    btn.setAttribute("aria-label", now === "dark" ? "Switch to light theme" : "Switch to dark theme");
+  }
+}
 function toggleTheme() {
-  const next = DB.get("theme", "dark") === "dark" ? "light" : "dark";
-  DB.set("theme", next);
-  document.documentElement.setAttribute("data-theme", next);
-  $("themebtn").textContent = next === "dark" ? "☀" : "☾";
+  DB.set("theme", effectiveTheme() === "dark" ? "light" : "dark");
+  applyTheme();
 }
 
 /* ============================================================ PROFILE ==== */
@@ -1172,7 +1189,7 @@ function clearHand() {
   buildHandInputs(); $("h-out").innerHTML = "";
 }
 function boot() {
-  document.documentElement.setAttribute("data-theme", DB.get("theme", "dark"));
+  applyTheme();
   const meta = I18N.lookup(LANG, "meta") || {};
   document.documentElement.lang = meta.htmlLang || LANG;
   document.title = t("app.docTitle");

@@ -442,3 +442,29 @@ test("practice offers short stacks and actually deals them", async () => {
   stacks.forEach((s) => assert.ok(s <= 12.5, "ultra-short bucket dealt a " + s + "BB stack"));
   noErrors();
 });
+
+test("seats can be cleared in one go", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#seat-palette button");
+
+  // with nothing seated the button is disabled rather than a no-op
+  await page.click("#seat-reset");
+  await page.waitForTimeout(80);
+  assert.equal(await page.$eval("#seat-reset", (e) => e.disabled), true, "clear should be disabled when empty");
+
+  await page.click('#seat-palette button[data-k="lag"]');
+  for (const p of ["UTG", "HJ", "CO", "SB"]) { await page.click(`.seat[data-p="${p}"]`); await page.waitForTimeout(50); }
+  assert.equal((await page.$$eval("#vt-chips button", (b) => b.length)), 4);
+  assert.equal(await page.$eval("#seat-reset", (e) => e.disabled), false, "clear should enable once seats are filled");
+
+  await page.click("#seat-reset");
+  await page.waitForTimeout(120);
+  assert.equal((await page.$$("#vt-chips button")).length, 0, "seats were not cleared");
+  assert.equal((await page.$$(".seat.vil")).length, 0, "table still shows opponents");
+  assert.equal((await page.$$(".seat.me")).length, 1, "hero lost their seat");
+  assert.equal(await page.$eval("#seat-reset", (e) => e.disabled), true, "clear stayed enabled after clearing");
+  noErrors();
+});

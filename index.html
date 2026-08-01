@@ -367,6 +367,7 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
       <div class="step"><span class="num">1</span><span id="lbl-step1"></span> <span class="sub" id="seat-hint"></span></div>
       <div class="bg" id="seat-palette" style="display:flex;margin-bottom:6px"></div>
       <div class="seatmap" id="seat-map"></div>
+      <div id="seat-tools" style="margin-top:8px"></div>
       <div class="step"><span class="num">2</span><span id="lbl-step2"></span> <span class="sub" id="lbl-step2sub"></span></div>
       <div class="bg" id="vt-chips" style="display:flex"></div>
       <div class="small dim" id="vt-desc" style="margin-top:6px"></div>
@@ -1747,6 +1748,7 @@ const ko = {
     step1: "자리 배치", step1sub: "성향을 고른 뒤 자리를 탭하세요 · 같은 성향을 여러 자리에 놓아도 됩니다",
     step2: "이 핸드의 상대", step2sub: "여러 명을 앉혀도 계산은 지정한 상대 한 명 기준입니다",
     paintMe: "나", paintEmpty: "빈자리",
+    clearSeats: "자리 모두 비우기", seatsCleared: "자리를 모두 비웠습니다.",
     seatedNone: "상대를 최소 한 명 앉혀주세요.",
     seatedCount: "{n}명 앉음",
     step3: "프리플랍은 어떻게 됐나요",
@@ -2070,6 +2072,7 @@ const en = {
     step1: "Seat the table", step1sub: "Pick a type, then tap seats · the same type can go in several seats",
     step2: "Opponent in this hand", step2sub: "Seat as many as you like — the maths uses the one you designate",
     paintMe: "Me", paintEmpty: "Empty",
+    clearSeats: "Clear all seats", seatsCleared: "All seats cleared.",
     seatedNone: "Seat at least one opponent.",
     seatedCount: "{n} seated",
     step3: "What happened preflop",
@@ -3101,6 +3104,19 @@ function renderSeatPalette() {
     esc(it.label) + "</button>").join("");
   el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.paint = b.dataset.k; renderSeatPalette(); }));
 }
+/** Empty every opponent seat in one go. Hero keeps a seat — a hand needs one. */
+function renderSeatTools() {
+  const el = $("seat-tools");
+  if (!el) return;
+  const n = seatedOpponents().length;
+  el.innerHTML = '<button class="btn sec sm" id="seat-reset"' + (n ? "" : " disabled") + ">" +
+    esc(t("hand.clearSeats")) + "</button>";
+  const b = $("seat-reset");
+  if (b && n) b.onclick = () => {
+    HI.seated = {}; HI.vpos = null; HI.vt = "unknown";
+    buildHandInputs(); toast(t("hand.seatsCleared"));
+  };
+}
 function renderSeats() {
   const el = $("seat-map"), L = PE.posList(setupSeats());
   // drop anything seated at a position this table size does not have
@@ -3130,6 +3146,7 @@ function renderSeats() {
     buildHandInputs();
   }));
   updateSeatHint();
+  renderSeatTools();
 }
 function updateSeatHint() {
   const n = seatedOpponents().length;

@@ -432,6 +432,19 @@ function renderSeatPalette() {
     esc(it.label) + "</button>").join("");
   el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.paint = b.dataset.k; renderSeatPalette(); }));
 }
+/** Empty every opponent seat in one go. Hero keeps a seat — a hand needs one. */
+function renderSeatTools() {
+  const el = $("seat-tools");
+  if (!el) return;
+  const n = seatedOpponents().length;
+  el.innerHTML = '<button class="btn sec sm" id="seat-reset"' + (n ? "" : " disabled") + ">" +
+    esc(t("hand.clearSeats")) + "</button>";
+  const b = $("seat-reset");
+  if (b && n) b.onclick = () => {
+    HI.seated = {}; HI.vpos = null; HI.vt = "unknown";
+    buildHandInputs(); toast(t("hand.seatsCleared"));
+  };
+}
 function renderSeats() {
   const el = $("seat-map"), L = PE.posList(setupSeats());
   // drop anything seated at a position this table size does not have
@@ -461,6 +474,7 @@ function renderSeats() {
     buildHandInputs();
   }));
   updateSeatHint();
+  renderSeatTools();
 }
 function updateSeatHint() {
   const n = seatedOpponents().length;

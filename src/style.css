@@ -301,3 +301,6 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   th,td{padding:6px 6px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.notation{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.7;word-break:break-word;color:var(--tx2)}

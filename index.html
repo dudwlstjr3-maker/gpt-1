@@ -309,6 +309,9 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   th,td{padding:6px 6px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.notation{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:9px 11px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;
+  line-height:1.7;word-break:break-word;color:var(--tx2)}
 </style>
 </head>
 <body>
@@ -322,6 +325,7 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   </div>
 </div></header>
 
+<div id="storagebar"></div>
 <div class="wrap" id="main">
   <section class="view on" id="v-home"></section>
   <section class="view" id="v-quiz"></section>
@@ -1099,11 +1103,18 @@ function flatRange(seats, caller, opener, vt) {
   const skip = caller === "BB" ? 3.5 : 5;
   return topPercentRange(clampPct(width * vt.openMul, 5, 92), skip);
 }
-/** 3-betting: a value core plus a suited bluff tail, not a pure top-N slice. */
-function threeBetRange(seats, pos, vt) {
-  const value = topPercentRange(clampPct(6 * vt.openMul, 2, 20));
+/** 3-betting: a value core plus a suited bluff tail, not a pure top-N slice.
+ *  How wide depends on who opened — you 3-bet an under-the-gun raiser far
+ *  less than a button steal, so the opener's seat has to be an input.      */
+function threeBetRange(seats, pos, vt, openerPos) {
+  const openW = openerPos ? (rangePct(rfiRange(seats, openerPos)) || 22) : 22;
+  // a 15% opener earns ~5.5% of 3-bets, a 45% opener ~11%
+  const width = clampPct(3.4 + openW * 0.17, 3, 14) * vt.openMul;
+  const value = topPercentRange(clampPct(width, 2, 20));
   const bluffs = parseRange("A5s-A2s K9s-K7s Q9s J9s T9s 98s 76s 65s");
-  const wanted = Math.round(bluffs.length * clampPct(vt.bluffMul, 0.2, 1.8) * 0.6);
+  // wider opens get attacked with more bluffs, not just more value
+  const share = clampPct(openW, 10, 50) / 50;
+  const wanted = Math.round(bluffs.length * share * clampPct(vt.bluffMul, 0.2, 1.8));
   const out = value.slice();
   bluffs.slice(0, wanted).forEach((c) => { if (out.indexOf(c) < 0) out.push(c); });
   return out;
@@ -1126,12 +1137,12 @@ const SCENARIOS = [
     vilR:  (seats, hp, vp, vt) => openRange(seats, vp, vt) },
   // hero 3-bet the villain's open and the villain called
   { id: "3b_call", pot: 19, heroAgg: true, heroInv: 9, opener: "villain",
-    heroR: (seats, hp, vp, vt) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown),
+    heroR: (seats, hp, vp, vt) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown, vp),
     vilR:  (seats, hp, vp, vt) => callVs3betRange(seats, vp, vt) },
   // hero opened, villain 3-bet, hero called
   { id: "call_3b", pot: 19, heroAgg: false, heroInv: 9, opener: "hero",
     heroR: (seats, hp, vp, vt) => callVs3betRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => threeBetRange(seats, vp, vt) },
+    vilR:  (seats, hp, vp, vt) => threeBetRange(seats, vp, vt, hp) },
   // multiway-ish limped pot
   { id: "limp", pot: 4.5, heroAgg: false, heroInv: 1, opener: null,
     heroR: () => topPercentRange(45, 5),
@@ -1176,6 +1187,75 @@ SCENARIOS.push(
     vilR:  (seats, hp, vp, vt) => fourBetRange(seats, vp, vt) }
 );
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
+
+/* ------------------------------------------------- situational ranges ----
+ * One accessor for every preflop spot the Range Lab shows, so the charts on
+ * screen are the same objects the EV maths uses — a chart that disagrees with
+ * the engine is worse than no chart.                                        */
+const SITUATIONS = [
+  { id: "rfi",       needsVs: false },   // first in
+  { id: "vs_open_3b", needsVs: true },   // facing an open: 3-bet
+  { id: "vs_open_call", needsVs: true }, // facing an open: flat
+  { id: "vs_3b_4b",  needsVs: true },    // facing a 3-bet: 4-bet
+  { id: "vs_3b_call", needsVs: true },   // facing a 3-bet: call
+  { id: "shove",     needsVs: false },   // short stack: jam
+  { id: "call_shove", needsVs: false }   // short stack: call a jam
+];
+function situationRange(o) {
+  const seats = o.seats || 6, pos = o.pos, vs = o.vs || "CO";
+  const vt = o.vt || VILLAIN_TYPES.unknown;
+  const stack = o.stack === undefined ? 15 : o.stack;
+  switch (o.situation) {
+    case "rfi":          return openRange(seats, pos, vt);
+    case "vs_open_3b":   return threeBetRange(seats, pos, vt, vs);
+    case "vs_open_call": return flatRange(seats, pos, vs, vt);
+    case "vs_3b_4b":     return fourBetRange(seats, pos, vt);
+    case "vs_3b_call":   return callVs3betRange(seats, pos, vt);
+    case "shove":        return shoveRange(stack, vt);
+    case "call_shove":   return callShoveRange(stack, vt);
+    default:             return openRange(seats, pos, vt);
+  }
+}
+/** Compact chart notation for a class list, e.g. "22+ A9s+ ATo+". */
+function rangeNotation(classes) {
+  const set = {}; classes.forEach((c) => (set[c] = 1));
+  const out = [];
+  // pairs
+  const pairs = RANKS.split("").filter((r) => set[r + r]);
+  if (pairs.length) {
+    let i = 0;
+    while (i < pairs.length) {
+      let j = i;
+      while (j + 1 < pairs.length && RANKS.indexOf(pairs[j + 1]) === RANKS.indexOf(pairs[j]) + 1) j++;
+      const lo = pairs[i], hi = pairs[j];
+      if (RANKS.indexOf(hi) === 12) out.push(lo + lo + "+");
+      else if (i === j) out.push(lo + lo);
+      else out.push(hi + hi + "-" + lo + lo);
+      i = j + 1;
+    }
+  }
+  // suited / offsuit runs, grouped by high card
+  ["s", "o"].forEach((suit) => {
+    for (let h = 12; h >= 0; h--) {
+      const ks = [];
+      for (let k = h - 1; k >= 0; k--) if (set[RANKS[h] + RANKS[k] + suit]) ks.push(k);
+      if (!ks.length) continue;
+      ks.sort((a, b) => b - a);
+      let i = 0;
+      while (i < ks.length) {
+        let j = i;
+        while (j + 1 < ks.length && ks[j + 1] === ks[j] - 1) j++;
+        const hiK = ks[i], loK = ks[j];
+        const label = (k) => RANKS[h] + RANKS[k] + suit;
+        if (hiK === h - 1) out.push(label(loK) + "+");
+        else if (i === j) out.push(label(hiK));
+        else out.push(label(hiK) + "-" + label(loK));
+        i = j + 1;
+      }
+    }
+  });
+  return out.join(" ");
+}
 
 /* ------------------------------------------------- preflop money ---------
  * The scenario fixes the *shape* of the preflop action; these sizes fix how
@@ -1469,7 +1549,8 @@ return {
   evCheck, evBet, evCall, evRaise, buildContext, options,
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
-  preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf, fourBetRange, callVs4betRange,
+  preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
+  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange, fourBetRange, callVs4betRange,
   // util
   mulberry32, seedFrom, round1
 };
@@ -1702,6 +1783,23 @@ const ko = {
     myHand: "내 핸드", vsRange: "상대 레인지", boardOpt: "보드 (선택)",
     calc: "계산", result: "결과",
     eqResult: "내 승률 <b>{eq}</b> · 상대 콤보 {n}개",
+    tableSize: "테이블", situation: "상황", position: "포지션", vsPosition: "상대 자리",
+    stackDepth: "스택 깊이", combos: "{n}콤보",
+    notation: "차트 표기", copyNotation: "표기 복사",
+    sit: {
+      rfi: "첫 진입 (오픈)", vs_open_3b: "오픈에 3벳", vs_open_call: "오픈에 콜",
+      vs_3b_4b: "3벳에 4벳", vs_3b_call: "3벳에 콜",
+      shove: "숏스택 올인", call_shove: "올인에 콜"
+    },
+    sitNote: {
+      rfi: "앞이 전부 폴드했을 때 이 자리에서 먼저 레이즈로 들어가는 레인지입니다.",
+      vs_open_3b: "앞사람이 오픈했을 때 3벳으로 되받는 레인지입니다. 밸류 위주에 수딧 블러프를 섞습니다.",
+      vs_open_call: "오픈에 콜만 하고 따라가는 레인지입니다. 3벳할 최상위는 여기서 빠져 있습니다.",
+      vs_3b_4b: "내 오픈에 3벳이 왔을 때 4벳으로 되받는 레인지입니다.",
+      vs_3b_call: "3벳을 맞고 콜로 받아 플랍을 보는 레인지입니다. 4벳할 최상위는 빠져 있습니다.",
+      shove: "스택이 얕을 때 레이즈 대신 그냥 올인으로 들어가는 레인지입니다. 스택이 짧을수록 넓어집니다.",
+      call_shove: "상대 올인을 받아주는 레인지입니다. 팟 오즈가 좋을수록 넓어집니다."
+    },
     presetTop: "상위 {p}%", customRange: "직접 입력",
     rangeHint: "예: 22+ A9s+ KTs+ AJo+  ·  쉼표나 공백으로 구분",
     invalidRange: "레인지를 알아볼 수 없습니다."
@@ -1713,6 +1811,8 @@ const ko = {
     date: "날짜", spot: "스팟", result: "결과", evLost: "EV 손실",
     delete: "삭제", confirmDelete: "이 기록을 삭제할까요?",
     leakTitle: "반복되는 패턴", leakNone: "아직 패턴을 잡을 만큼 표본이 없습니다.",
+    leakWhat: "리크(leak)란?",
+    leakWhatBody: "포커에서 <b>리크</b>는 <b>반복해서 돈을 흘리는 습관</b>을 뜻합니다. 한 판을 진 것은 리크가 아닙니다 — 운이 나쁠 수 있으니까요. 같은 구조의 스팟에서 <b>매번 같은 방향으로 잘못된 선택</b>을 하는 것, 그래서 장기적으로 EV가 새어 나가는 것이 리크입니다. 예를 들어 \'칠 자리에서 계속 체크한다\', \'팟 오즈가 맞는데도 겁이 나서 접는다\' 같은 것들입니다. 아래는 드릴에서 내린 선택을 모아 <b>어느 방향으로 자주 틀리는지</b> 집계한 것입니다.",
     totalHands: "핸드", totalDrills: "드릴 세션", avgCapture: "평균 EV 획득률"
   },
   help: {
@@ -1733,6 +1833,14 @@ const ko = {
     confirmReset: "저장된 모든 기록을 지울까요? 되돌릴 수 없습니다.",
     disclaimer: "이 도구는 학습·복기용이며 도박 자금 운용에 대한 조언이 아닙니다. 잃어도 생활에 지장이 없는 돈만 쓰세요.",
     responsible: "도움이 필요하면: 한국도박문제예방치유원 1336 · 국제 문의는 각국 상담 기관을 이용하세요."
+  },
+  storage: {
+    offTitle: "이 환경에서는 기록이 저장되지 않습니다",
+    offBody: "브라우저가 저장소를 막고 있어(시크릿 모드이거나 페이지가 샌드박스 안에 있을 때) 창을 닫으면 기록이 사라집니다. 남기려면 내보내기로 파일을 받아두세요.",
+    onTitle: "기록은 이 브라우저에 저장됩니다",
+    onBody: "이 기기의 이 브라우저에만 남습니다. 다른 기기나 다른 브라우저에서는 보이지 않고, 브라우저 데이터를 지우면 함께 사라집니다.",
+    whyNoAccount: "서버가 없는 단일 파일 앱이라 IP나 계정으로 기록을 묶을 수 없습니다. 기기 간에 옮기려면 내보내기·불러오기를 쓰세요.",
+    exportHint: "내보내기로 받은 파일은 다른 기기에서 불러오기로 그대로 복원됩니다."
   },
   bankroll: {
     title: "뱅크롤",
@@ -1958,6 +2066,23 @@ const en = {
     myHand: "My hand", vsRange: "Villain range", boardOpt: "Board (optional)",
     calc: "Calculate", result: "Result",
     eqResult: "Your equity <b>{eq}</b> · {n} villain combos",
+    tableSize: "Table", situation: "Situation", position: "Position", vsPosition: "Opponent seat",
+    stackDepth: "Stack depth", combos: "{n} combos",
+    notation: "Chart notation", copyNotation: "Copy notation",
+    sit: {
+      rfi: "First in (open)", vs_open_3b: "3-bet an open", vs_open_call: "Call an open",
+      vs_3b_4b: "4-bet a 3-bet", vs_3b_call: "Call a 3-bet",
+      shove: "Short-stack jam", call_shove: "Call a jam"
+    },
+    sitNote: {
+      rfi: "What you raise with from this seat when everyone folds to you.",
+      vs_open_3b: "What you 3-bet after someone opens — a value core plus suited bluffs.",
+      vs_open_call: "What you flat instead of raising. The very top 3-bets, so it is missing here.",
+      vs_3b_4b: "What you 4-bet after your open gets 3-bet.",
+      vs_3b_call: "What you call a 3-bet with to see a flop. The 4-betting top is missing here.",
+      shove: "What you jam instead of raising when stacks are shallow. It widens fast as the stack shortens.",
+      call_shove: "What you call a jam with. Better pot odds widen it."
+    },
     presetTop: "Top {p}%", customRange: "Custom",
     rangeHint: "e.g. 22+ A9s+ KTs+ AJo+  ·  separated by spaces or commas",
     invalidRange: "Could not parse that range."
@@ -1969,6 +2094,8 @@ const en = {
     date: "Date", spot: "Spot", result: "Result", evLost: "EV lost",
     delete: "Delete", confirmDelete: "Delete this entry?",
     leakTitle: "Recurring patterns", leakNone: "Not enough sample to call a pattern yet.",
+    leakWhat: "What is a leak?",
+    leakWhatBody: "A <b>leak</b> is a habit that loses money repeatedly. Losing one hand is not a leak — that can just be luck. A leak is making <b>the same kind of mistake in the same direction</b> every time a spot comes up, so EV drains away over the long run. Things like \'checking where you should bet\' or \'folding when the pot odds say call\'. Below is a tally of the choices you made in drills, grouped by <b>which way you tend to get it wrong</b>.",
     totalHands: "Hands", totalDrills: "Drill sessions", avgCapture: "Mean EV captured"
   },
   help: {
@@ -1989,6 +2116,14 @@ const en = {
     confirmReset: "Delete every saved record? This cannot be undone.",
     disclaimer: "This is a study tool, not advice on managing gambling money. Only ever play with money you can afford to lose.",
     responsible: "If you need help, contact a problem-gambling service in your country."
+  },
+  storage: {
+    offTitle: "Nothing is being saved here",
+    offBody: "Your browser is blocking storage — private browsing, or the page running inside a sandbox — so records disappear when you close the window. Export a file to keep them.",
+    onTitle: "Records live in this browser",
+    onBody: "They stay on this device in this browser only. Another device or browser will not see them, and clearing browser data deletes them.",
+    whyNoAccount: "This is a single file with no server behind it, so records cannot be tied to an IP address or an account. Use export and import to move them between devices.",
+    exportHint: "An exported file restores exactly as it was via Import on any other device."
   },
   bankroll: {
     title: "Bankroll",
@@ -2171,11 +2306,47 @@ return { LANGS, QUIZ, lookup, format, detect, codes: () => Object.keys(LANGS) };
 "use strict";
 
 /* ------------------------------------------------------------- storage --- */
-const DB = {
-  get(k, d) { try { const v = localStorage.getItem("hb." + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem("hb." + k, JSON.stringify(v)); } catch (e) {} },
-  del(k) { try { localStorage.removeItem("hb." + k); } catch (e) {} }
-};
+/* Storage is not guaranteed: a sandboxed iframe, private browsing, or a
+ * blocked-cookies setting all make localStorage throw. The old wrapper
+ * swallowed that silently, so the app looked like it was saving while nothing
+ * ever persisted. Probe once, fall back to memory so the session still works,
+ * and expose `persistent` so the UI can say so out loud. */
+const DB = (function () {
+  let persistent = false;
+  try {
+    const probe = "hb.__probe";
+    localStorage.setItem(probe, "1");
+    persistent = localStorage.getItem(probe) === "1";
+    localStorage.removeItem(probe);
+  } catch (e) { persistent = false; }
+
+  const mem = new Map();
+  const memStore = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => { mem.set(k, v); },
+    removeItem: (k) => { mem.delete(k); }
+  };
+  const store = () => (persistent ? localStorage : memStore);
+
+  return {
+    get persistent() { return persistent; },
+    get(k, d) {
+      try { const v = store().getItem("hb." + k); return v === null ? d : JSON.parse(v); }
+      catch (e) { return d; }
+    },
+    set(k, v) {
+      const body = JSON.stringify(v);
+      try { store().setItem("hb." + k, body); return true; }
+      catch (e) {
+        // out of quota or storage revoked mid-session: keep the app usable
+        persistent = false;
+        try { memStore.setItem("hb." + k, body); } catch (_) {}
+        return false;
+      }
+    },
+    del(k) { try { store().removeItem("hb." + k); } catch (e) {} }
+  };
+})();
 
 /* ------------------------------------------------------------------ i18n - */
 let LANG = DB.get("lang", null) || I18N.detect(navigator.languages || [navigator.language]);
@@ -2189,7 +2360,7 @@ function setLang(code) {
   const meta = I18N.lookup(code, "meta") || {};
   document.documentElement.lang = meta.htmlLang || code;
   document.title = t("app.docTitle");
-  renderChrome(); renderStaticLabels(); loadSetup(); renderView(STATE.view);
+  renderChrome(); renderStaticLabels(); renderStorageBar(); loadSetup(); renderView(STATE.view);
 }
 
 /* ------------------------------------------------------------------ util - */
@@ -2224,6 +2395,16 @@ const STATE = { view: "home", quiz: null, drill: null, analysis: null };
 
 /* ============================================================ CHROME ===== */
 const VIEWS = ["home", "quiz", "hand", "stats", "drill", "range", "help"];
+function renderStorageBar() {
+  const el = $("storagebar");
+  if (!el) return;
+  if (DB.persistent) { el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="wrap" style="padding-top:12px;padding-bottom:0">' +
+    '<div class="blk warn" style="margin:0"><div class="t">' + esc(t("storage.offTitle")) + "</div>" +
+    "<p style=\"margin:0 0 6px\">" + esc(t("storage.offBody")) + "</p>" +
+    '<button class="btn sec sm" id="sb-export">' + esc(t("help.exportBtn")) + "</button></div></div>";
+  const b = $("sb-export"); if (b) b.onclick = exportData;
+}
 function renderChrome() {
   $("logo").innerHTML = t("app.title");
   $("nav").innerHTML = VIEWS.map((v) =>
@@ -3165,31 +3346,96 @@ function drillHistoryHTML() {
 }
 
 /* ============================================================ RANGE LAB == */
-const RANGE_STATE = { pos: "BTN", hand: "", vs: "top20", custom: "22+ A9s+ KTs+ AJo+", board: "" };
+const RANGE_STATE = {
+  seats: 6, situation: "rfi", pos: "BTN", vs: "CO", stack: 15,
+  hand: "", custom: "22+ A9s+ KTs+ AJo+", board: ""
+};
+function chips(id, items, active, key) {
+  return '<div class="bg" id="' + id + '" style="display:flex;margin-bottom:8px">' +
+    items.map((it) => '<button data-k="' + esc(it.k) + '" class="' + (String(active) === String(it.k) ? "on" : "") + '">' +
+      esc(it.label) + "</button>").join("") + "</div>";
+}
 function renderRange() {
   const v = $("v-range");
-  const seats = setupSeats();
-  const L = PE.posList(seats).filter((p) => PE.rfiRange(seats, p).length);
-  if (L.indexOf(RANGE_STATE.pos) < 0) RANGE_STATE.pos = L[L.length - 1];
-  const chart = PE.rfiRange(seats, RANGE_STATE.pos);
+  const R = RANGE_STATE;
+  const sit = PE.SITUATIONS.find((x) => x.id === R.situation) || PE.SITUATIONS[0];
+
+  // positions that can actually take this action at this table size
+  const all = PE.posList(R.seats);
+  const canAct = R.situation === "rfi"
+    ? all.filter((p) => PE.rfiRange(R.seats, p).length)
+    : /shove/.test(R.situation) ? all : all;
+  if (canAct.indexOf(R.pos) < 0) R.pos = canAct[canAct.length - 1];
+  const opponents = all.filter((p) => p !== R.pos);
+  if (opponents.indexOf(R.vs) < 0) R.vs = opponents[0];
+
+  const classes = PE.situationRange({
+    seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs, stack: R.stack,
+    vt: PE.VILLAIN_TYPES.unknown
+  });
+  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
+  const shortStack = /shove/.test(R.situation);
+
   let h = '<div class="card"><h2>' + esc(t("range.h1")) + "</h2><p>" + esc(t("range.lead")) + "</p></div>";
-  h += '<div class="card"><h3>' + esc(t("range.chartTitle")) + "</h3>" +
-    '<div class="bg" id="rg-pos" style="display:flex;margin-bottom:10px">' +
-    L.map((p) => '<button data-p="' + p + '" class="' + (RANGE_STATE.pos === p ? "on" : "") + '">' + esc(posName(p)) + "</button>").join("") + "</div>" +
-    '<div class="small muted" style="margin-bottom:8px">' + esc(t("range.chartSub", {
-      seats: seats + "-max", pos: posName(RANGE_STATE.pos), pct: nfmt(PE.rangePct(chart)) })) + "</div>" +
-    gridHTML(chart, null) + "</div>";
+  h += '<div class="card">' +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.tableSize")) + "</div>" +
+    chips("rg-seats", [
+      { k: 2, label: t("hand.seats2") }, { k: 6, label: t("hand.seats6") }, { k: 9, label: t("hand.seats9") }
+    ], R.seats) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.situation")) + "</div>" +
+    chips("rg-sit", PE.SITUATIONS.map((x) => ({ k: x.id, label: t("range.sit." + x.id) })), R.situation) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.position")) + "</div>" +
+    chips("rg-pos", canAct.map((p) => ({ k: p, label: posName(p) })), R.pos) +
+    (sit.needsVs
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.vsPosition")) + "</div>" +
+        chips("rg-vs", opponents.map((p) => ({ k: p, label: posName(p) })), R.vs)
+      : "") +
+    (shortStack
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.stackDepth")) + "</div>" +
+        chips("rg-stack", [8, 10, 12, 15, 20, 25].map((n) => ({ k: n, label: n + "BB" })), R.stack)
+      : "") +
+    '<div class="blk hi" style="margin-top:12px"><div class="t">' +
+      esc(t("range.sit." + R.situation)) + " · " + esc(posName(R.pos)) +
+      (sit.needsVs ? " " + esc(t("common.vs")) + " " + esc(posName(R.vs)) : "") +
+      (shortStack ? " · " + R.stack + "BB" : "") + "</div>" +
+    "<p>" + esc(t("range.sitNote." + R.situation)) + "</p>" +
+    '<div class="facts" style="margin-bottom:10px">' +
+      fact(t("common.hand"), nfmt(PE.rangePct(classes)) + "%", t("range.combos", { n: combos })) +
+    "</div>" +
+    gridHTML(classes, null) +
+    '<div class="small muted" style="margin:10px 0 4px">' + esc(t("range.notation")) + "</div>" +
+    '<div class="notation" id="rg-note">' + esc(PE.rangeNotation(classes)) + "</div>" +
+    '<button class="btn sec sm" id="rg-copy" style="margin-top:8px">' + esc(t("range.copyNotation")) + "</button>" +
+    "</div></div>";
+
   h += '<div class="card"><h3>' + esc(t("range.calcTitle")) + "</h3>" +
     '<div class="grid g3">' +
-    '<div><label>' + esc(t("range.myHand")) + '</label><input id="rg-hand" value="' + esc(RANGE_STATE.hand) + '" placeholder="AsKd"></div>' +
-    '<div><label>' + esc(t("range.vsRange")) + '</label><input id="rg-range" value="' + esc(RANGE_STATE.custom) + '"></div>' +
-    '<div><label>' + esc(t("range.boardOpt")) + '</label><input id="rg-board" value="' + esc(RANGE_STATE.board) + '" placeholder="Kh7s2d"></div>' +
+    '<div><label>' + esc(t("range.myHand")) + '</label><input id="rg-hand" value="' + esc(R.hand) + '" placeholder="AsKd"></div>' +
+    '<div><label>' + esc(t("range.vsRange")) + '</label><input id="rg-range" value="' + esc(R.custom) + '"></div>' +
+    '<div><label>' + esc(t("range.boardOpt")) + '</label><input id="rg-board" value="' + esc(R.board) + '" placeholder="Kh7s2d"></div>' +
     "</div>" +
     '<div class="small dim" style="margin-top:6px">' + esc(t("range.rangeHint")) + "</div>" +
-    '<div class="row" style="margin-top:12px"><div style="flex:0 0 auto"><button class="btn" id="rg-go">' + esc(t("range.calc")) + "</button></div></div>" +
-    '<div id="rg-out"></div></div>';
+    '<div class="row" style="margin-top:12px">' +
+      '<div style="flex:0 0 auto"><button class="btn" id="rg-go">' + esc(t("range.calc")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="rg-use">' + esc(t("range.situation")) + " →</button></div>" +
+    "</div><div id=\"rg-out\"></div></div>";
   v.innerHTML = h;
-  v.querySelectorAll("#rg-pos button").forEach((b) => (b.onclick = () => { RANGE_STATE.pos = b.dataset.p; renderRange(); }));
+
+  const bind = (id, prop, cast) => {
+    const el = $(id); if (!el) return;
+    el.querySelectorAll("button").forEach((b) => (b.onclick = () => {
+      RANGE_STATE[prop] = cast ? cast(b.dataset.k) : b.dataset.k; renderRange();
+    }));
+  };
+  bind("rg-seats", "seats", Number); bind("rg-sit", "situation");
+  bind("rg-pos", "pos"); bind("rg-vs", "vs"); bind("rg-stack", "stack", Number);
+  $("rg-copy").onclick = () => {
+    const text = PE.rangeNotation(classes);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast(t("common.copied")), () => {});
+    else toast(t("common.copied"));
+  };
+  // drop the charted range straight into the calculator
+  $("rg-use").onclick = () => { RANGE_STATE.custom = PE.rangeNotation(classes); renderRange(); };
   $("rg-go").onclick = runRangeCalc;
 }
 function parseCards(str) {
@@ -3249,7 +3495,9 @@ function renderStats() {
     else if (l.best === "fold" && l.mine === "call") counts.calldown++;
     else counts.sizing++;
   }));
-  h += '<div class="card"><h3>' + esc(t("stats.leakTitle")) + "</h3>";
+  h += '<div class="card"><h3>' + esc(t("stats.leakTitle")) + "</h3>" +
+    '<details style="margin:0 0 12px"><summary>' + esc(t("stats.leakWhat")) + "</summary><p>" +
+    t("stats.leakWhatBody") + "</p></details>";
   if (total < 5) h += '<div class="notice">' + esc(t("stats.leakNone")) + "</div>";
   else {
     h += Object.keys(counts).filter((k) => counts[k]).sort((a, b) => counts[b] - counts[a]).map((k) =>
@@ -3380,6 +3628,7 @@ function boot() {
   document.title = t("app.docTitle");
   renderChrome();
   renderStaticLabels();
+  renderStorageBar();
 
   $("langsel").onchange = (e) => setLang(e.target.value);
   $("themebtn").onclick = toggleTheme;

@@ -225,6 +225,23 @@ const ko = {
     myHand: "내 핸드", vsRange: "상대 레인지", boardOpt: "보드 (선택)",
     calc: "계산", result: "결과",
     eqResult: "내 승률 <b>{eq}</b> · 상대 콤보 {n}개",
+    tableSize: "테이블", situation: "상황", position: "포지션", vsPosition: "상대 자리",
+    stackDepth: "스택 깊이", combos: "{n}콤보",
+    notation: "차트 표기", copyNotation: "표기 복사",
+    sit: {
+      rfi: "첫 진입 (오픈)", vs_open_3b: "오픈에 3벳", vs_open_call: "오픈에 콜",
+      vs_3b_4b: "3벳에 4벳", vs_3b_call: "3벳에 콜",
+      shove: "숏스택 올인", call_shove: "올인에 콜"
+    },
+    sitNote: {
+      rfi: "앞이 전부 폴드했을 때 이 자리에서 먼저 레이즈로 들어가는 레인지입니다.",
+      vs_open_3b: "앞사람이 오픈했을 때 3벳으로 되받는 레인지입니다. 밸류 위주에 수딧 블러프를 섞습니다.",
+      vs_open_call: "오픈에 콜만 하고 따라가는 레인지입니다. 3벳할 최상위는 여기서 빠져 있습니다.",
+      vs_3b_4b: "내 오픈에 3벳이 왔을 때 4벳으로 되받는 레인지입니다.",
+      vs_3b_call: "3벳을 맞고 콜로 받아 플랍을 보는 레인지입니다. 4벳할 최상위는 빠져 있습니다.",
+      shove: "스택이 얕을 때 레이즈 대신 그냥 올인으로 들어가는 레인지입니다. 스택이 짧을수록 넓어집니다.",
+      call_shove: "상대 올인을 받아주는 레인지입니다. 팟 오즈가 좋을수록 넓어집니다."
+    },
     presetTop: "상위 {p}%", customRange: "직접 입력",
     rangeHint: "예: 22+ A9s+ KTs+ AJo+  ·  쉼표나 공백으로 구분",
     invalidRange: "레인지를 알아볼 수 없습니다."
@@ -236,6 +253,8 @@ const ko = {
     date: "날짜", spot: "스팟", result: "결과", evLost: "EV 손실",
     delete: "삭제", confirmDelete: "이 기록을 삭제할까요?",
     leakTitle: "반복되는 패턴", leakNone: "아직 패턴을 잡을 만큼 표본이 없습니다.",
+    leakWhat: "리크(leak)란?",
+    leakWhatBody: "포커에서 <b>리크</b>는 <b>반복해서 돈을 흘리는 습관</b>을 뜻합니다. 한 판을 진 것은 리크가 아닙니다 — 운이 나쁠 수 있으니까요. 같은 구조의 스팟에서 <b>매번 같은 방향으로 잘못된 선택</b>을 하는 것, 그래서 장기적으로 EV가 새어 나가는 것이 리크입니다. 예를 들어 \'칠 자리에서 계속 체크한다\', \'팟 오즈가 맞는데도 겁이 나서 접는다\' 같은 것들입니다. 아래는 드릴에서 내린 선택을 모아 <b>어느 방향으로 자주 틀리는지</b> 집계한 것입니다.",
     totalHands: "핸드", totalDrills: "드릴 세션", avgCapture: "평균 EV 획득률"
   },
   help: {
@@ -256,6 +275,14 @@ const ko = {
     confirmReset: "저장된 모든 기록을 지울까요? 되돌릴 수 없습니다.",
     disclaimer: "이 도구는 학습·복기용이며 도박 자금 운용에 대한 조언이 아닙니다. 잃어도 생활에 지장이 없는 돈만 쓰세요.",
     responsible: "도움이 필요하면: 한국도박문제예방치유원 1336 · 국제 문의는 각국 상담 기관을 이용하세요."
+  },
+  storage: {
+    offTitle: "이 환경에서는 기록이 저장되지 않습니다",
+    offBody: "브라우저가 저장소를 막고 있어(시크릿 모드이거나 페이지가 샌드박스 안에 있을 때) 창을 닫으면 기록이 사라집니다. 남기려면 내보내기로 파일을 받아두세요.",
+    onTitle: "기록은 이 브라우저에 저장됩니다",
+    onBody: "이 기기의 이 브라우저에만 남습니다. 다른 기기나 다른 브라우저에서는 보이지 않고, 브라우저 데이터를 지우면 함께 사라집니다.",
+    whyNoAccount: "서버가 없는 단일 파일 앱이라 IP나 계정으로 기록을 묶을 수 없습니다. 기기 간에 옮기려면 내보내기·불러오기를 쓰세요.",
+    exportHint: "내보내기로 받은 파일은 다른 기기에서 불러오기로 그대로 복원됩니다."
   },
   bankroll: {
     title: "뱅크롤",
@@ -481,6 +508,23 @@ const en = {
     myHand: "My hand", vsRange: "Villain range", boardOpt: "Board (optional)",
     calc: "Calculate", result: "Result",
     eqResult: "Your equity <b>{eq}</b> · {n} villain combos",
+    tableSize: "Table", situation: "Situation", position: "Position", vsPosition: "Opponent seat",
+    stackDepth: "Stack depth", combos: "{n} combos",
+    notation: "Chart notation", copyNotation: "Copy notation",
+    sit: {
+      rfi: "First in (open)", vs_open_3b: "3-bet an open", vs_open_call: "Call an open",
+      vs_3b_4b: "4-bet a 3-bet", vs_3b_call: "Call a 3-bet",
+      shove: "Short-stack jam", call_shove: "Call a jam"
+    },
+    sitNote: {
+      rfi: "What you raise with from this seat when everyone folds to you.",
+      vs_open_3b: "What you 3-bet after someone opens — a value core plus suited bluffs.",
+      vs_open_call: "What you flat instead of raising. The very top 3-bets, so it is missing here.",
+      vs_3b_4b: "What you 4-bet after your open gets 3-bet.",
+      vs_3b_call: "What you call a 3-bet with to see a flop. The 4-betting top is missing here.",
+      shove: "What you jam instead of raising when stacks are shallow. It widens fast as the stack shortens.",
+      call_shove: "What you call a jam with. Better pot odds widen it."
+    },
     presetTop: "Top {p}%", customRange: "Custom",
     rangeHint: "e.g. 22+ A9s+ KTs+ AJo+  ·  separated by spaces or commas",
     invalidRange: "Could not parse that range."
@@ -492,6 +536,8 @@ const en = {
     date: "Date", spot: "Spot", result: "Result", evLost: "EV lost",
     delete: "Delete", confirmDelete: "Delete this entry?",
     leakTitle: "Recurring patterns", leakNone: "Not enough sample to call a pattern yet.",
+    leakWhat: "What is a leak?",
+    leakWhatBody: "A <b>leak</b> is a habit that loses money repeatedly. Losing one hand is not a leak — that can just be luck. A leak is making <b>the same kind of mistake in the same direction</b> every time a spot comes up, so EV drains away over the long run. Things like \'checking where you should bet\' or \'folding when the pot odds say call\'. Below is a tally of the choices you made in drills, grouped by <b>which way you tend to get it wrong</b>.",
     totalHands: "Hands", totalDrills: "Drill sessions", avgCapture: "Mean EV captured"
   },
   help: {
@@ -512,6 +558,14 @@ const en = {
     confirmReset: "Delete every saved record? This cannot be undone.",
     disclaimer: "This is a study tool, not advice on managing gambling money. Only ever play with money you can afford to lose.",
     responsible: "If you need help, contact a problem-gambling service in your country."
+  },
+  storage: {
+    offTitle: "Nothing is being saved here",
+    offBody: "Your browser is blocking storage — private browsing, or the page running inside a sandbox — so records disappear when you close the window. Export a file to keep them.",
+    onTitle: "Records live in this browser",
+    onBody: "They stay on this device in this browser only. Another device or browser will not see them, and clearing browser data deletes them.",
+    whyNoAccount: "This is a single file with no server behind it, so records cannot be tied to an IP address or an account. Use export and import to move them between devices.",
+    exportHint: "An exported file restores exactly as it was via Import on any other device."
   },
   bankroll: {
     title: "Bankroll",

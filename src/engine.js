@@ -721,11 +721,18 @@ function flatRange(seats, caller, opener, vt) {
   const skip = caller === "BB" ? 3.5 : 5;
   return topPercentRange(clampPct(width * vt.openMul, 5, 92), skip);
 }
-/** 3-betting: a value core plus a suited bluff tail, not a pure top-N slice. */
-function threeBetRange(seats, pos, vt) {
-  const value = topPercentRange(clampPct(6 * vt.openMul, 2, 20));
+/** 3-betting: a value core plus a suited bluff tail, not a pure top-N slice.
+ *  How wide depends on who opened — you 3-bet an under-the-gun raiser far
+ *  less than a button steal, so the opener's seat has to be an input.      */
+function threeBetRange(seats, pos, vt, openerPos) {
+  const openW = openerPos ? (rangePct(rfiRange(seats, openerPos)) || 22) : 22;
+  // a 15% opener earns ~5.5% of 3-bets, a 45% opener ~11%
+  const width = clampPct(3.4 + openW * 0.17, 3, 14) * vt.openMul;
+  const value = topPercentRange(clampPct(width, 2, 20));
   const bluffs = parseRange("A5s-A2s K9s-K7s Q9s J9s T9s 98s 76s 65s");
-  const wanted = Math.round(bluffs.length * clampPct(vt.bluffMul, 0.2, 1.8) * 0.6);
+  // wider opens get attacked with more bluffs, not just more value
+  const share = clampPct(openW, 10, 50) / 50;
+  const wanted = Math.round(bluffs.length * share * clampPct(vt.bluffMul, 0.2, 1.8));
   const out = value.slice();
   bluffs.slice(0, wanted).forEach((c) => { if (out.indexOf(c) < 0) out.push(c); });
   return out;
@@ -748,12 +755,12 @@ const SCENARIOS = [
     vilR:  (seats, hp, vp, vt) => openRange(seats, vp, vt) },
   // hero 3-bet the villain's open and the villain called
   { id: "3b_call", pot: 19, heroAgg: true, heroInv: 9, opener: "villain",
-    heroR: (seats, hp, vp, vt) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown),
+    heroR: (seats, hp, vp, vt) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown, vp),
     vilR:  (seats, hp, vp, vt) => callVs3betRange(seats, vp, vt) },
   // hero opened, villain 3-bet, hero called
   { id: "call_3b", pot: 19, heroAgg: false, heroInv: 9, opener: "hero",
     heroR: (seats, hp, vp, vt) => callVs3betRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => threeBetRange(seats, vp, vt) },
+    vilR:  (seats, hp, vp, vt) => threeBetRange(seats, vp, vt, hp) },
   // multiway-ish limped pot
   { id: "limp", pot: 4.5, heroAgg: false, heroInv: 1, opener: null,
     heroR: () => topPercentRange(45, 5),
@@ -798,6 +805,75 @@ SCENARIOS.push(
     vilR:  (seats, hp, vp, vt) => fourBetRange(seats, vp, vt) }
 );
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
+
+/* ------------------------------------------------- situational ranges ----
+ * One accessor for every preflop spot the Range Lab shows, so the charts on
+ * screen are the same objects the EV maths uses — a chart that disagrees with
+ * the engine is worse than no chart.                                        */
+const SITUATIONS = [
+  { id: "rfi",       needsVs: false },   // first in
+  { id: "vs_open_3b", needsVs: true },   // facing an open: 3-bet
+  { id: "vs_open_call", needsVs: true }, // facing an open: flat
+  { id: "vs_3b_4b",  needsVs: true },    // facing a 3-bet: 4-bet
+  { id: "vs_3b_call", needsVs: true },   // facing a 3-bet: call
+  { id: "shove",     needsVs: false },   // short stack: jam
+  { id: "call_shove", needsVs: false }   // short stack: call a jam
+];
+function situationRange(o) {
+  const seats = o.seats || 6, pos = o.pos, vs = o.vs || "CO";
+  const vt = o.vt || VILLAIN_TYPES.unknown;
+  const stack = o.stack === undefined ? 15 : o.stack;
+  switch (o.situation) {
+    case "rfi":          return openRange(seats, pos, vt);
+    case "vs_open_3b":   return threeBetRange(seats, pos, vt, vs);
+    case "vs_open_call": return flatRange(seats, pos, vs, vt);
+    case "vs_3b_4b":     return fourBetRange(seats, pos, vt);
+    case "vs_3b_call":   return callVs3betRange(seats, pos, vt);
+    case "shove":        return shoveRange(stack, vt);
+    case "call_shove":   return callShoveRange(stack, vt);
+    default:             return openRange(seats, pos, vt);
+  }
+}
+/** Compact chart notation for a class list, e.g. "22+ A9s+ ATo+". */
+function rangeNotation(classes) {
+  const set = {}; classes.forEach((c) => (set[c] = 1));
+  const out = [];
+  // pairs
+  const pairs = RANKS.split("").filter((r) => set[r + r]);
+  if (pairs.length) {
+    let i = 0;
+    while (i < pairs.length) {
+      let j = i;
+      while (j + 1 < pairs.length && RANKS.indexOf(pairs[j + 1]) === RANKS.indexOf(pairs[j]) + 1) j++;
+      const lo = pairs[i], hi = pairs[j];
+      if (RANKS.indexOf(hi) === 12) out.push(lo + lo + "+");
+      else if (i === j) out.push(lo + lo);
+      else out.push(hi + hi + "-" + lo + lo);
+      i = j + 1;
+    }
+  }
+  // suited / offsuit runs, grouped by high card
+  ["s", "o"].forEach((suit) => {
+    for (let h = 12; h >= 0; h--) {
+      const ks = [];
+      for (let k = h - 1; k >= 0; k--) if (set[RANKS[h] + RANKS[k] + suit]) ks.push(k);
+      if (!ks.length) continue;
+      ks.sort((a, b) => b - a);
+      let i = 0;
+      while (i < ks.length) {
+        let j = i;
+        while (j + 1 < ks.length && ks[j + 1] === ks[j] - 1) j++;
+        const hiK = ks[i], loK = ks[j];
+        const label = (k) => RANKS[h] + RANKS[k] + suit;
+        if (hiK === h - 1) out.push(label(loK) + "+");
+        else if (i === j) out.push(label(hiK));
+        else out.push(label(hiK) + "-" + label(loK));
+        i = j + 1;
+      }
+    }
+  });
+  return out.join(" ");
+}
 
 /* ------------------------------------------------- preflop money ---------
  * The scenario fixes the *shape* of the preflop action; these sizes fix how
@@ -1091,7 +1167,8 @@ return {
   evCheck, evBet, evCall, evRaise, buildContext, options,
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
-  preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf, fourBetRange, callVs4betRange,
+  preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
+  SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange, fourBetRange, callVs4betRange,
   // util
   mulberry32, seedFrom, round1
 };

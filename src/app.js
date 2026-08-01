@@ -4,11 +4,47 @@
 "use strict";
 
 /* ------------------------------------------------------------- storage --- */
-const DB = {
-  get(k, d) { try { const v = localStorage.getItem("hb." + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem("hb." + k, JSON.stringify(v)); } catch (e) {} },
-  del(k) { try { localStorage.removeItem("hb." + k); } catch (e) {} }
-};
+/* Storage is not guaranteed: a sandboxed iframe, private browsing, or a
+ * blocked-cookies setting all make localStorage throw. The old wrapper
+ * swallowed that silently, so the app looked like it was saving while nothing
+ * ever persisted. Probe once, fall back to memory so the session still works,
+ * and expose `persistent` so the UI can say so out loud. */
+const DB = (function () {
+  let persistent = false;
+  try {
+    const probe = "hb.__probe";
+    localStorage.setItem(probe, "1");
+    persistent = localStorage.getItem(probe) === "1";
+    localStorage.removeItem(probe);
+  } catch (e) { persistent = false; }
+
+  const mem = new Map();
+  const memStore = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => { mem.set(k, v); },
+    removeItem: (k) => { mem.delete(k); }
+  };
+  const store = () => (persistent ? localStorage : memStore);
+
+  return {
+    get persistent() { return persistent; },
+    get(k, d) {
+      try { const v = store().getItem("hb." + k); return v === null ? d : JSON.parse(v); }
+      catch (e) { return d; }
+    },
+    set(k, v) {
+      const body = JSON.stringify(v);
+      try { store().setItem("hb." + k, body); return true; }
+      catch (e) {
+        // out of quota or storage revoked mid-session: keep the app usable
+        persistent = false;
+        try { memStore.setItem("hb." + k, body); } catch (_) {}
+        return false;
+      }
+    },
+    del(k) { try { store().removeItem("hb." + k); } catch (e) {} }
+  };
+})();
 
 /* ------------------------------------------------------------------ i18n - */
 let LANG = DB.get("lang", null) || I18N.detect(navigator.languages || [navigator.language]);
@@ -22,7 +58,7 @@ function setLang(code) {
   const meta = I18N.lookup(code, "meta") || {};
   document.documentElement.lang = meta.htmlLang || code;
   document.title = t("app.docTitle");
-  renderChrome(); renderStaticLabels(); loadSetup(); renderView(STATE.view);
+  renderChrome(); renderStaticLabels(); renderStorageBar(); loadSetup(); renderView(STATE.view);
 }
 
 /* ------------------------------------------------------------------ util - */
@@ -57,6 +93,16 @@ const STATE = { view: "home", quiz: null, drill: null, analysis: null };
 
 /* ============================================================ CHROME ===== */
 const VIEWS = ["home", "quiz", "hand", "stats", "drill", "range", "help"];
+function renderStorageBar() {
+  const el = $("storagebar");
+  if (!el) return;
+  if (DB.persistent) { el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="wrap" style="padding-top:12px;padding-bottom:0">' +
+    '<div class="blk warn" style="margin:0"><div class="t">' + esc(t("storage.offTitle")) + "</div>" +
+    "<p style=\"margin:0 0 6px\">" + esc(t("storage.offBody")) + "</p>" +
+    '<button class="btn sec sm" id="sb-export">' + esc(t("help.exportBtn")) + "</button></div></div>";
+  const b = $("sb-export"); if (b) b.onclick = exportData;
+}
 function renderChrome() {
   $("logo").innerHTML = t("app.title");
   $("nav").innerHTML = VIEWS.map((v) =>
@@ -998,31 +1044,96 @@ function drillHistoryHTML() {
 }
 
 /* ============================================================ RANGE LAB == */
-const RANGE_STATE = { pos: "BTN", hand: "", vs: "top20", custom: "22+ A9s+ KTs+ AJo+", board: "" };
+const RANGE_STATE = {
+  seats: 6, situation: "rfi", pos: "BTN", vs: "CO", stack: 15,
+  hand: "", custom: "22+ A9s+ KTs+ AJo+", board: ""
+};
+function chips(id, items, active, key) {
+  return '<div class="bg" id="' + id + '" style="display:flex;margin-bottom:8px">' +
+    items.map((it) => '<button data-k="' + esc(it.k) + '" class="' + (String(active) === String(it.k) ? "on" : "") + '">' +
+      esc(it.label) + "</button>").join("") + "</div>";
+}
 function renderRange() {
   const v = $("v-range");
-  const seats = setupSeats();
-  const L = PE.posList(seats).filter((p) => PE.rfiRange(seats, p).length);
-  if (L.indexOf(RANGE_STATE.pos) < 0) RANGE_STATE.pos = L[L.length - 1];
-  const chart = PE.rfiRange(seats, RANGE_STATE.pos);
+  const R = RANGE_STATE;
+  const sit = PE.SITUATIONS.find((x) => x.id === R.situation) || PE.SITUATIONS[0];
+
+  // positions that can actually take this action at this table size
+  const all = PE.posList(R.seats);
+  const canAct = R.situation === "rfi"
+    ? all.filter((p) => PE.rfiRange(R.seats, p).length)
+    : /shove/.test(R.situation) ? all : all;
+  if (canAct.indexOf(R.pos) < 0) R.pos = canAct[canAct.length - 1];
+  const opponents = all.filter((p) => p !== R.pos);
+  if (opponents.indexOf(R.vs) < 0) R.vs = opponents[0];
+
+  const classes = PE.situationRange({
+    seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs, stack: R.stack,
+    vt: PE.VILLAIN_TYPES.unknown
+  });
+  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
+  const shortStack = /shove/.test(R.situation);
+
   let h = '<div class="card"><h2>' + esc(t("range.h1")) + "</h2><p>" + esc(t("range.lead")) + "</p></div>";
-  h += '<div class="card"><h3>' + esc(t("range.chartTitle")) + "</h3>" +
-    '<div class="bg" id="rg-pos" style="display:flex;margin-bottom:10px">' +
-    L.map((p) => '<button data-p="' + p + '" class="' + (RANGE_STATE.pos === p ? "on" : "") + '">' + esc(posName(p)) + "</button>").join("") + "</div>" +
-    '<div class="small muted" style="margin-bottom:8px">' + esc(t("range.chartSub", {
-      seats: seats + "-max", pos: posName(RANGE_STATE.pos), pct: nfmt(PE.rangePct(chart)) })) + "</div>" +
-    gridHTML(chart, null) + "</div>";
+  h += '<div class="card">' +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.tableSize")) + "</div>" +
+    chips("rg-seats", [
+      { k: 2, label: t("hand.seats2") }, { k: 6, label: t("hand.seats6") }, { k: 9, label: t("hand.seats9") }
+    ], R.seats) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.situation")) + "</div>" +
+    chips("rg-sit", PE.SITUATIONS.map((x) => ({ k: x.id, label: t("range.sit." + x.id) })), R.situation) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.position")) + "</div>" +
+    chips("rg-pos", canAct.map((p) => ({ k: p, label: posName(p) })), R.pos) +
+    (sit.needsVs
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.vsPosition")) + "</div>" +
+        chips("rg-vs", opponents.map((p) => ({ k: p, label: posName(p) })), R.vs)
+      : "") +
+    (shortStack
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.stackDepth")) + "</div>" +
+        chips("rg-stack", [8, 10, 12, 15, 20, 25].map((n) => ({ k: n, label: n + "BB" })), R.stack)
+      : "") +
+    '<div class="blk hi" style="margin-top:12px"><div class="t">' +
+      esc(t("range.sit." + R.situation)) + " · " + esc(posName(R.pos)) +
+      (sit.needsVs ? " " + esc(t("common.vs")) + " " + esc(posName(R.vs)) : "") +
+      (shortStack ? " · " + R.stack + "BB" : "") + "</div>" +
+    "<p>" + esc(t("range.sitNote." + R.situation)) + "</p>" +
+    '<div class="facts" style="margin-bottom:10px">' +
+      fact(t("common.hand"), nfmt(PE.rangePct(classes)) + "%", t("range.combos", { n: combos })) +
+    "</div>" +
+    gridHTML(classes, null) +
+    '<div class="small muted" style="margin:10px 0 4px">' + esc(t("range.notation")) + "</div>" +
+    '<div class="notation" id="rg-note">' + esc(PE.rangeNotation(classes)) + "</div>" +
+    '<button class="btn sec sm" id="rg-copy" style="margin-top:8px">' + esc(t("range.copyNotation")) + "</button>" +
+    "</div></div>";
+
   h += '<div class="card"><h3>' + esc(t("range.calcTitle")) + "</h3>" +
     '<div class="grid g3">' +
-    '<div><label>' + esc(t("range.myHand")) + '</label><input id="rg-hand" value="' + esc(RANGE_STATE.hand) + '" placeholder="AsKd"></div>' +
-    '<div><label>' + esc(t("range.vsRange")) + '</label><input id="rg-range" value="' + esc(RANGE_STATE.custom) + '"></div>' +
-    '<div><label>' + esc(t("range.boardOpt")) + '</label><input id="rg-board" value="' + esc(RANGE_STATE.board) + '" placeholder="Kh7s2d"></div>' +
+    '<div><label>' + esc(t("range.myHand")) + '</label><input id="rg-hand" value="' + esc(R.hand) + '" placeholder="AsKd"></div>' +
+    '<div><label>' + esc(t("range.vsRange")) + '</label><input id="rg-range" value="' + esc(R.custom) + '"></div>' +
+    '<div><label>' + esc(t("range.boardOpt")) + '</label><input id="rg-board" value="' + esc(R.board) + '" placeholder="Kh7s2d"></div>' +
     "</div>" +
     '<div class="small dim" style="margin-top:6px">' + esc(t("range.rangeHint")) + "</div>" +
-    '<div class="row" style="margin-top:12px"><div style="flex:0 0 auto"><button class="btn" id="rg-go">' + esc(t("range.calc")) + "</button></div></div>" +
-    '<div id="rg-out"></div></div>';
+    '<div class="row" style="margin-top:12px">' +
+      '<div style="flex:0 0 auto"><button class="btn" id="rg-go">' + esc(t("range.calc")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="rg-use">' + esc(t("range.situation")) + " →</button></div>" +
+    "</div><div id=\"rg-out\"></div></div>";
   v.innerHTML = h;
-  v.querySelectorAll("#rg-pos button").forEach((b) => (b.onclick = () => { RANGE_STATE.pos = b.dataset.p; renderRange(); }));
+
+  const bind = (id, prop, cast) => {
+    const el = $(id); if (!el) return;
+    el.querySelectorAll("button").forEach((b) => (b.onclick = () => {
+      RANGE_STATE[prop] = cast ? cast(b.dataset.k) : b.dataset.k; renderRange();
+    }));
+  };
+  bind("rg-seats", "seats", Number); bind("rg-sit", "situation");
+  bind("rg-pos", "pos"); bind("rg-vs", "vs"); bind("rg-stack", "stack", Number);
+  $("rg-copy").onclick = () => {
+    const text = PE.rangeNotation(classes);
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast(t("common.copied")), () => {});
+    else toast(t("common.copied"));
+  };
+  // drop the charted range straight into the calculator
+  $("rg-use").onclick = () => { RANGE_STATE.custom = PE.rangeNotation(classes); renderRange(); };
   $("rg-go").onclick = runRangeCalc;
 }
 function parseCards(str) {
@@ -1082,7 +1193,9 @@ function renderStats() {
     else if (l.best === "fold" && l.mine === "call") counts.calldown++;
     else counts.sizing++;
   }));
-  h += '<div class="card"><h3>' + esc(t("stats.leakTitle")) + "</h3>";
+  h += '<div class="card"><h3>' + esc(t("stats.leakTitle")) + "</h3>" +
+    '<details style="margin:0 0 12px"><summary>' + esc(t("stats.leakWhat")) + "</summary><p>" +
+    t("stats.leakWhatBody") + "</p></details>";
   if (total < 5) h += '<div class="notice">' + esc(t("stats.leakNone")) + "</div>";
   else {
     h += Object.keys(counts).filter((k) => counts[k]).sort((a, b) => counts[b] - counts[a]).map((k) =>
@@ -1213,6 +1326,7 @@ function boot() {
   document.title = t("app.docTitle");
   renderChrome();
   renderStaticLabels();
+  renderStorageBar();
 
   $("langsel").onchange = (e) => setLang(e.target.value);
   $("themebtn").onclick = toggleTheme;

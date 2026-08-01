@@ -335,7 +335,31 @@ function saveSetup() {
   DB.set("setup", s); toast(t("hand.setupSaved")); renderBankroll();
 }
 const setupSeats = () => +($("s-seats") ? $("s-seats").value : 6) || 6;
-const setupStack = () => +($("s-stack") ? $("s-stack").value : 100) || 100;
+const MAX_PRACTICE_BB = 500;   // nobody plays deeper than this; beyond it the value is a typo
+const rawStack = () => +($("s-stack") ? $("s-stack").value : 100) || 100;
+/** Stack in BB, clamped to something a real game could produce. */
+const setupStack = () => Math.max(2, Math.min(MAX_PRACTICE_BB, rawStack()));
+function blindSize() {
+  const parts = (($("s-bl") ? $("s-bl").value : "") || "").split("/");
+  const bb = +(parts[1] || parts[0] || 0);
+  return bb > 0 ? bb : 0;
+}
+/** Live feedback under the stack field so BB-vs-chips can't be confused. */
+function renderStackHint() {
+  const el = $("stack-hint"); if (!el) return;
+  const bb = rawStack(), unit = blindSize();
+  let h = "";
+  if (unit) {
+    h += '<div class="small dim">' + esc(t("hand.stackHint", {
+      bb: nfmt(bb, 0), chips: (bb * unit).toLocaleString(), bl: ($("s-bl").value || "")
+    })) + "</div>";
+  }
+  if (bb > MAX_PRACTICE_BB) {
+    h += '<div class="blk warn" style="margin:6px 0 0"><p style="margin:0 0 4px">' + t("hand.stackTooDeep") + "</p>" +
+      '<div class="small dim">' + esc(t("hand.stackClamped", { n: MAX_PRACTICE_BB })) + "</div></div>";
+  }
+  el.innerHTML = h;
+}
 
 function renderBankroll() {
   const el = $("br-advice"); if (!el) return;
@@ -831,10 +855,29 @@ function renderAnalysis(res) {
     DB.set("hands", hands.slice(0, 200)); toast(t("hand.handSaved")); renderHome();
   };
 }
-function renderHand() { loadSetup(); buildHandInputs(); renderBankroll(); }
+function renderHand() { loadSetup(); buildHandInputs(); renderBankroll(); renderStackHint(); }
 
 /* ============================================================ DRILL ====== */
 const DIFFICULTY = { easy: "easy", normal: "normal", hard: "hard" };
+/* Stack depth changes the game more than anything else on this screen: at
+ * 12BB it is push-fold, at 100BB it is a postflop game. "Mixed" deliberately
+ * spends most of its spots below 50BB, because that is where the decisions
+ * are sharpest and where the old build never went. */
+const DEPTHS = [
+  { k: "random", label: "drill.depthRandom", desc: "drill.depthRandomD" },
+  { k: "deep",   label: "drill.depthDeep",   desc: "drill.depthDeepD",   bb: 100 },
+  { k: "mid",    label: "drill.depthMid",    desc: "drill.depthMidD",    bb: 40 },
+  { k: "short",  label: "drill.depthShort",  desc: "drill.depthShortD",  bb: 20 },
+  { k: "ultra",  label: "drill.depthUltra",  desc: "drill.depthUltraD",  bb: 12 }
+];
+const MIXED_DEPTHS = [100, 75, 50, 40, 30, 25, 20, 15, 12, 10];
+/** Stack for the next spot: the chosen depth, or a draw from the mix. */
+function depthFor(cfg) {
+  const chosen = DEPTHS.find((d) => d.k === (cfg.depth || "random"));
+  if (chosen && chosen.bb) return Math.min(chosen.bb, setupStack());
+  const bb = MIXED_DEPTHS[(Math.random() * MIXED_DEPTHS.length) | 0];
+  return Math.min(bb, setupStack());
+}
 function drillConfig() { return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal" }); }
 
 function makeDrillSpot(cfg, stack) {
@@ -854,7 +897,8 @@ function makeDrillSpot(cfg, stack) {
   return best || PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
 }
 function startDrill(cfg) {
-  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot", stack: setupStack(),
+  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
+    depth: cfg.depth || "random", stack: setupStack(),
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
   if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
 }
@@ -865,7 +909,7 @@ function loadHand() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.run = HandRun.start({ stack: D.stack, villainType: D.vt, seats: setupSeats() });
+    D.run = HandRun.start({ stack: depthFor(D), villainType: D.vt, seats: setupSeats() });
     if (!D.run) { loadHand(); return; }
     D.dec = HandRun.decision(D.run);
     D.answered = null;
@@ -910,7 +954,7 @@ function loadSpot() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.cur = makeDrillSpot({ n: D.n, vt: D.vt, diff: D.diff }, D.stack);
+    D.cur = makeDrillSpot({ n: D.n, vt: D.vt, diff: D.diff }, depthFor(D));
     D.answered = null;
     renderDrill();
   }, 20);
@@ -982,7 +1026,13 @@ function renderDrill() {
         [["spot", "drill.modeSpot"], ["hand", "drill.modeHand"]].map(([k, lbl]) =>
           '<button data-k="' + k + '" class="' + ((cfg.mode || "spot") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' + esc(t("drill.mode" + ((cfg.mode || "spot") === "hand" ? "Hand" : "Spot") + "D")) + "</div>" +
-      '<div class="step"><span class="num">4</span>' + esc(t("drill.step3")) + "</div>" +
+      '<div class="step"><span class="num">4</span>' + esc(t("drill.depth")) + "</div>" +
+      '<div class="bg" id="dr-depth" style="display:flex">' +
+        DEPTHS.map((d) => '<button data-k="' + d.k + '" class="' + ((cfg.depth || "random") === d.k ? "on" : "") + '">' +
+          esc(t(d.label)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin-top:5px">' +
+        esc(t((DEPTHS.find((d) => d.k === (cfg.depth || "random")) || DEPTHS[0]).desc)) + "</div>" +
+      '<div class="step"><span class="num">5</span>' + esc(t("drill.step3")) + "</div>" +
       '<div class="bg" id="dr-diff" style="display:flex">' +
         Object.keys(DIFFICULTY).map((k) => '<button data-k="' + k + '" class="' + (cfg.diff === k ? "on" : "") + '">' +
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
@@ -993,6 +1043,7 @@ function renderDrill() {
     v.querySelectorAll("#dr-vt button").forEach((b) => (b.onclick = () => { cfg.vt = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-diff button").forEach((b) => (b.onclick = () => { cfg.diff = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-mode button").forEach((b) => (b.onclick = () => { cfg.mode = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-depth button").forEach((b) => (b.onclick = () => { cfg.depth = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
     return;
   }
@@ -1081,7 +1132,7 @@ function renderHandDrill(v) {
   const D = STATE.drill, run = D.run;
   if (run.done) return renderHandReport(v);
   const dec = D.dec, res = dec.res;
-  const eff = Math.max(0, D.stack - run.heroInv);
+  const eff = Math.max(0, run.stack - run.heroInv);
 
   let h = '<div class="card">' +
     '<div class="dprog"><span class="small muted">' + esc(t("drill.progress", { i: D.i + 1, n: D.n })) + "</span>" +
@@ -1582,7 +1633,10 @@ function boot() {
   $("themebtn").onclick = toggleTheme;
   $("s-save").onclick = saveSetup;
   ["s-seats", "s-stack", "s-bl", "s-br"].forEach((id) => {
-    const el = $(id); if (el) el.onchange = () => { renderBankroll(); if (id === "s-seats") buildHandInputs(); };
+    const el = $(id); if (el) {
+      const on = () => { renderBankroll(); renderStackHint(); if (id === "s-seats") buildHandInputs(); };
+      el.onchange = on; el.oninput = on;
+    }
   });
   $("h-run").onclick = () => { const r = analyzeHand(); if (r) { STATE.analysis = r; renderAnalysis(r); $("h-out").scrollIntoView({ behavior: "smooth", block: "start" }); } };
   $("h-clear").onclick = clearHand;

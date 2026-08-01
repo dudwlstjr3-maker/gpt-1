@@ -55,11 +55,11 @@ test("language switch translates the whole UI and persists", async () => {
   await page.selectOption("#langsel", "en");
   await page.waitForFunction(() => document.documentElement.lang === "en");
   const navEn = await page.$eval("#nav", (e) => e.textContent);
-  assert.match(navEn, /Drill/);
+  assert.match(navEn, /Practice/);
   await page.selectOption("#langsel", "ko");
   await page.waitForFunction(() => document.documentElement.lang === "ko");
   const navKo = await page.$eval("#nav", (e) => e.textContent);
-  assert.match(navKo, /드릴/);
+  assert.match(navKo, /핸드 연습/);
   // survives a reload
   await page.reload();
   await page.waitForSelector("#nav button");
@@ -382,5 +382,63 @@ test("seats take an opponent type, duplicates allowed", async () => {
   await page.click("#h-run");
   await page.waitForSelector("#h-out .st", { timeout: 60000 });
   assert.ok((await page.$$eval("#h-out .st", (e) => e.length)) >= 2);
+  noErrors();
+});
+
+test("the stack field cannot be confused with a chip count", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#s-stack");
+
+  // a sane depth shows the chip equivalent, no warning
+  await page.fill("#s-bl", "500/1000");
+  await page.fill("#s-stack", "100");
+  await page.waitForTimeout(150);
+  let hint = await page.$eval("#stack-hint", (e) => e.innerText);
+  assert.match(hint, /100,?000/, "chip equivalent missing: " + hint);
+  assert.ok(!(await page.$("#stack-hint .warn")), "warned about a normal 100BB stack");
+
+  // a chip count typed into a BB field must be called out, not silently used
+  await page.fill("#s-stack", "42000");
+  await page.waitForTimeout(150);
+  hint = await page.$eval("#stack-hint", (e) => e.innerText);
+  assert.ok(await page.$("#stack-hint .warn"), "42000 'BB' was accepted silently: " + hint);
+  assert.match(hint, /big blinds/i);
+
+  // and practice must not run a 42000BB stack
+  const used = await page.evaluate(() => setupStack());
+  assert.ok(used <= 500, "practice would use a " + used + "BB stack");
+  await page.fill("#s-stack", "100");
+});
+
+test("practice offers short stacks and actually deals them", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-depth button");
+
+  const depths = await page.$$eval("#dr-depth button", (b) => b.map((x) => x.dataset.k));
+  assert.deepEqual(depths, ["random", "deep", "mid", "short", "ultra"], "depth options: " + depths.join(","));
+
+  // pick the ultra-short bucket and check the spots really are short
+  await page.click('#dr-depth button[data-k="ultra"]');
+  await page.click('#dr-n button[data-n="5"]');
+  await page.click("#dr-go");
+  const stacks = [];
+  for (let i = 0; i < 3; i++) {
+    await page.waitForSelector(".dopt", { timeout: 60000 });
+    const meta = await page.$eval(".stmeta", (e) => e.innerText);
+    const m = meta.match(/Stack\s*([\d.]+)BB/);
+    if (m) stacks.push(parseFloat(m[1]));
+    await page.click(".dopt");
+    await page.waitForSelector("#dr-next", { timeout: 60000 });
+    await page.click("#dr-next");
+    if (await page.$("#dr-again")) break;
+  }
+  assert.ok(stacks.length >= 2, "could not read the stack from the spot header");
+  stacks.forEach((s) => assert.ok(s <= 12.5, "ultra-short bucket dealt a " + s + "BB stack"));
   noErrors();
 });

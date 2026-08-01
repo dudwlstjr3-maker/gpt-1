@@ -296,3 +296,96 @@ test("spots are reproducible from their seed", () => {
   assert.deepEqual(a.options.map((o) => o.key), b.options.map((o) => o.key));
   a.options.forEach((o, i) => assert.ok(Math.abs(o.ev - b.options[i].ev) < 1e-9, "same seed must give the same EV"));
 });
+
+/* ---------------------------------------------- preflop sizing & all-in -- */
+test("preflop pot follows the actual bet sizes", () => {
+  const line = (sc, sizes, hp, vp) =>
+    PE.preflopLine({ scenario: sc, sizes, heroPos: hp, vilPos: vp, stack: 100 });
+
+  // a bigger open makes a bigger pot, linearly
+  assert.equal(line("open_call", { open: 2.5 }, "BTN", "BB").pot, 5.5);
+  assert.equal(line("open_call", { open: 3 }, "BTN", "BB").pot, 6.5);
+  assert.equal(line("open_call", { open: 5 }, "BTN", "BB").pot, 10.5);
+
+  // blinds of players who folded are dead money on top
+  assert.equal(line("open_call", { open: 2.5 }, "CO", "BTN").pot, 6.5);   // SB+BB dead
+  assert.equal(line("open_call", { open: 2.5 }, "SB", "BB").pot, 5);      // neither dead
+
+  // hero's investment is what he matched, not the pot
+  assert.equal(line("3b_call", { threeBet: 12 }, "BTN", "CO").heroInv, 12);
+  assert.equal(line("4b_call", { fourBet: 22 }, "CO", "BTN").heroInv, 22);
+
+  // level is capped by the stack
+  assert.equal(line("3b_call", { threeBet: 500 }, "BTN", "CO").level, 100);
+});
+
+test("preflop sizing stays close to the old fixed pots at default sizes", () => {
+  // The old constants were single numbers that ignored who was in the blinds:
+  // 3b_call was always 19, but BTN vs BB is really 2*9 + 0.5 = 18.5 because the
+  // big blind is live, not dead. The computed value is the correct one — this
+  // only pins that the defaults did not drift somewhere unrecognisable.
+  const at = (sc, sizes) => PE.preflopLine({ scenario: sc, sizes, heroPos: "BTN", vilPos: "BB", stack: 100 }).pot;
+  assert.equal(at("open_call", { open: 2.5 }), PE.scenarioById("open_call").pot);
+  assert.ok(Math.abs(at("3b_call", { threeBet: 9 }) - PE.scenarioById("3b_call").pot) <= 1);
+
+  // and the dead-money rule itself is what accounts for the difference
+  const live = PE.preflopLine({ scenario: "3b_call", sizes: { threeBet: 9 }, heroPos: "BTN", vilPos: "BB", stack: 100 });
+  const dead = PE.preflopLine({ scenario: "3b_call", sizes: { threeBet: 9 }, heroPos: "BTN", vilPos: "CO", stack: 100 });
+  assert.equal(live.dead, 0.5);                 // BB is live, only the SB is dead
+  assert.equal(dead.dead, 1.5);                 // both blinds folded
+  assert.equal(dead.pot - live.pot, 1);
+});
+
+test("facing a shove: required equity is exact and the EV sign follows it", () => {
+  const hero = H("Ah Kd");
+  const pot = 21, toCall = 19;
+  const r = PE.allInPreflop({ hole: hero, vt: PE.VILLAIN_TYPES.unknown, stack: 20,
+    heroShoved: false, pot, toCall, rnd: PE.mulberry32(3) });
+  assert.ok(Math.abs(r.required - toCall / (pot + toCall)) < 1e-9);
+  assert.ok(Math.abs(r.evCall - (r.eq * pot - (1 - r.eq) * toCall)) < 1e-9);
+  // EV is positive exactly when equity clears the required threshold
+  assert.equal(r.evCall > 0, r.eq > r.required);
+});
+
+test("all-in EV is monotonic in hand strength", () => {
+  const call = (h) => PE.allInPreflop({ hole: H(h), vt: PE.VILLAIN_TYPES.unknown, stack: 20,
+    heroShoved: false, pot: 21, toCall: 19, rnd: PE.mulberry32(5) }).evCall;
+  const aa = call("As Ah"), ako = call("Ad Kc"), t7 = call("Td 7c"), junk = call("2c 7d");
+  assert.ok(aa > ako && ako > t7 && t7 > junk, `${aa} ${ako} ${t7} ${junk}`);
+  assert.ok(aa > 0, "AA must be a profitable call against any shoving range");
+});
+
+test("shoving junk is not profitable, shoving good hands is", () => {
+  const shove = (h, stack) => PE.allInPreflop({ hole: H(h), vt: PE.VILLAIN_TYPES.unknown,
+    stack, heroShoved: true, pot: 1, shove: stack, villainIn: 1, rnd: PE.mulberry32(7) }).evShove;
+  [10, 15, 20].forEach((st) => {
+    assert.ok(shove("2c 7d", st) < 0, `72o should not be a profitable ${st}BB shove`);
+    assert.ok(shove("9c 4d", st) < 0, `94o should not be a profitable ${st}BB shove`);
+    assert.ok(shove("Ad 9d", st) > 0, `A9s should be a profitable ${st}BB shove`);
+    assert.ok(shove("7c 7d", st) > 0, `77 should be a profitable ${st}BB shove`);
+  });
+});
+
+test("shoving ranges widen as stacks shorten", () => {
+  const w = (st) => PE.rangePct(PE.shoveRange(st, PE.VILLAIN_TYPES.unknown));
+  assert.ok(w(8) > w(15) && w(15) > w(25) && w(25) > w(40), [w(8), w(15), w(25), w(40)].join(" "));
+});
+
+test("calling a shove widens when the price improves", () => {
+  const vt = PE.VILLAIN_TYPES.unknown;
+  const tight = PE.rangePct(PE.callShoveRange(15, vt, 0.48));
+  const loose = PE.rangePct(PE.callShoveRange(15, vt, 0.30));
+  assert.ok(loose > tight, `better odds should widen the call: ${loose} vs ${tight}`);
+});
+
+test("all-in is offered postflop once the stack is short relative to the pot", () => {
+  const hero = H("As Ks"), board = H("Qs 7h 2d");
+  const shortCtx = PE.buildContext({ hole: hero, board, villainClasses: PE.topPercentRange(30),
+    vt: PE.VILLAIN_TYPES.unknown, ip: true, pot: 20, effStack: 25, history: [] });
+  assert.ok(PE.options(shortCtx, null).opts.some((o) => o.key === "allin"), "no all-in at SPR 1.25");
+  assert.ok(PE.options(shortCtx, { size: 10 }).opts.some((o) => o.key === "allin"), "no all-in facing a bet at SPR 1.25");
+
+  const deepCtx = PE.buildContext({ hole: hero, board, villainClasses: PE.topPercentRange(30),
+    vt: PE.VILLAIN_TYPES.unknown, ip: true, pot: 5, effStack: 200, history: [] });
+  assert.ok(!PE.options(deepCtx, null).opts.some((o) => o.key === "allin"), "all-in offered at SPR 40");
+});

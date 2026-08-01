@@ -649,7 +649,7 @@ function options(ctx, facing) {
         fold: r.fold, eqWhenCalled: r.eqWhenCalled
       });
     });
-    if (ctx.effStack > B * 1.4 && ctx.effStack <= B * 6) {
+    if (ctx.effStack > B * 1.4 && ctx.effStack <= B * 12) {
       const r = evRaise(sub, B, ctx.effStack);
       if (r) out.push({ key: "allin", label: "allin", ev: r.ev, amount: ctx.effStack, fold: r.fold, eqWhenCalled: r.eqWhenCalled });
     }
@@ -666,7 +666,7 @@ function options(ctx, facing) {
     const b = evBet(ctx, X);
     if (b) out.push({ key, label: "bet", ev: b.ev, amount: b.size, fold: b.fold, raised: b.raised, eqWhenCalled: b.eqWhenCalled });
   });
-  if (ctx.effStack > 0 && ctx.effStack <= P * 2.2) {
+  if (ctx.effStack > 0 && ctx.effStack <= P * 3.5) {
     const b = evBet(ctx, ctx.effStack);
     if (b) out.push({ key: "allin", label: "allin", ev: b.ev, amount: ctx.effStack, fold: b.fold, eqWhenCalled: b.eqWhenCalled });
   }
@@ -759,7 +759,136 @@ const SCENARIOS = [
     heroR: () => topPercentRange(45, 5),
     vilR:  (seats, hp, vp, vt) => topPercentRange(clampPct(50 * vt.openMul, 12, 90), 6) }
 ];
+/* 4-bet ranges, and the shove/call-a-shove ranges short stacks actually use. */
+function fourBetRange(seats, pos, vt) {
+  const value = topPercentRange(clampPct(3 * vt.openMul, 1, 12));
+  const bluffs = parseRange("A5s-A4s KQs A5o");
+  const out = value.slice();
+  if (vt.bluffMul >= 0.8) bluffs.slice(0, Math.round(bluffs.length * Math.min(1.5, vt.bluffMul))).forEach((c) => { if (out.indexOf(c) < 0) out.push(c); });
+  return out;
+}
+function callVs4betRange(seats, pos, vt) { return topPercentRange(clampPct(5 * vt.openMul, 1.5, 16)); }
+/** Shoving widens sharply as the stack shortens; calling a shove does too, but less. */
+function shoveRange(stackBB, vt) {
+  const w = stackBB <= 8 ? 38 : stackBB <= 12 ? 27 : stackBB <= 18 ? 18 : stackBB <= 25 ? 12 : 7;
+  return topPercentRange(clampPct(w * vt.openMul, 2, 85));
+}
+/* Calling a shove is a pot-odds decision: the shorter the shove relative to the
+ * pot, the better the price and the wider the call. Calibrated so that a very
+ * wide shove is punished — with too tight a calling range, fold equity gets so
+ * large that even 72o shows as a profitable jam, which is wrong. */
+function callShoveRange(stackBB, vt, requiredEq) {
+  const byStack = stackBB <= 8 ? 34 : stackBB <= 12 ? 26 : stackBB <= 18 ? 20 : stackBB <= 25 ? 15 : 10;
+  let w = byStack;
+  if (requiredEq !== undefined && requiredEq > 0) {
+    // needing ~50% -> tight; needing ~33% -> roughly double
+    w = byStack * Math.max(0.6, Math.min(2.4, 0.47 / Math.max(0.2, requiredEq)));
+  }
+  return topPercentRange(clampPct(w * vt.contMul, 2, 75));
+}
+/** Blind posted by a seat, in BB. Used to work out what is already in the pot. */
+const blindOf = (p) => (p === "BB" ? 1 : (p === "SB" || p === "BTN(SB)") ? 0.5 : 0);
+
+SCENARIOS.push(
+  { id: "4b_call", pot: 45, heroAgg: true, heroInv: 22, opener: "villain",
+    heroR: (seats, hp, vp, vt) => fourBetRange(seats, hp, VILLAIN_TYPES.unknown),
+    vilR:  (seats, hp, vp, vt) => callVs4betRange(seats, vp, vt) },
+  { id: "call_4b", pot: 45, heroAgg: false, heroInv: 22, opener: "hero",
+    heroR: (seats, hp, vp, vt) => callVs4betRange(seats, hp, VILLAIN_TYPES.unknown),
+    vilR:  (seats, hp, vp, vt) => fourBetRange(seats, vp, vt) }
+);
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
+
+/* ------------------------------------------------- preflop money ---------
+ * The scenario fixes the *shape* of the preflop action; these sizes fix how
+ * much actually went in. Each scenario used to carry a hardcoded pot
+ * (open_call was always 5.5BB), so a 3BB open or a 12BB 3-bet produced the
+ * wrong pot, the wrong SPR, and therefore the wrong EV on every later street.
+ *
+ * `level` is the amount each of the two live players finally matched. Blinds
+ * belonging to players who folded are dead money and are added on top; a blind
+ * belonging to a live player is already part of the level they matched.     */
+const PREFLOP_LEVEL = {
+  limp: (s) => s.open || 1,
+  open_call: (s) => s.open || 2.5,
+  call_open: (s) => s.open || 2.5,
+  "3b_call": (s) => s.threeBet || 9,
+  call_3b: (s) => s.threeBet || 9,
+  "4b_call": (s) => s.fourBet || 22,
+  call_4b: (s) => s.fourBet || 22,
+  pf_allin: (s) => s.allin || 20
+};
+function preflopLine(o) {
+  const id = o.scenario;
+  const sizes = o.sizes || {};
+  const stack = o.stack || 100;
+  const levelFn = PREFLOP_LEVEL[id];
+  if (!levelFn) return null;
+
+  const level = Math.max(0.5, Math.min(levelFn(sizes), stack));
+  const live = [o.heroPos, o.vilPos];
+  const hasSB = live.indexOf("SB") >= 0 || live.indexOf("BTN(SB)") >= 0;
+  const hasBB = live.indexOf("BB") >= 0;
+  let dead = 0;
+  if (!hasSB) dead += 0.5;
+  if (!hasBB) dead += 1;
+  // extra limpers who folded to the flop still leave their chips behind
+  const extra = id === "limp" ? Math.max(0, (sizes.limpers || 0)) * level : 0;
+  const ante = Math.max(0, o.ante || 0);
+
+  return {
+    level,
+    dead: round1(dead + extra + ante),
+    pot: round1(2 * level + dead + extra + ante),
+    heroInv: level,
+    vilInv: level,
+    allin: id === "pf_allin" || level >= stack - 1e-9
+  };
+}
+
+/* ---- preflop all-in --------------------------------------------------
+ * No streets left to play, so this is pure equity against the range that
+ * gets the money in. Two shapes:
+ *   heroShoved = false : villain jammed, hero decides whether to call
+ *   heroShoved = true  : hero jams, villain folds or calls                */
+function allInPreflop(o) {
+  const vt = o.vt || VILLAIN_TYPES.unknown;
+  const stack = o.stack || 20;
+  const classes = o.villainClasses && o.villainClasses.length
+    ? o.villainClasses
+    : (o.heroShoved ? callShoveRange(stack, vt) : shoveRange(stack, vt));
+  const combos = expandRange(classes, o.hole);
+  const table = matchupTable(o.hole, [], combos, { rnd: o.rnd, budget: o.budget || 800000 });
+  const w = new Float64Array(table.combos.length).fill(1);
+  const eq = weightedEquity(table, w).eq;
+
+  const pot = o.pot;                 // chips in the middle before hero acts
+  if (!o.heroShoved) {
+    // Hero calls `toCall` to play for a pot of `pot`.
+    const toCall = Math.min(o.toCall, stack);
+    const required = toCall / (pot + toCall);
+    const evCall = eq * pot - (1 - eq) * toCall;
+    return { mode: "call", eq, required, toCall, pot, evCall, evFold: 0,
+      combos: table.combos.length, classes,
+      best: evCall > 0 ? "call" : "fold", edge: eq - required };
+  }
+  // Hero jams `shove`. Villain folds, or calls with the range above.
+  const shove = Math.min(o.shove, stack);
+  // What the villain has to put in, and therefore the price he is getting.
+  const villainIn = o.villainIn === undefined ? 0 : o.villainIn;
+  const toCallVillain = Math.max(0.5, shove - villainIn);
+  const villainRequired = toCallVillain / (pot + shove + toCallVillain - villainIn);
+  const callClasses = callShoveRange(stack, vt, villainRequired);
+  const callers = expandRange(callClasses, o.hole);
+  const totalCombos = expandRange(topPercentRange(100), o.hole).length;
+  const foldFreq = Math.max(0.02, Math.min(0.97, 1 - callers.length / Math.max(1, totalCombos)));
+  const callTable = matchupTable(o.hole, [], callers, { rnd: o.rnd, budget: o.budget || 800000 });
+  const eqCalled = weightedEquity(callTable, new Float64Array(callTable.combos.length).fill(1)).eq;
+  const evShove = foldFreq * pot + (1 - foldFreq) * (eqCalled * (pot + shove) - (1 - eqCalled) * shove);
+  return { mode: "shove", eq, eqCalled, foldFreq, shove, pot, evShove, evFold: 0,
+    combos: callTable.combos.length, classes: callClasses, villainRequired,
+    best: evShove > 0 ? "shove" : "fold" };
+}
 
 /** Preflop action order is exactly the position list, so "acted earlier"
  *  is just a lower index. The raiser must act before the caller.           */
@@ -962,6 +1091,7 @@ return {
   evCheck, evBet, evCall, evRaise, buildContext, options,
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
+  preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf, fourBetRange, callVs4betRange,
   // util
   mulberry32, seedFrom, round1
 };

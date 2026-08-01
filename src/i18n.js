@@ -51,7 +51,8 @@ const ko = {
   scenarios: {
     open_call: "내가 오픈 → 상대 콜", call_open: "상대 오픈 → 내가 콜",
     "3b_call": "내가 3벳 → 상대 콜", call_3b: "상대 3벳 → 내가 콜",
-    limp: "림프 팟", pf_only: "프리플랍 결정만 분석"
+    "4b_call": "내가 4벳 → 상대 콜", call_4b: "상대 4벳 → 내가 콜",
+    pf_allin: "프리플랍 올인", limp: "림프 팟", pf_only: "프리플랍 결정만 분석"
   },
   home: {
     h1: "무엇을 고치고 싶으신가요",
@@ -123,6 +124,20 @@ const ko = {
     step4: "카드 고르기", step4sub: "아래 덱에서 탭하세요 · 놓은 카드를 다시 탭하면 지워집니다",
     step5: "액션 넣기", step5sub: "단위는 BB",
     myCards: "내 카드",
+    pfSizes: "얼마가 오갔나요", pfSizesSub: "단위는 BB",
+    openSize: "오픈", threeBetSize: "3벳", fourBetSize: "4벳",
+    limpers: "추가 림퍼 수", allinSize: "올인 금액", toCallSize: "내가 콜해야 할 금액",
+    potNow: "프리플랍 종료 시 팟", deadMoney: "죽은 돈",
+    whoShoved: "누가 올인했나요", iShoved: "내가 올인", villainShoved: "상대가 올인",
+    allinTitle: "프리플랍 올인 분석",
+    allinNote: "올인이면 남은 스트리트가 없으므로 순수 승률 싸움입니다. 보드 5장을 전부 돌려 계산합니다.",
+    allinVsRange: "상대 올인 레인지", allinVsCallRange: "상대 콜 레인지",
+    allinCallGood: "콜이 이득입니다 — 필요 {req}에 실제 {eq}입니다.",
+    allinCallBad: "폴드가 맞습니다 — 필요 {req}에 실제 {eq}로 못 미칩니다.",
+    allinShoveGood: "올인이 이득입니다 — 폴드 에퀴티 {fe}에 콜 받으면 승률 {eqc}입니다.",
+    allinShoveBad: "올인은 손해입니다 — 폴드 에퀴티 {fe}로는 부족합니다.",
+    allinFoldEq: "상대 폴드 빈도", allinEqCalled: "콜 받았을 때 승률",
+    potFacing: "콜하기 전 팟", potIfAllFold: "다 접으면 따는 금액",
     run: "분석하기", clear: "초기화", demo: "예시 채우기",
     needCards: "내 카드 2장을 먼저 골라주세요.",
     villainActs: "상대", myAct: "나",
@@ -288,7 +303,8 @@ const en = {
   scenarios: {
     open_call: "I opened → villain called", call_open: "Villain opened → I called",
     "3b_call": "I 3-bet → villain called", call_3b: "Villain 3-bet → I called",
-    limp: "Limped pot", pf_only: "Preflop decision only"
+    "4b_call": "I 4-bet -> villain called", call_4b: "Villain 4-bet -> I called",
+    pf_allin: "Preflop all-in", limp: "Limped pot", pf_only: "Preflop decision only"
   },
   home: {
     h1: "What do you want to fix?",
@@ -360,6 +376,20 @@ const en = {
     step4: "Pick the cards", step4sub: "Tap from the deck below · tap a placed card to clear it",
     step5: "Enter the action", step5sub: "Amounts in BB",
     myCards: "My cards",
+    pfSizes: "How much went in", pfSizesSub: "amounts in BB",
+    openSize: "Open", threeBetSize: "3-bet", fourBetSize: "4-bet",
+    limpers: "Extra limpers", allinSize: "All-in amount", toCallSize: "Amount you must call",
+    potNow: "Pot after preflop", deadMoney: "Dead money",
+    whoShoved: "Who shoved", iShoved: "I shoved", villainShoved: "Villain shoved",
+    allinTitle: "Preflop all-in",
+    allinNote: "All-in means there are no streets left to play, so this is pure equity. All five board cards are run out.",
+    allinVsRange: "Villain shoving range", allinVsCallRange: "Villain calling range",
+    allinCallGood: "Calling is profitable - you need {req} and you have {eq}.",
+    allinCallBad: "Folding is right - you need {req} and only have {eq}.",
+    allinShoveGood: "Shoving is profitable - {fe} fold equity, and {eqc} when called.",
+    allinShoveBad: "Shoving loses - {fe} fold equity is not enough.",
+    allinFoldEq: "Villain folds", allinEqCalled: "Equity when called",
+    potFacing: "pot before your call", potIfAllFold: "what you win if all fold",
     run: "Analyse", clear: "Clear", demo: "Fill example",
     needCards: "Pick your two cards first.",
     villainActs: "Villain", myAct: "Me",

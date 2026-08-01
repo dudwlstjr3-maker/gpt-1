@@ -225,3 +225,62 @@ test("no untranslated i18n key paths leak into the UI", async () => {
   }
   noErrors();
 });
+
+test("preflop bet sizes drive the pot", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#pf-chips button");
+
+  await page.click('#pf-chips button[data-k="open_call"]');
+  await page.waitForSelector('#pf-sizes input[data-sz="open"]');
+  const potFor = async (v) => {
+    await page.fill('#pf-sizes input[data-sz="open"]', String(v));
+    await page.waitForTimeout(120);
+    const txt = await page.$eval("#pf-sizes", (e) => e.innerText);
+    return parseFloat(txt.match(/([\d.]+)BB/)[1]);
+  };
+  const a = await potFor(2.5), b = await potFor(3), c = await potFor(5);
+  assert.ok(b > a && c > b, `pot must grow with the open: ${a} ${b} ${c}`);
+  assert.equal(c - b, 4, "each extra BB opened adds 2BB to the pot");
+  noErrors();
+});
+
+test("preflop all-in is analysed as an equity decision", async () => {
+  await page.click('#pf-chips button[data-k="pf_allin"]');
+  await page.waitForSelector("#pf-shover button");
+  await page.fill('#pf-sizes input[data-sz="allin"]', "20");
+  await page.waitForTimeout(120);
+
+  const id = (r, s) => "23456789TJQKA".indexOf(r) * 4 + "shdc".indexOf(s);
+  await page.click(`.dc[data-c="${id("A", "h")}"]`);
+  await page.click(`.dc[data-c="${id("K", "d")}"]`);
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .recbox", { timeout: 60000 });
+
+  const text = await page.$eval("#h-out", (e) => e.innerText);
+  assert.match(text, /Equity/, "no equity shown");
+  assert.match(text, /Equity needed/, "no required equity shown");
+  // AKo against a 20BB shoving range is a clear call
+  assert.match(text, /Calling is profitable/, "AKo should be a call: " + text.slice(0, 400));
+  // an all-in has no streets, so no per-street EV tables
+  assert.equal(await page.$$eval("#h-out .st", (e) => e.length), 0, "all-in should not render streets");
+  noErrors();
+});
+
+test("shoving junk is reported as a fold", async () => {
+  await page.click("#h-clear");
+  await page.waitForSelector("#pf-shover button");
+  await page.click('#pf-shover button[data-k="hero"]');
+  await page.fill('#pf-sizes input[data-sz="allin"]', "15");
+  await page.waitForTimeout(120);
+  const id = (r, s) => "23456789TJQKA".indexOf(r) * 4 + "shdc".indexOf(s);
+  await page.click(`.dc[data-c="${id("7", "c")}"]`);
+  await page.click(`.dc[data-c="${id("2", "d")}"]`);
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .recbox", { timeout: 60000 });
+  const text = await page.$eval("#h-out", (e) => e.innerText);
+  assert.match(text, /Shoving loses/, "72o at 15BB should not be a shove: " + text.slice(0, 300));
+  noErrors();
+});

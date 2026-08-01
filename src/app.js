@@ -295,6 +295,10 @@ const SLOT_GROUPS = [
 ];
 const HI = {
   pos: "BTN", vpos: "BB", scenario: "open_call", pick: "me", target: "h0", vt: "unknown",
+  // how much actually went in preflop — these drive the pot, the SPR and every
+  // downstream EV, instead of the fixed pot each scenario used to carry.
+  sizes: { open: 2.5, threeBet: 9, fourBet: 22, limpers: 2, allin: 20, toCall: 20 },
+  shover: "villain",
   c: { h0: null, h1: null, f0: null, f1: null, f2: null, t0: null, r0: null },
   acts: [{ v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }]
 };
@@ -345,12 +349,56 @@ function renderVillainChips() {
   el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.vt = b.dataset.k; renderVillainChips(); }));
   $("vt-desc").textContent = t("villain." + HI.vt + ".d");
 }
+/* Which size fields a given preflop line actually needs. */
+const SIZE_FIELDS = {
+  limp:        [["limpers", "hand.limpers"]],
+  open_call:   [["open", "hand.openSize"]],
+  call_open:   [["open", "hand.openSize"]],
+  "3b_call":   [["open", "hand.openSize"], ["threeBet", "hand.threeBetSize"]],
+  call_3b:     [["open", "hand.openSize"], ["threeBet", "hand.threeBetSize"]],
+  "4b_call":   [["threeBet", "hand.threeBetSize"], ["fourBet", "hand.fourBetSize"]],
+  call_4b:     [["threeBet", "hand.threeBetSize"], ["fourBet", "hand.fourBetSize"]],
+  pf_allin:    [["allin", "hand.allinSize"]],
+  pf_only:     []
+};
 function renderScenarioChips() {
   const el = $("pf-chips");
-  const ids = PE.SCENARIOS.map((s) => s.id).concat(["pf_only"]);
+  const ids = PE.SCENARIOS.map((s) => s.id).concat(["pf_allin", "pf_only"]);
   el.innerHTML = ids.map((id) =>
     '<button data-k="' + id + '" class="' + (HI.scenario === id ? "on" : "") + '">' + esc(t("scenarios." + id)) + "</button>").join("");
-  el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.scenario = b.dataset.k; renderScenarioChips(); }));
+  el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.scenario = b.dataset.k; renderScenarioChips(); renderActions(); }));
+  renderPreflopSizes();
+}
+function renderPreflopSizes() {
+  const el = $("pf-sizes");
+  if (!el) return;
+  const fields = SIZE_FIELDS[HI.scenario] || [];
+  const isAllin = HI.scenario === "pf_allin";
+  if (!fields.length && !isAllin) { el.innerHTML = ""; return; }
+
+  let h = '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
+    ' <span class="dim">' + esc(t("hand.pfSizesSub")) + "</span></div>";
+  if (isAllin) {
+    h += '<div class="bg" id="pf-shover" style="display:flex;margin-bottom:8px">' +
+      [["villain", "hand.villainShoved"], ["hero", "hand.iShoved"]].map(([k, lbl]) =>
+        '<button data-k="' + k + '" class="' + (HI.shover === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>";
+  }
+  const rows = isAllin
+    ? [["allin", HI.shover === "hero" ? "hand.allinSize" : "hand.toCallSize"]]
+    : fields;
+  h += '<div class="row">' + rows.map(([k, lbl]) =>
+    '<div><label>' + esc(t(lbl)) + '</label><input class="szin" type="number" min="0" step="0.5" data-sz="' + k + '" value="' + (HI.sizes[k]) + '"></div>').join("") + "</div>";
+
+  // show the resulting pot so the numbers are never a mystery
+  const line = PE.preflopLine({ scenario: HI.scenario, sizes: HI.sizes, heroPos: HI.pos,
+    vilPos: HI.vpos, stack: setupStack(), ante: +($("s-ante") ? $("s-ante").value : 0) || 0 });
+  if (line) h += '<div class="small dim" style="margin-top:6px">' + esc(t("hand.potNow")) +
+    " <b>" + nfmt(line.pot) + "BB</b> · " + esc(t("hand.deadMoney")) + " " + nfmt(line.dead) + "BB</div>";
+  el.innerHTML = h;
+  el.querySelectorAll("input[data-sz]").forEach((inp) => (inp.oninput = () => {
+    HI.sizes[inp.dataset.sz] = +inp.value || 0; renderPreflopSizes(); renderActions();
+  }));
+  el.querySelectorAll("#pf-shover button").forEach((b) => (b.onclick = () => { HI.shover = b.dataset.k; renderPreflopSizes(); }));
 }
 function renderSlots() {
   const el = $("slots");
@@ -390,9 +438,13 @@ function renderDeck() {
   }));
 }
 /* running pot/investment for the action rows */
+function preflopMoney() {
+  return PE.preflopLine({ scenario: HI.scenario, sizes: HI.sizes, heroPos: HI.pos,
+    vilPos: HI.vpos, stack: setupStack(), ante: +($("s-ante") ? $("s-ante").value : 0) || 0 })
+    || { pot: PE.scenarioById(HI.scenario).pot, heroInv: PE.scenarioById(HI.scenario).heroInv, dead: 0, allin: false };
+}
 function potBefore(i) {
-  const scen = PE.scenarioById(HI.scenario);
-  let pot = scen.pot;
+  let pot = preflopMoney().pot;
   for (let k = 0; k < i; k++) {
     const a = HI.acts[k];
     const facing = (a.v === "bet" || a.v === "raise") && +a.vs > 0;
@@ -453,6 +505,32 @@ function analyzeHand() {
   };
   if (HI.scenario === "pf_only") return res;
 
+  const money = preflopMoney();
+  res.money = money;
+
+  // All-in preflop: no streets left, so it resolves to pure equity.
+  if (HI.scenario === "pf_allin") {
+    const heroShoved = HI.shover === "hero";
+    const amount = Math.min(HI.sizes.allin || 0, stack);
+    const heroBlind = PE.blindOf(HI.pos), vilBlind = PE.blindOf(HI.vpos);
+    // Facing a shove: the pot is the dead money, hero's own blind, and the
+    // whole shove. Shoving: it is what hero collects when everyone folds, so
+    // hero's own blind does not count — that money comes back to him.
+    const potBefore = heroShoved
+      ? money.dead + vilBlind
+      : money.dead + heroBlind + amount;
+    // Range width must come from the stack actually in play, not the stack
+    // configured in setup: a 20BB jam is a far wider range than a 100BB one.
+    const effAllin = Math.max(1, Math.min(stack, amount));
+    res.allin = PE.allInPreflop({
+      hole, vt, stack: effAllin, heroShoved,
+      pot: Math.round(potBefore * 10) / 10,
+      toCall: Math.max(0, amount - heroBlind), shove: amount, villainIn: vilBlind,
+      rnd: PE.mulberry32(PE.seedFrom(hole[0] * 53 + hole[1] * 7))
+    });
+    return res;
+  }
+
   const board = boardCards();
   if (board.length < 3) return res;
 
@@ -460,7 +538,7 @@ function analyzeHand() {
   const villainClasses = scen.vilR(seats, HI.pos, HI.vpos, vt);
   res.heroClasses = heroClasses; res.villainClasses = villainClasses;
 
-  let pot = scen.pot, heroInv = scen.heroInv;
+  let pot = money.pot, heroInv = money.heroInv;
   const history = [];
   const names = ["flop", "turn", "river"];
 
@@ -578,6 +656,33 @@ function renderAnalysis(res) {
     fact(t("hand.openStd"), nfmt(res.preflop.openPct) + "%", posName(res.pos)) +
     "</div><p style=\"margin-top:9px\">" + esc(res.preflop.inChart ? t("hand.inChart") : t("hand.notInChart")) + "</p>" +
     gridHTML(res.preflop.chart, res.cls) + "</div></div>";
+
+  // ---- preflop all-in: one equity question, no streets ----
+  if (res.allin) {
+    const a = res.allin;
+    const isCall = a.mode === "call";
+    const ev = isCall ? a.evCall : a.evShove;
+    const good = ev > 0;
+    h += '<div class="blk"><div class="t">' + esc(t("hand.allinTitle")) + '</div><div class="facts">' +
+      fact(t("common.equity"), pct(a.eq), "") +
+      (isCall ? fact(t("hand.reqEquity"), pct(a.required), t("hand.toCallSize") + " " + nfmt(a.toCall) + "BB")
+              : fact(t("hand.allinFoldEq"), pct(a.foldFreq), t("hand.allinEqCalled") + " " + pct(a.eqCalled))) +
+      fact(t("common.pot"), nfmt(a.pot) + "BB", isCall ? t("hand.potFacing") : t("hand.potIfAllFold")) +
+      fact(t("common.ev"), signed(ev) + " BB", isCall ? t("common.call") : t("common.allin")) +
+      "</div></div>";
+    h += '<div class="recbox' + (good ? " good" : "") + '"><div class="rl">' + esc(t("hand.recTitle")) + "</div>" +
+      '<div class="ra">' + esc(good ? (isCall ? t("common.call") : t("common.allin")) : t("common.fold")) + "</div>" +
+      '<div class="rs">' + (isCall
+        ? t(good ? "hand.allinCallGood" : "hand.allinCallBad", { req: pct(a.required), eq: pct(a.eq) })
+        : t(good ? "hand.allinShoveGood" : "hand.allinShoveBad", { fe: pct(a.foldFreq), eqc: pct(a.eqCalled) })) +
+      "</div></div>";
+    h += '<div class="blk"><div class="t">' + esc(isCall ? t("hand.allinVsRange") : t("hand.allinVsCallRange")) + "</div>" +
+      '<div class="small dim" style="margin-bottom:6px">' + nfmt(PE.rangePct(a.classes)) + "% · " + a.combos + " combos</div>" +
+      gridHTML(a.classes, res.cls) + "</div>";
+    h += '<div class="notice">' + esc(t("hand.allinNote")) + "</div></div>";
+    out.innerHTML = h;
+    return;
+  }
 
   res.streets.forEach((s) => {
     h += '<div class="st"><h3><span class="stn">' + esc(t("common." + s.name)) + "</span>" +

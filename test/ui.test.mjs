@@ -1,0 +1,227 @@
+/* Browser smoke test of the built index.html. Run: node --test test/ui.test.mjs
+ * Requires the build to be current: node build.mjs                          */
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { chromium } from "playwright";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const URL = "file://" + join(root, "index.html");
+
+/* The sandbox ships a Chromium that may not match the installed Playwright's
+ * pinned revision, so launch the one that is actually on disk.              */
+import { existsSync, readdirSync } from "node:fs";
+function chromiumPath() {
+  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
+  if (!existsSync(base)) return undefined;
+  const dir = readdirSync(base).filter((d) => /^chromium-\d+$/.test(d)).sort().pop();
+  if (!dir) return undefined;
+  const exe = join(base, dir, "chrome-linux", "chrome");
+  return existsSync(exe) ? exe : undefined;
+}
+
+let browser, page, errors;
+before(async () => {
+  browser = await chromium.launch({ executablePath: chromiumPath(), args: ["--no-sandbox"] });
+  page = await browser.newPage();
+  errors = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  await page.goto(URL);
+  await page.waitForSelector("#nav button");
+});
+after(async () => { await browser.close(); });
+
+const noErrors = () => assert.deepEqual(errors, [], "console/page errors: " + errors.join(" | "));
+
+test("boots with no runtime errors and renders the nav", async () => {
+  const tabs = await page.$$eval("#nav button", (b) => b.map((x) => x.textContent.trim()));
+  assert.ok(tabs.length >= 6, "expected the full nav, got " + tabs.join(","));
+  noErrors();
+});
+
+test("every view renders", async () => {
+  for (const v of ["quiz", "hand", "stats", "drill", "range", "help", "home"]) {
+    await page.click(`#nav button[data-v="${v}"]`);
+    await page.waitForSelector(`#v-${v}.on`);
+    const html = await page.$eval(`#v-${v}`, (e) => e.innerHTML.trim());
+    assert.ok(html.length > 40, `view ${v} rendered empty`);
+  }
+  noErrors();
+});
+
+test("language switch translates the whole UI and persists", async () => {
+  await page.selectOption("#langsel", "en");
+  await page.waitForFunction(() => document.documentElement.lang === "en");
+  const navEn = await page.$eval("#nav", (e) => e.textContent);
+  assert.match(navEn, /Drill/);
+  await page.selectOption("#langsel", "ko");
+  await page.waitForFunction(() => document.documentElement.lang === "ko");
+  const navKo = await page.$eval("#nav", (e) => e.textContent);
+  assert.match(navKo, /드릴/);
+  // survives a reload
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  assert.equal(await page.evaluate(() => document.documentElement.lang), "ko");
+  await page.selectOption("#langsel", "en");
+  await page.waitForFunction(() => document.documentElement.lang === "en");
+  noErrors();
+});
+
+test("theme toggle flips and persists", async () => {
+  const before = await page.evaluate(() => document.documentElement.dataset.theme);
+  await page.click("#themebtn");
+  const after = await page.evaluate(() => document.documentElement.dataset.theme);
+  assert.notEqual(before, after);
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), after);
+  await page.click("#themebtn");
+  noErrors();
+});
+
+test("a full drill spot can be answered and shows a signed EV for every option", async () => {
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-go");
+  await page.click("#dr-go");
+  await page.waitForSelector(".dopt", { timeout: 30000 });
+  const nOpts = await page.$$eval(".dopt", (b) => b.length);
+  assert.ok(nOpts >= 2, "a decision needs at least two options");
+  await page.click(".dopt");
+  await page.waitForSelector(".dtable .drow");
+  const rows = await page.$$eval(".dtable .drow .dv", (e) => e.map((x) => x.textContent.trim()));
+  assert.ok(rows.length >= 2);
+  rows.forEach((r) => assert.match(r, /^[+-]\d/, "EV cell not signed: " + r));
+  // the reported bug: it must be possible to see a +EV line
+  assert.ok(await page.$(".dbadge.b"), "no best-option badge rendered");
+  assert.ok(await page.$("#dr-next"), "no next button");
+  noErrors();
+});
+
+/* Drill state lives in memory, so a reload is the cleanest way to guarantee a
+ * fresh session regardless of what an earlier test left on screen.          */
+async function startFreshDrill() {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-go", { timeout: 30000 });
+  await page.click("#dr-go");
+  await page.waitForSelector(".dopt", { timeout: 60000 });
+}
+
+test("across many drill spots, +EV options actually appear", async () => {
+  await startFreshDrill();
+  let sawPositive = 0, spots = 0;
+  for (let i = 0; i < 8; i++) {
+    await page.click(".dopt");
+    await page.waitForSelector(".dtable .drow");
+    const evs = await page.$$eval(".dtable .drow .dv", (e) => e.map((x) => parseFloat(x.textContent)));
+    spots++;
+    if (evs.some((v) => v > 0)) sawPositive++;
+    const next = await page.$("#dr-next");
+    if (!next) break;
+    await next.click();
+    if (await page.$("#dr-again")) break;                  // session finished
+    await page.waitForSelector(".dopt", { timeout: 60000 });
+  }
+  assert.ok(spots >= 5, "expected to walk several spots, got " + spots);
+  assert.ok(sawPositive / spots >= 0.5,
+    `only ${sawPositive}/${spots} spots showed a +EV option — the original bug`);
+  noErrors();
+});
+
+test("keyboard shortcuts pick an option", async () => {
+  await startFreshDrill();
+  await page.keyboard.press("1");
+  await page.waitForSelector(".dtable .drow");
+  assert.ok(await page.$(".drow.mine"), "keyboard pick was not registered");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".dopt", { timeout: 60000 });
+  noErrors();
+});
+
+test("hand analysis runs from the demo hand and produces street EV tables", async () => {
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#h-demo");
+  await page.click("#h-demo");
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .st", { timeout: 30000 });
+  const streets = await page.$$eval("#h-out .st", (e) => e.length);
+  assert.ok(streets >= 2, "expected flop and turn analysis, got " + streets);
+  const evCells = await page.$$eval("#h-out .dtable .drow .dv", (e) => e.map((x) => x.textContent.trim()));
+  assert.ok(evCells.length > 0, "no EV table in the analysis");
+  evCells.forEach((c) => assert.match(c, /^[+-]\d/));
+  assert.ok(await page.$("#h-save"), "no save button");
+  noErrors();
+});
+
+test("range lab computes a known equity", async () => {
+  await page.click('#nav button[data-v="range"]');
+  await page.waitForSelector("#rg-go");
+  await page.fill("#rg-hand", "AsAh");
+  await page.fill("#rg-range", "KK");
+  await page.fill("#rg-board", "");
+  await page.click("#rg-go");
+  await page.waitForSelector("#rg-out .blk", { timeout: 30000 });
+  const txt = await page.$eval("#rg-out", (e) => e.textContent);
+  const m = txt.match(/(\d+)%/);
+  assert.ok(m, "no percentage in the result: " + txt);
+  const eq = +m[1];
+  assert.ok(eq >= 79 && eq <= 83, `AA vs KK should be ~81%, got ${eq}%`);
+  noErrors();
+});
+
+test("quiz can be started and answered", async () => {
+  await page.click('#nav button[data-v="quiz"]');
+  await page.waitForSelector("#qz-go");
+  await page.click("#qz-go");
+  await page.waitForSelector(".opt");
+  for (let i = 0; i < 5; i++) {
+    const opt = await page.$(".opt");
+    if (!opt) break;
+    await opt.click();
+    await page.waitForTimeout(60);
+  }
+  const progress = await page.$eval("#v-quiz .dprog", (e) => e.textContent);
+  assert.match(progress, /5/, "progress did not advance: " + progress);
+  noErrors();
+});
+
+test("data export produces a valid download", async () => {
+  await page.click('#nav button[data-v="help"]');
+  await page.waitForSelector("#ex-json");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.click("#ex-json")]);
+  assert.match(download.suggestedFilename(), /holdem-studio-.*\.json/);
+  noErrors();
+});
+
+test("no horizontal overflow at mobile width", async () => {
+  await page.setViewportSize({ width: 360, height: 760 });
+  for (const v of ["home", "hand", "drill", "range", "help"]) {
+    await page.click(`#nav button[data-v="${v}"]`);
+    await page.waitForTimeout(150);
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(overflow <= 1, `${v} overflows horizontally by ${overflow}px`);
+  }
+  noErrors();
+});
+
+test("no untranslated i18n key paths leak into the UI", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  for (const lang of ["en", "ko"]) {
+    await page.selectOption("#langsel", lang);
+    await page.waitForTimeout(200);
+    for (const v of ["home", "quiz", "hand", "stats", "range", "help"]) {
+      await page.click(`#nav button[data-v="${v}"]`);
+      await page.waitForTimeout(120);
+      const text = await page.$eval(`#v-${v}`, (e) => e.innerText);
+      // a leaked key looks like "common.myCards" / "drill.story.checkCheck"
+      const leaks = text.match(/\b(common|hand|drill|quiz|stats|help|home|range|villain|axes|scenarios|positions|draws|texture|bankroll|profileNotes|archetypes|app|nav)\.[a-zA-Z0-9.]+/g);
+      assert.equal(leaks, null, `${lang}/${v} leaked i18n keys: ${leaks && leaks.join(", ")}`);
+    }
+  }
+  noErrors();
+});

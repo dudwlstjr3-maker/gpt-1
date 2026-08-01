@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Poker hand analysis, opponent profiling and EV drills. Runs entirely in your browser.">
+<meta name="color-scheme" content="dark light">
+<title>Holdem Studio</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><div class="hd">
+  <div class="logo" id="logo"></div>
+  <nav id="nav"></nav>
+  <div class="hdtools">
+    <select id="langsel" aria-label="Language"></select>
+    <button class="iconbtn" id="themebtn" aria-label="Toggle theme">☀</button>
+  </div>
+</div></header>
+
+<div class="wrap" id="main">
+  <section class="view on" id="v-home"></section>
+  <section class="view" id="v-quiz"></section>
+
+  <section class="view" id="v-hand">
+    <div class="card">
+      <h2 id="lbl-setup"></h2>
+      <p class="muted small" id="lbl-setupnote"></p>
+      <div class="grid g3" style="margin-top:10px">
+        <div><label id="lbl-gt"></label><select id="s-gt"></select></div>
+        <div><label id="lbl-seats"></label><select id="s-seats"></select></div>
+        <div><label id="lbl-stack"></label><input id="s-stack" type="number" value="100" min="5" step="1"></div>
+        <div><label id="lbl-bl"></label><input id="s-bl" value="0.5/1"></div>
+        <div><label id="lbl-ante"></label><input id="s-ante" type="number" value="0" step="0.1"></div>
+        <div><label id="lbl-br"></label><input id="s-br" type="number" value="0" step="10"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div style="flex:2"><label id="lbl-goal"></label><select id="s-goal"></select></div>
+        <div style="flex:0 0 auto"><button class="btn sec sm" id="s-save"></button></div>
+      </div>
+      <div id="br-advice"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="lbl-input"></h2>
+      <div class="step"><span class="num">1</span><span id="lbl-step1"></span> <span class="sub" id="seat-hint"></span></div>
+      <div class="seatmap" id="seat-map"></div>
+      <div class="step"><span class="num">2</span><span id="lbl-step2"></span> <span class="sub" id="lbl-step2sub"></span></div>
+      <div class="bg" id="vt-chips" style="display:flex"></div>
+      <div class="small dim" id="vt-desc" style="margin-top:6px"></div>
+      <div class="step"><span class="num">3</span><span id="lbl-step3"></span></div>
+      <div class="bg" id="pf-chips" style="display:flex"></div>
+      <div class="step"><span class="num">4</span><span id="lbl-step4"></span> <span class="sub" id="lbl-step4sub"></span></div>
+      <div class="slotrow" id="slots"></div>
+      <div class="deck" id="deck"></div>
+      <div class="step"><span class="num">5</span><span id="lbl-step5"></span> <span class="sub" id="lbl-step5sub"></span></div>
+      <div id="acts2"></div>
+      <div class="row" style="margin-top:16px">
+        <div style="flex:0 0 auto"><button class="btn" id="h-run"></button></div>
+        <div style="flex:0 0 auto"><button class="btn sec" id="h-clear"></button></div>
+        <div style="flex:0 0 auto"><button class="btn sec" id="h-demo"></button></div>
+      </div>
+    </div>
+    <div id="h-out"></div>
+  </section>
+
+  <section class="view" id="v-stats"></section>
+  <section class="view" id="v-drill"></section>
+  <section class="view" id="v-range"></section>
+  <section class="view" id="v-help"></section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>/*__ENGINE__*/</script>
+<script>/*__I18N__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

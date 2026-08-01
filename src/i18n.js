@@ -1,0 +1,651 @@
+/* =============================================================================
+ * i18n.js — all user-facing text.
+ *
+ * Adding a language is a data-only change: copy the `en` object, translate the
+ * values, register it in LANGS. Nothing in app.js or engine.js hard-codes a
+ * string. Keys are dot-paths; {name} placeholders are filled by t().
+ * ========================================================================== */
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.I18N = factory();
+})(typeof self !== "undefined" ? self : typeof globalThis !== "undefined" ? globalThis : this, function () {
+"use strict";
+
+const ko = {
+  meta: { name: "한국어", htmlLang: "ko", dir: "ltr" },
+  app: {
+    title: "홀덤 <span>스튜디오</span>",
+    tagline: "성향 진단 · 핸드 분석 · EV 드릴",
+    docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 드릴"
+  },
+  nav: { home: "홈", quiz: "성향 진단", hand: "핸드 분석", stats: "리크 · 기록", drill: "드릴", range: "레인지 랩", help: "도움말" },
+  common: {
+    bb: "BB", pot: "팟", stack: "스택", position: "포지션", board: "보드", hand: "핸드",
+    equity: "승률", ev: "EV", save: "저장", cancel: "취소", close: "닫기", reset: "초기화",
+    start: "시작하기", next: "다음", back: "뒤로", done: "완료", loading: "계산 중…",
+    yes: "예", no: "아니오", none: "없음", unknown: "모름", of: "/", best: "최선",
+    yourPick: "내 선택", correct: "정답", incorrect: "오답", street: "스트리트",
+    flop: "플랍", turn: "턴", river: "리버", preflop: "프리플랍",
+    inPosition: "포지션 유리", outOfPosition: "포지션 불리",
+    check: "체크", bet: "벳", call: "콜", raise: "레이즈", fold: "폴드", allin: "올인",
+    vs: "vs", copy: "복사", copied: "복사했습니다",
+    folds: "폴드", ifCalled: "콜 받으면", needed: "필요"
+  },
+  positions: { UTG: "UTG", "UTG+1": "UTG+1", MP: "MP", "MP+1": "MP+1", HJ: "HJ", CO: "CO", BTN: "BTN", SB: "SB", BB: "BB", "BTN(SB)": "BTN(SB)" },
+  categories: ["하이카드", "원페어", "투페어", "트립스", "스트레이트", "플러시", "풀하우스", "포카드", "스트레이트 플러시"],
+  draws: { flushDraw: "플러시 드로", oesd: "양차 스트레이트 드로", gutshot: "건샷", bdFlush: "백도어 플러시", twoOvers: "오버카드 2장" },
+  texture: {
+    wet: "젖은(드로 많은) 보드", mid: "중간 텍스처", dry: "마른(드로 적은) 보드",
+    mono: "모노톤", twotone: "투톤", rainbow: "레인보우",
+    high: "하이카드 보드", middling: "미들 보드", low: "로우 보드"
+  },
+  villain: {
+    label: "상대 유형",
+    unknown: { n: "모름 / 표준 레귤러", d: "기본값. 이론 기준 그대로 봅니다." },
+    nit: { n: "락 (타이트·패시브)", d: "거의 안 들어오고, 들어오면 진짜입니다. 이 사람의 벳은 강함을 뜻합니다." },
+    tag: { n: "TAG (타이트·어그로)", d: "핸드 선택이 좋고 압박도 넣습니다. 가장 까다로운 상대이며 이론값에 가깝게 대해야 합니다." },
+    station: { n: "콜링 스테이션 (루즈·패시브)", d: "많이 들어오고 거의 안 접습니다. 블러프가 통하지 않으니 밸류로만 벌어야 합니다." },
+    lag: { n: "LAG · 매니악 (루즈·어그로)", d: "넓게 들어오고 자주 칩니다. 벳이 강함을 뜻하지 않으므로 더 자주 받아줘야 합니다." },
+    fish: { n: "초보 (예측 불가)", d: "레인지가 뒤죽박죽입니다. 블러프는 줄이고 밸류는 두껍게 가져가세요." }
+  },
+  scenarios: {
+    open_call: "내가 오픈 → 상대 콜", call_open: "상대 오픈 → 내가 콜",
+    "3b_call": "내가 3벳 → 상대 콜", call_3b: "상대 3벳 → 내가 콜",
+    limp: "림프 팟", pf_only: "프리플랍 결정만 분석"
+  },
+  home: {
+    h1: "무엇을 고치고 싶으신가요",
+    lead: "이 도구는 세 가지를 합니다. <b>성향을 진단</b>하고, <b>친 핸드의 EV를 계산</b>하고, <b>같은 실수를 반복하는지 드릴로 확인</b>합니다.",
+    cta1: "성향 진단부터", cta1d: "25문항이면 내 누수 축이 나옵니다.",
+    cta2: "핸드 분석", cta2d: "방금 친 핸드를 넣고 스트리트별 EV를 봅니다.",
+    cta3: "EV 드릴", cta3d: "임의 스팟에서 액션을 고르고 선택지별 EV로 채점받습니다.",
+    profileTitle: "내 성향",
+    noProfile: "아직 진단 기록이 없습니다.",
+    recentHands: "최근 기록한 핸드", noHands: "아직 저장된 핸드가 없습니다.",
+    drillSummary: "드릴 성적", noDrill: "아직 드릴 기록이 없습니다.",
+    quickStats: "요약"
+  },
+  quiz: {
+    h1: "성향 진단",
+    lead: "정답이 있는 시험이 아닙니다. <b>평소에 실제로 어떻게 하는지</b> 고르세요. 최소 {min}문항, 축이 안정되면 자동으로 끝납니다.",
+    progress: "{done} / {total} 문항",
+    confidence: "신뢰도",
+    restart: "다시 진단",
+    resultTitle: "진단 결과",
+    archetype: "유형",
+    axesTitle: "축별 성향",
+    summaryTitle: "무엇을 뜻하는가",
+    sample: "표본 {n}문항",
+    lowConf: "표본이 얇은 축입니다. 문항을 더 풀면 정확해집니다.",
+    saved: "진단 결과를 저장했습니다.",
+    retakeWarn: "다시 진단하면 기존 결과를 덮어씁니다."
+  },
+  axes: {
+    A1: { n: "진입 폭", lo: "타이트", hi: "루즈", d: "어떤 핸드로 팟에 들어가는가" },
+    A2: { n: "공격성", lo: "패시브", hi: "어그레시브", d: "콜·체크로 가는가, 벳·레이즈로 가는가" },
+    A3: { n: "리스크 감내", lo: "회피", hi: "감수", d: "분산 큰 라인을 얼마나 감당하는가" },
+    A4: { n: "압박 저항", lo: "쉽게 접음", hi: "끝까지 버팀", d: "큰 벳·3벳을 맞았을 때 물러서는가" },
+    A5: { n: "사고 스타일", lo: "직관형", hi: "계산형", d: "오즈·빈도를 실제로 따지는가" },
+    B1: { n: "감정 회복력", lo: "흔들림", hi: "단단함", d: "배드빗·연패 직후에도 판단이 유지되는가" },
+    B2: { n: "일관성", lo: "들쭉날쭉", hi: "일관됨", d: "같은 구조의 스팟에 같은 답을 하는가" }
+  },
+  archetypes: {
+    balanced: "밸런스형", tagStrong: "TAG (타이트 어그레시브)", tagWeak: "약한 TAG",
+    maniac: "매니악 성향", lag: "LAG (루즈 어그레시브)", rock: "락 · 니트",
+    tightPassive: "타이트 패시브", station: "콜링 스테이션 성향"
+  },
+  profileNotes: {
+    tightAgg: "들어갈 핸드를 잘 고르고, 들어간 다음엔 밀어붙입니다. 가장 돈 되는 조합입니다.",
+    tightPass: "핸드 선택은 좋은데 들어간 다음이 소극적입니다. <b>이길 판에서 덜 벌고 있습니다</b> — 가장 큰 누수 지점입니다.",
+    loosePass: "너무 많이 들어가고, 들어가서는 콜만 합니다. 장기적으로 가장 손해가 큰 조합이니 <b>진입 폭부터</b> 줄이세요.",
+    looseAgg: "공격적이고 압박은 잘 넣지만 분산이 큽니다. 상대가 잡아채기 시작하면 손실이 빠릅니다.",
+    foldsEasy: "큰 벳을 맞으면 쉽게 물러섭니다. 관찰력 있는 상대에게는 <b>블러프로 계속 털립니다</b>.",
+    neverFolds: "잘 안 접습니다. 블러프는 못 뚫리지만 <b>이미 진 핸드에 계속 돈을 냅니다</b>.",
+    feel: "느낌으로 결정하는 편입니다. 감각은 자산이지만, 오즈 계산만 붙여도 승률이 붙습니다.",
+    calc: "근거를 따져 결정합니다. 이 성향은 이 앱의 숫자 파트를 그대로 흡수할 수 있습니다.",
+    tilt: "배드빗·연패 뒤 판단이 흔들립니다. 스톱로스를 <b>숫자로</b> 정하는 것만으로 큰 효과가 있습니다.",
+    inconsistent: "같은 구조의 스팟에 다르게 답했습니다. 기준이 아직 안 잡혔다는 뜻이고, 이건 나쁜 게 아니라 <b>공부 지점</b>입니다.",
+    neutral: "전 축이 중간대입니다. 뚜렷한 약점이 없다는 뜻이기도 하고, 아직 표본이 얇다는 뜻이기도 합니다."
+  },
+  hand: {
+    h1: "핸드 분석",
+    setupTitle: "세션 세팅", setupNote: "한 번 저장하면 다음부터 자동으로 불러옵니다.",
+    gameType: "게임 타입", cash: "캐시 게임", mtt: "토너먼트(MTT)", sng: "SNG",
+    seats: "테이블 인원", seats6: "6맥스", seats9: "9맥스(풀링)", seats2: "헤즈업",
+    effStack: "유효 스택 (BB)", blinds: "블라인드 (SB/BB)", ante: "앤티 (BB 단위)",
+    bankroll: "뱅크롤 (총액)", goal: "이번 세션 목표",
+    goalPractice: "연습 · 복기 위주", goalProfit: "수익 목표", goalLeak: "특정 리크 교정",
+    saveSetup: "세팅 저장", setupSaved: "세팅을 저장했습니다.",
+    inputTitle: "핸드 입력",
+    step1: "자리 고르기", step1sub: "나와 상대를 탭하세요",
+    step2: "상대는 어떤 사람인가요", step2sub: "모르면 그대로 두세요",
+    step3: "프리플랍은 어떻게 됐나요",
+    step4: "카드 고르기", step4sub: "아래 덱에서 탭하세요 · 놓은 카드를 다시 탭하면 지워집니다",
+    step5: "액션 넣기", step5sub: "단위는 BB",
+    myCards: "내 카드",
+    run: "분석하기", clear: "초기화", demo: "예시 채우기",
+    needCards: "내 카드 2장을 먼저 골라주세요.",
+    villainActs: "상대", myAct: "나",
+    resultTitle: "분석 결과",
+    preflopTitle: "프리플랍",
+    handClass: "핸드", handPctl: "상위", openStd: "이 자리 표준 오픈",
+    inChart: "표준 오픈 레인지 안에 있습니다.", notInChart: "표준 오픈 레인지 밖입니다.",
+    recTitle: "권장", whyTitle: "왜", evTitle: "선택지별 기대값", numbersTitle: "숫자",
+    reqEquity: "필요 승률", mdf: "MDF", alpha: "α (블러프 기준)", spr: "SPR",
+    potOdds: "팟 오즈", villainCombos: "상대 남은 콤보", myHandNow: "현재 내 핸드",
+    saveHand: "이 핸드 기록에 저장", handSaved: "핸드를 저장했습니다.",
+    assumptionNote: "상대 레인지는 <b>{type}</b> 가정으로 구성한 근사치입니다(잔여 {n}콤보). 승률·EV는 그 레인지에 대해 정확히 계산한 값입니다.",
+    yourActionTitle: "내가 한 액션", evLost: "EV 손실",
+    tagOverfold: "성급한 폴드", tagBadCall: "질 걸 알고 낸 콜", tagPassive: "소극적 라인",
+    tagWildBluff: "근거 없는 블러프", tagMissedValue: "밸류벳 누락",
+    tagSizeBig: "사이즈 과대", tagSizeSmall: "사이즈 과소"
+  },
+  drill: {
+    h1: "EV 드릴",
+    lead: "임의의 스팟을 하나씩 드립니다. 액션을 고르면 <b>고를 수 있었던 모든 선택지의 EV</b>를 계산해서 보여줍니다.",
+    note: "플랍 이후 스팟만 나옵니다. 프리플랍은 레인지 문제라 <b>핸드 분석</b>의 차트 기준을 쓰세요.",
+    step1: "몇 스팟 볼까요", step2: "상대는", step3: "난이도",
+    spots: "{n}스팟", randomVillain: "매번 랜덤",
+    diffEasy: "입문", diffEasyD: "명확한 스팟 위주",
+    diffNormal: "표준", diffNormalD: "실전 분포 그대로",
+    diffHard: "고급", diffHardD: "경계선 스팟만",
+    computing: "스팟을 만들고 EV를 계산하는 중…",
+    progress: "{i} / {n}",
+    running: "누적",
+    villainBet: "상대가 <b>{size}BB</b> 벳했습니다. 어떻게 하시겠습니까?",
+    villainCheck: "상대 체크. 어떻게 하시겠습니까?",
+    heroFirst: "당신 차례입니다. 어떻게 하시겠습니까?",
+    afterCheck: "당신이 체크하자 상대가 <b>{size}BB</b> 벳했습니다.",
+    optCheck: "체크", optFold: "폴드", optCall: "콜 {size}BB",
+    optBet: "벳 {size}BB", optRaise: "레이즈 {size}BB", optAllin: "올인 {size}BB",
+    betLabelSmall: "1/3", betLabelMid: "2/3", betLabelPot: "팟",
+    evTable: "선택지별 기대값",
+    perfect: "정확합니다 — EV 손실 0",
+    lostEv: "EV 손실 <b>{v}BB</b> · 최선은 <b>{best}</b>",
+    profitableButNotBest: "이 선택도 <b>+EV</b>지만, <b>{best}</b>가 {v}BB 더 벌립니다.",
+    correctFold: "정확합니다. 여기서는 <b>접는 것이 이기는 것</b>입니다 — 콜했다면 {v}BB를 잃습니다.",
+    capture: "EV 획득률",
+    runningLost: "누적 손실",
+    spotLoss: "이 스팟 손실",
+    grade: "등급",
+    tipTitle: "한 줄",
+    next: "다음 스팟", seeResult: "결과 보기", quit: "중단하고 결과 보기",
+    reveal: "상대 레인지 보기", hideReveal: "접기",
+    rangeNote: "상대 레인지는 <b>{type}</b> 가정으로 구성했습니다(잔여 {n}콤보). 벳 EV에는 상대 폴드 빈도 가정이 들어가고, 콜·폴드 EV는 가정 없이 정확합니다.",
+    endTitle: "드릴 결과",
+    endSpots: "스팟", endAccuracy: "정확도", endEvLost: "총 EV 손실", endPerSpot: "스팟당",
+    endCapture: "EV 획득률",
+    endByAction: "액션별 성적", endByStreet: "스트리트별 성적",
+    endLeak: "가장 큰 누수", endNoLeak: "뚜렷한 편향이 없습니다.",
+    again: "한 세션 더", home: "드릴 첫 화면", history: "지난 세션",
+    leakPassive: "칠 자리에서 참았습니다. 공격 쪽 EV를 계속 놓치고 있습니다.",
+    leakAggro: "참을 자리에서 쳤습니다. 이 상대에게 값을 못 받는 공격입니다.",
+    leakOverfold: "접지 않아도 될 자리에서 접었습니다. 팟 오즈를 먼저 보세요.",
+    leakCallDown: "질 걸 알면서 받아줬습니다. 필요 승률에 미달하는 콜입니다.",
+    leakSizing: "액션은 맞는데 사이즈가 어긋납니다.",
+    tipBest: "정확합니다. 같은 상황이 또 오면 그대로 하세요.",
+    tipShouldAggr: "여기는 <b>치는 자리</b>였습니다. 승률 {eq}에 공격 쪽 EV가 더 높습니다.",
+    tipShouldPassive: "여기는 <b>참는 자리</b>였습니다. 상대가 {type}이라 이 공격은 값을 못 받습니다.",
+    tipShouldFold: "손익분기 승률에 못 미칩니다. 접는 게 이기는 겁니다.",
+    tipShouldCall: "승률 {eq}면 받아주는 게 맞습니다. 크기가 커 보여도 팟이 이미 큽니다.",
+    tipSizing: "액션은 맞았으니 <b>얼마를 거는지</b>만 조정하면 됩니다.",
+    keyHint: "키보드: 1–9 선택 · Enter 다음",
+    story: {
+      checkCheck: "체크–체크",
+      villainBetHeroCall: "상대 {size}BB 벳 → 내가 콜",
+      heroBetVillainCall: "내가 {size}BB 벳 → 상대 콜",
+      heroCheckVillainBetHeroCall: "내 체크 → 상대 {size}BB 벳 → 내가 콜",
+      villainCheckHeroBetVillainCall: "상대 체크 → 내가 {size}BB 벳 → 상대 콜"
+    }
+  },
+  range: {
+    h1: "레인지 랩",
+    lead: "포지션별 표준 오픈 레인지를 보고, 내 핸드 vs 상대 레인지 승률을 직접 계산합니다.",
+    chartTitle: "포지션별 오픈 레인지", chartSub: "{seats} · {pos} · 상위 {pct}%",
+    calcTitle: "에퀴티 계산기",
+    myHand: "내 핸드", vsRange: "상대 레인지", boardOpt: "보드 (선택)",
+    calc: "계산", result: "결과",
+    eqResult: "내 승률 <b>{eq}</b> · 상대 콤보 {n}개",
+    presetTop: "상위 {p}%", customRange: "직접 입력",
+    rangeHint: "예: 22+ A9s+ KTs+ AJo+  ·  쉼표나 공백으로 구분",
+    invalidRange: "레인지를 알아볼 수 없습니다."
+  },
+  stats: {
+    h1: "리크 · 기록",
+    handsTitle: "저장한 핸드", drillTitle: "드릴 기록",
+    noData: "아직 기록이 없습니다. 핸드 분석이나 드릴을 먼저 해보세요.",
+    date: "날짜", spot: "스팟", result: "결과", evLost: "EV 손실",
+    delete: "삭제", confirmDelete: "이 기록을 삭제할까요?",
+    leakTitle: "반복되는 패턴", leakNone: "아직 패턴을 잡을 만큼 표본이 없습니다.",
+    totalHands: "핸드", totalDrills: "드릴 세션", avgCapture: "평균 EV 획득률"
+  },
+  help: {
+    h1: "도움말",
+    whatTitle: "이 앱은 무엇인가",
+    whatBody: "친 핸드를 다시 넣어보고 <b>(1)</b> 내 성향을 진단하고 <b>(2)</b> 그 성향에 맞춘 지침을 받고 <b>(3)</b> 드릴로 교정하는 <b>학습·복기 도구</b>입니다.",
+    mathTitle: "계산은 어디까지 진짜인가",
+    mathExact: "<b>정확한 계산:</b> 팟 오즈, 필요 에퀴티, SPR, MDF, EV — 전부 공식 그대로입니다.",
+    mathEquity: "<b>정확한 계산:</b> 내 핸드 vs 상대 레인지 승률 — 남은 카드를 전부 돌리거나, 많을 때는 고정 시드 몬테카를로로 구합니다. 한 스팟 안의 모든 선택지는 <b>같은 런아웃</b>으로 채점하므로 선택지 간 EV 차이에는 표본 오차가 없습니다.",
+    mathModel: "<b>모델이 들어간 값:</b> 상대의 레인지. 벳 레인지는 밸류와 블러프를 균형 비율 s/(P+2s)로 섞은 <b>폴라라이즈드</b> 구조, 콜 레인지는 MDF 기준의 <b>컨덴스드</b> 구조로 만듭니다. 상대 유형은 이 비율을 밀고 당깁니다.",
+    mathRec: "<b>권장 액션:</b> 위 숫자에서 도출한 것이지 솔버 출력이 아닙니다. 방향은 믿되 소수점까지 믿지는 마세요.",
+    fixTitle: "이전 버전에서 고친 것",
+    fixBody: "이전 버전은 상대 레인지를 <b>절대 핸드 강도 상위 N%</b>로 잘라 만들었습니다. 그러면 상대의 벳 레인지에 블러프가 하나도 남지 않아, 어떤 핸드로도 콜이 이득이 되지 않고 거의 모든 선택지가 -EV로 나왔습니다. 지금은 벳 레인지를 밸류+블러프로 구성합니다. 또한 벳 EV 식이 자기 벳을 되돌려받는 형태(P+2X)로 잘못 적혀 있어 모든 벳을 과대평가하던 것도 바로잡았습니다.",
+    dataTitle: "데이터",
+    dataBody: "모든 기록은 이 브라우저 안에만 저장됩니다(localStorage). 서버로 보내지 않습니다. 브라우저 데이터를 지우면 함께 사라지니 아래에서 백업하세요.",
+    exportBtn: "데이터 내보내기", importBtn: "데이터 불러오기", resetBtn: "전체 초기화",
+    exported: "내보냈습니다.", imported: "불러왔습니다.", importFail: "파일을 읽을 수 없습니다.",
+    confirmReset: "저장된 모든 기록을 지울까요? 되돌릴 수 없습니다.",
+    disclaimer: "이 도구는 학습·복기용이며 도박 자금 운용에 대한 조언이 아닙니다. 잃어도 생활에 지장이 없는 돈만 쓰세요.",
+    responsible: "도움이 필요하면: 한국도박문제예방치유원 1336 · 국제 문의는 각국 상담 기관을 이용하세요."
+  },
+  bankroll: {
+    title: "뱅크롤",
+    buyins: "현재 뱅크롤은 이 스테이크 <b>{n}바이인</b>입니다.",
+    safe: "충분합니다. 이 스테이크를 유지하세요.",
+    caution: "여유가 빠듯합니다. 연패가 오면 한 단계 내리는 걸 미리 정해두세요.",
+    danger: "바이인이 부족합니다. 한 단계 낮은 스테이크를 권합니다.",
+    setBankroll: "뱅크롤을 입력하면 조언이 표시됩니다."
+  }
+};
+
+const en = {
+  meta: { name: "English", htmlLang: "en", dir: "ltr" },
+  app: {
+    title: "Holdem <span>Studio</span>",
+    tagline: "Profile · Hand analysis · EV drills",
+    docTitle: "Holdem Studio — Hand Analysis & EV Drills"
+  },
+  nav: { home: "Home", quiz: "Profile", hand: "Analyse", stats: "Leaks · Log", drill: "Drill", range: "Range Lab", help: "Help" },
+  common: {
+    bb: "BB", pot: "Pot", stack: "Stack", position: "Position", board: "Board", hand: "Hand",
+    equity: "Equity", ev: "EV", save: "Save", cancel: "Cancel", close: "Close", reset: "Reset",
+    start: "Start", next: "Next", back: "Back", done: "Done", loading: "Calculating…",
+    yes: "Yes", no: "No", none: "None", unknown: "Unknown", of: "/", best: "Best",
+    yourPick: "Your pick", correct: "Correct", incorrect: "Wrong", street: "Street",
+    flop: "Flop", turn: "Turn", river: "River", preflop: "Preflop",
+    inPosition: "In position", outOfPosition: "Out of position",
+    check: "Check", bet: "Bet", call: "Call", raise: "Raise", fold: "Fold", allin: "All-in",
+    vs: "vs", copy: "Copy", copied: "Copied",
+    folds: "folds", ifCalled: "if called", needed: "needs"
+  },
+  positions: { UTG: "UTG", "UTG+1": "UTG+1", MP: "MP", "MP+1": "MP+1", HJ: "HJ", CO: "CO", BTN: "BTN", SB: "SB", BB: "BB", "BTN(SB)": "BTN(SB)" },
+  categories: ["High card", "One pair", "Two pair", "Three of a kind", "Straight", "Flush", "Full house", "Four of a kind", "Straight flush"],
+  draws: { flushDraw: "Flush draw", oesd: "Open-ended straight draw", gutshot: "Gutshot", bdFlush: "Backdoor flush", twoOvers: "Two overcards" },
+  texture: {
+    wet: "Wet (draw-heavy) board", mid: "Medium texture", dry: "Dry (draw-light) board",
+    mono: "Monotone", twotone: "Two-tone", rainbow: "Rainbow",
+    high: "High board", middling: "Middling board", low: "Low board"
+  },
+  villain: {
+    label: "Opponent type",
+    unknown: { n: "Unknown / standard reg", d: "The default. Everything is read straight off theory." },
+    nit: { n: "Rock (tight-passive)", d: "Barely plays, and means it when they do. Their bet means strength." },
+    tag: { n: "TAG (tight-aggressive)", d: "Good hand selection and applies pressure. The toughest type — play close to theory." },
+    station: { n: "Calling station (loose-passive)", d: "Plays everything, folds nothing. Bluffs do not work; earn with value only." },
+    lag: { n: "LAG / maniac (loose-aggressive)", d: "Wide and constantly firing. A bet does not mean strength, so call more." },
+    fish: { n: "Beginner (unpredictable)", d: "The range is all over the place. Cut bluffs, thicken value." }
+  },
+  scenarios: {
+    open_call: "I opened → villain called", call_open: "Villain opened → I called",
+    "3b_call": "I 3-bet → villain called", call_3b: "Villain 3-bet → I called",
+    limp: "Limped pot", pf_only: "Preflop decision only"
+  },
+  home: {
+    h1: "What do you want to fix?",
+    lead: "Three things: <b>profile your tendencies</b>, <b>compute the EV of hands you actually played</b>, and <b>drill until the same mistake stops repeating</b>.",
+    cta1: "Start with the profile", cta1d: "25 questions is enough to find your leak axis.",
+    cta2: "Analyse a hand", cta2d: "Enter the hand you just played and see street-by-street EV.",
+    cta3: "EV drill", cta3d: "Pick an action in a random spot and get scored on every option's EV.",
+    profileTitle: "Your profile",
+    noProfile: "No profile yet.",
+    recentHands: "Recent hands", noHands: "No saved hands yet.",
+    drillSummary: "Drill record", noDrill: "No drill sessions yet.",
+    quickStats: "Summary"
+  },
+  quiz: {
+    h1: "Tendency profile",
+    lead: "There are no right answers. Pick <b>what you actually do</b>. Minimum {min} questions; it stops early once your axes settle.",
+    progress: "{done} / {total} questions",
+    confidence: "Confidence",
+    restart: "Retake",
+    resultTitle: "Your profile",
+    archetype: "Archetype",
+    axesTitle: "Axis by axis",
+    summaryTitle: "What this means",
+    sample: "{n} answers",
+    lowConf: "Thin sample on this axis. Answer more to sharpen it.",
+    saved: "Profile saved.",
+    retakeWarn: "Retaking overwrites your current profile."
+  },
+  axes: {
+    A1: { n: "Entry width", lo: "Tight", hi: "Loose", d: "Which hands you enter pots with" },
+    A2: { n: "Aggression", lo: "Passive", hi: "Aggressive", d: "Whether you call/check or bet/raise" },
+    A3: { n: "Risk tolerance", lo: "Averse", hi: "Willing", d: "How much variance you can sit through" },
+    A4: { n: "Pressure resistance", lo: "Folds easily", hi: "Never backs down", d: "What you do facing big bets and 3-bets" },
+    A5: { n: "Thinking style", lo: "Intuitive", hi: "Calculating", d: "Whether you actually work out odds and frequencies" },
+    B1: { n: "Emotional resilience", lo: "Tilts", hi: "Steady", d: "Whether judgement holds after a bad beat" },
+    B2: { n: "Consistency", lo: "Erratic", hi: "Consistent", d: "Whether you answer structurally identical spots the same way" }
+  },
+  archetypes: {
+    balanced: "Balanced", tagStrong: "TAG (tight-aggressive)", tagWeak: "Soft TAG",
+    maniac: "Maniac leaning", lag: "LAG (loose-aggressive)", rock: "Rock / nit",
+    tightPassive: "Tight-passive", station: "Calling-station leaning"
+  },
+  profileNotes: {
+    tightAgg: "You pick your spots and then apply pressure. This is the most profitable combination there is.",
+    tightPass: "Good hand selection, timid afterwards. <b>You are under-earning on the pots you win</b> — your biggest leak.",
+    loosePass: "Too many hands, and then only calls. This is the costliest combination long term — <b>start with entry width</b>.",
+    looseAgg: "Aggressive and good at applying pressure, but high variance. Once opponents adjust, losses come fast.",
+    foldsEasy: "You back down to big bets. Observant opponents will <b>bluff you relentlessly</b>.",
+    neverFolds: "You rarely fold. Bluffs do not get through, but <b>you keep paying off hands that already beat you</b>.",
+    feel: "You decide by feel. Instinct is an asset — bolt pot odds onto it and the win rate follows.",
+    calc: "You reason from evidence. This profile absorbs the numeric half of this app directly.",
+    tilt: "Judgement slips after bad beats and downswings. Setting a stop-loss <b>as a number</b> alone helps a lot.",
+    inconsistent: "You answered structurally identical spots differently. That means your baseline is not set yet — not a flaw, a <b>study target</b>.",
+    neutral: "Every axis sits mid-range. That can mean no glaring weakness, or simply a thin sample so far."
+  },
+  hand: {
+    h1: "Hand analysis",
+    setupTitle: "Session setup", setupNote: "Saved once, loaded automatically from then on.",
+    gameType: "Game type", cash: "Cash game", mtt: "Tournament (MTT)", sng: "SNG",
+    seats: "Table size", seats6: "6-max", seats9: "9-max (full ring)", seats2: "Heads-up",
+    effStack: "Effective stack (BB)", blinds: "Blinds (SB/BB)", ante: "Ante (in BB)",
+    bankroll: "Bankroll (total)", goal: "Goal this session",
+    goalPractice: "Practice / review", goalProfit: "Profit target", goalLeak: "Fix a specific leak",
+    saveSetup: "Save setup", setupSaved: "Setup saved.",
+    inputTitle: "Enter the hand",
+    step1: "Pick the seats", step1sub: "Tap yourself and the opponent",
+    step2: "What kind of opponent", step2sub: "Leave it if you do not know",
+    step3: "What happened preflop",
+    step4: "Pick the cards", step4sub: "Tap from the deck below · tap a placed card to clear it",
+    step5: "Enter the action", step5sub: "Amounts in BB",
+    myCards: "My cards",
+    run: "Analyse", clear: "Clear", demo: "Fill example",
+    needCards: "Pick your two cards first.",
+    villainActs: "Villain", myAct: "Me",
+    resultTitle: "Analysis",
+    preflopTitle: "Preflop",
+    handClass: "Hand", handPctl: "Top", openStd: "Standard open here",
+    inChart: "Inside the standard opening range.", notInChart: "Outside the standard opening range.",
+    recTitle: "Recommended", whyTitle: "Why", evTitle: "EV by option", numbersTitle: "Numbers",
+    reqEquity: "Equity needed", mdf: "MDF", alpha: "α (bluff threshold)", spr: "SPR",
+    potOdds: "Pot odds", villainCombos: "Villain combos left", myHandNow: "Your hand now",
+    saveHand: "Save this hand to the log", handSaved: "Hand saved.",
+    assumptionNote: "The villain range is built on the <b>{type}</b> assumption ({n} combos left). Equity and EV are computed exactly against that range.",
+    yourActionTitle: "What you did", evLost: "EV lost",
+    tagOverfold: "Premature fold", tagBadCall: "Call that was already beaten", tagPassive: "Passive line",
+    tagWildBluff: "Bluff without a reason", tagMissedValue: "Missed value bet",
+    tagSizeBig: "Oversized", tagSizeSmall: "Undersized"
+  },
+  drill: {
+    h1: "EV drill",
+    lead: "One random spot at a time. Pick an action and every option you could have taken is scored by <b>its actual EV</b>.",
+    note: "Postflop spots only. Preflop is a range problem — use the charts in <b>Analyse</b> for that.",
+    step1: "How many spots", step2: "Opponent", step3: "Difficulty",
+    spots: "{n} spots", randomVillain: "Random each time",
+    diffEasy: "Starter", diffEasyD: "Clear-cut spots",
+    diffNormal: "Standard", diffNormalD: "Real-game distribution",
+    diffHard: "Advanced", diffHardD: "Close decisions only",
+    computing: "Building the spot and computing EV…",
+    progress: "{i} / {n}",
+    running: "Running",
+    villainBet: "Villain bets <b>{size}BB</b>. What do you do?",
+    villainCheck: "Villain checks. What do you do?",
+    heroFirst: "It is on you. What do you do?",
+    afterCheck: "You checked and villain bet <b>{size}BB</b>.",
+    optCheck: "Check", optFold: "Fold", optCall: "Call {size}BB",
+    optBet: "Bet {size}BB", optRaise: "Raise to {size}BB", optAllin: "All-in {size}BB",
+    betLabelSmall: "1/3", betLabelMid: "2/3", betLabelPot: "pot",
+    evTable: "EV by option",
+    perfect: "Correct — zero EV lost",
+    lostEv: "EV lost <b>{v}BB</b> · best was <b>{best}</b>",
+    profitableButNotBest: "Still <b>+EV</b>, but <b>{best}</b> earns {v}BB more.",
+    correctFold: "Correct. <b>Folding is the winning play</b> here — calling would have cost you {v}BB.",
+    capture: "EV captured",
+    runningLost: "Lost so far",
+    spotLoss: "Lost here",
+    grade: "Grade",
+    tipTitle: "In one line",
+    next: "Next spot", seeResult: "See results", quit: "Stop and see results",
+    reveal: "Show villain range", hideReveal: "Hide",
+    rangeNote: "The villain range is built on the <b>{type}</b> assumption ({n} combos left). Bet EVs include a fold-frequency model; call and fold EVs are exact.",
+    endTitle: "Drill results",
+    endSpots: "Spots", endAccuracy: "Accuracy", endEvLost: "Total EV lost", endPerSpot: "Per spot",
+    endCapture: "EV captured",
+    endByAction: "By action", endByStreet: "By street",
+    endLeak: "Biggest leak", endNoLeak: "No clear bias.",
+    again: "Another session", home: "Drill menu", history: "Past sessions",
+    leakPassive: "You checked where you should have bet. You are leaving aggressive EV on the table.",
+    leakAggro: "You bet where you should have checked. That aggression does not get paid here.",
+    leakOverfold: "You folded where you did not have to. Check the pot odds first.",
+    leakCallDown: "You called knowing you were behind. Those calls are below the required equity.",
+    leakSizing: "Right action, wrong size.",
+    tipBest: "Correct. Do exactly this next time.",
+    tipShouldAggr: "This was a <b>betting spot</b>. At {eq} equity the aggressive line has more EV.",
+    tipShouldPassive: "This was a <b>restraint spot</b>. Against a {type} that aggression does not get paid.",
+    tipShouldFold: "Below the break-even equity. Folding is how you win here.",
+    tipShouldCall: "At {eq} equity you take this. The bet looks big because the pot already is.",
+    tipSizing: "Action was right — only the <b>amount</b> needs adjusting.",
+    keyHint: "Keyboard: 1–9 to pick · Enter for next",
+    story: {
+      checkCheck: "checked through",
+      villainBetHeroCall: "villain bet {size}BB, you called",
+      heroBetVillainCall: "you bet {size}BB, villain called",
+      heroCheckVillainBetHeroCall: "you checked, villain bet {size}BB, you called",
+      villainCheckHeroBetVillainCall: "villain checked, you bet {size}BB, villain called"
+    }
+  },
+  range: {
+    h1: "Range Lab",
+    lead: "Browse standard opening ranges by position and compute your equity against any range.",
+    chartTitle: "Opening range by position", chartSub: "{seats} · {pos} · top {pct}%",
+    calcTitle: "Equity calculator",
+    myHand: "My hand", vsRange: "Villain range", boardOpt: "Board (optional)",
+    calc: "Calculate", result: "Result",
+    eqResult: "Your equity <b>{eq}</b> · {n} villain combos",
+    presetTop: "Top {p}%", customRange: "Custom",
+    rangeHint: "e.g. 22+ A9s+ KTs+ AJo+  ·  separated by spaces or commas",
+    invalidRange: "Could not parse that range."
+  },
+  stats: {
+    h1: "Leaks · Log",
+    handsTitle: "Saved hands", drillTitle: "Drill log",
+    noData: "Nothing logged yet. Analyse a hand or run a drill first.",
+    date: "Date", spot: "Spot", result: "Result", evLost: "EV lost",
+    delete: "Delete", confirmDelete: "Delete this entry?",
+    leakTitle: "Recurring patterns", leakNone: "Not enough sample to call a pattern yet.",
+    totalHands: "Hands", totalDrills: "Drill sessions", avgCapture: "Mean EV captured"
+  },
+  help: {
+    h1: "Help",
+    whatTitle: "What this is",
+    whatBody: "A <b>study and review tool</b>: replay a hand, <b>(1)</b> profile your tendencies, <b>(2)</b> get guidance matched to that profile, and <b>(3)</b> drill until it sticks.",
+    mathTitle: "How much of this is real maths",
+    mathExact: "<b>Exact:</b> pot odds, required equity, SPR, MDF, EV — straight from the formulas.",
+    mathEquity: "<b>Exact:</b> your hand vs the villain range — full enumeration of the remaining cards, or fixed-seed Monte Carlo when that is too large. Every option inside one spot is scored on the <b>same runouts</b>, so EV differences between options carry no sampling error.",
+    mathModel: "<b>Modelled:</b> the villain's range. Betting ranges are <b>polarised</b> — value plus bluffs mixed at the equilibrium ratio s/(P+2s). Calling ranges are <b>condensed</b> around MDF. The opponent type shifts those ratios.",
+    mathRec: "<b>Recommended actions:</b> derived from those numbers, not solver output. Trust the direction, not the decimal.",
+    fixTitle: "What changed from the previous version",
+    fixBody: "The old build cut the villain's range to the <b>top N% by absolute hand strength</b>. That leaves a betting range with zero bluffs, so no hand could ever profitably continue and nearly every option scored -EV. Betting ranges are now built from value plus bluffs. The bet-EV formula was also written so hero was paid back his own bet (P+2X), which overstated every bet — that is fixed too.",
+    dataTitle: "Your data",
+    dataBody: "Everything stays in this browser (localStorage). Nothing is sent to a server. Clearing browser data deletes it, so export a backup below.",
+    exportBtn: "Export data", importBtn: "Import data", resetBtn: "Reset everything",
+    exported: "Exported.", imported: "Imported.", importFail: "Could not read that file.",
+    confirmReset: "Delete every saved record? This cannot be undone.",
+    disclaimer: "This is a study tool, not advice on managing gambling money. Only ever play with money you can afford to lose.",
+    responsible: "If you need help, contact a problem-gambling service in your country."
+  },
+  bankroll: {
+    title: "Bankroll",
+    buyins: "Your bankroll is <b>{n} buy-ins</b> at this stake.",
+    safe: "That is comfortable. Stay at this stake.",
+    caution: "That is thin. Decide now what downswing sends you down a level.",
+    danger: "Not enough buy-ins. Drop a level.",
+    setBankroll: "Enter a bankroll to see guidance."
+  }
+};
+
+/* --------------------------------------------------------------------------
+ * Quiz questions. Shared structure (ids, axis weights, pairing) lives here so
+ * both languages stay in lockstep; only `q` and option labels are translated.
+ * ------------------------------------------------------------------------ */
+const QUESTIONS = [
+  { id: 1, axis: "A1", w: [{ A1: -2 }, { A1: 0, A2: 1 }, { A1: 1, A2: 2 }, { A1: 1, A2: -2 }] },
+  { id: 2, axis: "A1", w: [{ A1: -2 }, { A1: 1, A2: 1 }, { A1: 1, A2: 2 }] },
+  { id: 3, axis: "A3", w: [{ A1: -2, A3: -1 }, { A1: 1, A3: 1 }, { A2: 2, A3: 2 }] },
+  { id: 4, axis: "A1", pair: "P1", w: [{ A1: -2, A4: -1 }, { A1: 1, A4: 1 }, { A1: 1, A2: 2, A4: 2 }] },
+  { id: 5, axis: "A2", w: [{ A1: -2, A4: -2 }, { A2: -1 }, { A2: 2 }] },
+  { id: 6, axis: "A4", w: [{ A4: -2 }, { A4: 1, A2: -1 }, { A2: 2, A4: 2, A3: 1 }] },
+  { id: 7, axis: "A3", w: [{ A3: -2, A4: -2 }, { A3: 1, A4: 1 }, { A2: 2, A3: 2 }] },
+  { id: 8, axis: "A2", w: [{ A2: -2, A1: 1 }, { A1: -2 }, { A2: 2, A3: 1 }] },
+  { id: 9, axis: "A3", w: [{ A1: -2, A3: -2 }, { A2: 1, A5: 1 }, { A2: 2, A3: 2 }] },
+  { id: 10, axis: "A1", w: [{ A1: -2 }, { A1: 2, A4: 1 }, { A1: 1, A2: 2 }] },
+  { id: 11, axis: "A2", w: [{ A2: -2 }, { A2: 1, A5: 1 }, { A2: 2, A3: 1 }] },
+  { id: 12, axis: "A3", w: [{ A3: -2, A4: -2 }, { A3: 1, A2: -1 }, { A2: 2, A3: 2 }] },
+  { id: 13, axis: "A5", w: [{ A2: -1, A5: 1 }, { A5: 2, A2: 1 }, { A2: 2, A5: -1 }] },
+  { id: 14, axis: "A2", w: [{ A2: -2, A3: 1 }, { A2: 1, A5: 1 }, { A2: 2, A5: 1 }] },
+  { id: 15, axis: "A4", pair: "P2", w: [{ A4: -2 }, { A4: 1, A5: 1 }, { A4: 2, A2: 2 }] },
+  { id: 16, axis: "A2", w: [{ A2: -2 }, { A2: 2, A5: 1 }] },
+  { id: 17, axis: "A3", w: [{ A3: -2, A4: -2 }, { A3: 0 }, { A2: 2, A3: 2 }] },
+  { id: 18, axis: "A4", w: [{ A4: -2 }, { A4: 1, A2: -1 }, { A4: 2, A2: 2 }] },
+  { id: 19, axis: "A4", w: [{ A4: -2 }, { A4: 2, A3: 1 }, { A2: 2, A3: 2, A4: 2 }] },
+  { id: 20, axis: "A2", w: [{ A2: -2 }, { A2: 2, A3: 2 }, { A2: 1, A5: 2 }] },
+  { id: 21, axis: "A2", w: [{ A2: -1, A5: 1 }, { A2: 2, A3: 1 }, { A5: 2, A2: 0 }] },
+  { id: 22, axis: "A5", w: [{ A5: -2, A4: -2 }, { A5: 2 }, { A5: 0, A4: 1 }] },
+  { id: 23, axis: "A5", w: [{ A5: -2 }, { A5: 1 }, { A5: 2 }] },
+  { id: 24, axis: "A2", w: [{ A2: -2 }, { A2: 1, A5: 2 }, { A2: 2, A3: 1 }] },
+  { id: 25, axis: "A5", pair: "P3", w: [{ A5: -2, A4: -2 }, { A5: 2, A4: 1 }, { A5: -1, A4: 2 }] },
+  { id: 26, axis: "A4", w: [{ A4: -2, A3: -2 }, { A4: 2, A3: 2 }] },
+  { id: 27, axis: "A2", w: [{ A2: -2 }, { A2: 2, A5: 2 }] },
+  { id: 28, axis: "A3", w: [{ A2: -2, A3: -2 }, { A2: 2, A3: 2 }, { A5: 2, A3: 1 }] },
+  { id: 29, axis: "A5", w: [{ A5: -2 }, { A5: 2 }, { A5: -1 }] },
+  { id: 30, axis: "A5", w: [{ A5: -2 }, { A5: 0 }, { A5: 2 }] },
+  { id: 31, axis: "A5", w: [{ A5: -2 }, { A5: 1 }, { A5: 2 }] },
+  { id: 32, axis: "A5", w: [{ A5: -2 }, { A5: 0 }, { A5: 2 }] },
+  { id: 33, axis: "B1", w: [{ B1: -2, A1: 2 }, { B1: 2 }, { B1: 2, A5: 1 }] },
+  { id: 34, axis: "B1", w: [{ B1: -2 }, { B1: 1 }, { B1: 2, A5: 2 }] },
+  { id: 35, axis: "B1", w: [{ B1: -1, A2: 2, A3: 2 }, { B1: 2 }, { B1: -1, A2: -2 }] },
+  { id: 36, axis: "B1", w: [{ B1: -2, A5: -1 }, { B1: 0 }, { B1: 2, A5: 2 }] },
+  { id: 37, axis: "B1", w: [{ B1: -2, A2: 2 }, { B1: 2 }, { B1: 2, A5: 2 }] },
+  { id: 38, axis: "A1", pair: "P1", w: [{ A1: -2, A4: -1 }, { A1: 1, A4: 1 }, { A1: 1, A2: 2, A4: 2 }] },
+  { id: 39, axis: "A4", pair: "P2", w: [{ A4: -2 }, { A4: 1, A5: 1 }, { A4: 2, A2: 2 }] },
+  { id: 40, axis: "A5", pair: "P3", w: [{ A5: -2, A4: -2 }, { A5: 2, A4: 1 }, { A5: -1, A4: 2 }] }
+];
+
+const QUIZ_TEXT = {
+  ko: {
+    cats: { pf: "프리플랍", flop: "플랍", turn: "턴", river: "리버", think: "사고", emo: "감정" },
+    1: { c: "pf", q: "9맥스 캐시, 100BB. UTG에서 A♠J♦를 받았습니다. 앞은 전부 폴드.", o: ["폴드한다", "2.5BB 오픈", "3BB 오픈", "림프(1BB)로 들어간다"] },
+    2: { c: "pf", q: "6맥스 캐시, 100BB. BTN까지 전부 폴드. 내 핸드는 K♠8♠.", o: ["폴드", "2.2BB 오픈", "3BB 오픈"] },
+    3: { c: "pf", q: "CO가 2.5BB 오픈. 나는 BTN에 5♥5♣, 스택 100BB.", o: ["폴드", "콜(셋 노리고)", "3벳 8BB"] },
+    4: { c: "pf", q: "BTN이 2.5BB 오픈, SB 폴드. 나는 BB에 Q♦9♦.", o: ["폴드", "콜(디펜스)", "3벳 11BB"] },
+    5: { c: "pf", q: "UTG가 2.5BB 오픈. 나는 HJ에 A♥Q♣, 100BB.", o: ["폴드", "콜", "3벳 8BB"] },
+    6: { c: "pf", q: "내가 CO에서 2.5BB 오픈했는데 BTN이 8BB로 3벳. 내 핸드 A♥K♠, 100BB.", o: ["폴드", "콜", "4벳 20BB"] },
+    7: { c: "pf", q: "내가 BTN 오픈, BB가 12BB로 3벳. 내 핸드 7♠7♦, 100BB.", o: ["폴드", "콜(셋 마이닝)", "4벳 블러프성"] },
+    8: { c: "pf", q: "3명이 림프로 들어왔습니다. 나는 SB에 A♣T♣.", o: ["나도 림프", "폴드", "6BB로 아이솔레이트 레이즈"] },
+    9: { c: "pf", q: "MTT 버블 근처, 스택 22BB. HJ에서 A♦9♦, 앞은 전부 폴드.", o: ["폴드", "2.2BB 오픈", "올인 푸시"] },
+    10: { c: "pf", q: "6맥스. SB가 3BB 오픈, 나는 BB에 J♠4♠.", o: ["폴드", "콜", "3벳"] },
+    11: { c: "flop", q: "내가 BTN 오픈, BB 콜. 플랍 K♠7♥2♦(마른 보드). BB 체크. 내 핸드 A♠Q♠.", o: ["체크(무료 카드)", "팟 1/3 c-벳", "팟 3/4 c-벳"] },
+    12: { c: "flop", q: "BB에서 콜. 플랍 9♥8♥3♣, 내 핸드 J♥T♥(플러시드로+양차). 상대 팟 1/2 벳.", o: ["폴드", "콜", "체크레이즈"] },
+    13: { c: "flop", q: "내가 3벳, 상대 콜. 플랍 A♦5♣2♠. 내 핸드 K♣K♦. 상대 체크.", o: ["체크(팟 컨트롤)", "팟 1/4 작은 벳", "팟 2/3 벳"] },
+    14: { c: "flop", q: "플랍 J♥9♥6♣에서 셋(9♠9♦)을 맞췄습니다. 드로가 많은 보드, 상대 체크.", o: ["체크(슬로플레이)", "팟 1/2 벳", "팟 사이즈 벳"] },
+    15: { c: "flop", q: "내 Q♠Q♦로 3벳 팟. 플랍 8♣6♦3♥. 내가 c-벳했는데 상대가 체크레이즈.", o: ["폴드", "콜하고 턴 본다", "3벳으로 되받는다"] },
+    16: { c: "flop", q: "내가 오픈, BB 콜. 플랍 T♠6♦4♣. 내 핸드 A♥3♥(완전 미스). 상대 체크.", o: ["체크", "팟 1/3 블러프 벳"] },
+    17: { c: "flop", q: "SPR 3인 상황. 플랍에서 플러시드로+오버카드 2장. 상대가 팟 1/2 벳.", o: ["폴드", "콜", "올인 체크레이즈"] },
+    18: { c: "flop", q: "내가 프리플랍 레이저인데 플랍에서 상대가 먼저 팟 사이즈로 리드벳. 내 핸드는 탑페어 굿키커.", o: ["폴드", "콜", "레이즈"] },
+    19: { c: "turn", q: "플랍 K♦8♦4♠에서 내가 K♠J♣로 탑페어. 턴 2♦로 플러시 완성 가능. 상대가 팟 사이즈 벳.", o: ["폴드", "콜", "레이즈"] },
+    20: { c: "turn", q: "내 드로가 턴에서 미스. 상대가 체크로 넘겼습니다. 팟은 큽니다.", o: ["체크(쇼다운 보러 감)", "팟 2/3 블러프", "팟 1/3 작은 블러프"] },
+    21: { c: "turn", q: "플랍 c-벳이 콜됐습니다. 턴은 브릭. 내 핸드는 여전히 오버카드 2장뿐.", o: ["체크", "두 번째 배럴을 친다", "체크한 뒤 리버에서 친다"] },
+    22: { c: "turn", q: "턴에서 상대가 정확히 최소 레이즈를 했습니다. 가장 먼저 하는 생각은?", o: ["뭔가 강한 것 같다, 접자", "이 사이즈로 뭘 하려는지 상대 레인지를 나눠본다", "오즈가 좋으니 일단 콜"] },
+    23: { c: "turn", q: "턴에서 벳할지 고민할 때, 리버까지의 계획을 미리 세우나요?", o: ["보통 그 순간만 보고 결정한다", "리버에 뭐가 나오면 어떻게 할지 대충 그려본다", "리버 카드 종류별로 액션을 미리 정해둔다"] },
+    24: { c: "river", q: "리버에서 내가 확실히 이기는 핸드입니다. 상대는 중간 강도로 보입니다.", o: ["체크(못 이길까 봐)", "팟 1/3 작게 밸류벳", "팟 3/4 크게 밸류벳"] },
+    25: { c: "river", q: "리버에서 상대가 팟 사이즈 벳. 내 핸드는 블러프캐처(중간 페어)입니다.", o: ["느낌상 강해 보여서 폴드", "팟오즈상 33% 이기면 되니 상대 블러프 빈도를 따져 콜", "일단 콜, 판단은 나중에"] },
+    26: { c: "river", q: "리버에서 상대가 오버벳 올인. 내 핸드는 두 번째 넛입니다.", o: ["폴드", "콜"] },
+    27: { c: "river", q: "리버에서 내 핸드가 상대 레인지의 절반 조금 넘게 이깁니다. 상대는 체크.", o: ["체크백(얇은 밸류는 위험)", "작게 얇은 밸류벳"] },
+    28: { c: "river", q: "턴까지 두 번 블러프했는데 리버에서도 미스. 세 번째 배럴이면 스택 절반이 갑니다.", o: ["포기하고 체크", "계획대로 친다", "상대 폴드 빈도를 추정해보고 결정"] },
+    29: { c: "think", q: "어려운 스팟에서 결정할 때, 가장 먼저 보는 것은?", o: ["내 핸드가 얼마나 센가", "상대가 어떤 핸드들로 여기까지 왔을까(레인지)", "상대 표정·타이밍·습관"] },
+    30: { c: "think", q: "상대 레인지를 실제로 세어보나요?", o: ["거의 안 센다", "대충 '넓다/좁다' 정도로만", "콤보 단위로 대략 헤아려본다"] },
+    31: { c: "think", q: "콜할지 고민할 때 팟 오즈를 계산하나요?", o: ["거의 안 한다", "큰 벳일 때만 한다", "거의 매번 한다"] },
+    32: { c: "think", q: "게임 외 시간에 차트·솔버·복기를 하나요?", o: ["거의 안 한다", "가끔 영상·글로 본다", "주기적으로 복기하고 차트를 외운다"] },
+    33: { c: "emo", q: "리버에서 2아웃츠 배드빗으로 큰 팟을 잃었습니다. 바로 다음 핸드는?", o: ["평소보다 넓게 들어간다", "평소와 똑같이 한다", "한두 핸드 쉬고 호흡을 고른다"] },
+    34: { c: "emo", q: "큰 팟 3연패. 지금 스택은 바이인의 60%. 어떻게 하나요?", o: ["본전 생각에 계속한다", "평소대로 계속한다", "미리 정한 스톱로스라면 자리를 뜬다"] },
+    35: { c: "emo", q: "크게 이겨서 스택이 3배가 됐습니다.", o: ["기세를 타서 더 공격적으로", "똑같은 기준으로 계속", "딴 만큼 지킬 생각에 소극적으로"] },
+    36: { c: "emo", q: "세션 시작 전에 손실 한도를 정해두나요?", o: ["정하지 않는다", "머릿속으로만 대충", "숫자로 정하고 지킨다"] },
+    37: { c: "emo", q: "상대가 채팅으로 도발하며 계속 나를 노립니다.", o: ["본때를 보여준다", "신경 끄고 하던 대로", "오히려 그 상대에 대한 정보로 활용"] },
+    38: { c: "pf", q: "CO가 2.5BB 오픈, 뒤는 전부 폴드. 나는 BB에 J♥T♥.", o: ["폴드", "콜", "3벳 11BB"] },
+    39: { c: "flop", q: "내 J♠J♦로 3벳 팟. 플랍 9♥5♣2♠. 내 c-벳에 상대가 체크레이즈.", o: ["폴드", "콜하고 턴 본다", "3벳으로 되받는다"] },
+    40: { c: "river", q: "리버에서 상대가 팟 사이즈로 밀었습니다. 내 핸드는 탑페어 약한 키커 — 딱 블러프캐처입니다.", o: ["강해 보여서 폴드", "필요 승률 33%를 두고 상대 블러프 조합을 세어 콜", "고민 없이 콜"] }
+  },
+  en: {
+    cats: { pf: "Preflop", flop: "Flop", turn: "Turn", river: "River", think: "Thinking", emo: "Emotion" },
+    1: { c: "pf", q: "9-max cash, 100BB. A♠J♦ under the gun, folded to you.", o: ["Fold", "Open 2.5BB", "Open 3BB", "Limp for 1BB"] },
+    2: { c: "pf", q: "6-max cash, 100BB. Folded to you on the button with K♠8♠.", o: ["Fold", "Open 2.2BB", "Open 3BB"] },
+    3: { c: "pf", q: "CO opens to 2.5BB. You are on the button with 5♥5♣, 100BB.", o: ["Fold", "Call (set mining)", "3-bet to 8BB"] },
+    4: { c: "pf", q: "BTN opens 2.5BB, SB folds. You are in the BB with Q♦9♦.", o: ["Fold", "Call (defend)", "3-bet to 11BB"] },
+    5: { c: "pf", q: "UTG opens 2.5BB. You are in the HJ with A♥Q♣, 100BB.", o: ["Fold", "Call", "3-bet to 8BB"] },
+    6: { c: "pf", q: "You open 2.5BB from the CO and the button 3-bets to 8BB. You hold A♥K♠, 100BB.", o: ["Fold", "Call", "4-bet to 20BB"] },
+    7: { c: "pf", q: "You open on the button, BB 3-bets to 12BB. You hold 7♠7♦, 100BB.", o: ["Fold", "Call (set mining)", "4-bet as a bluff"] },
+    8: { c: "pf", q: "Three players limp. You are in the SB with A♣T♣.", o: ["Limp along", "Fold", "Isolate to 6BB"] },
+    9: { c: "pf", q: "MTT near the bubble, 22BB stack. A♦9♦ in the HJ, folded to you.", o: ["Fold", "Open 2.2BB", "Shove all-in"] },
+    10: { c: "pf", q: "6-max. SB opens 3BB, you are in the BB with J♠4♠.", o: ["Fold", "Call", "3-bet"] },
+    11: { c: "flop", q: "You open on the button, BB calls. Flop K♠7♥2♦ (dry). BB checks. You hold A♠Q♠.", o: ["Check (take the free card)", "C-bet 1/3 pot", "C-bet 3/4 pot"] },
+    12: { c: "flop", q: "You called from the BB. Flop 9♥8♥3♣, you hold J♥T♥ (flush draw + open-ender). Villain bets half pot.", o: ["Fold", "Call", "Check-raise"] },
+    13: { c: "flop", q: "You 3-bet, villain called. Flop A♦5♣2♠, you hold K♣K♦. Villain checks.", o: ["Check (pot control)", "Small bet, 1/4 pot", "Bet 2/3 pot"] },
+    14: { c: "flop", q: "You flop a set (9♠9♦) on J♥9♥6♣. Draw-heavy board, villain checks.", o: ["Check (slowplay)", "Bet half pot", "Bet pot"] },
+    15: { c: "flop", q: "3-bet pot with Q♠Q♦. Flop 8♣6♦3♥. You c-bet and villain check-raises.", o: ["Fold", "Call and see the turn", "Re-raise"] },
+    16: { c: "flop", q: "You open, BB calls. Flop T♠6♦4♣, you hold A♥3♥ (complete miss). Villain checks.", o: ["Check", "Bluff 1/3 pot"] },
+    17: { c: "flop", q: "SPR of 3. You flop a flush draw plus two overcards. Villain bets half pot.", o: ["Fold", "Call", "Check-raise all-in"] },
+    18: { c: "flop", q: "You were the preflop raiser but villain donk-leads pot on the flop. You have top pair, good kicker.", o: ["Fold", "Call", "Raise"] },
+    19: { c: "turn", q: "Flop K♦8♦4♠, you hold K♠J♣ for top pair. Turn 2♦ completes a flush. Villain bets pot.", o: ["Fold", "Call", "Raise"] },
+    20: { c: "turn", q: "Your draw bricks on the turn. Villain checks to you. The pot is large.", o: ["Check (take a showdown)", "Bluff 2/3 pot", "Small bluff, 1/3 pot"] },
+    21: { c: "turn", q: "Your flop c-bet got called. The turn is a brick. You still have only two overcards.", o: ["Check", "Fire a second barrel", "Check now, bet the river"] },
+    22: { c: "turn", q: "Villain makes an exact minimum raise on the turn. Your first thought is:", o: ["Looks strong, fold", "Split their range — what is this size for?", "Odds are fine, just call"] },
+    23: { c: "turn", q: "When deciding whether to bet the turn, do you plan the river first?", o: ["I usually decide in the moment", "I roughly picture how river cards play", "I pre-assign an action to each river card type"] },
+    24: { c: "river", q: "You hold a clear winner on the river. Villain looks medium-strength.", o: ["Check (afraid of losing)", "Small value bet, 1/3 pot", "Big value bet, 3/4 pot"] },
+    25: { c: "river", q: "Villain bets pot on the river. You hold a bluff-catcher (middle pair).", o: ["Feels strong — fold", "Pot odds say 33%; count their bluffs and call", "Call now, think later"] },
+    26: { c: "river", q: "Villain overbet-shoves the river. You hold the second nuts.", o: ["Fold", "Call"] },
+    27: { c: "river", q: "On the river you beat a bit over half of villain's range. Villain checks.", o: ["Check back (thin value is risky)", "Small thin value bet"] },
+    28: { c: "river", q: "You bluffed twice and missed on the river. A third barrel is half your stack.", o: ["Give up and check", "Fire as planned", "Estimate their fold frequency, then decide"] },
+    29: { c: "think", q: "In a tough spot, what do you look at first?", o: ["How strong my hand is", "Which hands villain gets here with (their range)", "Their tells, timing and habits"] },
+    30: { c: "think", q: "Do you actually count villain's range?", o: ["Almost never", "Only roughly — wide or narrow", "I count it in combos"] },
+    31: { c: "think", q: "Do you compute pot odds before calling?", o: ["Almost never", "Only on big bets", "Almost every time"] },
+    32: { c: "think", q: "Away from the table, do you study charts, solvers or reviews?", o: ["Almost never", "Occasionally, videos or articles", "Regularly — I review and memorise charts"] },
+    33: { c: "emo", q: "You just lost a big pot to a two-outer on the river. The very next hand you:", o: ["Play wider than usual", "Play exactly as usual", "Sit out a hand or two to reset"] },
+    34: { c: "emo", q: "Three big pots lost in a row. You are down to 60% of a buy-in.", o: ["Keep going to get it back", "Keep playing as normal", "Leave if this hits my stop-loss"] },
+    35: { c: "emo", q: "You are running hot and have tripled your stack.", o: ["Ride the momentum, get more aggressive", "Same standards as always", "Tighten up to protect the win"] },
+    36: { c: "emo", q: "Do you set a loss limit before a session?", o: ["No", "Roughly, in my head", "Yes, a number I stick to"] },
+    37: { c: "emo", q: "An opponent is needling you in chat and targeting you.", o: ["Teach them a lesson", "Ignore it, play my game", "Use it as information about them"] },
+    38: { c: "pf", q: "CO opens 2.5BB, folded to you in the BB with J♥T♥.", o: ["Fold", "Call", "3-bet to 11BB"] },
+    39: { c: "flop", q: "3-bet pot with J♠J♦. Flop 9♥5♣2♠. You c-bet and villain check-raises.", o: ["Fold", "Call and see the turn", "Re-raise"] },
+    40: { c: "river", q: "Villain shoves pot on the river. You hold top pair, weak kicker — a pure bluff-catcher.", o: ["Looks strong, fold", "Set the bar at 33% and count their bluff combos, then call", "Call without thinking"] }
+  }
+};
+
+const LANGS = { ko, en };
+const QUIZ = { QUESTIONS, TEXT: QUIZ_TEXT };
+
+/** Resolve a dot-path against a language object, falling back to English. */
+function lookup(lang, path) {
+  const walk = (obj) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+  let v = walk(LANGS[lang]);
+  if (v === undefined && lang !== "en") v = walk(LANGS.en);
+  return v;
+}
+function format(str, vars) {
+  if (typeof str !== "string" || !vars) return str;
+  return str.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : vars[k]));
+}
+/** Pick the best available language for a browser locale list. */
+function detect(locales) {
+  const list = [].concat(locales || []).filter(Boolean);
+  for (let i = 0; i < list.length; i++) {
+    const tag = String(list[i]).toLowerCase();
+    const base = tag.split("-")[0];
+    if (LANGS[tag]) return tag;
+    if (LANGS[base]) return base;
+  }
+  return "en";
+}
+
+return { LANGS, QUIZ, lookup, format, detect, codes: () => Object.keys(LANGS) };
+});

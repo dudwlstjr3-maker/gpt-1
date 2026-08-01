@@ -86,6 +86,7 @@ const cardHTML = (c, sm) => {
 const catName = (i) => (t("categories") || [])[i] || "";
 const drawNames = (keys) => keys.map((k) => t("draws." + k)).filter(Boolean);
 const vtName = (id) => t("villain." + id + ".n");
+const vtShort = (id) => t("villain." + id + ".s") || vtName(id);
 const posName = (p) => t("positions." + p) || p;
 
 /* ------------------------------------------------------------------ state - */
@@ -357,7 +358,11 @@ const SLOT_GROUPS = [
   { k: "common.turn", s: ["t0"] }, { k: "common.river", s: ["r0"] }
 ];
 const HI = {
-  pos: "BTN", vpos: "BB", scenario: "open_call", pick: "me", target: "h0", vt: "unknown",
+  pos: "BTN", vpos: "BB", scenario: "open_call", target: "h0", vt: "unknown",
+  // seat -> opponent type. Several seats may share a type; only the seat named
+  // by `vpos` is the opponent the heads-up maths actually runs against.
+  seated: { BB: "unknown" },
+  paint: "unknown",
   // how much actually went in preflop — these drive the pot, the SPR and every
   // downstream EV, instead of the fixed pot each scenario used to carry.
   sizes: { open: 2.5, threeBet: 9, fourBet: 22, limpers: 2, allin: 20, toCall: 20 },
@@ -381,35 +386,78 @@ function nextTarget(from) {
   for (let j = 0; j < SLOTS.length; j++) if (slotEnabled(SLOTS[j]) && HI.c[SLOTS[j]] === null) return SLOTS[j];
   return from;
 }
+function paletteItems() {
+  return [{ k: "me", label: t("hand.paintMe") }, { k: "empty", label: t("hand.paintEmpty") }]
+    .concat(Object.keys(PE.VILLAIN_TYPES).map((k) => ({ k, label: vtName(k) })));
+}
+function seatedOpponents() {
+  return PE.posList(setupSeats()).filter((p) => p !== HI.pos && HI.seated[p]);
+}
+/** Keep the designated opponent and HI.vt consistent with what is on the table. */
+function syncVillain() {
+  const seated = seatedOpponents();
+  if (!seated.length) { HI.vpos = null; HI.vt = "unknown"; return; }
+  if (seated.indexOf(HI.vpos) < 0) HI.vpos = seated[0];
+  HI.vt = HI.seated[HI.vpos] || "unknown";
+}
+function renderSeatPalette() {
+  const el = $("seat-palette");
+  if (!el) return;
+  el.innerHTML = paletteItems().map((it) =>
+    '<button data-k="' + esc(it.k) + '" class="' + (HI.paint === it.k ? "on" : "") + '">' +
+    esc(it.label) + "</button>").join("");
+  el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.paint = b.dataset.k; renderSeatPalette(); }));
+}
 function renderSeats() {
   const el = $("seat-map"), L = PE.posList(setupSeats());
+  // drop anything seated at a position this table size does not have
+  Object.keys(HI.seated).forEach((p) => { if (L.indexOf(p) < 0) delete HI.seated[p]; });
+  if (L.indexOf(HI.pos) < 0) HI.pos = L[L.length - 3] || L[0];
+  delete HI.seated[HI.pos];
+  syncVillain();
+
   const btn = Math.max(0, L.indexOf("BTN") >= 0 ? L.indexOf("BTN") : L.length - 3);
   let h = '<div class="felt"></div>';
   L.forEach((p, i) => {
     const ang = (90 + (i - btn) * (360 / L.length)) * Math.PI / 180;
     const x = 50 + 46 * Math.cos(ang), y = 50 + 42 * Math.sin(ang);
-    const cls = HI.pos === p ? "me" : HI.vpos === p ? "vil" : "";
-    h += '<button class="seat ' + cls + '" data-p="' + p + '" style="left:' + x + "%;top:" + y + '%">' +
-      "<b>" + (HI.pos === p ? esc(t("hand.myAct")) : HI.vpos === p ? esc(t("hand.villainActs")) : "&nbsp;") + "</b>" + esc(posName(p)) + "</button>";
+    const isMe = HI.pos === p, type = HI.seated[p];
+    const cls = isMe ? "me" : type ? "vil" : "";
+    const tag = isMe ? t("hand.paintMe") : type ? vtShort(type) : "";
+    h += '<button class="seat ' + cls + (HI.vpos === p ? " active" : "") + '" data-p="' + p + '" ' +
+      'style="left:' + x + "%;top:" + y + '%" title="' + esc(isMe ? t("hand.paintMe") : type ? vtName(type) : "") + '">' +
+      "<b>" + (tag ? esc(tag) : "&nbsp;") + "</b>" + esc(posName(p)) + "</button>";
   });
   el.innerHTML = h;
   el.querySelectorAll(".seat").forEach((b) => (b.onclick = () => {
     const p = b.dataset.p;
-    if (HI.pick === "me") { if (HI.vpos === p) HI.vpos = HI.pos; HI.pos = p; HI.pick = "vil"; }
-    else { if (HI.pos === p) HI.pos = HI.vpos; HI.vpos = p; HI.pick = "me"; }
-    renderSeats(); updateSeatHint();
+    if (HI.paint === "me") { delete HI.seated[p]; HI.pos = p; }
+    else if (HI.paint === "empty") { delete HI.seated[p]; }
+    else { if (HI.pos === p) return; HI.seated[p] = HI.paint; if (!HI.vpos) HI.vpos = p; }
+    buildHandInputs();
   }));
   updateSeatHint();
 }
 function updateSeatHint() {
-  $("seat-hint").textContent = HI.pick === "me"
-    ? t("hand.myAct") + " · " + posName(HI.pos) : t("hand.villainActs") + " · " + posName(HI.vpos);
+  const n = seatedOpponents().length;
+  $("seat-hint").textContent = t("hand.paintMe") + " · " + posName(HI.pos) +
+    "  ·  " + t("hand.seatedCount", { n });
 }
+/** Which seated opponent this hand is actually against. */
 function renderVillainChips() {
   const el = $("vt-chips");
-  el.innerHTML = Object.keys(PE.VILLAIN_TYPES).map((k) =>
-    '<button data-k="' + k + '" class="' + (HI.vt === k ? "on" : "") + '">' + esc(vtName(k)) + "</button>").join("");
-  el.querySelectorAll("button").forEach((b) => (b.onclick = () => { HI.vt = b.dataset.k; renderVillainChips(); }));
+  const seated = seatedOpponents();
+  if (!seated.length) {
+    el.innerHTML = '<span class="small dim">' + esc(t("hand.seatedNone")) + "</span>";
+    $("vt-desc").textContent = "";
+    return;
+  }
+  el.innerHTML = seated.map((p) =>
+    '<button data-p="' + p + '" class="' + (HI.vpos === p ? "on" : "") + '">' +
+    esc(posName(p)) + " · " + esc(vtName(HI.seated[p])) + "</button>").join("");
+  el.querySelectorAll("button").forEach((b) => (b.onclick = () => {
+    HI.vpos = b.dataset.p; syncVillain(); buildHandInputs();
+  }));
   $("vt-desc").textContent = t("villain." + HI.vt + ".d");
 }
 /* Which size fields a given preflop line actually needs. */
@@ -545,7 +593,7 @@ function renderActions() {
   }));
   el.querySelectorAll("input[data-f]").forEach((inp) => (inp.oninput = () => { HI.acts[+inp.dataset.i][inp.dataset.f] = +inp.value || 0; }));
 }
-function buildHandInputs() { renderSeats(); renderVillainChips(); renderScenarioChips(); renderSlots(); renderDeck(); renderActions(); }
+function buildHandInputs() { renderSeatPalette(); renderSeats(); renderVillainChips(); renderScenarioChips(); renderSlots(); renderDeck(); renderActions(); }
 
 /* ============================================================ ANALYSIS === */
 function analyzeHand() {
@@ -1508,7 +1556,8 @@ function importData(e) {
 /* ============================================================ BOOT ======= */
 function fillDemo() {
   const C = (s) => PE.cardId(s[0], s[1]);
-  HI.pos = "BTN"; HI.vpos = "BB"; HI.scenario = "open_call"; HI.vt = "tag";
+  HI.pos = "BTN"; HI.seated = { BB: "tag", CO: "station", HJ: "nit" };
+  HI.vpos = "BB"; HI.scenario = "open_call"; HI.vt = "tag";
   HI.c = { h0: C("As"), h1: C("Ks"), f0: C("Qs"), f1: C("7h"), f2: C("2d"), t0: C("9s"), r0: null };
   HI.acts = [{ v: "check", vs: 0, m: "bet", ms: 2 }, { v: "bet", vs: 6, m: "call", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }];
   HI.target = "r0";

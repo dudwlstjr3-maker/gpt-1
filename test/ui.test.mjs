@@ -332,3 +332,55 @@ test("a drill session tracks EV earned, not only EV lost", async () => {
     `best - earned (${(best - earned).toFixed(2)}) should equal EV lost (${Math.abs(lost).toFixed(2)})`);
   noErrors();
 });
+
+test("seats take an opponent type, duplicates allowed", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#seat-palette button");
+
+  // the palette offers "me", "empty" and every opponent type
+  const palette = await page.$$eval("#seat-palette button", (b) => b.map((x) => x.dataset.k));
+  assert.ok(palette.includes("me") && palette.includes("empty"), "palette missing me/empty");
+  assert.ok(palette.includes("station") && palette.includes("nit"), "palette missing types");
+
+  // seat the SAME type in three seats — the duplicate case
+  await page.click('#seat-palette button[data-k="station"]');
+  for (const p of ["UTG", "HJ", "CO"]) { await page.click(`.seat[data-p="${p}"]`); await page.waitForTimeout(60); }
+  await page.click('#seat-palette button[data-k="nit"]');
+  for (const p of ["SB", "BB"]) { await page.click(`.seat[data-p="${p}"]`); await page.waitForTimeout(60); }
+
+  const chips = await page.$$eval("#vt-chips button", (b) => b.map((x) => x.innerText));
+  assert.equal(chips.length, 5, "expected 5 seated opponents, got " + chips.join(" | "));
+  assert.equal(chips.filter((c) => /station/i.test(c)).length, 3, "duplicates were collapsed: " + chips.join(" | "));
+
+  // moving myself frees the seat I left and takes the new one
+  await page.click('#seat-palette button[data-k="me"]');
+  await page.click('.seat[data-p="CO"]');
+  await page.waitForTimeout(80);
+  const after = await page.$$eval("#vt-chips button", (b) => b.map((x) => x.innerText));
+  assert.ok(!after.some((c) => c.startsWith("CO")), "my own seat is still listed as an opponent");
+
+  // choosing which opponent the hand is against drives the type used
+  await page.click("#vt-chips button:last-of-type");
+  await page.waitForTimeout(80);
+  const active = await page.$eval("#vt-chips button.on", (e) => e.innerText);
+  const desc = await page.$eval("#vt-desc", (e) => e.innerText);
+  assert.ok(desc.length > 10, "no description for the designated opponent");
+  assert.ok(await page.$(".seat.active"), "designated opponent is not marked on the table");
+
+  // clearing a seat removes it
+  await page.click('#seat-palette button[data-k="empty"]');
+  await page.click('.seat[data-p="UTG"]');
+  await page.waitForTimeout(80);
+  const cleared = await page.$$eval("#vt-chips button", (b) => b.map((x) => x.innerText));
+  assert.ok(!cleared.some((c) => c.startsWith("UTG")), "cleared seat still listed");
+
+  // and the analysis still runs off the designated opponent
+  await page.click("#h-demo");
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .st", { timeout: 60000 });
+  assert.ok((await page.$$eval("#h-out .st", (e) => e.length)) >= 2);
+  noErrors();
+});

@@ -594,6 +594,42 @@ test("the profile tab offers an assessment, then shows the saved profile", async
   noErrors();
 });
 
+test("a hand that ends early says so, and says why", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-mode button");
+  await page.click('#dr-mode button[data-k="hand"]');
+  await page.click('#dr-n button[data-n="10"]');
+  await page.click("#dr-go");
+
+  // Bet or raise at every turn until villain gives one up. Always taking the
+  // last option means the most aggressive line on offer.
+  let banner = null;
+  for (let guard = 0; guard < 60 && !banner; guard++) {
+    if (await page.$("#dr-again")) break;
+    if (await page.$(".endban")) {
+      const txt = await page.$eval(".endban", (e) => e.innerText);
+      if (/Villain folded/.test(txt)) { banner = txt; break; }
+      await page.click("#dr-nexthand");
+      continue;
+    }
+    if (await page.$("#dr-cont")) { await page.click("#dr-cont"); continue; }
+    await page.waitForSelector(".dopt, .endban, #dr-again", { timeout: 60000 });
+    const opts = await page.$$(".dopt");
+    if (opts.length) await opts[opts.length - 1].click();
+  }
+
+  assert.ok(banner, "no hand ended in a villain fold across 10 aggressive hands");
+  // the three things the player needs: what happened, why, and where it stopped
+  assert.match(banner, /pot is yours/i, "the outcome is not headlined: " + banner);
+  assert.match(banner, /took it down/i, "the banner does not tie the fold to my action: " + banner);
+  assert.match(banner, /Ended on the (Preflop|Flop|Turn|River)/,
+    "the banner does not say which street it ended on: " + banner);
+  noErrors();
+});
+
 test("play keeps moving the profile after the assessment is saved", async () => {
   // A passive sample: almost never takes the aggressive line the solver takes,
   // folds far more often than it should, and never picks the biggest size.

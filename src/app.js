@@ -1487,19 +1487,33 @@ function renderHandReport(v) {
   const made = run.board.length >= 3 ? PE.categoryBreakdown(vr.combos, vr.weights, run.board) : [];
   const standing = HandRun.heroStanding(run);
 
-  let outcome = "";
-  if (run.result === "heroFold") outcome = t("drill.endedHeroFold");
-  else if (run.result === "villainFold") outcome = t("drill.endedVillainFold", { pot: nfmt(run.wonPot || run.pot) });
-  else if (run.result === "allin") outcome = t("drill.endedAllin");
-  else outcome = t("drill.endedShowdown");
+  // Why the hand stopped, said plainly. A hand that ends before the river —
+  // villain folding to your bet, most often preflop — otherwise just looks like
+  // the practice refused to deal the next street.
+  const lastAct = run.log.length ? optLabel(run.log[run.log.length - 1].mine) : "";
+  let head, outcome, tone;
+  if (run.result === "heroFold") {
+    head = t("drill.outHeroFold"); outcome = esc(t("drill.endedHeroFold")); tone = "warn";
+  } else if (run.result === "villainFold") {
+    head = t("drill.outVillainFold"); tone = "good";
+    outcome = t("drill.endedWhy", { act: esc(lastAct), pot: nfmt(run.wonPot || run.pot) });
+  } else if (run.result === "allin") {
+    head = t("drill.outAllin"); outcome = esc(t("drill.endedAllin")); tone = "";
+  } else {
+    head = t("drill.outShowdown"); outcome = esc(t("drill.endedShowdown")); tone = "";
+  }
 
   let h = '<div class="card"><h2>' + esc(t("drill.reportTitle")) + "</h2>" +
+    '<div class="endban ' + tone + '"><div class="eh">' + esc(head) + "</div>" +
+    '<div class="es">' + outcome + "</div>" +
+    '<div class="ew">' + esc(t("drill.endedAt", { street: streetName(run.street) })) +
+      (run.result === "villainFold" && run.street < 3 ? " · " + esc(t("drill.endedEarly")) : "") + "</div></div>" +
     '<div class="stmeta"><span>' + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
     "<span>" + esc(vtName(run.vt.id)) + "</span>" +
     "<span>" + esc(t("common.pot")) + " <b>" + nfmt(run.pot) + "BB</b></span></div>" +
     '<div class="dspot"><div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") +
       (run.board.length ? ' <span class="dim" style="margin:0 8px">|</span> ' + run.board.map((c) => cardHTML(c)).join("") : "") +
-    "</div><div class=\"dvs\" style=\"font-size:14px\">" + esc(outcome) + "</div></div>";
+    "</div></div>";
 
   // showdown, if it got there
   if (run.result === "showdown") {

@@ -229,6 +229,16 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .dspot .dq{font-size:12px;color:var(--spottx);font-weight:700;letter-spacing:.4px;margin-bottom:8px}
 .dspot .dh{margin:6px 0}
 .dspot .dvs{font-size:15px;font-weight:800;margin-top:9px}
+/* why the hand stopped — the first thing the report has to answer */
+.endban{border:1px solid var(--spotline);border-left:4px solid var(--tx2);background:var(--spot);
+  border-radius:0 10px 10px 0;padding:11px 14px;margin:0 0 13px}
+.endban.good{border-color:var(--hiline);border-left-color:var(--good);background:var(--hi)}
+.endban.warn{border-color:var(--wline);border-left-color:var(--warn);background:var(--wbg)}
+.endban .eh{font-size:17px;font-weight:800;line-height:1.3}
+.endban.good .eh{color:var(--good)}
+.endban.warn .eh{color:var(--warn)}
+.endban .es{font-size:13.5px;margin-top:4px;line-height:1.5}
+.endban .ew{font-size:11.5px;color:var(--tx2);margin-top:5px;line-height:1.5}
 .dprog{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
 .dprog .bar{flex:1;min-width:80px}
 .stmeta{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
@@ -257,7 +267,8 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .kpi .k .kv{font-size:17px;font-weight:800}
 .sumcard .sr{display:flex;gap:9px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .sumcard .sr:last-child{border-bottom:0}
-.sumcard .sr .n{flex:0 0 34px;font-weight:800;font-size:12.5px;color:var(--tx2)}
+/* street names are one word in every language we ship — never break them */
+.sumcard .sr .n{flex:0 0 auto;min-width:34px;font-weight:800;font-size:12.5px;color:var(--tx2);white-space:nowrap}
 .sumcard .sr .a{flex:1 1 130px;font-size:13px}
 .sumcard .sr .a b{color:var(--ac2)}
 .sumcard .sr .z{margin-left:auto;font-size:12px;white-space:nowrap}
@@ -1938,6 +1949,13 @@ const ko = {
     endedVillainFold: "상대가 폴드했습니다. 팟 {pot}BB를 가져갑니다.",
     endedShowdown: "쇼다운까지 갔습니다.",
     endedAllin: "올인으로 끝났습니다.",
+    outHeroFold: "폴드 — 핸드 종료",
+    outVillainFold: "상대 폴드 — 팟은 내 것",
+    outShowdown: "쇼다운까지",
+    outAllin: "올인 — 보드만 남았습니다",
+    endedAt: "{street}에서 끝났습니다",
+    endedWhy: "내 <b>{act}</b>에 상대가 접었습니다. 팟 {pot}BB를 가져갑니다.",
+    endedEarly: "상대가 접으면 핸드는 여기서 끝납니다. 남은 스트리트는 진행하지 않습니다.",
     toCall: "콜 금액", potNow: "현재 팟",
     villainOpened: "상대가 <b>{size}BB</b>로 오픈했습니다.",
     youPostBB: "당신은 BB입니다. 상대가 <b>{size}BB</b>로 올렸습니다.",
@@ -2292,6 +2310,13 @@ const en = {
     endedVillainFold: "Villain folded. You take the {pot}BB pot.",
     endedShowdown: "It went to showdown.",
     endedAllin: "It ended all-in.",
+    outHeroFold: "Folded — hand over",
+    outVillainFold: "Villain folded — pot is yours",
+    outShowdown: "Showdown",
+    outAllin: "All-in — the board runs out",
+    endedAt: "Ended on the {street}",
+    endedWhy: "Your <b>{act}</b> took it down. You collect the {pot}BB pot.",
+    endedEarly: "When villain folds the hand is over here — the remaining streets are not played.",
     toCall: "To call", potNow: "Pot",
     villainOpened: "Villain opens to <b>{size}BB</b>.",
     youPostBB: "You are in the big blind. Villain raises to <b>{size}BB</b>.",
@@ -4275,19 +4300,33 @@ function renderHandReport(v) {
   const made = run.board.length >= 3 ? PE.categoryBreakdown(vr.combos, vr.weights, run.board) : [];
   const standing = HandRun.heroStanding(run);
 
-  let outcome = "";
-  if (run.result === "heroFold") outcome = t("drill.endedHeroFold");
-  else if (run.result === "villainFold") outcome = t("drill.endedVillainFold", { pot: nfmt(run.wonPot || run.pot) });
-  else if (run.result === "allin") outcome = t("drill.endedAllin");
-  else outcome = t("drill.endedShowdown");
+  // Why the hand stopped, said plainly. A hand that ends before the river —
+  // villain folding to your bet, most often preflop — otherwise just looks like
+  // the practice refused to deal the next street.
+  const lastAct = run.log.length ? optLabel(run.log[run.log.length - 1].mine) : "";
+  let head, outcome, tone;
+  if (run.result === "heroFold") {
+    head = t("drill.outHeroFold"); outcome = esc(t("drill.endedHeroFold")); tone = "warn";
+  } else if (run.result === "villainFold") {
+    head = t("drill.outVillainFold"); tone = "good";
+    outcome = t("drill.endedWhy", { act: esc(lastAct), pot: nfmt(run.wonPot || run.pot) });
+  } else if (run.result === "allin") {
+    head = t("drill.outAllin"); outcome = esc(t("drill.endedAllin")); tone = "";
+  } else {
+    head = t("drill.outShowdown"); outcome = esc(t("drill.endedShowdown")); tone = "";
+  }
 
   let h = '<div class="card"><h2>' + esc(t("drill.reportTitle")) + "</h2>" +
+    '<div class="endban ' + tone + '"><div class="eh">' + esc(head) + "</div>" +
+    '<div class="es">' + outcome + "</div>" +
+    '<div class="ew">' + esc(t("drill.endedAt", { street: streetName(run.street) })) +
+      (run.result === "villainFold" && run.street < 3 ? " · " + esc(t("drill.endedEarly")) : "") + "</div></div>" +
     '<div class="stmeta"><span>' + esc(posName(run.heroPos)) + " <b>vs</b> " + esc(posName(run.vilPos)) + "</span>" +
     "<span>" + esc(vtName(run.vt.id)) + "</span>" +
     "<span>" + esc(t("common.pot")) + " <b>" + nfmt(run.pot) + "BB</b></span></div>" +
     '<div class="dspot"><div class="dh">' + run.hole.map((c) => cardHTML(c)).join("") +
       (run.board.length ? ' <span class="dim" style="margin:0 8px">|</span> ' + run.board.map((c) => cardHTML(c)).join("") : "") +
-    "</div><div class=\"dvs\" style=\"font-size:14px\">" + esc(outcome) + "</div></div>";
+    "</div></div>";
 
   // showdown, if it got there
   if (run.result === "showdown") {

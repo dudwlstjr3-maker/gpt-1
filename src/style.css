@@ -361,3 +361,4 @@ details.stcard>.bd{padding:14px 15px}
 .gbadge{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:1px 9px;
   font-size:11.5px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
 .gbadge b{font-weight:800;opacity:.75;margin-left:2px}
+.pill.m{background:var(--pillm);color:var(--ac2)}

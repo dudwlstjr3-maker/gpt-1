@@ -179,6 +179,71 @@ const CORE_AXES = ["A1", "A2", "A3", "A4", "A5", "B1"];
 const QMIN = 25;
 const getProfile = () => DB.get("profile", null);
 
+/* --------------------------------------------------------- play profile --
+ * The quiz asks what you think you do. This records what you actually did,
+ * so the profile keeps moving as you practise. Only the axes that play can
+ * evidence are touched: how often you take the aggressive line, how often you
+ * fold, and how often you pick the biggest size — each measured against what
+ * the best line would have done in the same spots, so the baseline is the
+ * spot mix and not your own taste. */
+const blankPlay = () => ({ picks: 0, aggr: 0, bestAggr: 0, facing: 0, folds: 0, bestFolds: 0, big: 0, bestBig: 0 });
+const getPlay = () => Object.assign(blankPlay(), DB.get("playstats", null) || {});
+
+function recordPlay(opts, mine, best, facing) {
+  const st = getPlay();
+  st.picks++;
+  if (isAggressive(mine.key)) st.aggr++;
+  if (isAggressive(best.key)) st.bestAggr++;
+  if (facing) {
+    st.facing++;
+    if (mine.key === "fold") st.folds++;
+    if (best.key === "fold") st.bestFolds++;
+  }
+  // "big" = the largest sizing offered, or an all-in
+  const sizes = opts.filter((o) => o.amount > 0).map((o) => o.amount);
+  const maxSize = sizes.length ? Math.max.apply(null, sizes) : 0;
+  if (maxSize > 0) {
+    if (mine.amount >= maxSize - 1e-9) st.big++;
+    if (best.amount >= maxSize - 1e-9) st.bestBig++;
+  }
+  DB.set("playstats", st);
+}
+
+/** Axis deltas implied by play, relative to what the best line would do. */
+function playAxes(st) {
+  if (!st || st.picks < 8) return null;
+  const w = Math.min(1, st.picks / 60);          // confidence grows with sample
+  const rate = (a, b) => (b > 0 ? a / b : 0);
+  const d = {};
+  d.A2 = Math.max(-60, Math.min(60, (rate(st.aggr, st.picks) - rate(st.bestAggr, st.picks)) * 220 * w));
+  if (st.facing >= 5) {
+    // folding MORE than optimal means lower resistance to pressure
+    d.A4 = Math.max(-60, Math.min(60, (rate(st.bestFolds, st.facing) - rate(st.folds, st.facing)) * 220 * w));
+  }
+  d.A3 = Math.max(-50, Math.min(50, (rate(st.big, st.picks) - rate(st.bestBig, st.picks)) * 200 * w));
+  Object.keys(d).forEach((k) => (d[k] = Math.round(d[k])));
+  return { deltas: d, picks: st.picks, weight: w };
+}
+/** The profile actually used everywhere: answers, moved by observed play. */
+function effectiveProfile() {
+  const p = getProfile();
+  const play = playAxes(getPlay());
+  if (!p) return play ? { axes: playAxesOnly(play), conf: {}, n: 0, archetype: null, play, derived: true } : null;
+  if (!play) return Object.assign({}, p, { play: null });
+  const axes = Object.assign({}, p.axes);
+  Object.keys(play.deltas).forEach((k) => {
+    axes[k] = Math.max(-100, Math.min(100, Math.round((axes[k] || 0) + play.deltas[k])));
+  });
+  return Object.assign({}, p, { axes, play });
+}
+/** With no quiz answers, play alone still says something about a few axes. */
+function playAxesOnly(play) {
+  const axes = {};
+  AXIS_KEYS.forEach((k) => (axes[k] = 0));
+  Object.keys(play.deltas).forEach((k) => (axes[k] = play.deltas[k]));
+  return axes;
+}
+
 function axisStats(answers) {
   const sum = {}, wsum = {}, cnt = {}, dirs = {};
   AXIS_KEYS.forEach((k) => { sum[k] = 0; wsum[k] = 0; cnt[k] = 0; dirs[k] = []; });
@@ -258,10 +323,12 @@ function quizDone(qz) {
   const st = axisStats(qz.ans);
   return CORE_AXES.every((k) => st.conf[k] >= 0.8);
 }
-function axisBar(k, v, conf) {
+function axisBar(k, v, conf, delta) {
   const A = t("axes." + k), left = (v + 100) / 2;
   return '<div class="axis"><div class="lb"><span>' + esc(A.lo) + "</span><b>" + esc(A.n) +
-    " <span class=\"dim\">" + (v > 0 ? "+" : "") + v + "</span></b><span>" + esc(A.hi) + "</span></div>" +
+    " <span class=\"dim\">" + (v > 0 ? "+" : "") + v + "</span>" +
+    (delta ? ' <span class="pill m" style="font-size:10px">' + esc(delta) + " " + esc(t("quiz.playAdjusted")) + "</span>" : "") +
+    "</b><span>" + esc(A.hi) + "</span></div>" +
     '<div class="axbar"><u></u><i style="left:calc(' + left + '% - 2px)"></i></div>' +
     '<div class="small dim">' + esc(A.d) + (conf !== undefined && conf < 0.5 ? " · " + esc(t("quiz.lowConf")) : "") + "</div></div>";
 }
@@ -269,27 +336,34 @@ function renderQuiz() {
   const v = $("v-quiz");
   const qz = STATE.quiz;
   if (!qz) {
-    const p = getProfile();
+    // Branch on whether the ASSESSMENT was taken, not on whether we have any
+    // signal: play alone yields a partial profile, but it is not a substitute
+    // for the questions and must not present itself as one.
+    const answered = getProfile();
+    const p = effectiveProfile();
     let h;
-    if (p) {
+    if (answered) {
       // A saved profile is the point of this screen; retaking is secondary.
       h = profileCard(p) +
         '<div class="card"><div class="small dim" style="margin-bottom:8px">' +
-          esc(t("quiz.savedAt", { d: new Date(p.at).toLocaleDateString() })) + " · " + esc(t("quiz.savedNote")) + "</div>" +
+          (answered.at ? esc(t("quiz.savedAt", { d: new Date(answered.at).toLocaleDateString() })) + " · " : "") +
+          esc(t("quiz.savedNote")) + "</div>" +
         '<button class="btn sec" id="qz-go">' + esc(t("quiz.restart")) + "</button>" +
         '<div class="notice">' + esc(t("quiz.retakeWarn")) + "</div></div>";
     } else {
       h = '<div class="card"><h2>' + esc(t("quiz.noneTitle")) + "</h2>" +
         "<p>" + esc(t("quiz.noneBody")) + "</p><p>" + t("quiz.lead", { min: QMIN }) + "</p>" +
         '<div style="margin-top:14px"><button class="btn" id="qz-go">' + esc(t("quiz.startDiagnose")) + "</button></div></div>";
+      // play on its own still says something — show it, clearly labelled
+      if (p && p.play) h += profileCard(p, true);
     }
     v.innerHTML = h;
     $("qz-go").onclick = () => { STATE.quiz = { asked: [], ans: {}, cur: null }; STATE.quiz.cur = nextQuestion(STATE.quiz); renderQuiz(); };
     return;
   }
   if (qz.done) {
-    const p = saveProfile(qz);
-    v.innerHTML = profileCard(p) +
+    saveProfile(qz);
+    v.innerHTML = profileCard(effectiveProfile()) +
       '<div class="card"><button class="btn sec" id="qz-again">' + esc(t("quiz.restart")) + "</button></div>";
     $("qz-again").onclick = () => { STATE.quiz = null; renderQuiz(); };
     return;
@@ -322,14 +396,45 @@ function saveProfile(qz) {
   DB.set("profile", p);
   return p;
 }
-function profileCard(p) {
-  return '<div class="card"><h2>' + esc(t("quiz.resultTitle")) + "</h2>" +
-    '<div class="stmeta"><span>' + esc(t("quiz.archetype")) + " <b>" + esc(p.archetype) + "</b></span>" +
-    "<span>" + esc(t("quiz.sample", { n: p.n })) + "</span></div>" +
+function profileCard(p, playOnly) {
+  const play = p.play;
+  let h = '<div class="card"><h2>' +
+    esc(playOnly ? t("quiz.playOnlyTitle") : t("quiz.resultTitle")) + "</h2>" +
+    (playOnly ? "<p>" + t("quiz.playOnlyNote") + "</p>" : "") +
+    '<div class="stmeta">' +
+    // an archetype needs the questions; play alone cannot name one
+    (playOnly ? "" : '<span>' + esc(t("quiz.archetype")) + " <b>" +
+      esc(p.archetype || archetype(p.axes)) + "</b></span>") +
+    (p.n ? "<span>" + esc(t("quiz.sample", { n: p.n })) + "</span>" : "") +
+    (play ? '<span>' + esc(t("quiz.playAdjusted")) + " <b>" + play.picks + "</b></span>" : "") +
+    "</div>" +
     '<div class="blk"><div class="t">' + esc(t("quiz.axesTitle")) + "</div>" +
-    AXIS_KEYS.map((k) => axisBar(k, p.axes[k] || 0, p.conf ? p.conf[k] : undefined)).join("") + "</div>" +
-    '<div class="blk hi"><div class="t">' + esc(t("quiz.summaryTitle")) + "</div>" +
-    profileNotes(p.axes).map((s) => "<p>" + s + "</p>").join("") + "</div></div>";
+    AXIS_KEYS.filter((k) => !playOnly || (play && play.deltas[k] !== undefined)).map((k) => {
+      const moved = play && play.deltas[k] !== undefined && play.deltas[k] !== 0;
+      return axisBar(k, p.axes[k] || 0, p.conf ? p.conf[k] : undefined,
+        moved ? (play.deltas[k] > 0 ? "+" : "") + play.deltas[k] : null);
+    }).join("") +
+    '<div class="small dim">' + esc(t("quiz.playAxisNote")) + "</div></div>";
+
+  // what the table actually showed
+  h += '<div class="blk ' + (play ? "vx" : "") + '"><div class="t">' + esc(t("quiz.playTitle")) + "</div>";
+  if (!play) h += '<p class="small dim">' + esc(t("quiz.playNone")) + "</p>";
+  else {
+    h += "<p>" + t("quiz.playNote", { n: play.picks }) + "</p><ul style=\"padding-left:18px;margin:0\">" +
+      (play.deltas.A2 >= 8 ? "<li>" + esc(t("quiz.playMoreAggr")) + "</li>"
+        : play.deltas.A2 <= -8 ? "<li>" + esc(t("quiz.playLessAggr")) + "</li>" : "") +
+      (play.deltas.A4 !== undefined && play.deltas.A4 <= -8 ? "<li>" + esc(t("quiz.playMoreFold")) + "</li>"
+        : play.deltas.A4 >= 8 ? "<li>" + esc(t("quiz.playLessFold")) + "</li>" : "") +
+      (Math.abs(play.deltas.A2) < 8 && Math.abs(play.deltas.A4 || 0) < 8
+        ? "<li>" + esc(t("quiz.playOnPoint")) + "</li>" : "") + "</ul>";
+  }
+  h += "</div>";
+
+  if (!playOnly) {
+    h += '<div class="blk hi"><div class="t">' + esc(t("quiz.summaryTitle")) + "</div>" +
+      profileNotes(p.axes).map((x) => "<p>" + x + "</p>").join("") + "</div>";
+  }
+  return h + "</div>";
 }
 
 /* ============================================================ SETUP ====== */
@@ -1023,7 +1128,8 @@ function makeDrillSpot(cfg, stack) {
 function startDrill(cfg) {
   STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
     depth: cfg.depth || "random", stack: setupStack(),
-    i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, correct: 0, answered: null, log: [], done: false };
+    i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, potSum: 0, correct: 0,
+    answered: null, log: [], done: false };
   if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
 }
 
@@ -1048,10 +1154,12 @@ function answerHand(i) {
   const bestEv = Math.max.apply(null, evs), worst = Math.min.apply(null, evs);
   const span = bestEv - worst;
   D.evLost += bestEv - opt.ev;
+  D.potSum += Math.max(0.5, D.run.pot);
   D.evEarned += opt.ev;
   D.evBest += bestEv;
   D.evCaptured += span > 1e-9 ? (opt.ev - worst) / span : 1;
   if (bestEv - opt.ev < 0.02) D.correct++;
+  recordPlay(D.dec.res.opts, opt, D.dec.res.opts.find((o) => o.ev === bestEv), !!D.run.facing);
   D.decisions = (D.decisions || 0) + 1;
   D.answered = i;
   renderDrill();
@@ -1094,10 +1202,12 @@ function answerSpot(i) {
   const span = best - worst;
   const capture = span > 1e-9 ? (mine.ev - worst) / span : 1;
   D.evLost += lost;
+  D.potSum += Math.max(0.5, sp.pot);   // scores EV loss relative to what was at stake
   D.evEarned += mine.ev;     // what your decisions were actually worth
   D.evBest += best;          // what perfect play would have been worth
   D.evCaptured += capture;
   if (lost < 0.02) D.correct++;
+  recordPlay(sp.options, mine, sp.options.find((o) => o.ev === best), !!sp.facing);
   D.log.push({
     street: sp.street, facing: !!sp.facing, mine: mine.key, mineLabel: optLabel(mine),
     best: sp.options.find((o) => o.ev === best).key, bestLabel: optLabel(sp.options.find((o) => o.ev === best)),
@@ -1114,7 +1224,7 @@ function saveDrill() {
   const D = STATE.drill;
   const hist = DB.get("drills", []);
   hist.unshift({ at: Date.now(), n: D.i, vt: D.vt, diff: D.diff, mode: D.mode,
-    decisions: D.mode === "hand" ? (D.decisions || D.i) : D.i,
+    decisions: D.mode === "hand" ? (D.decisions || D.i) : D.i, potSum: D.potSum,
     evLost: D.evLost, evEarned: D.evEarned, evBest: D.evBest,
     capture: D.i ? D.evCaptured / D.i : 0, correct: D.correct,
     log: D.log });
@@ -1123,30 +1233,59 @@ function saveDrill() {
 /* Rating and grade both come from one number: EV lost per decision. The
  * anchors are the grade boundaries, interpolated between, so the letter and
  * the number can never disagree. Lower loss = higher rating. */
-const RATING_ANCHORS = [[0, 100], [0.05, 90], [0.15, 75], [0.35, 55], [0.70, 35], [1.50, 0]];
-function ratingOf(perDecisionLoss) {
-  const x = Math.max(0, perDecisionLoss || 0);
-  for (let i = 1; i < RATING_ANCHORS.length; i++) {
-    const [x0, y0] = RATING_ANCHORS[i - 1], [x1, y1] = RATING_ANCHORS[i];
+/** How many decisions a stored session represents (hand mode logs several). */
+const sessionDecisions = (d) => Math.max(1, d.decisions || d.n || 1);
+
+/* EV lost is scored as a FRACTION OF THE POT, not in absolute BB. A 0.5BB
+ * mistake in a 5BB pot and the same 0.5BB in a 40BB pot are not the same
+ * error, and this app mixes stack depths from 10BB to 100BB. Grading on
+ * absolute BB put even a strong player in D: simulated across skill levels,
+ * an expert loses 0.27BB per decision and a random player 2.4BB, which the
+ * old anchors (D beyond 1.5BB) squashed into one grade.
+ *
+ * As a share of the pot the same players separate cleanly — expert 1.5%,
+ * strong 4%, decent 9%, casual 16% — so the anchors sit there.            */
+const RATING_ANCHORS = [[0, 100], [0.015, 90], [0.045, 78], [0.10, 60], [0.16, 40], [0.26, 0]];
+/* Records saved before pot sizes were tracked only have absolute BB. These
+ * anchors are the same skill levels measured in BB, so old rows still grade
+ * sensibly instead of all reading D. */
+const RATING_ANCHORS_BB = [[0, 100], [0.25, 90], [0.6, 75], [1.0, 55], [1.8, 35], [3.0, 0]];
+function interp(anchors, x) {
+  x = Math.max(0, x || 0);
+  for (let i = 1; i < anchors.length; i++) {
+    const [x0, y0] = anchors[i - 1], [x1, y1] = anchors[i];
     if (x <= x1) return Math.round(y0 + (y1 - y0) * (x - x0) / (x1 - x0));
   }
   return 0;
 }
-function gradeOf(perDecisionLoss) {
-  const r = ratingOf(perDecisionLoss);
-  return r >= 90 ? "S" : r >= 75 ? "A" : r >= 55 ? "B" : r >= 35 ? "C" : "D";
+const ratingOf = (lossFrac) => interp(RATING_ANCHORS, lossFrac);
+const ratingOfBB = (lossBB) => interp(RATING_ANCHORS_BB, lossBB);
+const gradeFromRating = (r) => (r >= 90 ? "S" : r >= 75 ? "A" : r >= 55 ? "B" : r >= 35 ? "C" : "D");
+const gradeOf = (lossFrac) => gradeFromRating(ratingOf(lossFrac));
+/** Rating for a stored session: by pot share when we have it, else by BB. */
+function sessionRating(d) {
+  const n = sessionDecisions(d);
+  if (d.potSum > 0) return ratingOf((d.evLost || 0) / d.potSum);
+  return ratingOfBB((d.evLost || 0) / n);
 }
 const gradeColor = (g) => (g === "S" || g === "A" ? "var(--good)" : g === "B" ? "var(--ac2)" : g === "C" ? "var(--warn)" : "var(--bad)");
-/** How many decisions a stored session represents (hand mode logs several). */
-const sessionDecisions = (d) => Math.max(1, d.decisions || d.n || 1);
 /** Pool every stored session into one rating. */
 function overallRating() {
   const hist = DB.get("drills", []);
-  let loss = 0, n = 0;
-  hist.forEach((d) => { loss += d.evLost || 0; n += sessionDecisions(d); });
-  if (!n) return null;
-  const per = loss / n;
-  return { per, rating: ratingOf(per), grade: gradeOf(per), decisions: n, sessions: hist.length };
+  if (!hist.length) return null;
+  let loss = 0, potSum = 0, n = 0, bbLoss = 0, bbN = 0;
+  hist.forEach((d) => {
+    n += sessionDecisions(d);
+    if (d.potSum > 0) { loss += d.evLost || 0; potSum += d.potSum; }
+    else { bbLoss += d.evLost || 0; bbN += sessionDecisions(d); }
+  });
+  // prefer the pot-share measure; fall back to BB only if nothing has pots
+  const rating = potSum > 0 ? ratingOf(loss / potSum) : bbN ? ratingOfBB(bbLoss / bbN) : null;
+  if (rating === null) return null;
+  return {
+    rating, grade: gradeFromRating(rating), decisions: n, sessions: hist.length,
+    per: potSum > 0 ? loss / potSum : null, perBB: potSum > 0 ? null : bbLoss / bbN
+  };
 }
 function gradeBadge(grade, rating) {
   return '<span class="gbadge" style="color:' + gradeColor(grade) + ';border-color:' + gradeColor(grade) + '">' +
@@ -1435,7 +1574,8 @@ function renderDrillEnd(v) {
   const perSpot = D.evLost / n;
   const capture = D.evCaptured / n;
   const earned = D.evEarned, bestPossible = D.evBest;
-  const grade = gradeOf(perSpot);
+  const sessionRate = D.potSum > 0 ? ratingOf(D.evLost / D.potSum) : ratingOfBB(perSpot);
+  const grade = gradeFromRating(sessionRate);
   // leak detection
   const counts = { passive: 0, aggro: 0, overfold: 0, calldown: 0, sizing: 0 };
   D.log.forEach((l) => {
@@ -1455,7 +1595,7 @@ function renderDrillEnd(v) {
       Math.round(D.correct / n * 100) + "%</b></div>" +
     '<div><div class="small muted">' + esc(t("drill.grade")) + " · " + esc(t("drill.rating")) + "</div>" +
     '<div class="gv" style="color:' + gradeColor(grade) + '">' + grade +
-      ' <span style="font-size:20px">' + ratingOf(perSpot) + "</span></div>" +
+      ' <span style="font-size:20px">' + sessionRate + "</span></div>" +
     '<div class="small dim">' + esc(t("drill.gradeNote")) + "</div></div></div>" +
     '<div class="kpi">' +
       '<div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + D.i + "</div></div>" +
@@ -1493,8 +1633,8 @@ function drillHistoryHTML() {
     hist.slice(0, 8).map((d) => "<tr><td data-l=\"" + esc(t("stats.date")) + "\">" + new Date(d.at).toLocaleDateString() + "</td>" +
       '<td data-l="' + esc(t("drill.endSpots")) + '">' + d.n + "</td>" +
       '<td data-l="' + esc(t("drill.grade")) + '">' + (function () {
-        const per = (d.evLost || 0) / sessionDecisions(d);
-        return gradeBadge(gradeOf(per), ratingOf(per));
+        const r = sessionRating(d);
+        return gradeBadge(gradeFromRating(r), r);
       })() + "</td>" +
       '<td data-l="' + esc(t("drill.endEarned")) + '">' +
         (d.evEarned === undefined ? "—" : '<span style="color:' + (d.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(d.evEarned) + "BB</span>") + "</td>" +
@@ -1641,7 +1781,9 @@ function renderStats() {
       '<div><div class="small muted">' + esc(t("stats.overallRating")) + "</div>" +
       '<div class="gv" style="color:' + gradeColor(ov.grade) + '">' + ov.rating + "</div>" +
       '<div class="small dim">' + esc(t("stats.decisions")) + " " + ov.decisions + " · " +
-        esc(t("hand.evLost")) + " " + lossText(ov.per) + "BB" + "</div></div></div>" +
+        esc(t("hand.evLost")) + " " +
+        (ov.per !== null ? Math.round(ov.per * 1000) / 10 + "% " + esc(t("stats.ofPot"))
+                         : lossText(ov.perBB) + "BB") + "</div></div></div>" +
       '<div class="small dim" style="margin-bottom:10px">' + esc(t("stats.ratingNote")) + "</div>";
   }
   h += '<div class="kpi">' +
@@ -1696,7 +1838,7 @@ function renderStats() {
 /* ============================================================ HOME ======= */
 function renderHome() {
   const v = $("v-home");
-  const p = getProfile(), hands = DB.get("hands", []), drills = DB.get("drills", []);
+  const p = effectiveProfile(), hands = DB.get("hands", []), drills = DB.get("drills", []);
   let h = '<div class="card"><h1>' + esc(t("home.h1")) + "</h1><p>" + t("home.lead") + "</p>" +
     '<div class="homecta">' +
       '<button data-go="quiz"><div class="ct">' + esc(t("home.cta1")) + '</div><div class="cd">' + esc(t("home.cta1d")) + "</div></button>" +
@@ -1710,8 +1852,8 @@ function renderHome() {
     h += '<div class="card"><h3>' + esc(t("home.drillSummary")) + "</h3>" +
       '<div class="kpi"><div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + last.n + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.grade")) + '</div><div class="kv">' + (function () {
-        const per = (last.evLost || 0) / sessionDecisions(last);
-        return '<span style="color:' + gradeColor(gradeOf(per)) + '">' + gradeOf(per) + " " + ratingOf(per) + "</span>";
+        const r = sessionRating(last), g = gradeFromRating(r);
+        return '<span style="color:' + gradeColor(g) + '">' + g + " " + r + "</span>";
       })() + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
         (last.evEarned === undefined ? "" : last.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' +

@@ -438,9 +438,11 @@ test("practice offers short stacks and actually deals them", async () => {
   const stacks = [];
   for (let i = 0; i < 3; i++) {
     await page.waitForSelector(".dopt", { timeout: 60000 });
-    const meta = await page.$eval(".stmeta", (e) => e.innerText);
+    // scope to the drill view: other views render .stmeta too
+    const meta = await page.$eval("#v-drill .stmeta", (e) => e.innerText);
     const m = meta.match(/Stack\s*([\d.]+)BB/);
-    if (m) stacks.push(parseFloat(m[1]));
+    assert.ok(m, "no stack in the spot header: " + meta.replace(/\n/g, " | "));
+    stacks.push(parseFloat(m[1]));
     await page.click(".dopt");
     await page.waitForSelector("#dr-next", { timeout: 60000 });
     await page.click("#dr-next");
@@ -527,8 +529,15 @@ test("practice sessions carry a grade and pool into one rating", async () => {
   await page.selectOption("#langsel", "en");
   // four sessions of deliberately different quality
   await page.evaluate(() => {
-    const mk = (n, lost, earned) => ({ at: Date.now(), n, decisions: n, evLost: lost, evEarned: earned, capture: 0.7, correct: 2, log: [] });
-    localStorage.setItem("hb.drills", JSON.stringify([mk(10, 0.3, 12), mk(10, 2.1, 8), mk(5, 4.5, 1), mk(20, 0.6, 30)]));
+    // potSum matters: grading is EV lost as a share of the pot, not raw BB
+    const mk = (n, lostFrac, earned) => ({ at: Date.now(), n, decisions: n, potSum: n * 20,
+      evLost: lostFrac * n * 20, evEarned: earned, capture: 0.7, correct: 2, log: [] });
+    localStorage.setItem("hb.drills", JSON.stringify([
+      mk(10, 0.01, 12),   // 1% of pot  -> S
+      mk(10, 0.06, 8),    // 6%         -> B
+      mk(5, 0.30, 1),     // 30%        -> D
+      mk(20, 0.02, 30)    // 2%         -> S/A
+    ]));
   });
   await page.reload();
   await page.waitForSelector("#nav button");
@@ -541,8 +550,8 @@ test("practice sessions carry a grade and pool into one rating", async () => {
   const letters = badges.map((b) => b.split(/\s+/)[0]);
   assert.ok(new Set(letters).size >= 3, "grades do not discriminate: " + badges.join(", "));
   // 0.03BB per decision is excellent; 0.9BB is terrible
-  assert.equal(letters[0], "S", "0.03BB/decision should be S: " + badges[0]);
-  assert.equal(letters[2], "D", "0.9BB/decision should be D: " + badges[2]);
+  assert.equal(letters[0], "S", "1% of pot per decision should be S: " + badges[0]);
+  assert.equal(letters[2], "D", "30% of pot per decision should be D: " + badges[2]);
   // rating must fall as loss rises
   const nums = badges.map((b) => parseInt(b.split(/\s+/)[1], 10));
   assert.ok(nums[0] > nums[1] && nums[1] > nums[2], "rating not monotonic: " + nums.join(","));
@@ -555,7 +564,7 @@ test("practice sessions carry a grade and pool into one rating", async () => {
 });
 
 test("the profile tab offers an assessment, then shows the saved profile", async () => {
-  await page.evaluate(() => localStorage.removeItem("hb.profile"));
+  await page.evaluate(() => { localStorage.removeItem("hb.profile"); localStorage.removeItem("hb.playstats"); });
   await page.reload();
   await page.waitForSelector("#nav button");
   await page.selectOption("#langsel", "en");
@@ -582,5 +591,44 @@ test("the profile tab offers an assessment, then shows the saved profile", async
   assert.match(body, /Your profile/, "saved profile is not shown: " + body.slice(0, 200));
   assert.ok(body.indexOf("Your profile") < body.indexOf("Retake"), "retake should come after the profile");
   assert.match(await page.$eval("#qz-go", (e) => e.innerText), /Retake/);
+  noErrors();
+});
+
+test("play keeps moving the profile after the assessment is saved", async () => {
+  // A passive sample: almost never takes the aggressive line the solver takes,
+  // folds far more often than it should, and never picks the biggest size.
+  const passive = { picks: 40, aggr: 2, bestAggr: 26, facing: 20, folds: 15, bestFolds: 4, big: 0, bestBig: 11 };
+  await page.evaluate((st) => {
+    localStorage.setItem("hb.profile", JSON.stringify({
+      axes: { A1: 0, A2: 0, A3: 0, A4: 0, A5: 0, B1: 0, B2: 0 },
+      conf: { A1: .9, A2: .9, A3: .9, A4: .9, A5: .9, B1: .9, B2: .9 },
+      cnt: {}, n: 28, archetype: "TAG", at: Date.now()
+    }));
+    localStorage.setItem("hb.playstats", JSON.stringify(st));
+  }, passive);
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="quiz"]');
+  await page.waitForSelector("#qz-go");
+
+  const body = await page.$eval("#v-quiz", (e) => e.innerText);
+  assert.match(body, /from play/, "no play-derived marker on the axes: " + body.slice(0, 300));
+  assert.match(body, /40/, "the decision count behind the adjustment is not shown");
+
+  // Every axis row carries its value; the card renders them in AXIS_KEYS order.
+  const shown = await page.$$eval("#v-quiz .axis .lb b .dim", (els) =>
+    els.map((e) => Number(e.textContent.trim())));
+  assert.equal(shown.length, 7, "expected one row per axis, got " + shown.length);
+  const axes = {};
+  ["A1", "A2", "A3", "A4", "A5", "B1", "B2"].forEach((k, i) => (axes[k] = shown[i]));
+
+  // The three axes play can evidence must have moved off the assessment's zero.
+  assert.ok(axes.A2 < -15, "aggression should read passive, got " + axes.A2);
+  assert.ok(axes.A4 < -15, "folding more than optimal should lower pressure resistance, got " + axes.A4);
+  assert.ok(axes.A3 < -15, "never taking the big size should lower risk tolerance, got " + axes.A3);
+  // Axes play cannot speak to stay where the assessment left them.
+  ["A1", "A5", "B1", "B2"].forEach((k) =>
+    assert.equal(axes[k], 0, k + " moved without any evidence from play"));
   noErrors();
 });

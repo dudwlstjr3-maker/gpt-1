@@ -1038,9 +1038,17 @@ function makeSpot(cfg) {
   const rnd = mulberry32(seedFrom(seed));
   const pick = (a) => a[Math.floor(rnd() * a.length)];
   const seats = cfg.seats || 6;
+  const stack = cfg.stack || 100;
   const L = posList(seats);
 
-  const scen = scenarioById(cfg.scenario || pick(["open_call", "call_open", "3b_call", "call_3b", "limp"]));
+  // A short stack cannot play a big preflop pot: at 12BB there is no such
+  // thing as a 3-bet pot where hero has already put in 9BB. Only offer
+  // scenarios the stack can actually support, or the spot arrives with a
+  // 25BB pot and half a blind behind.
+  const affordable = ["open_call", "call_open", "3b_call", "call_3b", "limp"]
+    .filter((id) => scenarioById(id).heroInv <= stack * 0.35);
+  const scen = scenarioById(cfg.scenario ||
+    pick(affordable.length ? affordable : ["limp", "open_call"]));
   const { pos, vpos } = pickPositions(scen, seats, pick);
 
   const vt = VILLAIN_TYPES[cfg.villainType === "random" || !cfg.villainType
@@ -1059,7 +1067,6 @@ function makeSpot(cfg) {
   const ip = isInPosition(seats, pos, vpos);
 
   let pot = scen.pot, heroInv = scen.heroInv;
-  const stack = cfg.stack || 100;
   const story = [], history = [];
   let vilCombos = expandRange(villainClasses, hole);
   if (!vilCombos.length) return null;
@@ -1078,10 +1085,14 @@ function makeSpot(cfg) {
     })();
     const heroDraw = drawInfo(hole, board).quality;
 
-    const betSize = round1(pot * pick([0.33, 0.5, 0.66]));
+    // Leave hero something to play with: a spot presented with half a blind
+    // behind is not a decision. Stop simulating earlier streets once the
+    // stack is nearly spent, and never let a simulated bet commit it all.
     const eff = Math.max(0, stack - heroInv);
-    if (eff <= 0.5) break;
-    const size = Math.min(eff, betSize);
+    const floor = Math.max(1, stack * 0.15);
+    if (eff <= floor) break;
+    const size = Math.min(eff - floor, round1(pot * pick([0.33, 0.5, 0.66])));
+    if (size <= 0.2) break;
 
     const villainBetsFirst = !ip;   // whoever is OOP acts first
     let acted = false;

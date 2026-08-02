@@ -18,7 +18,7 @@ const ko = {
     tagline: "성향 진단 · 핸드 분석 · EV 드릴",
     docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 드릴"
   },
-  nav: { home: "홈", quiz: "성향 진단", hand: "핸드 분석", stats: "리크 · 기록", drill: "핸드 연습", range: "레인지 랩", help: "도움말" },
+  nav: { home: "홈", quiz: "성향", hand: "핸드 분석", stats: "리크 · 기록", drill: "핸드 연습", range: "레인지 랩", help: "도움말" },
   common: {
     bb: "BB", pot: "팟", stack: "스택", position: "포지션", board: "보드", hand: "핸드",
     equity: "승률", ev: "EV", save: "저장", cancel: "취소", close: "닫기", reset: "초기화",
@@ -67,12 +67,17 @@ const ko = {
     quickStats: "요약"
   },
   quiz: {
-    h1: "성향 진단",
+    h1: "내 성향",
     lead: "정답이 있는 시험이 아닙니다. <b>평소에 실제로 어떻게 하는지</b> 고르세요. 최소 {min}문항, 축이 안정되면 자동으로 끝납니다.",
     progress: "{done} / {total} 문항",
     confidence: "신뢰도",
     restart: "다시 진단",
-    resultTitle: "진단 결과",
+    noneTitle: "아직 성향이 없습니다",
+    noneBody: "짧은 진단으로 내 성향을 잡아두면, 핸드 분석과 연습이 그 성향에 맞춰 조언합니다.",
+    startDiagnose: "성향 진단 시작",
+    savedAt: "{d}에 저장됨",
+    savedNote: "이 성향은 저장돼 있어서 다시 진단하기 전까지 계속 쓰입니다.",
+    resultTitle: "내 성향",
     archetype: "유형",
     axesTitle: "축별 성향",
     summaryTitle: "무엇을 뜻하는가",
@@ -202,7 +207,8 @@ const ko = {
     endEarned: "획득 EV", endBest: "최선이었다면",
     sessionEarned: "이번 세션의 내 선택은 <b>{earned}BB</b>를 만들었습니다. 매번 최선을 골랐다면 <b>{best}BB</b>였습니다.",
     sessionPerfect: "이번 세션의 내 선택은 <b>{earned}BB</b>를 만들었습니다. 한 번도 EV를 흘리지 않았습니다.",
-    grade: "등급",
+    grade: "등급", rating: "레이팅",
+    gradeNote: "결정 한 번당 흘린 EV로 매깁니다. 0에 가까울수록 높습니다.",
     tipTitle: "한 줄",
     next: "다음 스팟", seeResult: "결과 보기", quit: "중단하고 결과 보기",
     reveal: "상대 레인지 보기", hideReveal: "접기",
@@ -305,7 +311,10 @@ const ko = {
     leakTitle: "반복되는 패턴", leakNone: "아직 패턴을 잡을 만큼 표본이 없습니다.",
     leakWhat: "리크(leak)란?",
     leakWhatBody: "포커에서 <b>리크</b>는 <b>반복해서 돈을 흘리는 습관</b>을 뜻합니다. 한 판을 진 것은 리크가 아닙니다 — 운이 나쁠 수 있으니까요. 같은 구조의 스팟에서 <b>매번 같은 방향으로 잘못된 선택</b>을 하는 것, 그래서 장기적으로 EV가 새어 나가는 것이 리크입니다. 예를 들어 \'칠 자리에서 계속 체크한다\', \'팟 오즈가 맞는데도 겁이 나서 접는다\' 같은 것들입니다. 아래는 핸드 연습에서 내린 선택을 모아 <b>어느 방향으로 자주 틀리는지</b> 집계한 것입니다.",
-    totalHands: "핸드", totalDrills: "연습 세션", avgCapture: "평균 EV 획득률"
+    totalHands: "핸드", totalDrills: "연습 세션", avgCapture: "평균 EV 획득률",
+    overallGrade: "종합 등급", overallRating: "종합 레이팅", decisions: "결정 수",
+    ratingNote: "모든 연습 세션의 결정을 합쳐 계산합니다. 세션이 쌓일수록 안정됩니다.",
+    needMore: "세션을 더 하면 등급이 나옵니다."
   },
   help: {
     h1: "도움말",
@@ -400,11 +409,16 @@ const en = {
     quickStats: "Summary"
   },
   quiz: {
-    h1: "Tendency profile",
+    h1: "Your profile",
     lead: "There are no right answers. Pick <b>what you actually do</b>. Minimum {min} questions; it stops early once your axes settle.",
     progress: "{done} / {total} questions",
     confidence: "Confidence",
     restart: "Retake",
+    noneTitle: "No profile yet",
+    noneBody: "A short assessment pins down how you play, and the analysis and practice screens tailor their advice to it.",
+    startDiagnose: "Start the assessment",
+    savedAt: "saved {d}",
+    savedNote: "This profile is stored and keeps being used until you retake it.",
     resultTitle: "Your profile",
     archetype: "Archetype",
     axesTitle: "Axis by axis",
@@ -535,7 +549,8 @@ const en = {
     endEarned: "EV earned", endBest: "Perfect play",
     sessionEarned: "Your choices this session were worth <b>{earned}BB</b>. Picking the best line every time would have been <b>{best}BB</b>.",
     sessionPerfect: "Your choices this session were worth <b>{earned}BB</b>. You did not give up a single chip of EV.",
-    grade: "Grade",
+    grade: "Grade", rating: "Rating",
+    gradeNote: "Scored on EV lost per decision — the closer to zero, the higher.",
     tipTitle: "In one line",
     next: "Next spot", seeResult: "See results", quit: "Stop and see results",
     reveal: "Show villain range", hideReveal: "Hide",
@@ -638,7 +653,10 @@ const en = {
     leakTitle: "Recurring patterns", leakNone: "Not enough sample to call a pattern yet.",
     leakWhat: "What is a leak?",
     leakWhatBody: "A <b>leak</b> is a habit that loses money repeatedly. Losing one hand is not a leak — that can just be luck. A leak is making <b>the same kind of mistake in the same direction</b> every time a spot comes up, so EV drains away over the long run. Things like \'checking where you should bet\' or \'folding when the pot odds say call\'. Below is a tally of the choices you made in practice, grouped by <b>which way you tend to get it wrong</b>.",
-    totalHands: "Hands", totalDrills: "Practice sessions", avgCapture: "Mean EV captured"
+    totalHands: "Hands", totalDrills: "Practice sessions", avgCapture: "Mean EV captured",
+    overallGrade: "Overall grade", overallRating: "Overall rating", decisions: "Decisions",
+    ratingNote: "Pooled across every practice session. It settles as sessions add up.",
+    needMore: "Play a few more sessions for a grade."
   },
   help: {
     h1: "Help",

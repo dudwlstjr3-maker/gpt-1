@@ -270,10 +270,19 @@ function renderQuiz() {
   const qz = STATE.quiz;
   if (!qz) {
     const p = getProfile();
-    let h = '<div class="card"><h2>' + esc(t("quiz.h1")) + "</h2><p>" + t("quiz.lead", { min: QMIN }) + "</p>";
-    if (p) h += '<div class="notice">' + esc(t("quiz.retakeWarn")) + "</div>";
-    h += '<div style="margin-top:14px"><button class="btn" id="qz-go">' + esc(t("common.start")) + "</button></div></div>";
-    if (p) h += profileCard(p);
+    let h;
+    if (p) {
+      // A saved profile is the point of this screen; retaking is secondary.
+      h = profileCard(p) +
+        '<div class="card"><div class="small dim" style="margin-bottom:8px">' +
+          esc(t("quiz.savedAt", { d: new Date(p.at).toLocaleDateString() })) + " · " + esc(t("quiz.savedNote")) + "</div>" +
+        '<button class="btn sec" id="qz-go">' + esc(t("quiz.restart")) + "</button>" +
+        '<div class="notice">' + esc(t("quiz.retakeWarn")) + "</div></div>";
+    } else {
+      h = '<div class="card"><h2>' + esc(t("quiz.noneTitle")) + "</h2>" +
+        "<p>" + esc(t("quiz.noneBody")) + "</p><p>" + t("quiz.lead", { min: QMIN }) + "</p>" +
+        '<div style="margin-top:14px"><button class="btn" id="qz-go">' + esc(t("quiz.startDiagnose")) + "</button></div></div>";
+    }
     v.innerHTML = h;
     $("qz-go").onclick = () => { STATE.quiz = { asked: [], ans: {}, cur: null }; STATE.quiz.cur = nextQuestion(STATE.quiz); renderQuiz(); };
     return;
@@ -1104,14 +1113,44 @@ function nextSpot() {
 function saveDrill() {
   const D = STATE.drill;
   const hist = DB.get("drills", []);
-  hist.unshift({ at: Date.now(), n: D.i, vt: D.vt, diff: D.diff,
+  hist.unshift({ at: Date.now(), n: D.i, vt: D.vt, diff: D.diff, mode: D.mode,
+    decisions: D.mode === "hand" ? (D.decisions || D.i) : D.i,
     evLost: D.evLost, evEarned: D.evEarned, evBest: D.evBest,
     capture: D.i ? D.evCaptured / D.i : 0, correct: D.correct,
     log: D.log });
   DB.set("drills", hist.slice(0, 100));
 }
-function gradeOf(perSpot) {
-  return perSpot < 0.05 ? "S" : perSpot < 0.15 ? "A" : perSpot < 0.35 ? "B" : perSpot < 0.7 ? "C" : "D";
+/* Rating and grade both come from one number: EV lost per decision. The
+ * anchors are the grade boundaries, interpolated between, so the letter and
+ * the number can never disagree. Lower loss = higher rating. */
+const RATING_ANCHORS = [[0, 100], [0.05, 90], [0.15, 75], [0.35, 55], [0.70, 35], [1.50, 0]];
+function ratingOf(perDecisionLoss) {
+  const x = Math.max(0, perDecisionLoss || 0);
+  for (let i = 1; i < RATING_ANCHORS.length; i++) {
+    const [x0, y0] = RATING_ANCHORS[i - 1], [x1, y1] = RATING_ANCHORS[i];
+    if (x <= x1) return Math.round(y0 + (y1 - y0) * (x - x0) / (x1 - x0));
+  }
+  return 0;
+}
+function gradeOf(perDecisionLoss) {
+  const r = ratingOf(perDecisionLoss);
+  return r >= 90 ? "S" : r >= 75 ? "A" : r >= 55 ? "B" : r >= 35 ? "C" : "D";
+}
+const gradeColor = (g) => (g === "S" || g === "A" ? "var(--good)" : g === "B" ? "var(--ac2)" : g === "C" ? "var(--warn)" : "var(--bad)");
+/** How many decisions a stored session represents (hand mode logs several). */
+const sessionDecisions = (d) => Math.max(1, d.decisions || d.n || 1);
+/** Pool every stored session into one rating. */
+function overallRating() {
+  const hist = DB.get("drills", []);
+  let loss = 0, n = 0;
+  hist.forEach((d) => { loss += d.evLost || 0; n += sessionDecisions(d); });
+  if (!n) return null;
+  const per = loss / n;
+  return { per, rating: ratingOf(per), grade: gradeOf(per), decisions: n, sessions: hist.length };
+}
+function gradeBadge(grade, rating) {
+  return '<span class="gbadge" style="color:' + gradeColor(grade) + ';border-color:' + gradeColor(grade) + '">' +
+    esc(grade) + (rating === undefined ? "" : ' <b>' + rating + "</b>") + "</span>";
 }
 const isAggressive = (key) => /^(bet|raise|allin)/.test(key);
 
@@ -1414,8 +1453,10 @@ function renderDrillEnd(v) {
   let h = '<div class="card"><h2>' + esc(t("drill.endTitle")) + "</h2>" +
     '<div class="score"><div class="ring" style="--p:' + Math.round(D.correct / n * 100) + '"><b>' +
       Math.round(D.correct / n * 100) + "%</b></div>" +
-    '<div><div class="small muted">' + esc(t("drill.grade")) + '</div><div class="gv">' + grade + "</div>" +
-    '<div class="small dim">' + esc(t("drill.endAccuracy")) + "</div></div></div>" +
+    '<div><div class="small muted">' + esc(t("drill.grade")) + " · " + esc(t("drill.rating")) + "</div>" +
+    '<div class="gv" style="color:' + gradeColor(grade) + '">' + grade +
+      ' <span style="font-size:20px">' + ratingOf(perSpot) + "</span></div>" +
+    '<div class="small dim">' + esc(t("drill.gradeNote")) + "</div></div></div>" +
     '<div class="kpi">' +
       '<div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + D.i + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
@@ -1447,13 +1488,16 @@ function drillHistoryHTML() {
   if (!hist.length) return "";
   return '<div class="card"><h3>' + esc(t("drill.history")) + "</h3>" +
     '<div class="scrollx"><table class="tstack"><tr><th>' + esc(t("stats.date")) + "</th><th>" +
-    esc(t("drill.endSpots")) + "</th><th>" + esc(t("drill.endEarned")) + "</th><th>" +
-    esc(t("drill.endCapture")) + "</th><th>" + esc(t("drill.endEvLost")) + "</th></tr>" +
+    esc(t("drill.endSpots")) + "</th><th>" + esc(t("drill.grade")) + "</th><th>" +
+    esc(t("drill.endEarned")) + "</th><th>" + esc(t("drill.endEvLost")) + "</th></tr>" +
     hist.slice(0, 8).map((d) => "<tr><td data-l=\"" + esc(t("stats.date")) + "\">" + new Date(d.at).toLocaleDateString() + "</td>" +
       '<td data-l="' + esc(t("drill.endSpots")) + '">' + d.n + "</td>" +
+      '<td data-l="' + esc(t("drill.grade")) + '">' + (function () {
+        const per = (d.evLost || 0) / sessionDecisions(d);
+        return gradeBadge(gradeOf(per), ratingOf(per));
+      })() + "</td>" +
       '<td data-l="' + esc(t("drill.endEarned")) + '">' +
         (d.evEarned === undefined ? "—" : '<span style="color:' + (d.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(d.evEarned) + "BB</span>") + "</td>" +
-      '<td data-l="' + esc(t("drill.endCapture")) + '">' + Math.round((d.capture || 0) * 100) + "%</td>" +
       '<td data-l="' + esc(t("drill.endEvLost")) + '">' + lossText(d.evLost) + "BB</td></tr>").join("") +
     "</table></div></div>";
 }
@@ -1589,8 +1633,18 @@ function renderStats() {
     return;
   }
   const avgCapture = drills.length ? drills.reduce((a, d) => a + (d.capture || 0), 0) / drills.length : 0;
-  let h = '<div class="card"><h2>' + esc(t("stats.h1")) + "</h2>" +
-    '<div class="kpi">' +
+  const ov = overallRating();
+  let h = '<div class="card"><h2>' + esc(t("stats.h1")) + "</h2>";
+  if (ov) {
+    h += '<div class="score" style="margin-bottom:12px">' +
+      '<div class="ring" style="--p:' + ov.rating + '"><b style="color:' + gradeColor(ov.grade) + '">' + ov.grade + "</b></div>" +
+      '<div><div class="small muted">' + esc(t("stats.overallRating")) + "</div>" +
+      '<div class="gv" style="color:' + gradeColor(ov.grade) + '">' + ov.rating + "</div>" +
+      '<div class="small dim">' + esc(t("stats.decisions")) + " " + ov.decisions + " · " +
+        esc(t("hand.evLost")) + " " + lossText(ov.per) + "BB" + "</div></div></div>" +
+      '<div class="small dim" style="margin-bottom:10px">' + esc(t("stats.ratingNote")) + "</div>";
+  }
+  h += '<div class="kpi">' +
     '<div class="k"><div class="kk">' + esc(t("stats.totalHands")) + '</div><div class="kv">' + hands.length + "</div></div>" +
     '<div class="k"><div class="kk">' + esc(t("stats.totalDrills")) + '</div><div class="kv">' + drills.length + "</div></div>" +
     '<div class="k"><div class="kk">' + esc(t("stats.avgCapture")) + '</div><div class="kv">' + Math.round(avgCapture * 100) + "%</div></div>" +
@@ -1655,7 +1709,10 @@ function renderHome() {
     const last = drills[0];
     h += '<div class="card"><h3>' + esc(t("home.drillSummary")) + "</h3>" +
       '<div class="kpi"><div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + last.n + "</div></div>" +
-      '<div class="k"><div class="kk">' + esc(t("drill.endCapture")) + '</div><div class="kv">' + Math.round((last.capture || 0) * 100) + "%</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t("drill.grade")) + '</div><div class="kv">' + (function () {
+        const per = (last.evLost || 0) / sessionDecisions(last);
+        return '<span style="color:' + gradeColor(gradeOf(per)) + '">' + gradeOf(per) + " " + ratingOf(per) + "</span>";
+      })() + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
         (last.evEarned === undefined ? "" : last.evEarned >= 0 ? "var(--good)" : "var(--bad)") + '">' +
         (last.evEarned === undefined ? "—" : signed(last.evEarned)) + "</div></div>" +

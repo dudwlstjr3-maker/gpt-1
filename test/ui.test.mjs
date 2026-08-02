@@ -520,3 +520,67 @@ test("hand analysis leads with the line and an equity bar", async () => {
   assert.ok(await page.$$eval(".stcard[open]", (e) => e.length) >= 1);
   noErrors();
 });
+
+test("practice sessions carry a grade and pool into one rating", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  // four sessions of deliberately different quality
+  await page.evaluate(() => {
+    const mk = (n, lost, earned) => ({ at: Date.now(), n, decisions: n, evLost: lost, evEarned: earned, capture: 0.7, correct: 2, log: [] });
+    localStorage.setItem("hb.drills", JSON.stringify([mk(10, 0.3, 12), mk(10, 2.1, 8), mk(5, 4.5, 1), mk(20, 0.6, 30)]));
+  });
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.click('#nav button[data-v="stats"]');
+  await page.waitForTimeout(250);
+
+  // the grade scale must actually discriminate, not label everything the same
+  const badges = await page.$$eval("#v-stats .gbadge", (e) => e.map((x) => x.innerText.trim()));
+  assert.equal(badges.length, 4, "expected a grade per session, got " + badges.join(","));
+  const letters = badges.map((b) => b.split(/\s+/)[0]);
+  assert.ok(new Set(letters).size >= 3, "grades do not discriminate: " + badges.join(", "));
+  // 0.03BB per decision is excellent; 0.9BB is terrible
+  assert.equal(letters[0], "S", "0.03BB/decision should be S: " + badges[0]);
+  assert.equal(letters[2], "D", "0.9BB/decision should be D: " + badges[2]);
+  // rating must fall as loss rises
+  const nums = badges.map((b) => parseInt(b.split(/\s+/)[1], 10));
+  assert.ok(nums[0] > nums[1] && nums[1] > nums[2], "rating not monotonic: " + nums.join(","));
+
+  // and there is one pooled rating over everything
+  const txt = await page.$eval("#v-stats", (e) => e.innerText);
+  assert.match(txt, /Overall rating/, "no overall rating");
+  assert.match(txt, /Decisions\s*45/, "pooled decision count wrong: " + txt.slice(0, 300));
+  noErrors();
+});
+
+test("the profile tab offers an assessment, then shows the saved profile", async () => {
+  await page.evaluate(() => localStorage.removeItem("hb.profile"));
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+
+  const nav = await page.$eval('#nav button[data-v="quiz"]', (e) => e.innerText);
+  assert.equal(nav, "Profile", "tab should be named for the profile, got " + nav);
+
+  await page.click('#nav button[data-v="quiz"]');
+  await page.waitForSelector("#qz-go");
+  assert.match(await page.$eval("#v-quiz", (e) => e.innerText), /No profile yet/);
+  assert.match(await page.$eval("#qz-go", (e) => e.innerText), /assessment/i);
+
+  // a saved profile becomes the content, with retake demoted
+  await page.evaluate(() => localStorage.setItem("hb.profile", JSON.stringify({
+    axes: { A1: -30, A2: 40, A3: 10, A4: -20, A5: 35, B1: 15, B2: 20 },
+    conf: { A1: .9, A2: .9, A3: .8, A4: .8, A5: .9, B1: .8, B2: .7 },
+    cnt: {}, n: 28, archetype: "TAG", at: Date.now()
+  })));
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.click('#nav button[data-v="quiz"]');
+  await page.waitForSelector("#qz-go");
+  const body = await page.$eval("#v-quiz", (e) => e.innerText);
+  assert.match(body, /Your profile/, "saved profile is not shown: " + body.slice(0, 200));
+  assert.ok(body.indexOf("Your profile") < body.indexOf("Retake"), "retake should come after the profile");
+  assert.match(await page.$eval("#qz-go", (e) => e.innerText), /Retake/);
+  noErrors();
+});

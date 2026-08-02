@@ -449,6 +449,9 @@ function saveSetup() {
   DB.set("setup", s); toast(t("hand.setupSaved")); renderBankroll();
 }
 const setupSeats = () => +($("s-seats") ? $("s-seats").value : 6) || 6;
+/** "cash" | "mtt" | "sng". Anything but cash is played on a prize ladder. */
+const setupGame = () => ($("s-gt") ? $("s-gt").value : "cash") || "cash";
+const setupAnte = () => Math.max(0, +($("s-ante") ? $("s-ante").value : 0) || 0);
 const MAX_PRACTICE_BB = 500;   // nobody plays deeper than this; beyond it the value is a typo
 const rawStack = () => +($("s-stack") ? $("s-stack").value : 100) || 100;
 /** Stack in BB, clamped to something a real game could produce. */
@@ -505,6 +508,7 @@ const HI = {
   // downstream EV, instead of the fixed pot each scenario used to carry.
   sizes: { open: 2.5, threeBet: 9, fourBet: 22, limpers: 2, allin: 20, toCall: 20 },
   shover: "villain",
+  stage: "middle",          // only read when the setup's game type is not cash
   c: { h0: null, h1: null, f0: null, f1: null, f2: null, t0: null, r0: null },
   acts: [{ v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }]
 };
@@ -642,7 +646,17 @@ function renderPreflopSizes() {
   const isAllin = HI.scenario === "pf_allin";
   if (!fields.length && !isAllin) { el.innerHTML = ""; return; }
 
-  let h = '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
+  // On a prize ladder the stage decides how much a stack-off really costs, so
+  // it has to be an input here the same way the villain's type is.
+  let h = "";
+  if (setupGame() !== "cash") {
+    h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("drill.stageStep")) + "</div>" +
+      '<div class="bg" id="pf-stage" style="display:flex;margin-bottom:8px">' +
+      MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + (HI.stage === k ? "on" : "") + '">' +
+        esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin:-4px 0 4px">' + esc(stageBlurb(HI.stage)) + "</div>";
+  }
+  h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
     ' <span class="dim">' + esc(t("hand.pfSizesSub")) + "</span></div>";
   if (isAllin) {
     h += '<div class="bg" id="pf-shover" style="display:flex;margin-bottom:8px">' +
@@ -665,6 +679,7 @@ function renderPreflopSizes() {
     HI.sizes[inp.dataset.sz] = +inp.value || 0; renderPreflopSizes(); renderActions();
   }));
   el.querySelectorAll("#pf-shover button").forEach((b) => (b.onclick = () => { HI.shover = b.dataset.k; renderPreflopSizes(); }));
+  el.querySelectorAll("#pf-stage button").forEach((b) => (b.onclick = () => { HI.stage = b.dataset.k; renderPreflopSizes(); renderActions(); }));
 }
 function renderSlots() {
   const el = $("slots");
@@ -759,7 +774,12 @@ function analyzeHand() {
   const scen = PE.scenarioById(HI.scenario);
   const cls = PE.handClass(hole[0], hole[1]);
   const ip = PE.isInPosition(seats, HI.pos, HI.vpos);
-  const res = { cls, ip, vt, scenario: HI.scenario, pos: HI.pos, vpos: HI.vpos, streets: [] };
+  // The setup's game type has always been on screen; until now nothing read
+  // it, so a tournament hand was analysed as if a chip were worth a chip.
+  const mtt = setupGame() !== "cash";
+  const ante = setupAnte();
+  const res = { cls, ip, vt, scenario: HI.scenario, pos: HI.pos, vpos: HI.vpos, streets: [],
+    game: mtt ? "mtt" : "cash", stage: HI.stage, ante };
 
   // preflop
   const chart = PE.rfiRange(seats, HI.pos);
@@ -800,8 +820,8 @@ function analyzeHand() {
   const board = boardCards();
   if (board.length < 3) return res;
 
-  const heroClasses = scen.heroR(seats, HI.pos, HI.vpos, PE.VILLAIN_TYPES.unknown);
-  const villainClasses = scen.vilR(seats, HI.pos, HI.vpos, vt);
+  const heroClasses = scen.heroR(seats, HI.pos, HI.vpos, PE.VILLAIN_TYPES.unknown, ante);
+  const villainClasses = scen.vilR(seats, HI.pos, HI.vpos, vt, ante);
   res.heroClasses = heroClasses; res.villainClasses = villainClasses;
 
   let pot = money.pot, heroInv = money.heroInv;
@@ -816,8 +836,10 @@ function analyzeHand() {
     const facing = (vAct === "bet" || vAct === "raise") && vSize > 0;
     const effStack = Math.max(0.5, stack - heroInv);
 
+    const icm = mtt
+      ? PE.icmTable({ stage: HI.stage, heroStack: effStack, vilStack: effStack }) : null;
     const ctx = PE.buildContext({
-      hole, board: bd, villainClasses, vt, ip, pot, effStack, history,
+      hole, board: bd, villainClasses, vt, ip, pot, effStack, history, icm,
       rnd: PE.mulberry32(PE.seedFrom(hole[0] * 53 + hole[1] * 7 + i))
     });
     const res2 = PE.options(ctx, facing ? { size: vSize } : null);
@@ -838,6 +860,7 @@ function analyzeHand() {
       name: names[i], board: bd.slice(), pot, effStack, spr: ctx.spr,
       eq: res2.eq, facing, vAct, vSize, mAct, mSize,
       required: facing ? vSize / (pot + 2 * vSize) : 0,
+      requiredIcm: res2.requiredIcm, riskPremium: res2.riskPremium,
       mdf: facing ? pot / (pot + vSize) : 0,
       alpha: facing ? vSize / (pot + vSize) : 0,
       bi, draw: dr, cat: PE.catOf(myScore),
@@ -882,6 +905,44 @@ function optNote(o) {
   if (o.eqWhenCalled !== undefined) bits.push(t("common.ifCalled") + " " + pct(o.eqWhenCalled));
   return bits.join(" · ");
 }
+/* --- tournament read-outs ---------------------------------------------- */
+/** A chip in the spot header naming the game and, in a tournament, the stage
+ *  and the ante — the two things that make the numbers below differ. */
+function gameChip(sp) {
+  if (!sp || sp.game !== "mtt") return "";
+  return '<span class="gm">' + esc(t("drill.gameMtt")) + " · " +
+    esc(t("drill.stage" + sp.stage[0].toUpperCase() + sp.stage.slice(1))) +
+    (sp.ante ? " · " + esc(t("drill.anteChip", { v: nfmt(sp.ante) })) : "") + "</span>";
+}
+/** "46 left, 45 paid — one more out and everyone else cashes." */
+function stageBlurb(stage) {
+  const s = PE.MTT_STAGES[stage] || PE.MTT_STAGES.middle;
+  return t("drill.stageBlurb", { left: s.left, paid: s.paid }) + " " +
+    t("drill.stage" + stage[0].toUpperCase() + stage.slice(1) + "D");
+}
+/** The one number that explains tournament play: what the ladder adds to the
+ *  price of a call. Rendered only when it is big enough to matter. */
+function riskPremiumHTML(sp) {
+  if (!sp || !(sp.riskPremium > 0.005) || sp.required === undefined) return "";
+  const cell = (k, v, warn) => '<div class="icmc"><div class="k">' + esc(k) + "</div>" +
+    '<div class="v"' + (warn ? ' style="color:var(--warn)"' : "") + ">" + v + "</div></div>";
+  return '<div class="blk warn"><div class="t">' + esc(t("drill.icmTitle")) + "</div>" +
+    '<div class="icm3">' +
+      cell(t("drill.icmChip"), pct(sp.required)) +
+      cell(t("drill.icmIcm"), pct(sp.requiredIcm), true) +
+      cell(t("drill.icmPremium"), "+" + (sp.riskPremium * 100).toFixed(1) + "pp", true) +
+    "</div>" +
+    '<div class="small dim" style="margin-top:8px">' + t("drill.icmNote") + "</div></div>";
+}
+/** How far an option moved once the prize ladder was applied. */
+function icmDelta(o) {
+  if (o.chipEv === undefined) return "";
+  const d = o.ev - o.chipEv;
+  if (Math.abs(d) < 0.05) return "";
+  return ' <span class="pill ' + (d < 0 ? "w" : "g") + '" style="font-size:10px">' +
+    esc(t("drill.icmWas", { v: nfmt(o.chipEv, 2) })) + "</span>";
+}
+
 function evTable(opts, mine) {
   const best = Math.max.apply(null, opts.map((o) => o.ev));
   return '<div class="dtable">' + opts.slice().sort((a, b) => b.ev - a.ev).map((o) => {
@@ -891,7 +952,7 @@ function evTable(opts, mine) {
       '<span class="dv" style="color:' + (o.ev >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(o.ev) + " BB</span>" +
       (isBest ? '<span class="dbadge b">' + esc(t("common.best")) + "</span>" : "") +
       (isMine ? '<span class="dbadge m">' + esc(t("common.yourPick")) + "</span>" : "") +
-      '<span class="dn">' + esc(optNote(o)) + "</span></div>";
+      '<span class="dn">' + esc(optNote(o)) + icmDelta(o) + "</span></div>";
   }).join("") + "</div>";
 }
 function fact(k, v, s) {
@@ -1000,7 +1061,8 @@ function renderAnalysis(res) {
     '<div class="stmeta"><span>' + esc(posName(res.pos)) + " <b>vs</b> " + esc(posName(res.vpos)) + "</span>" +
     "<span>" + esc(t("scenarios." + res.scenario)) + "</span>" +
     "<span>" + esc(vtName(res.vt.id)) + "</span>" +
-    "<span>" + esc(res.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span></div>";
+    "<span>" + esc(res.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+    gameChip(res) + "</div>";
   if (res.streets.length) h += lineStrip(res);
   h += "</div>";
 
@@ -1064,6 +1126,7 @@ function renderAnalysis(res) {
       fact(t("hand.myHandNow"), catName(st.cat), drawNames(st.draw.keys).join(" · ")) +
       "</div>";
     h += '<div class="blk" style="margin-top:12px">' + compareBlock(st) + "</div>";
+    h += riskPremiumHTML(st);
     h += '<details class="numd"><summary><b>' + esc(t("hand.evTitle")) + "</b></summary>" +
       evTable(st.opts, st.mine) + "</details>";
     h += villainReadout(st);
@@ -1100,21 +1163,35 @@ const DEPTHS = [
   { k: "ultra",  label: "drill.depthUltra",  desc: "drill.depthUltraD",  bb: 12 }
 ];
 const MIXED_DEPTHS = [100, 75, 50, 40, 30, 25, 20, 15, 12, 10];
+/* A tournament is not a cash game with a shorter stack. Stacks really are
+ * shorter, but the pot also carries an ante and the chips are worth less the
+ * further you risk them, so the depth mix is drawn from a different shelf. */
+const MTT_DEPTHS = [60, 45, 35, 28, 22, 18, 15, 12, 10, 8];
+const MTT_STAGE_KEYS = ["early", "middle", "bubble", "final"];
+const isMtt = (cfg) => (cfg && cfg.game) === "mtt";
 /** Stack for the next spot: the chosen depth, or a draw from the mix. */
 function depthFor(cfg) {
   const chosen = DEPTHS.find((d) => d.k === (cfg.depth || "random"));
   if (chosen && chosen.bb) return Math.min(chosen.bb, setupStack());
-  const bb = MIXED_DEPTHS[(Math.random() * MIXED_DEPTHS.length) | 0];
+  const mix = isMtt(cfg) ? MTT_DEPTHS : MIXED_DEPTHS;
+  const bb = mix[(Math.random() * mix.length) | 0];
   return Math.min(bb, setupStack());
 }
-function drillConfig() { return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal" }); }
+function drillConfig() {
+  return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal", game: "cash", stage: "middle" });
+}
+/** The tournament settings shared by every spot factory call. */
+function gameOpts(cfg) {
+  return isMtt(cfg) ? { game: "mtt", stage: cfg.stage || "middle" } : { game: "cash" };
+}
 
 function makeDrillSpot(cfg, stack) {
   // Difficulty filters on how close the top two options are: "easy" wants a
   // clear best line, "hard" wants genuinely close decisions.
+  const base = () => Object.assign({ villainType: cfg.vt, stack, seats: setupSeats() }, gameOpts(cfg));
   let best = null;
   for (let attempt = 0; attempt < (cfg.diff === "normal" ? 1 : 14); attempt++) {
-    const sp = PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
+    const sp = PE.makeSpot(base());
     if (!sp) continue;
     const evs = sp.options.map((o) => o.ev).sort((a, b) => b - a);
     const gap = evs.length > 1 ? evs[0] - evs[1] : 99;
@@ -1123,11 +1200,12 @@ function makeDrillSpot(cfg, stack) {
     if (!best) best = sp;
     if (cfg.diff === "normal") return sp;
   }
-  return best || PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
+  return best || PE.makeSpot(base());
 }
 function startDrill(cfg) {
   STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
     depth: cfg.depth || "random", stack: setupStack(),
+    game: cfg.game || "cash", stage: cfg.stage || "middle",
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, potSum: 0, correct: 0,
     answered: null, log: [], done: false };
   if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
@@ -1139,7 +1217,8 @@ function loadHand() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.run = HandRun.start({ stack: depthFor(D), villainType: D.vt, seats: setupSeats() });
+    D.run = HandRun.start(Object.assign(
+      { stack: depthFor(D), villainType: D.vt, seats: setupSeats() }, gameOpts(D)));
     if (!D.run) { loadHand(); return; }
     D.dec = HandRun.decision(D.run);
     D.answered = null;
@@ -1186,7 +1265,9 @@ function loadSpot() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.cur = makeDrillSpot({ n: D.n, vt: D.vt, diff: D.diff }, depthFor(D));
+    // D carries the session's settings; passing a hand-built subset here is
+    // how the game type got silently dropped from every spot.
+    D.cur = makeDrillSpot(D, depthFor(D));
     D.answered = null;
     renderDrill();
   }, 20);
@@ -1307,25 +1388,37 @@ function renderDrill() {
     const cfg = drillConfig();
     v.innerHTML = '<div class="card"><h2>' + esc(t("drill.h1")) + "</h2><p>" + t("drill.lead") + "</p>" +
       '<div class="notice">' + t("drill.note") + "</div>" +
-      '<div class="step"><span class="num">1</span>' + esc(t("drill.step1")) + "</div>" +
+      '<div class="step"><span class="num">1</span>' + esc(t("drill.gameStep")) + "</div>" +
+      '<div class="bg" id="dr-game" style="display:flex">' +
+        [["cash", "drill.gameCash"], ["mtt", "drill.gameMtt"]].map(([k, lbl]) =>
+          '<button data-k="' + k + '" class="' + ((cfg.game || "cash") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin-top:5px">' + esc(t(isMtt(cfg) ? "drill.gameMttD" : "drill.gameCashD")) + "</div>" +
+      (isMtt(cfg)
+        ? '<div class="step sub">' + esc(t("drill.stageStep")) + "</div>" +
+          '<div class="bg" id="dr-stage" style="display:flex">' +
+            MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + ((cfg.stage || "middle") === k ? "on" : "") + '">' +
+              esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
+          '<div class="small dim" style="margin-top:5px">' + esc(stageBlurb(cfg.stage || "middle")) + "</div>"
+        : "") +
+      '<div class="step"><span class="num">2</span>' + esc(t("drill.step1")) + "</div>" +
       '<div class="bg" id="dr-n" style="display:flex">' +
         [5, 10, 20].map((n) => '<button data-n="' + n + '" class="' + (cfg.n === n ? "on" : "") + '">' + esc(t("drill.spots", { n })) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">2</span>' + esc(t("drill.step2")) + "</div>" +
+      '<div class="step"><span class="num">3</span>' + esc(t("drill.step2")) + "</div>" +
       '<div class="bg" id="dr-vt" style="display:flex">' +
         '<button data-k="random" class="' + (cfg.vt === "random" ? "on" : "") + '">' + esc(t("drill.randomVillain")) + "</button>" +
         Object.keys(PE.VILLAIN_TYPES).map((k) => '<button data-k="' + k + '" class="' + (cfg.vt === k ? "on" : "") + '">' + esc(vtName(k)) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">3</span>' + esc(t("drill.mode")) + "</div>" +
+      '<div class="step"><span class="num">4</span>' + esc(t("drill.mode")) + "</div>" +
       '<div class="bg" id="dr-mode" style="display:flex">' +
         [["spot", "drill.modeSpot"], ["hand", "drill.modeHand"]].map(([k, lbl]) =>
           '<button data-k="' + k + '" class="' + ((cfg.mode || "spot") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' + esc(t("drill.mode" + ((cfg.mode || "spot") === "hand" ? "Hand" : "Spot") + "D")) + "</div>" +
-      '<div class="step"><span class="num">4</span>' + esc(t("drill.depth")) + "</div>" +
+      '<div class="step"><span class="num">5</span>' + esc(t("drill.depth")) + "</div>" +
       '<div class="bg" id="dr-depth" style="display:flex">' +
         DEPTHS.map((d) => '<button data-k="' + d.k + '" class="' + ((cfg.depth || "random") === d.k ? "on" : "") + '">' +
           esc(t(d.label)) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' +
         esc(t((DEPTHS.find((d) => d.k === (cfg.depth || "random")) || DEPTHS[0]).desc)) + "</div>" +
-      '<div class="step"><span class="num">5</span>' + esc(t("drill.step3")) + "</div>" +
+      '<div class="step"><span class="num">6</span>' + esc(t("drill.step3")) + "</div>" +
       '<div class="bg" id="dr-diff" style="display:flex">' +
         Object.keys(DIFFICULTY).map((k) => '<button data-k="' + k + '" class="' + (cfg.diff === k ? "on" : "") + '">' +
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
@@ -1337,6 +1430,8 @@ function renderDrill() {
     v.querySelectorAll("#dr-diff button").forEach((b) => (b.onclick = () => { cfg.diff = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-mode button").forEach((b) => (b.onclick = () => { cfg.mode = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-depth button").forEach((b) => (b.onclick = () => { cfg.depth = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-game button").forEach((b) => (b.onclick = () => { cfg.game = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-stage button").forEach((b) => (b.onclick = () => { cfg.stage = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
     return;
   }
@@ -1360,6 +1455,7 @@ function renderDrill() {
       "<span>" + esc(t("common.pot")) + " <b>" + nfmt(sp.pot) + "BB</b></span>" +
       "<span>" + esc(t("common.stack")) + " <b>" + nfmt(sp.effStack) + "BB</b></span>" +
       "<span>" + esc(sp.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+      gameChip(sp) +
     "</div>";
   if (sp.story && sp.story.length) {
     h += '<div class="small muted" style="margin:-4px 0 10px">' + sp.story.map((s) =>
@@ -1406,6 +1502,7 @@ function renderDrill() {
         : "") + "</div>";
     h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(sp.options, mine) +
       '<div class="notice">' + t("drill.rangeNote", { type: esc(vtName(sp.villainType)), n: sp.villainRangeSize }) + "</div></div>";
+    h += riskPremiumHTML(sp);
     h += '<div class="blk"><div class="t">' + esc(t("drill.tipTitle")) + '</div><div class="rx">' + drillTip(sp, mine, best) + "</div></div>";
     h += '<button class="btn" id="dr-next">' + esc(D.i + 1 >= D.n ? t("drill.seeResult") : t("drill.next")) + "</button>";
   }
@@ -1438,6 +1535,7 @@ function renderHandDrill(v) {
       "<span>" + esc(t("drill.potNow")) + " <b>" + nfmt(run.pot) + "BB</b></span>" +
       "<span>" + esc(t("common.stack")) + " <b>" + nfmt(eff) + "BB</b></span>" +
       "<span>" + esc(run.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+      gameChip(run) +
     "</div>";
 
   // street rail — shows where in the hand you are
@@ -1471,6 +1569,7 @@ function renderHandDrill(v) {
       '<div class="rs">' + (lost < 0.02 ? t("drill.perfect")
         : t("drill.lostEv", { v: nfmt(lost, 2), best: esc(optLabel(best)) })) + "</div></div>";
     h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(res.opts, mine) + "</div>";
+    h += riskPremiumHTML(res);
     h += '<button class="btn" id="dr-cont">' + esc(t("common.next")) + "</button>";
   }
   v.innerHTML = h + "</div>";
@@ -1659,6 +1758,7 @@ function drillHistoryHTML() {
 /* ============================================================ RANGE LAB == */
 const RANGE_STATE = {
   seats: 6, situation: "rfi", pos: "BTN", vs: "CO", stack: 15,
+  game: "cash", stage: "bubble",
   hand: "", custom: "22+ A9s+ KTs+ AJo+", board: ""
 };
 function chips(id, items, active, key) {
@@ -1680,12 +1780,26 @@ function renderRange() {
   const opponents = all.filter((p) => p !== R.pos);
   if (opponents.indexOf(R.vs) < 0) R.vs = opponents[0];
 
-  const classes = PE.situationRange({
-    seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs, stack: R.stack,
-    vt: PE.VILLAIN_TYPES.unknown
-  });
-  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
+  const mtt = R.game === "mtt";
+  const ante = mtt ? 1 : 0;
   const shortStack = /shove/.test(R.situation);
+  // A jam is the one chart where the prize ladder changes the answer, so it
+  // is the only one that carries an ICM model.
+  const icm = mtt && shortStack
+    ? PE.icmTable({ stage: R.stage, heroStack: R.stack, vilStack: R.stack }) : null;
+  const args = { seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs,
+    stack: R.stack, vt: PE.VILLAIN_TYPES.unknown, ante, icm };
+  const classes = PE.situationRange(args);
+  // What to compare against depends on what is doing the work. For an ordinary
+  // chart the ante is the whole story, so cash is the baseline. For a jam the
+  // ante and the ladder pull in opposite directions and roughly cancel against
+  // cash — comparing to the same tournament chart priced on chips instead
+  // isolates what the ladder actually costs you.
+  const baseArgs = icm ? Object.assign({}, args, { icm: null })
+                       : Object.assign({}, args, { ante: 0 });
+  const baseClasses = mtt ? PE.situationRange(baseArgs) : null;
+  const baseLabel = icm ? "range.vsChipEv" : "range.vsCash";
+  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
 
   let h = '<div class="card"><h2>' + esc(t("range.h1")) + "</h2><p>" + esc(t("range.lead")) + "</p></div>";
   h += '<div class="card">' +
@@ -1693,6 +1807,13 @@ function renderRange() {
     chips("rg-seats", [
       { k: 2, label: t("hand.seats2") }, { k: 6, label: t("hand.seats6") }, { k: 9, label: t("hand.seats9") }
     ], R.seats) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("drill.gameStep")) + "</div>" +
+    chips("rg-game", [{ k: "cash", label: t("drill.gameCash") }, { k: "mtt", label: t("drill.gameMtt") }], R.game) +
+    (mtt && shortStack
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("drill.stageStep")) + "</div>" +
+        chips("rg-stage", MTT_STAGE_KEYS.map((k) =>
+          ({ k, label: t("drill.stage" + k[0].toUpperCase() + k.slice(1)) })), R.stage)
+      : "") +
     '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.situation")) + "</div>" +
     chips("rg-sit", PE.SITUATIONS.map((x) => ({ k: x.id, label: t("range.sit." + x.id) })), R.situation) +
     '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.position")) + "</div>" +
@@ -1708,10 +1829,17 @@ function renderRange() {
     '<div class="blk hi" style="margin-top:12px"><div class="t">' +
       esc(t("range.sit." + R.situation)) + " · " + esc(posName(R.pos)) +
       (sit.needsVs ? " " + esc(t("common.vs")) + " " + esc(posName(R.vs)) : "") +
-      (shortStack ? " · " + R.stack + "BB" : "") + "</div>" +
+      (shortStack ? " · " + R.stack + "BB" : "") +
+      (mtt ? " · " + esc(t("drill.gameMtt")) + (icm ? " " + esc(t("drill.stage" + R.stage[0].toUpperCase() + R.stage.slice(1))) : "") : "") +
+      "</div>" +
     "<p>" + esc(t("range.sitNote." + R.situation)) + "</p>" +
+    (mtt ? '<p class="small dim">' + t(icm ? "range.mttIcmNote" : "range.mttNote") + "</p>" : "") +
     '<div class="facts" style="margin-bottom:10px">' +
       fact(t("common.hand"), nfmt(PE.rangePct(classes)) + "%", t("range.combos", { n: combos })) +
+      (baseClasses
+        ? fact(t(baseLabel), nfmt(PE.rangePct(baseClasses)) + "%",
+            t("range.vsCashD", { v: signed(PE.rangePct(classes) - PE.rangePct(baseClasses), 1) }))
+        : "") +
     "</div>" +
     gridHTML(classes, null) +
     '<div class="small muted" style="margin:10px 0 4px">' + esc(t("range.notation")) + "</div>" +
@@ -1740,6 +1868,7 @@ function renderRange() {
   };
   bind("rg-seats", "seats", Number); bind("rg-sit", "situation");
   bind("rg-pos", "pos"); bind("rg-vs", "vs"); bind("rg-stack", "stack", Number);
+  bind("rg-game", "game"); bind("rg-stage", "stage");
   $("rg-copy").onclick = () => {
     const text = PE.rangeNotation(classes);
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast(t("common.copied")), () => {});
@@ -1960,9 +2089,20 @@ function boot() {
   $("langsel").onchange = (e) => setLang(e.target.value);
   $("themebtn").onclick = toggleTheme;
   $("s-save").onclick = saveSetup;
-  ["s-seats", "s-stack", "s-bl", "s-br"].forEach((id) => {
+  ["s-seats", "s-stack", "s-bl", "s-br", "s-gt", "s-ante"].forEach((id) => {
     const el = $(id); if (el) {
-      const on = () => { renderBankroll(); renderStackHint(); if (id === "s-seats") buildHandInputs(); };
+      const on = () => {
+        renderBankroll(); renderStackHint();
+        if (id === "s-seats") buildHandInputs();
+        // Switching to a tournament brings in the ante and the stage picker;
+        // a tournament with no ante posted is almost never what was meant.
+        if (id === "s-gt") {
+          const ante = $("s-ante");
+          if (ante && setupGame() !== "cash" && !(+ante.value > 0)) ante.value = 1;
+          if (ante && setupGame() === "cash" && +ante.value === 1) ante.value = 0;
+        }
+        if (id === "s-gt" || id === "s-ante") { renderPreflopSizes(); renderActions(); }
+      };
       el.onchange = on; el.oninput = on;
     }
   });

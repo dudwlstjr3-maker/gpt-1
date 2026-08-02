@@ -346,6 +346,15 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
 .eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
 .eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+/* tournament: chip price vs ICM price vs the gap between them */
+.icm3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.icmc{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;text-align:center}
+.icmc .k{font-size:10.5px;color:var(--tx3);letter-spacing:.2px;line-height:1.35}
+.icmc .v{font-size:17px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+@media (max-width:380px){.icmc .v{font-size:15px}}
+/* the tournament badge in a spot header, so a stage is never ambiguous */
+.stmeta span.gm{background:var(--wbg);color:var(--warn);border:1px solid var(--wline);font-weight:700}
+.step.sub{margin:12px 0 8px;font-size:13px;color:var(--tx2)}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:520px){.cmp{grid-template-columns:1fr}}
 .cmpc{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}

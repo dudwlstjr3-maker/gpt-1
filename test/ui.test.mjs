@@ -668,3 +668,119 @@ test("play keeps moving the profile after the assessment is saved", async () => 
     assert.equal(axes[k], 0, k + " moved without any evidence from play"));
   noErrors();
 });
+
+test("practice can be played as a tournament, with an ante and a stage", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-game button");
+
+  // cash is the default and offers no stage
+  assert.equal(await page.$("#dr-stage"), null, "cash should not ask for a tournament stage");
+
+  await page.click('#dr-game button[data-k="mtt"]');
+  await page.waitForSelector("#dr-stage button");
+  const stages = await page.$$eval("#dr-stage button", (b) => b.map((x) => x.dataset.k));
+  assert.deepEqual(stages, ["early", "middle", "bubble", "final"], "stages: " + stages.join(","));
+  await page.click('#dr-stage button[data-k="bubble"]');
+  assert.match(await page.$eval("#v-drill", (e) => e.innerText), /46 left, 45 paid/,
+    "the stage should say how close the money is");
+
+  // the mode is remembered across sessions, so pin it rather than inherit it
+  await page.click('#dr-mode button[data-k="spot"]');
+  await page.click('#dr-n button[data-n="5"]');
+  await page.click("#dr-go");
+  await page.waitForSelector(".dopt", { timeout: 60000 });
+  const meta = await page.$eval("#v-drill .stmeta", (e) => e.innerText.replace(/\n/g, " | "));
+  assert.match(meta, /Tournament/, "the spot header must name the game: " + meta);
+  assert.match(meta, /Bubble/, "the spot header must name the stage: " + meta);
+  assert.match(meta, /1BB ante/, "the spot header must show the ante: " + meta);
+  noErrors();
+});
+
+test("a tournament decision is priced on the ladder, not on chips", async () => {
+  // Play aggressively at a short depth until a spot facing a bet turns up:
+  // that is where the risk premium exists and has to be shown.
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-game button");
+  await page.click('#dr-game button[data-k="mtt"]');
+  await page.waitForSelector("#dr-stage button");
+  await page.click('#dr-stage button[data-k="bubble"]');
+  await page.click('#dr-mode button[data-k="spot"]');
+  await page.click('#dr-depth button[data-k="short"]');
+  await page.click('#dr-n button[data-n="20"]');
+  await page.click("#dr-go");
+
+  let icm = null;
+  for (let g = 0; g < 25 && !icm; g++) {
+    if (await page.$("#dr-again")) break;
+    await page.waitForSelector(".dopt, #dr-again", { timeout: 60000 });
+    if (!(await page.$(".dopt"))) break;
+    await page.click(".dopt");
+    await page.waitForSelector("#dr-next", { timeout: 60000 });
+    if (await page.$(".icm3")) { icm = await page.$eval(".blk.warn", (e) => e.innerText); break; }
+    await page.click("#dr-next");
+  }
+  assert.ok(icm, "no spot in 20 short-stacked bubble hands showed a risk premium");
+  assert.match(icm, /By chips/, "the chip price is missing: " + icm);
+  assert.match(icm, /By ICM/, "the ICM price is missing: " + icm);
+  assert.match(icm, /\+\d+\.\d+pp/, "the premium is missing: " + icm);
+
+  // the ladder must have moved at least one option away from its chip EV
+  const table = await page.$eval(".dtable", (e) => e.innerText);
+  assert.match(table, /in chips/, "no option shows what it was worth in chips: " + table);
+  noErrors();
+});
+
+test("the bubble tightens a calling range below its chip-EV width", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="range"]');
+  await page.waitForSelector("#rg-game button");
+  await page.click('#rg-sit button[data-k="call_shove"]');
+  await page.click('#rg-stack button[data-k="15"]');
+  await page.click('#rg-game button[data-k="mtt"]');
+  await page.waitForSelector("#rg-stage button");
+  await page.click('#rg-stage button[data-k="bubble"]');
+
+  const facts = await page.$eval("#v-range .facts", (e) => e.innerText.replace(/\n/g, " "));
+  const nums = facts.match(/([\d.]+)%/g);
+  assert.ok(nums && nums.length >= 2, "expected the chart and its baseline: " + facts);
+  const shown = parseFloat(nums[0]), onChips = parseFloat(nums[1]);
+  assert.ok(shown < onChips - 3,
+    `the bubble must call materially tighter than chip EV: ${shown}% vs ${onChips}%`);
+  assert.match(facts, /Same seat, on chips/, "the baseline is not labelled: " + facts);
+  noErrors();
+});
+
+test("choosing a tournament in setup posts an ante and asks for the stage", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#s-gt");
+
+  assert.equal(await page.$("#pf-stage"), null, "a cash game needs no stage");
+  await page.selectOption("#s-gt", "mtt");
+  await page.waitForSelector("#pf-stage button");
+  assert.equal(await page.$eval("#s-ante", (e) => e.value), "1",
+    "a tournament should post a big-blind ante by default");
+
+  await page.click('#pf-stage button[data-k="bubble"]');
+  await page.click("#h-demo");
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .card");
+  const header = await page.$eval("#h-out .stmeta", (e) => e.innerText.replace(/\n/g, " | "));
+  assert.match(header, /Tournament · Bubble/, "the analysis must name the game: " + header);
+
+  // and switching back to cash puts the ante away again
+  await page.selectOption("#s-gt", "cash");
+  assert.equal(await page.$("#pf-stage"), null, "the stage picker should go away for cash");
+  assert.equal(await page.$eval("#s-ante", (e) => e.value), "0", "the ante should clear for cash");
+  noErrors();
+});

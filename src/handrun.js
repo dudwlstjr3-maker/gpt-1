@@ -42,9 +42,15 @@ const HandRun = (function () {
     const vt = PE.VILLAIN_TYPES[cfg.villainType === "random" || !cfg.villainType
       ? pick(Object.keys(PE.VILLAIN_TYPES)) : cfg.villainType] || PE.VILLAIN_TYPES.unknown;
 
-    const openSize = pick([2.2, 2.5, 3]);
-    const vilClasses = PE.openRange(seats, vilPos, vt);
-    const heroClasses = PE.flatRange(seats, heroPos, vilPos, PE.VILLAIN_TYPES.unknown);
+    // Tournament: a big-blind ante sits in every pot, so opens are cheaper
+    // relative to what they win and the ranges taking them are wider.
+    const mtt = cfg.game === "mtt";
+    const ante = mtt ? (cfg.ante === undefined ? 1 : cfg.ante) : 0;
+    const stage = cfg.stage || "middle";
+
+    const openSize = pick(mtt ? [2, 2.2, 2.5] : [2.2, 2.5, 3]);
+    const vilClasses = PE.openRange(seats, vilPos, vt, ante);
+    const heroClasses = PE.flatRange(seats, heroPos, vilPos, PE.VILLAIN_TYPES.unknown, ante);
     const hole = PE.drawCombo(heroClasses.length ? heroClasses : PE.topPercentRange(35), [], rnd);
     if (!hole) return null;
 
@@ -64,7 +70,8 @@ const HandRun = (function () {
       seed, seats, stack, rnd, vt, heroPos, vilPos, hole,
       deck, board: [], street: 0, done: false,
       heroClasses, vilClasses, openSize,
-      pot: r1(openSize + heroBlind + dead),
+      game: mtt ? "mtt" : "cash", ante, stage: mtt ? stage : null,
+      pot: r1(openSize + heroBlind + dead + ante),
       heroInv: heroBlind, vilInv: openSize,
       facing: { size: r1(openSize - heroBlind) },
       ip: PE.isInPosition(seats, heroPos, vilPos),
@@ -77,10 +84,16 @@ const HandRun = (function () {
   /** The decision facing hero right now, with an EV on every option. */
   function decision(run) {
     const eff = Math.max(0.5, run.stack - run.heroInv);
+    // Both stacks shrink as the hand goes on, and ICM prices the chips that
+    // are actually still behind — not the ones already in the middle.
+    const icm = run.game === "mtt"
+      ? PE.icmTable({ stage: run.stage, heroStack: eff,
+                      vilStack: Math.max(0.5, run.stack - run.vilInv) })
+      : null;
     const ctx = PE.buildContext({
       hole: run.hole, board: run.board, villainClasses: run.vilClasses, vt: run.vt,
       ip: run.ip, pot: run.pot, effStack: eff, history: run.history, rnd: run.rnd,
-      budget: run.street === 0 ? 90000 : 260000
+      icm, budget: run.street === 0 ? 90000 : 260000
     });
     run.lastCtx = ctx;
     return { ctx, res: PE.options(ctx, run.facing), eff };

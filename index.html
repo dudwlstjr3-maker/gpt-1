@@ -354,6 +354,15 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
 .eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
 .eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+/* tournament: chip price vs ICM price vs the gap between them */
+.icm3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.icmc{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;text-align:center}
+.icmc .k{font-size:10.5px;color:var(--tx3);letter-spacing:.2px;line-height:1.35}
+.icmc .v{font-size:17px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+@media (max-width:380px){.icmc .v{font-size:15px}}
+/* the tournament badge in a spot header, so a stage is never ambiguous */
+.stmeta span.gm{background:var(--wbg);color:var(--warn);border:1px solid var(--wline);font-weight:700}
+.step.sub{margin:12px 0 8px;font-size:13px;color:var(--tx2)}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:520px){.cmp{grid-template-columns:1fr}}
 .cmpc{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
@@ -1075,13 +1084,35 @@ function buildContext(o) {
   return {
     table, rank, weights, pot: o.pot, vt: o.vt || VILLAIN_TYPES.unknown,
     ip: !!o.ip, effStack: o.effStack, drawQuality: draw.quality, draw,
-    spr: o.pot > 0 ? o.effStack / o.pot : 0, board: o.board, hole: o.hole
+    spr: o.pot > 0 ? o.effStack / o.pot : 0, board: o.board, hole: o.hole,
+    icm: o.icm || null            // set only in tournament mode
   };
 }
 
 /* ----------------------------------------------- 15. Option enumeration --
  * Builds the full option list for a decision point with an EV on each.      */
 const round1 = (x) => Math.round(x * 10) / 10;
+
+/* Chip EV is the right answer in a cash game and the wrong one under a prize
+ * ladder. Every option list funnels through here, so this is the one place
+ * that has to know the difference. In cash `ctx.icm` is null and nothing
+ * changes; in a tournament each option is re-priced from its own branches
+ * and keeps its chip EV alongside, so the UI can show what the ladder cost. */
+function priceOptions(ctx, out, P, extra) {
+  if (!ctx.icm) return Object.assign({ opts: out }, extra);
+  const opts = applyIcm(out, P, ctx.icm);
+  const info = { opts, icm: true };
+  if (extra && extra.facing && extra.required !== undefined) {
+    // the headline tournament number: what the ladder adds to the price
+    const B = Math.min(ctx.effStack, extra.callAmount || 0);
+    if (B > 0) {
+      const r = icmRequired(ctx.icm, P, B);
+      info.requiredIcm = r.icm;
+      info.riskPremium = r.premium;
+    }
+  }
+  return Object.assign({}, extra, info);
+}
 
 function options(ctx, facing) {
   const out = [];
@@ -1107,7 +1138,10 @@ function options(ctx, facing) {
       if (r) out.push({ key: "allin", label: "allin", ev: r.ev, amount: ctx.effStack, fold: r.fold, eqWhenCalled: r.eqWhenCalled });
     }
     const eqRaw = weightedEquity(ctx.table, betW);
-    return { opts: out, eq: eqRaw.eq, facing: true, villainRangeSize: Math.round(totalMass(betW)), required: B / (P + 2 * B), mdf: P / (P + B) };
+    return priceOptions(ctx, out, P, {
+      eq: eqRaw.eq, facing: true, villainRangeSize: Math.round(totalMass(betW)),
+      required: B / (P + 2 * B), mdf: P / (P + B), callAmount: B
+    });
   }
   // Hero acts first (or villain checked).
   const checkW = ctx.weights;
@@ -1123,7 +1157,9 @@ function options(ctx, facing) {
     const b = evBet(ctx, ctx.effStack);
     if (b) out.push({ key: "allin", label: "allin", ev: b.ev, amount: ctx.effStack, fold: b.fold, eqWhenCalled: b.eqWhenCalled });
   }
-  return { opts: out, eq: ck.eq, facing: false, villainRangeSize: Math.round(totalMass(checkW)) };
+  return priceOptions(ctx, out, P, {
+    eq: ck.eq, facing: false, villainRangeSize: Math.round(totalMass(checkW))
+  });
 }
 
 /* ---------------------------------------------------- 16. Spot factory ----
@@ -1160,14 +1196,25 @@ const clampPct = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
  * which is why the caller's position and the opener's position are separate
  * arguments here. Passing the wrong one used to hand the villain a top-6%
  * premium range and quietly crush hero in every "villain opened" spot.      */
-function openRange(seats, pos, vt) {
+/* An ante changes what an open is worth before a single card is looked at.
+ * With a 1BB big-blind ante there is 2.5BB out there instead of 1.5BB, so a
+ * 2.2BB steal risks the same and wins 65% more — which is why tournament
+ * opening ranges are visibly wider than cash ones from the same seat. The
+ * multiplier is on the width, so late position (where most of the extra
+ * hands are playable) gains the most in absolute terms.                    */
+function anteWiden(ante) {
+  if (!(ante > 0)) return 1;
+  const potBefore = 1.5, potAfter = 1.5 + ante;
+  return 1 + 0.55 * (potAfter / potBefore - 1);      // 1BB ante -> ~1.37x
+}
+function openRange(seats, pos, vt, ante) {
   const chart = rfiRange(seats, pos);
   const base = chart.length ? chart : rfiRange(seats, "CO");
-  return resizeRange(base, clampPct(rangePct(base) * vt.openMul, 4, 92));
+  return resizeRange(base, clampPct(rangePct(base) * vt.openMul * anteWiden(ante), 4, 92));
 }
 /** Flat-calling an open: the very top of the range 3-bets instead. */
-function flatRange(seats, caller, opener, vt) {
-  const openW = rangePct(rfiRange(seats, opener)) || 22;
+function flatRange(seats, caller, opener, vt, ante) {
+  const openW = (rangePct(rfiRange(seats, opener)) || 22) * anteWiden(ante);
   const width = caller === "BB" ? clampPct(16 + openW * 0.78, 20, 62)
               : caller === "SB" ? 13
               : clampPct(7 + openW * 0.34, 9, 26);
@@ -1177,8 +1224,8 @@ function flatRange(seats, caller, opener, vt) {
 /** 3-betting: a value core plus a suited bluff tail, not a pure top-N slice.
  *  How wide depends on who opened — you 3-bet an under-the-gun raiser far
  *  less than a button steal, so the opener's seat has to be an input.      */
-function threeBetRange(seats, pos, vt, openerPos) {
-  const openW = openerPos ? (rangePct(rfiRange(seats, openerPos)) || 22) : 22;
+function threeBetRange(seats, pos, vt, openerPos, ante) {
+  const openW = (openerPos ? (rangePct(rfiRange(seats, openerPos)) || 22) : 22) * anteWiden(ante);
   // a 15% opener earns ~5.5% of 3-bets, a 45% opener ~11%
   const width = clampPct(3.4 + openW * 0.17, 3, 14) * vt.openMul;
   const value = topPercentRange(clampPct(width, 2, 20));
@@ -1191,29 +1238,32 @@ function threeBetRange(seats, pos, vt, openerPos) {
   return out;
 }
 /** The opener's range once it has called a 3-bet: the 4-bet top is gone. */
-function callVs3betRange(seats, pos, vt) {
-  const open = openRange(seats, pos, vt);
+function callVs3betRange(seats, pos, vt, ante) {
+  const open = openRange(seats, pos, vt, ante);
   const openW = rangePct(open);
   return topPercentRange(clampPct(Math.min(openW, 16) * vt.openMul, 4, 30), 2.5);
 }
 
+/* `pot` is the cash-game pot; an ante is dead money on top of it, added once
+ * in makeSpot. Every range builder takes the ante too, because a tournament
+ * preflop pot is not a cash preflop pot with the same ranges in it.        */
 const SCENARIOS = [
   // hero raised first in and got called
   { id: "open_call", pot: 5.5, heroAgg: true, heroInv: 2.5, opener: "hero",
-    heroR: (seats, hp, vp, vt) => openRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => flatRange(seats, vp, hp, vt) },
+    heroR: (seats, hp, vp, vt, an) => openRange(seats, hp, VILLAIN_TYPES.unknown, an),
+    vilR:  (seats, hp, vp, vt, an) => flatRange(seats, vp, hp, vt, an) },
   // villain raised first in, hero called
   { id: "call_open", pot: 5.5, heroAgg: false, heroInv: 2.5, opener: "villain",
-    heroR: (seats, hp, vp, vt) => flatRange(seats, hp, vp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => openRange(seats, vp, vt) },
+    heroR: (seats, hp, vp, vt, an) => flatRange(seats, hp, vp, VILLAIN_TYPES.unknown, an),
+    vilR:  (seats, hp, vp, vt, an) => openRange(seats, vp, vt, an) },
   // hero 3-bet the villain's open and the villain called
   { id: "3b_call", pot: 19, heroAgg: true, heroInv: 9, opener: "villain",
-    heroR: (seats, hp, vp, vt) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown, vp),
-    vilR:  (seats, hp, vp, vt) => callVs3betRange(seats, vp, vt) },
+    heroR: (seats, hp, vp, vt, an) => threeBetRange(seats, hp, VILLAIN_TYPES.unknown, vp, an),
+    vilR:  (seats, hp, vp, vt, an) => callVs3betRange(seats, vp, vt, an) },
   // hero opened, villain 3-bet, hero called
   { id: "call_3b", pot: 19, heroAgg: false, heroInv: 9, opener: "hero",
-    heroR: (seats, hp, vp, vt) => callVs3betRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => threeBetRange(seats, vp, vt, hp) },
+    heroR: (seats, hp, vp, vt, an) => callVs3betRange(seats, hp, VILLAIN_TYPES.unknown, an),
+    vilR:  (seats, hp, vp, vt, an) => threeBetRange(seats, vp, vt, hp, an) },
   // multiway-ish limped pot
   { id: "limp", pot: 4.5, heroAgg: false, heroInv: 1, opener: null,
     heroR: () => topPercentRange(45, 5),
@@ -1228,22 +1278,40 @@ function fourBetRange(seats, pos, vt) {
   return out;
 }
 function callVs4betRange(seats, pos, vt) { return topPercentRange(clampPct(5 * vt.openMul, 1.5, 16)); }
-/** Shoving widens sharply as the stack shortens; calling a shove does too, but less. */
-function shoveRange(stackBB, vt) {
+/** Shoving widens sharply as the stack shortens; calling a shove does too, but less.
+ *  An ante adds dead money worth stealing, which widens the jam further; a
+ *  prize ladder pushes the other way, because the jam risks the tournament. */
+function shoveRange(stackBB, vt, ante, icm) {
   const w = stackBB <= 8 ? 38 : stackBB <= 12 ? 27 : stackBB <= 18 ? 18 : stackBB <= 25 ? 12 : 7;
-  return topPercentRange(clampPct(w * vt.openMul, 2, 85));
+  let mul = vt.openMul * anteWiden(ante);
+  if (icm) {
+    // fold equity is still worth having, so the jam tightens far less than
+    // the call does — but it does tighten
+    const prem = icmRequired(icm, 1.5 + (ante || 0), stackBB).premium;
+    mul *= Math.max(0.45, 1 - 1.4 * prem);
+  }
+  return topPercentRange(clampPct(w * mul, 2, 85));
 }
 /* Calling a shove is a pot-odds decision: the shorter the shove relative to the
  * pot, the better the price and the wider the call. Calibrated so that a very
  * wide shove is punished — with too tight a calling range, fold equity gets so
  * large that even 72o shows as a profitable jam, which is wrong. */
-function callShoveRange(stackBB, vt, requiredEq) {
+function callShoveRange(stackBB, vt, requiredEq, ante, icm) {
   const byStack = stackBB <= 8 ? 34 : stackBB <= 12 ? 26 : stackBB <= 18 ? 20 : stackBB <= 25 ? 15 : 10;
   let w = byStack;
-  if (requiredEq !== undefined && requiredEq > 0) {
-    // needing ~50% -> tight; needing ~33% -> roughly double
-    w = byStack * Math.max(0.6, Math.min(2.4, 0.47 / Math.max(0.2, requiredEq)));
+  let req = requiredEq;
+  // Calling off is where a prize ladder does its real damage: there is no
+  // fold equity to offset it, so the extra equity ICM demands comes straight
+  // off the top of the calling range.
+  if (icm) {
+    const r = icmRequired(icm, (1.5 + (ante || 0)) + stackBB, stackBB);
+    req = req === undefined ? r.icm : req + r.premium;
   }
+  if (req !== undefined && req > 0) {
+    // needing ~50% -> tight; needing ~33% -> roughly double
+    w = byStack * Math.max(0.6, Math.min(2.4, 0.47 / Math.max(0.2, req)));
+  }
+  if (!icm) w *= anteWiden(ante);          // dead money alone widens the call
   return topPercentRange(clampPct(w * vt.contMul, 2, 75));
 }
 /** Blind posted by a seat, in BB. Used to work out what is already in the pot. */
@@ -1251,11 +1319,11 @@ const blindOf = (p) => (p === "BB" ? 1 : (p === "SB" || p === "BTN(SB)") ? 0.5 :
 
 SCENARIOS.push(
   { id: "4b_call", pot: 45, heroAgg: true, heroInv: 22, opener: "villain",
-    heroR: (seats, hp, vp, vt) => fourBetRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => callVs4betRange(seats, vp, vt) },
+    heroR: (seats, hp, vp, vt, an) => fourBetRange(seats, hp, VILLAIN_TYPES.unknown, an),
+    vilR:  (seats, hp, vp, vt, an) => callVs4betRange(seats, vp, vt, an) },
   { id: "call_4b", pot: 45, heroAgg: false, heroInv: 22, opener: "hero",
-    heroR: (seats, hp, vp, vt) => callVs4betRange(seats, hp, VILLAIN_TYPES.unknown),
-    vilR:  (seats, hp, vp, vt) => fourBetRange(seats, vp, vt) }
+    heroR: (seats, hp, vp, vt, an) => callVs4betRange(seats, hp, VILLAIN_TYPES.unknown, an),
+    vilR:  (seats, hp, vp, vt, an) => fourBetRange(seats, vp, vt, an) }
 );
 const scenarioById = (id) => SCENARIOS.filter((s) => s.id === id)[0] || SCENARIOS[0];
 
@@ -1326,15 +1394,16 @@ function situationRange(o) {
   const seats = o.seats || 6, pos = o.pos, vs = o.vs || "CO";
   const vt = o.vt || VILLAIN_TYPES.unknown;
   const stack = o.stack === undefined ? 15 : o.stack;
+  const ante = o.ante || 0;
   switch (o.situation) {
-    case "rfi":          return openRange(seats, pos, vt);
-    case "vs_open_3b":   return threeBetRange(seats, pos, vt, vs);
-    case "vs_open_call": return flatRange(seats, pos, vs, vt);
+    case "rfi":          return openRange(seats, pos, vt, ante);
+    case "vs_open_3b":   return threeBetRange(seats, pos, vt, vs, ante);
+    case "vs_open_call": return flatRange(seats, pos, vs, vt, ante);
     case "vs_3b_4b":     return fourBetRange(seats, pos, vt);
-    case "vs_3b_call":   return callVs3betRange(seats, pos, vt);
-    case "shove":        return shoveRange(stack, vt);
-    case "call_shove":   return callShoveRange(stack, vt);
-    default:             return openRange(seats, pos, vt);
+    case "vs_3b_call":   return callVs3betRange(seats, pos, vt, ante);
+    case "shove":        return shoveRange(stack, vt, ante, o.icm);
+    case "call_shove":   return callShoveRange(stack, vt, o.required, ante, o.icm);
+    default:             return openRange(seats, pos, vt, ante);
   }
 }
 /** Compact chart notation for a class list, e.g. "22+ A9s+ ATo+". */
@@ -1469,6 +1538,241 @@ function allInPreflop(o) {
     best: evShove > 0 ? "shove" : "fold" };
 }
 
+/* ==========================================================================
+ * TOURNAMENT: chips are not money
+ *
+ * In a cash game a chip is a chip: win 10BB and you are 10BB richer, lose
+ * 10BB and you are 10BB poorer, and maximising chips maximises money. A
+ * tournament pays a fixed prize ladder, so the chips you win are worth less
+ * per chip than the chips you lose — busting costs you every future prize,
+ * while doubling up does not double your equity. Every number in this file
+ * that says "EV" means chip EV; under a prize ladder that is the wrong
+ * quantity, and this section computes the right one.
+ * ========================================================================== */
+
+/** Malmuth-Harville: P(finishing k-th) is the chance of being picked k-th
+ *  from a lottery weighted by stack, having removed those already placed.
+ *  Returns each player's share of the prize pool (the payouts as given).   */
+function icmEquity(stacks, payouts) {
+  const n = stacks.length;
+  const eq = new Array(n).fill(0);
+  const total = stacks.reduce((a, b) => a + Math.max(0, b), 0);
+  if (total <= 0) return eq;
+  const K = Math.min(payouts.length, n);
+  const used = new Array(n).fill(false);
+  (function place(k, remaining, prob) {
+    if (k >= K || prob < 1e-12 || remaining <= 0) return;
+    for (let i = 0; i < n; i++) {
+      if (used[i] || stacks[i] <= 0) continue;
+      const p = prob * (stacks[i] / remaining);
+      eq[i] += p * payouts[k];
+      if (k + 1 < K) {
+        used[i] = true;
+        place(k + 1, remaining - stacks[i], p);
+        used[i] = false;
+      }
+    }
+  })(0, total, 1);
+  return eq;
+}
+
+/* The flat version above is exact but costs O(n^places), which caps it at a
+ * single table. A real tournament has hundreds of players left and pays
+ * dozens of places, and that is not a detail — it is the whole reason the
+ * early stage plays nothing like the bubble. Players on identical stacks are
+ * interchangeable, so the field collapses into a handful of groups and the
+ * same recursion becomes a small DP over "how many of each group are left".
+ *
+ * Places past the last paid one contribute nothing to anyone's equity, so
+ * the DP only ever runs as deep as the money — a 300-player field with 45
+ * paid costs the same as a 45-player one.                                  */
+function icmEquityGrouped(groups, payouts) {
+  const G = groups.length;
+  const stack = groups.map((g) => Math.max(0, g.stack));
+  const count = groups.map((g) => Math.max(0, Math.round(g.count)));
+  const field = count.reduce((a, b) => a + b, 0);
+  const K = Math.min(payouts.length, field);
+  const eq = new Array(G).fill(0);
+  if (!field || !K) return eq;
+
+  const chipsOf = (rem) => { let c = 0; for (let i = 0; i < G; i++) c += rem[i] * stack[i]; return c; };
+  let states = new Map();
+  states.set(count.join(","), { p: 1, rem: count.slice() });
+
+  for (let k = 0; k < K; k++) {
+    const next = new Map();
+    states.forEach((st) => {
+      const chips = chipsOf(st.rem);
+      if (chips <= 0 || st.p < 1e-14) return;
+      for (let g = 0; g < G; g++) {
+        if (st.rem[g] <= 0 || stack[g] <= 0) continue;
+        const p = st.p * (st.rem[g] * stack[g]) / chips;
+        if (p < 1e-14) continue;
+        eq[g] += p * payouts[k];                 // prize money landing on the group
+        if (k + 1 >= K) continue;
+        const rem = st.rem.slice(); rem[g]--;
+        const key = rem.join(",");
+        const hit = next.get(key);
+        if (hit) hit.p += p; else next.set(key, { p, rem });
+      }
+    });
+    states = next;
+    if (!states.size) break;
+  }
+  // symmetric members share the group's money equally
+  for (let g = 0; g < G; g++) eq[g] = count[g] > 0 ? eq[g] / count[g] : 0;
+  return eq;
+}
+
+/* A realistic ladder for `paid` places, as a share of the prize pool: steep
+ * at the top, a long flat tail near the min-cash. Generated rather than
+ * tabulated so any field size gets a sane structure. */
+function mttPayouts(paid) {
+  const n = Math.max(1, Math.round(paid));
+  if (n === 1) return [1];
+  const raw = [];
+  for (let i = 0; i < n; i++) raw.push(Math.pow(i + 1, -0.92));
+  const sum = raw.reduce((a, b) => a + b, 0);
+  return raw.map((r) => r / sum);
+}
+
+/* Stages are (players left, places paid). Those two numbers are what make a
+ * tournament stage feel the way it does — being 300 from the money is
+ * nothing like being one off it, on the same ladder. */
+const MTT_STAGES = {
+  early:  { id: "early",  left: 300, paid: 45 },
+  middle: { id: "middle", left: 90,  paid: 45 },
+  bubble: { id: "bubble", left: 46,  paid: 45 },   // one more out and the rest cash
+  final:  { id: "final",  left: 9,   paid: 45 }    // the top nine of the same ladder
+};
+
+/** The field an ICM calculation runs on: hero, the villain in the hand, and
+ *  the rest of the field on the average stack. Stacks are in BB.           */
+function icmTable(o) {
+  const stage = MTT_STAGES[o.stage] || MTT_STAGES.middle;
+  const hero = Math.max(0.01, o.heroStack);
+  const vil = Math.max(0.01, o.vilStack === undefined ? hero : o.vilStack);
+  const left = Math.max(2, o.left || stage.left);
+  const paid = Math.max(1, Math.min(o.paid || stage.paid, left));
+  // Everyone not in the hand sits on the field average. Hero and villain are
+  // already part of the field, so the rest have to carry the remaining chips.
+  const avg = o.avgStack || Math.max(1, (hero + vil) / 2);
+  return {
+    groups: [{ stack: hero, count: 1 }, { stack: vil, count: 1 },
+             { stack: avg, count: left - 2 }],
+    payouts: mttPayouts(paid), stage, left, paid
+  };
+}
+
+/* Hero's prize equity for a given pair of stack deltas. Memoised on the
+ * rounded delta pair, because a single option set asks for a handful of
+ * points over and over and the DP is the expensive part here. */
+function icmValuer(tbl) {
+  const pay = tbl.payouts, memo = {};
+  const groups = tbl.groups
+    ? tbl.groups
+    : tbl.stacks.map((s, i) => ({ stack: s, count: 1 }));
+  return function (dHero, dVil) {
+    const key = Math.round(dHero * 100) + "|" + Math.round(dVil * 100);
+    if (memo[key] !== undefined) return memo[key];
+    const g = groups.map((x) => ({ stack: x.stack, count: x.count }));
+    g[0].stack = Math.max(0, g[0].stack + dHero);
+    g[1].stack = Math.max(0, g[1].stack + dVil);
+    const v = icmEquityGrouped(g, pay)[0];
+    memo[key] = v;
+    return v;
+  };
+}
+
+/* --------------------------------------------------------------------------
+ * Turning branches into an ICM-adjusted EV.
+ *
+ * Every branch of every action in this engine is "hero ends up x chips better
+ * off than right now". The chips hero does not take go to the villain, so the
+ * villain's delta is (pot - x): hero winning a bet-and-called pot is
+ * x = P + X for hero and -X for villain, hero losing it is x = -X and P + X.
+ *
+ * Folding is the zero point (the framing used everywhere else in this file),
+ * so an option is measured against the fold branch rather than against now.
+ * Dividing by the local marginal value of a chip puts the answer back in BB,
+ * so it stays comparable with every other number on screen: "this is worth
+ * as much to you as winning N BB outright would be".
+ *
+ * With a linear prize ladder this reduces exactly to the chip EV, which is
+ * the property the tests pin.
+ * ------------------------------------------------------------------------ */
+function icmEv(valuer, pot, branches) {
+  const foldV = valuer(0, pot);                 // hero folds, villain takes it
+  const u = 0.5;
+  const unit = (valuer(u, pot - u) - foldV) / u;
+  if (!(unit > 1e-12)) return null;
+  let acc = 0;
+  for (let i = 0; i < branches.length; i++) {
+    const b = branches[i];
+    if (!(b.p > 0)) continue;
+    acc += b.p * (valuer(b.x, pot - b.x) - foldV);
+  }
+  return acc / unit;
+}
+
+/** Equity hero needs to call `B` into `pot`, by pot odds and under ICM.
+ *  The gap between them is the risk premium — the single number that
+ *  explains why a call that is right for chips is wrong for money.        */
+function icmRequired(tbl, pot, B) {
+  const v = icmValuer(tbl);
+  const win = v(pot + B, -B), lose = v(-B, pot + B), fold = v(0, pot);
+  const chip = B / (pot + 2 * B);
+  const span = win - lose;
+  if (!(span > 1e-12)) return { chip, icm: chip, premium: 0 };
+  const icm = Math.max(0, Math.min(1, (fold - lose) / span));
+  return { chip, icm, premium: icm - chip };
+}
+
+/** Every option carries the branch structure its EV was built from, so the
+ *  ICM pass can re-price it without re-running any equity maths.          */
+function optionBranches(o, pot) {
+  const A = o.amount || 0;
+  switch (o.label) {
+    case "fold":  return [{ p: 1, x: 0 }];
+    // A check is priced as "realised equity share of the pot" — the same
+    // approximation the chip EV uses, carried over so the two agree in cash.
+    case "check": {
+      const share = o.realised === undefined ? (o.eq || 0) : (o.eq || 0) * o.realised;
+      return [{ p: share, x: pot }, { p: 1 - share, x: 0 }];
+    }
+    case "call": {
+      const eq = o.eq || 0;
+      return [{ p: eq, x: pot + A }, { p: 1 - eq, x: -A }];
+    }
+    case "bet": case "allin": case "raise": {
+      const f = o.fold || 0, rz = o.raised || 0;
+      const called = Math.max(0, 1 - f - rz);
+      const eqc = o.eqWhenCalled === undefined ? 0.5 : o.eqWhenCalled;
+      const br = [{ p: f, x: pot }];
+      br.push({ p: called * eqc, x: pot + A });
+      br.push({ p: called * (1 - eqc), x: -A });
+      // Facing a check-raise, hero's chip EV already picked the better of
+      // folding and calling; price that same branch at its own amount.
+      if (rz > 0) br.push({ p: rz, x: -A });
+      return br;
+    }
+    default: return null;
+  }
+}
+
+/** Re-price a whole option list under a prize ladder. Options keep their chip
+ *  EV in `chipEv` so the UI can show both and name the difference.         */
+function applyIcm(opts, pot, tbl) {
+  const v = icmValuer(tbl);
+  return opts.map((o) => {
+    const br = optionBranches(o, pot);
+    if (!br) return o;
+    const ev = icmEv(v, pot, br);
+    if (ev === null || !isFinite(ev)) return o;
+    return Object.assign({}, o, { ev, chipEv: o.ev, icm: true });
+  });
+}
+
 /** Preflop action order is exactly the position list, so "acted earlier"
  *  is just a lower index. The raiser must act before the caller.           */
 function pickPositions(scen, seats, pick) {
@@ -1493,6 +1797,11 @@ function makeSpot(cfg) {
   const seats = cfg.seats || 6;
   const stack = cfg.stack || 100;
   const L = posList(seats);
+  // Tournament: a big-blind ante is dead money in every pot, and the chips
+  // being won are worth less than the chips being risked.
+  const mtt = cfg.game === "mtt";
+  const ante = mtt ? (cfg.ante === undefined ? 1 : cfg.ante) : 0;
+  const stage = cfg.stage || "middle";
 
   // A short stack cannot play a big preflop pot: at 12BB there is no such
   // thing as a 3-bet pot where hero has already put in 9BB. Only offer
@@ -1507,8 +1816,8 @@ function makeSpot(cfg) {
   const vt = VILLAIN_TYPES[cfg.villainType === "random" || !cfg.villainType
     ? pick(Object.keys(VILLAIN_TYPES)) : cfg.villainType] || VILLAIN_TYPES.unknown;
 
-  const heroClasses = scen.heroR(seats, pos, vpos, vt);
-  const villainClasses = scen.vilR(seats, pos, vpos, vt);
+  const heroClasses = scen.heroR(seats, pos, vpos, vt, ante);
+  const villainClasses = scen.vilR(seats, pos, vpos, vt, ante);
   const hole = drawCombo(heroClasses.length ? heroClasses : topPercentRange(30), [], rnd);
   if (!hole) return null;
 
@@ -1519,7 +1828,7 @@ function makeSpot(cfg) {
   const fullBoard = deck.slice(0, 3 + targetStreet);
   const ip = isInPosition(seats, pos, vpos);
 
-  let pot = scen.pot, heroInv = scen.heroInv;
+  let pot = round1(scen.pot + ante), heroInv = scen.heroInv;
   const story = [], history = [];
   let vilCombos = expandRange(villainClasses, hole);
   if (!vilCombos.length) return null;
@@ -1602,8 +1911,11 @@ function makeSpot(cfg) {
   }
 
   const effStack = Math.max(0.5, stack - heroInv);
+  // The villain is in for the same as hero in every scenario here, so his
+  // remaining stack is hero's — the ICM model needs both, not just hero's.
+  const icm = mtt ? icmTable({ stage, heroStack: effStack, vilStack: effStack }) : null;
   const ctx = buildContext({
-    hole, board: fullBoard, villainClasses, vt, ip, pot, effStack, history, rnd
+    hole, board: fullBoard, villainClasses, vt, ip, pot, effStack, history, rnd, icm
   });
 
   // ---- decide the decision point itself ----
@@ -1647,7 +1959,9 @@ function makeSpot(cfg) {
     hole, board: fullBoard, street: targetStreet, pot, effStack, ip,
     story, prelude, facing, heroClasses, villainClasses,
     options: res.opts, eq: res.eq, villainRangeSize: res.villainRangeSize,
-    required: res.required, mdf: res.mdf, ctx
+    required: res.required, mdf: res.mdf, ctx,
+    game: mtt ? "mtt" : "cash", ante, stage: mtt ? stage : null, icm,
+    requiredIcm: res.requiredIcm, riskPremium: res.riskPremium
   };
 }
 
@@ -1682,6 +1996,9 @@ return {
   // spots
   SCENARIOS, scenarioById, makeSpot, preflopAdvice,
   preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
+  // tournament
+  icmEquity, icmEquityGrouped, mttPayouts, icmTable, icmValuer, icmEv, icmRequired,
+  applyIcm, optionBranches, MTT_STAGES,
   SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange,
   topClasses, categoryBreakdown, perceivedRange, fourBetRange, callVs4betRange,
   // util
@@ -1941,6 +2258,22 @@ const ko = {
     depthMid: "미들 40BB", depthMidD: "SPR이 낮아 플랍에서 결정이 납니다.",
     depthShort: "숏 20BB", depthShortD: "3벳이면 거의 커밋됩니다.",
     depthUltra: "초숏 12BB", depthUltraD: "푸시·폴드 구간입니다.",
+    gameStep: "게임 종류를 고르세요",
+    gameCash: "캐시", gameMtt: "토너먼트",
+    gameCashD: "칩 한 개는 언제나 칩 한 개입니다. 칩을 최대로 모으는 것이 곧 돈을 최대로 버는 것입니다.",
+    gameMttD: "앤티가 매 팟에 깔리고, 상금 사다리 때문에 <b>잃는 칩이 따는 칩보다 비쌉니다</b>. 칩 EV가 아니라 ICM으로 채점합니다.",
+    stageStep: "토너먼트 단계",
+    stageEarly: "초반", stageMiddle: "중반", stageBubble: "버블", stageFinal: "파이널",
+    stageBlurb: "{left}명 남음 · {paid}명 입상.",
+    stageEarlyD: "돈까지 한참 남아서 칩은 거의 선형입니다. 캐시처럼 쳐도 큰 손해가 없습니다.",
+    stageMiddleD: "사다리가 보이기 시작합니다. 스택을 다 걸어야 하는 자리는 조금씩 손해가 됩니다.",
+    stageBubbleD: "한 명만 더 나가면 나머지는 전부 입상합니다. 탈락 비용이 가장 큰 구간입니다.",
+    stageFinalD: "상금 점프가 가파릅니다. 칩으로는 이득인 콜도 돈으로는 크게 손해일 수 있습니다.",
+    anteChip: "앤티 {v}BB",
+    icmTitle: "ICM — 콜에 필요한 승률",
+    icmChip: "칩 기준", icmIcm: "ICM 기준", icmPremium: "리스크 프리미엄",
+    icmNote: "칩 오즈만 보면 왼쪽이면 콜입니다. 하지만 탈락하면 남은 상금 사다리를 전부 잃기 때문에, 실제로는 가운데만큼의 승률이 있어야 콜이 이득입니다. 그 차이가 <b>리스크 프리미엄</b>입니다.",
+    icmWas: "칩 기준 {v}",
     modeSpot: "스팟 단위", modeSpotD: "임의의 한 장면만 보고 판단합니다.",
     modeHand: "핸드 전체", modeHandD: "프리플랍부터 리버까지 한 핸드를 끝까지 플레이합니다.",
     streets: ["프리플랍", "플랍", "턴", "리버"],
@@ -1993,6 +2326,10 @@ const ko = {
     eqResult: "내 승률 <b>{eq}</b> · 상대 콤보 {n}개",
     tableSize: "테이블", situation: "상황", position: "포지션", vsPosition: "상대 자리",
     stackDepth: "스택 깊이", combos: "{n}콤보",
+    vsCash: "같은 자리 캐시", vsCashD: "차이 {v}%p",
+    vsChipEv: "같은 자리 칩 EV",
+    mttNote: "앤티가 깔려 있어서 훔칠 판돈이 큽니다. 같은 자리라도 캐시보다 넓게 칩니다.",
+    mttIcmNote: "앤티는 레인지를 넓히지만, 상금 사다리는 반대로 좁힙니다. 올인은 탈락과 직결되므로 ICM이 그만큼 되돌려 놓습니다. <b>콜</b>은 폴드 에퀴티가 없어서 <b>잼</b>보다 훨씬 크게 좁아집니다.",
     notation: "차트 표기", copyNotation: "표기 복사",
     sit: {
       rfi: "첫 진입 (오픈)", vs_open_3b: "오픈에 3벳", vs_open_call: "오픈에 콜",
@@ -2302,6 +2639,22 @@ const en = {
     depthMid: "Mid 40BB", depthMidD: "Low SPR; most hands resolve on the flop.",
     depthShort: "Short 20BB", depthShortD: "A 3-bet is close to committing.",
     depthUltra: "Ultra 12BB", depthUltraD: "Push-fold territory.",
+    gameStep: "Pick the game",
+    gameCash: "Cash", gameMtt: "Tournament",
+    gameCashD: "A chip is a chip. Winning the most chips is the same thing as winning the most money.",
+    gameMttD: "An ante sits in every pot, and the prize ladder makes <b>the chips you lose cost more than the chips you win</b>. Scored on ICM, not chip EV.",
+    stageStep: "Stage of the tournament",
+    stageEarly: "Early", stageMiddle: "Middle", stageBubble: "Bubble", stageFinal: "Final table",
+    stageBlurb: "{left} left, {paid} paid.",
+    stageEarlyD: "The money is a long way off and chips are nearly linear. Playing it like a cash game costs you little.",
+    stageMiddleD: "The ladder is coming into view. Spots that risk your whole stack start to cost more than they win.",
+    stageBubbleD: "One more player out and everybody else cashes. Busting has never been more expensive.",
+    stageFinalD: "The pay jumps are steep. A call that wins chips can lose a lot of money.",
+    anteChip: "{v}BB ante",
+    icmTitle: "ICM — equity you need to call",
+    icmChip: "By chips", icmIcm: "By ICM", icmPremium: "Risk premium",
+    icmNote: "On pot odds alone the left-hand number is the price. But busting forfeits the whole rest of the ladder, so the call only makes money if you actually have the middle number. That gap is the <b>risk premium</b>.",
+    icmWas: "{v} in chips",
     modeSpot: "Single spot", modeSpotD: "One random moment, judged on its own.",
     modeHand: "Whole hand", modeHandD: "Play one hand right through from preflop to the river.",
     streets: ["Preflop", "Flop", "Turn", "River"],
@@ -2354,6 +2707,10 @@ const en = {
     eqResult: "Your equity <b>{eq}</b> · {n} villain combos",
     tableSize: "Table", situation: "Situation", position: "Position", vsPosition: "Opponent seat",
     stackDepth: "Stack depth", combos: "{n} combos",
+    vsCash: "Cash, same seat", vsCashD: "{v}pp difference",
+    vsChipEv: "Same seat, on chips",
+    mttNote: "An ante means there is more out there worth stealing, so the same seat plays wider than it would for cash.",
+    mttIcmNote: "The ante widens this and the prize ladder narrows it back: a jam risks the tournament, so ICM takes some of it away. <b>Calling</b> tightens far more than <b>jamming</b>, because a call has no fold equity to pay for the risk.",
     notation: "Chart notation", copyNotation: "Copy notation",
     sit: {
       rfi: "First in (open)", vs_open_3b: "3-bet an open", vs_open_call: "Call an open",
@@ -2633,9 +2990,15 @@ const HandRun = (function () {
     const vt = PE.VILLAIN_TYPES[cfg.villainType === "random" || !cfg.villainType
       ? pick(Object.keys(PE.VILLAIN_TYPES)) : cfg.villainType] || PE.VILLAIN_TYPES.unknown;
 
-    const openSize = pick([2.2, 2.5, 3]);
-    const vilClasses = PE.openRange(seats, vilPos, vt);
-    const heroClasses = PE.flatRange(seats, heroPos, vilPos, PE.VILLAIN_TYPES.unknown);
+    // Tournament: a big-blind ante sits in every pot, so opens are cheaper
+    // relative to what they win and the ranges taking them are wider.
+    const mtt = cfg.game === "mtt";
+    const ante = mtt ? (cfg.ante === undefined ? 1 : cfg.ante) : 0;
+    const stage = cfg.stage || "middle";
+
+    const openSize = pick(mtt ? [2, 2.2, 2.5] : [2.2, 2.5, 3]);
+    const vilClasses = PE.openRange(seats, vilPos, vt, ante);
+    const heroClasses = PE.flatRange(seats, heroPos, vilPos, PE.VILLAIN_TYPES.unknown, ante);
     const hole = PE.drawCombo(heroClasses.length ? heroClasses : PE.topPercentRange(35), [], rnd);
     if (!hole) return null;
 
@@ -2655,7 +3018,8 @@ const HandRun = (function () {
       seed, seats, stack, rnd, vt, heroPos, vilPos, hole,
       deck, board: [], street: 0, done: false,
       heroClasses, vilClasses, openSize,
-      pot: r1(openSize + heroBlind + dead),
+      game: mtt ? "mtt" : "cash", ante, stage: mtt ? stage : null,
+      pot: r1(openSize + heroBlind + dead + ante),
       heroInv: heroBlind, vilInv: openSize,
       facing: { size: r1(openSize - heroBlind) },
       ip: PE.isInPosition(seats, heroPos, vilPos),
@@ -2668,10 +3032,16 @@ const HandRun = (function () {
   /** The decision facing hero right now, with an EV on every option. */
   function decision(run) {
     const eff = Math.max(0.5, run.stack - run.heroInv);
+    // Both stacks shrink as the hand goes on, and ICM prices the chips that
+    // are actually still behind — not the ones already in the middle.
+    const icm = run.game === "mtt"
+      ? PE.icmTable({ stage: run.stage, heroStack: eff,
+                      vilStack: Math.max(0.5, run.stack - run.vilInv) })
+      : null;
     const ctx = PE.buildContext({
       hole: run.hole, board: run.board, villainClasses: run.vilClasses, vt: run.vt,
       ip: run.ip, pot: run.pot, effStack: eff, history: run.history, rnd: run.rnd,
-      budget: run.street === 0 ? 90000 : 260000
+      icm, budget: run.street === 0 ? 90000 : 260000
     });
     run.lastCtx = ctx;
     return { ctx, res: PE.options(ctx, run.facing), eff };
@@ -3262,6 +3632,9 @@ function saveSetup() {
   DB.set("setup", s); toast(t("hand.setupSaved")); renderBankroll();
 }
 const setupSeats = () => +($("s-seats") ? $("s-seats").value : 6) || 6;
+/** "cash" | "mtt" | "sng". Anything but cash is played on a prize ladder. */
+const setupGame = () => ($("s-gt") ? $("s-gt").value : "cash") || "cash";
+const setupAnte = () => Math.max(0, +($("s-ante") ? $("s-ante").value : 0) || 0);
 const MAX_PRACTICE_BB = 500;   // nobody plays deeper than this; beyond it the value is a typo
 const rawStack = () => +($("s-stack") ? $("s-stack").value : 100) || 100;
 /** Stack in BB, clamped to something a real game could produce. */
@@ -3318,6 +3691,7 @@ const HI = {
   // downstream EV, instead of the fixed pot each scenario used to carry.
   sizes: { open: 2.5, threeBet: 9, fourBet: 22, limpers: 2, allin: 20, toCall: 20 },
   shover: "villain",
+  stage: "middle",          // only read when the setup's game type is not cash
   c: { h0: null, h1: null, f0: null, f1: null, f2: null, t0: null, r0: null },
   acts: [{ v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }, { v: "check", vs: 0, m: "check", ms: 0 }]
 };
@@ -3455,7 +3829,17 @@ function renderPreflopSizes() {
   const isAllin = HI.scenario === "pf_allin";
   if (!fields.length && !isAllin) { el.innerHTML = ""; return; }
 
-  let h = '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
+  // On a prize ladder the stage decides how much a stack-off really costs, so
+  // it has to be an input here the same way the villain's type is.
+  let h = "";
+  if (setupGame() !== "cash") {
+    h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("drill.stageStep")) + "</div>" +
+      '<div class="bg" id="pf-stage" style="display:flex;margin-bottom:8px">' +
+      MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + (HI.stage === k ? "on" : "") + '">' +
+        esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin:-4px 0 4px">' + esc(stageBlurb(HI.stage)) + "</div>";
+  }
+  h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
     ' <span class="dim">' + esc(t("hand.pfSizesSub")) + "</span></div>";
   if (isAllin) {
     h += '<div class="bg" id="pf-shover" style="display:flex;margin-bottom:8px">' +
@@ -3478,6 +3862,7 @@ function renderPreflopSizes() {
     HI.sizes[inp.dataset.sz] = +inp.value || 0; renderPreflopSizes(); renderActions();
   }));
   el.querySelectorAll("#pf-shover button").forEach((b) => (b.onclick = () => { HI.shover = b.dataset.k; renderPreflopSizes(); }));
+  el.querySelectorAll("#pf-stage button").forEach((b) => (b.onclick = () => { HI.stage = b.dataset.k; renderPreflopSizes(); renderActions(); }));
 }
 function renderSlots() {
   const el = $("slots");
@@ -3572,7 +3957,12 @@ function analyzeHand() {
   const scen = PE.scenarioById(HI.scenario);
   const cls = PE.handClass(hole[0], hole[1]);
   const ip = PE.isInPosition(seats, HI.pos, HI.vpos);
-  const res = { cls, ip, vt, scenario: HI.scenario, pos: HI.pos, vpos: HI.vpos, streets: [] };
+  // The setup's game type has always been on screen; until now nothing read
+  // it, so a tournament hand was analysed as if a chip were worth a chip.
+  const mtt = setupGame() !== "cash";
+  const ante = setupAnte();
+  const res = { cls, ip, vt, scenario: HI.scenario, pos: HI.pos, vpos: HI.vpos, streets: [],
+    game: mtt ? "mtt" : "cash", stage: HI.stage, ante };
 
   // preflop
   const chart = PE.rfiRange(seats, HI.pos);
@@ -3613,8 +4003,8 @@ function analyzeHand() {
   const board = boardCards();
   if (board.length < 3) return res;
 
-  const heroClasses = scen.heroR(seats, HI.pos, HI.vpos, PE.VILLAIN_TYPES.unknown);
-  const villainClasses = scen.vilR(seats, HI.pos, HI.vpos, vt);
+  const heroClasses = scen.heroR(seats, HI.pos, HI.vpos, PE.VILLAIN_TYPES.unknown, ante);
+  const villainClasses = scen.vilR(seats, HI.pos, HI.vpos, vt, ante);
   res.heroClasses = heroClasses; res.villainClasses = villainClasses;
 
   let pot = money.pot, heroInv = money.heroInv;
@@ -3629,8 +4019,10 @@ function analyzeHand() {
     const facing = (vAct === "bet" || vAct === "raise") && vSize > 0;
     const effStack = Math.max(0.5, stack - heroInv);
 
+    const icm = mtt
+      ? PE.icmTable({ stage: HI.stage, heroStack: effStack, vilStack: effStack }) : null;
     const ctx = PE.buildContext({
-      hole, board: bd, villainClasses, vt, ip, pot, effStack, history,
+      hole, board: bd, villainClasses, vt, ip, pot, effStack, history, icm,
       rnd: PE.mulberry32(PE.seedFrom(hole[0] * 53 + hole[1] * 7 + i))
     });
     const res2 = PE.options(ctx, facing ? { size: vSize } : null);
@@ -3651,6 +4043,7 @@ function analyzeHand() {
       name: names[i], board: bd.slice(), pot, effStack, spr: ctx.spr,
       eq: res2.eq, facing, vAct, vSize, mAct, mSize,
       required: facing ? vSize / (pot + 2 * vSize) : 0,
+      requiredIcm: res2.requiredIcm, riskPremium: res2.riskPremium,
       mdf: facing ? pot / (pot + vSize) : 0,
       alpha: facing ? vSize / (pot + vSize) : 0,
       bi, draw: dr, cat: PE.catOf(myScore),
@@ -3695,6 +4088,44 @@ function optNote(o) {
   if (o.eqWhenCalled !== undefined) bits.push(t("common.ifCalled") + " " + pct(o.eqWhenCalled));
   return bits.join(" · ");
 }
+/* --- tournament read-outs ---------------------------------------------- */
+/** A chip in the spot header naming the game and, in a tournament, the stage
+ *  and the ante — the two things that make the numbers below differ. */
+function gameChip(sp) {
+  if (!sp || sp.game !== "mtt") return "";
+  return '<span class="gm">' + esc(t("drill.gameMtt")) + " · " +
+    esc(t("drill.stage" + sp.stage[0].toUpperCase() + sp.stage.slice(1))) +
+    (sp.ante ? " · " + esc(t("drill.anteChip", { v: nfmt(sp.ante) })) : "") + "</span>";
+}
+/** "46 left, 45 paid — one more out and everyone else cashes." */
+function stageBlurb(stage) {
+  const s = PE.MTT_STAGES[stage] || PE.MTT_STAGES.middle;
+  return t("drill.stageBlurb", { left: s.left, paid: s.paid }) + " " +
+    t("drill.stage" + stage[0].toUpperCase() + stage.slice(1) + "D");
+}
+/** The one number that explains tournament play: what the ladder adds to the
+ *  price of a call. Rendered only when it is big enough to matter. */
+function riskPremiumHTML(sp) {
+  if (!sp || !(sp.riskPremium > 0.005) || sp.required === undefined) return "";
+  const cell = (k, v, warn) => '<div class="icmc"><div class="k">' + esc(k) + "</div>" +
+    '<div class="v"' + (warn ? ' style="color:var(--warn)"' : "") + ">" + v + "</div></div>";
+  return '<div class="blk warn"><div class="t">' + esc(t("drill.icmTitle")) + "</div>" +
+    '<div class="icm3">' +
+      cell(t("drill.icmChip"), pct(sp.required)) +
+      cell(t("drill.icmIcm"), pct(sp.requiredIcm), true) +
+      cell(t("drill.icmPremium"), "+" + (sp.riskPremium * 100).toFixed(1) + "pp", true) +
+    "</div>" +
+    '<div class="small dim" style="margin-top:8px">' + t("drill.icmNote") + "</div></div>";
+}
+/** How far an option moved once the prize ladder was applied. */
+function icmDelta(o) {
+  if (o.chipEv === undefined) return "";
+  const d = o.ev - o.chipEv;
+  if (Math.abs(d) < 0.05) return "";
+  return ' <span class="pill ' + (d < 0 ? "w" : "g") + '" style="font-size:10px">' +
+    esc(t("drill.icmWas", { v: nfmt(o.chipEv, 2) })) + "</span>";
+}
+
 function evTable(opts, mine) {
   const best = Math.max.apply(null, opts.map((o) => o.ev));
   return '<div class="dtable">' + opts.slice().sort((a, b) => b.ev - a.ev).map((o) => {
@@ -3704,7 +4135,7 @@ function evTable(opts, mine) {
       '<span class="dv" style="color:' + (o.ev >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(o.ev) + " BB</span>" +
       (isBest ? '<span class="dbadge b">' + esc(t("common.best")) + "</span>" : "") +
       (isMine ? '<span class="dbadge m">' + esc(t("common.yourPick")) + "</span>" : "") +
-      '<span class="dn">' + esc(optNote(o)) + "</span></div>";
+      '<span class="dn">' + esc(optNote(o)) + icmDelta(o) + "</span></div>";
   }).join("") + "</div>";
 }
 function fact(k, v, s) {
@@ -3813,7 +4244,8 @@ function renderAnalysis(res) {
     '<div class="stmeta"><span>' + esc(posName(res.pos)) + " <b>vs</b> " + esc(posName(res.vpos)) + "</span>" +
     "<span>" + esc(t("scenarios." + res.scenario)) + "</span>" +
     "<span>" + esc(vtName(res.vt.id)) + "</span>" +
-    "<span>" + esc(res.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span></div>";
+    "<span>" + esc(res.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+    gameChip(res) + "</div>";
   if (res.streets.length) h += lineStrip(res);
   h += "</div>";
 
@@ -3877,6 +4309,7 @@ function renderAnalysis(res) {
       fact(t("hand.myHandNow"), catName(st.cat), drawNames(st.draw.keys).join(" · ")) +
       "</div>";
     h += '<div class="blk" style="margin-top:12px">' + compareBlock(st) + "</div>";
+    h += riskPremiumHTML(st);
     h += '<details class="numd"><summary><b>' + esc(t("hand.evTitle")) + "</b></summary>" +
       evTable(st.opts, st.mine) + "</details>";
     h += villainReadout(st);
@@ -3913,21 +4346,35 @@ const DEPTHS = [
   { k: "ultra",  label: "drill.depthUltra",  desc: "drill.depthUltraD",  bb: 12 }
 ];
 const MIXED_DEPTHS = [100, 75, 50, 40, 30, 25, 20, 15, 12, 10];
+/* A tournament is not a cash game with a shorter stack. Stacks really are
+ * shorter, but the pot also carries an ante and the chips are worth less the
+ * further you risk them, so the depth mix is drawn from a different shelf. */
+const MTT_DEPTHS = [60, 45, 35, 28, 22, 18, 15, 12, 10, 8];
+const MTT_STAGE_KEYS = ["early", "middle", "bubble", "final"];
+const isMtt = (cfg) => (cfg && cfg.game) === "mtt";
 /** Stack for the next spot: the chosen depth, or a draw from the mix. */
 function depthFor(cfg) {
   const chosen = DEPTHS.find((d) => d.k === (cfg.depth || "random"));
   if (chosen && chosen.bb) return Math.min(chosen.bb, setupStack());
-  const bb = MIXED_DEPTHS[(Math.random() * MIXED_DEPTHS.length) | 0];
+  const mix = isMtt(cfg) ? MTT_DEPTHS : MIXED_DEPTHS;
+  const bb = mix[(Math.random() * mix.length) | 0];
   return Math.min(bb, setupStack());
 }
-function drillConfig() { return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal" }); }
+function drillConfig() {
+  return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal", game: "cash", stage: "middle" });
+}
+/** The tournament settings shared by every spot factory call. */
+function gameOpts(cfg) {
+  return isMtt(cfg) ? { game: "mtt", stage: cfg.stage || "middle" } : { game: "cash" };
+}
 
 function makeDrillSpot(cfg, stack) {
   // Difficulty filters on how close the top two options are: "easy" wants a
   // clear best line, "hard" wants genuinely close decisions.
+  const base = () => Object.assign({ villainType: cfg.vt, stack, seats: setupSeats() }, gameOpts(cfg));
   let best = null;
   for (let attempt = 0; attempt < (cfg.diff === "normal" ? 1 : 14); attempt++) {
-    const sp = PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
+    const sp = PE.makeSpot(base());
     if (!sp) continue;
     const evs = sp.options.map((o) => o.ev).sort((a, b) => b - a);
     const gap = evs.length > 1 ? evs[0] - evs[1] : 99;
@@ -3936,11 +4383,12 @@ function makeDrillSpot(cfg, stack) {
     if (!best) best = sp;
     if (cfg.diff === "normal") return sp;
   }
-  return best || PE.makeSpot({ villainType: cfg.vt, stack, seats: setupSeats() });
+  return best || PE.makeSpot(base());
 }
 function startDrill(cfg) {
   STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
     depth: cfg.depth || "random", stack: setupStack(),
+    game: cfg.game || "cash", stage: cfg.stage || "middle",
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, potSum: 0, correct: 0,
     answered: null, log: [], done: false };
   if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
@@ -3952,7 +4400,8 @@ function loadHand() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.run = HandRun.start({ stack: depthFor(D), villainType: D.vt, seats: setupSeats() });
+    D.run = HandRun.start(Object.assign(
+      { stack: depthFor(D), villainType: D.vt, seats: setupSeats() }, gameOpts(D)));
     if (!D.run) { loadHand(); return; }
     D.dec = HandRun.decision(D.run);
     D.answered = null;
@@ -3999,7 +4448,9 @@ function loadSpot() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
-    D.cur = makeDrillSpot({ n: D.n, vt: D.vt, diff: D.diff }, depthFor(D));
+    // D carries the session's settings; passing a hand-built subset here is
+    // how the game type got silently dropped from every spot.
+    D.cur = makeDrillSpot(D, depthFor(D));
     D.answered = null;
     renderDrill();
   }, 20);
@@ -4120,25 +4571,37 @@ function renderDrill() {
     const cfg = drillConfig();
     v.innerHTML = '<div class="card"><h2>' + esc(t("drill.h1")) + "</h2><p>" + t("drill.lead") + "</p>" +
       '<div class="notice">' + t("drill.note") + "</div>" +
-      '<div class="step"><span class="num">1</span>' + esc(t("drill.step1")) + "</div>" +
+      '<div class="step"><span class="num">1</span>' + esc(t("drill.gameStep")) + "</div>" +
+      '<div class="bg" id="dr-game" style="display:flex">' +
+        [["cash", "drill.gameCash"], ["mtt", "drill.gameMtt"]].map(([k, lbl]) =>
+          '<button data-k="' + k + '" class="' + ((cfg.game || "cash") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin-top:5px">' + esc(t(isMtt(cfg) ? "drill.gameMttD" : "drill.gameCashD")) + "</div>" +
+      (isMtt(cfg)
+        ? '<div class="step sub">' + esc(t("drill.stageStep")) + "</div>" +
+          '<div class="bg" id="dr-stage" style="display:flex">' +
+            MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + ((cfg.stage || "middle") === k ? "on" : "") + '">' +
+              esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
+          '<div class="small dim" style="margin-top:5px">' + esc(stageBlurb(cfg.stage || "middle")) + "</div>"
+        : "") +
+      '<div class="step"><span class="num">2</span>' + esc(t("drill.step1")) + "</div>" +
       '<div class="bg" id="dr-n" style="display:flex">' +
         [5, 10, 20].map((n) => '<button data-n="' + n + '" class="' + (cfg.n === n ? "on" : "") + '">' + esc(t("drill.spots", { n })) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">2</span>' + esc(t("drill.step2")) + "</div>" +
+      '<div class="step"><span class="num">3</span>' + esc(t("drill.step2")) + "</div>" +
       '<div class="bg" id="dr-vt" style="display:flex">' +
         '<button data-k="random" class="' + (cfg.vt === "random" ? "on" : "") + '">' + esc(t("drill.randomVillain")) + "</button>" +
         Object.keys(PE.VILLAIN_TYPES).map((k) => '<button data-k="' + k + '" class="' + (cfg.vt === k ? "on" : "") + '">' + esc(vtName(k)) + "</button>").join("") + "</div>" +
-      '<div class="step"><span class="num">3</span>' + esc(t("drill.mode")) + "</div>" +
+      '<div class="step"><span class="num">4</span>' + esc(t("drill.mode")) + "</div>" +
       '<div class="bg" id="dr-mode" style="display:flex">' +
         [["spot", "drill.modeSpot"], ["hand", "drill.modeHand"]].map(([k, lbl]) =>
           '<button data-k="' + k + '" class="' + ((cfg.mode || "spot") === k ? "on" : "") + '">' + esc(t(lbl)) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' + esc(t("drill.mode" + ((cfg.mode || "spot") === "hand" ? "Hand" : "Spot") + "D")) + "</div>" +
-      '<div class="step"><span class="num">4</span>' + esc(t("drill.depth")) + "</div>" +
+      '<div class="step"><span class="num">5</span>' + esc(t("drill.depth")) + "</div>" +
       '<div class="bg" id="dr-depth" style="display:flex">' +
         DEPTHS.map((d) => '<button data-k="' + d.k + '" class="' + ((cfg.depth || "random") === d.k ? "on" : "") + '">' +
           esc(t(d.label)) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' +
         esc(t((DEPTHS.find((d) => d.k === (cfg.depth || "random")) || DEPTHS[0]).desc)) + "</div>" +
-      '<div class="step"><span class="num">5</span>' + esc(t("drill.step3")) + "</div>" +
+      '<div class="step"><span class="num">6</span>' + esc(t("drill.step3")) + "</div>" +
       '<div class="bg" id="dr-diff" style="display:flex">' +
         Object.keys(DIFFICULTY).map((k) => '<button data-k="' + k + '" class="' + (cfg.diff === k ? "on" : "") + '">' +
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
@@ -4150,6 +4613,8 @@ function renderDrill() {
     v.querySelectorAll("#dr-diff button").forEach((b) => (b.onclick = () => { cfg.diff = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-mode button").forEach((b) => (b.onclick = () => { cfg.mode = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-depth button").forEach((b) => (b.onclick = () => { cfg.depth = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-game button").forEach((b) => (b.onclick = () => { cfg.game = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
+    v.querySelectorAll("#dr-stage button").forEach((b) => (b.onclick = () => { cfg.stage = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
     return;
   }
@@ -4173,6 +4638,7 @@ function renderDrill() {
       "<span>" + esc(t("common.pot")) + " <b>" + nfmt(sp.pot) + "BB</b></span>" +
       "<span>" + esc(t("common.stack")) + " <b>" + nfmt(sp.effStack) + "BB</b></span>" +
       "<span>" + esc(sp.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+      gameChip(sp) +
     "</div>";
   if (sp.story && sp.story.length) {
     h += '<div class="small muted" style="margin:-4px 0 10px">' + sp.story.map((s) =>
@@ -4219,6 +4685,7 @@ function renderDrill() {
         : "") + "</div>";
     h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(sp.options, mine) +
       '<div class="notice">' + t("drill.rangeNote", { type: esc(vtName(sp.villainType)), n: sp.villainRangeSize }) + "</div></div>";
+    h += riskPremiumHTML(sp);
     h += '<div class="blk"><div class="t">' + esc(t("drill.tipTitle")) + '</div><div class="rx">' + drillTip(sp, mine, best) + "</div></div>";
     h += '<button class="btn" id="dr-next">' + esc(D.i + 1 >= D.n ? t("drill.seeResult") : t("drill.next")) + "</button>";
   }
@@ -4251,6 +4718,7 @@ function renderHandDrill(v) {
       "<span>" + esc(t("drill.potNow")) + " <b>" + nfmt(run.pot) + "BB</b></span>" +
       "<span>" + esc(t("common.stack")) + " <b>" + nfmt(eff) + "BB</b></span>" +
       "<span>" + esc(run.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span>" +
+      gameChip(run) +
     "</div>";
 
   // street rail — shows where in the hand you are
@@ -4284,6 +4752,7 @@ function renderHandDrill(v) {
       '<div class="rs">' + (lost < 0.02 ? t("drill.perfect")
         : t("drill.lostEv", { v: nfmt(lost, 2), best: esc(optLabel(best)) })) + "</div></div>";
     h += '<div class="blk"><div class="t">' + esc(t("drill.evTable")) + "</div>" + evTable(res.opts, mine) + "</div>";
+    h += riskPremiumHTML(res);
     h += '<button class="btn" id="dr-cont">' + esc(t("common.next")) + "</button>";
   }
   v.innerHTML = h + "</div>";
@@ -4472,6 +4941,7 @@ function drillHistoryHTML() {
 /* ============================================================ RANGE LAB == */
 const RANGE_STATE = {
   seats: 6, situation: "rfi", pos: "BTN", vs: "CO", stack: 15,
+  game: "cash", stage: "bubble",
   hand: "", custom: "22+ A9s+ KTs+ AJo+", board: ""
 };
 function chips(id, items, active, key) {
@@ -4493,12 +4963,26 @@ function renderRange() {
   const opponents = all.filter((p) => p !== R.pos);
   if (opponents.indexOf(R.vs) < 0) R.vs = opponents[0];
 
-  const classes = PE.situationRange({
-    seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs, stack: R.stack,
-    vt: PE.VILLAIN_TYPES.unknown
-  });
-  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
+  const mtt = R.game === "mtt";
+  const ante = mtt ? 1 : 0;
   const shortStack = /shove/.test(R.situation);
+  // A jam is the one chart where the prize ladder changes the answer, so it
+  // is the only one that carries an ICM model.
+  const icm = mtt && shortStack
+    ? PE.icmTable({ stage: R.stage, heroStack: R.stack, vilStack: R.stack }) : null;
+  const args = { seats: R.seats, situation: R.situation, pos: R.pos, vs: R.vs,
+    stack: R.stack, vt: PE.VILLAIN_TYPES.unknown, ante, icm };
+  const classes = PE.situationRange(args);
+  // What to compare against depends on what is doing the work. For an ordinary
+  // chart the ante is the whole story, so cash is the baseline. For a jam the
+  // ante and the ladder pull in opposite directions and roughly cancel against
+  // cash — comparing to the same tournament chart priced on chips instead
+  // isolates what the ladder actually costs you.
+  const baseArgs = icm ? Object.assign({}, args, { icm: null })
+                       : Object.assign({}, args, { ante: 0 });
+  const baseClasses = mtt ? PE.situationRange(baseArgs) : null;
+  const baseLabel = icm ? "range.vsChipEv" : "range.vsCash";
+  const combos = classes.reduce((a, c) => a + PE.combosOf(c), 0);
 
   let h = '<div class="card"><h2>' + esc(t("range.h1")) + "</h2><p>" + esc(t("range.lead")) + "</p></div>";
   h += '<div class="card">' +
@@ -4506,6 +4990,13 @@ function renderRange() {
     chips("rg-seats", [
       { k: 2, label: t("hand.seats2") }, { k: 6, label: t("hand.seats6") }, { k: 9, label: t("hand.seats9") }
     ], R.seats) +
+    '<div class="small muted" style="margin-bottom:4px">' + esc(t("drill.gameStep")) + "</div>" +
+    chips("rg-game", [{ k: "cash", label: t("drill.gameCash") }, { k: "mtt", label: t("drill.gameMtt") }], R.game) +
+    (mtt && shortStack
+      ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("drill.stageStep")) + "</div>" +
+        chips("rg-stage", MTT_STAGE_KEYS.map((k) =>
+          ({ k, label: t("drill.stage" + k[0].toUpperCase() + k.slice(1)) })), R.stage)
+      : "") +
     '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.situation")) + "</div>" +
     chips("rg-sit", PE.SITUATIONS.map((x) => ({ k: x.id, label: t("range.sit." + x.id) })), R.situation) +
     '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.position")) + "</div>" +
@@ -4521,10 +5012,17 @@ function renderRange() {
     '<div class="blk hi" style="margin-top:12px"><div class="t">' +
       esc(t("range.sit." + R.situation)) + " · " + esc(posName(R.pos)) +
       (sit.needsVs ? " " + esc(t("common.vs")) + " " + esc(posName(R.vs)) : "") +
-      (shortStack ? " · " + R.stack + "BB" : "") + "</div>" +
+      (shortStack ? " · " + R.stack + "BB" : "") +
+      (mtt ? " · " + esc(t("drill.gameMtt")) + (icm ? " " + esc(t("drill.stage" + R.stage[0].toUpperCase() + R.stage.slice(1))) : "") : "") +
+      "</div>" +
     "<p>" + esc(t("range.sitNote." + R.situation)) + "</p>" +
+    (mtt ? '<p class="small dim">' + t(icm ? "range.mttIcmNote" : "range.mttNote") + "</p>" : "") +
     '<div class="facts" style="margin-bottom:10px">' +
       fact(t("common.hand"), nfmt(PE.rangePct(classes)) + "%", t("range.combos", { n: combos })) +
+      (baseClasses
+        ? fact(t(baseLabel), nfmt(PE.rangePct(baseClasses)) + "%",
+            t("range.vsCashD", { v: signed(PE.rangePct(classes) - PE.rangePct(baseClasses), 1) }))
+        : "") +
     "</div>" +
     gridHTML(classes, null) +
     '<div class="small muted" style="margin:10px 0 4px">' + esc(t("range.notation")) + "</div>" +
@@ -4553,6 +5051,7 @@ function renderRange() {
   };
   bind("rg-seats", "seats", Number); bind("rg-sit", "situation");
   bind("rg-pos", "pos"); bind("rg-vs", "vs"); bind("rg-stack", "stack", Number);
+  bind("rg-game", "game"); bind("rg-stage", "stage");
   $("rg-copy").onclick = () => {
     const text = PE.rangeNotation(classes);
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast(t("common.copied")), () => {});
@@ -4773,9 +5272,20 @@ function boot() {
   $("langsel").onchange = (e) => setLang(e.target.value);
   $("themebtn").onclick = toggleTheme;
   $("s-save").onclick = saveSetup;
-  ["s-seats", "s-stack", "s-bl", "s-br"].forEach((id) => {
+  ["s-seats", "s-stack", "s-bl", "s-br", "s-gt", "s-ante"].forEach((id) => {
     const el = $(id); if (el) {
-      const on = () => { renderBankroll(); renderStackHint(); if (id === "s-seats") buildHandInputs(); };
+      const on = () => {
+        renderBankroll(); renderStackHint();
+        if (id === "s-seats") buildHandInputs();
+        // Switching to a tournament brings in the ante and the stage picker;
+        // a tournament with no ante posted is almost never what was meant.
+        if (id === "s-gt") {
+          const ante = $("s-ante");
+          if (ante && setupGame() !== "cash" && !(+ante.value > 0)) ante.value = 1;
+          if (ante && setupGame() === "cash" && +ante.value === 1) ante.value = 0;
+        }
+        if (id === "s-gt" || id === "s-ante") { renderPreflopSizes(); renderActions(); }
+      };
       el.onchange = on; el.oninput = on;
     }
   });

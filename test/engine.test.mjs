@@ -442,3 +442,186 @@ test("hand rank inside the represented range is monotonic", () => {
   assert.ok(order[0] < 0.05, "a set of kings should be at the very top, got " + order[0]);
   assert.ok(order[order.length - 1] > 0.85, "air should be at the bottom, got " + order[order.length - 1]);
 });
+
+/* ----------------------------------------------------------- tournament */
+test("ICM equity sums to the prize pool and orders by stack", () => {
+  const pay = [0.5, 0.3, 0.2];
+  const eq = PE.icmEquity([50, 30, 20], pay);
+  const sum = eq.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, "equity does not sum to the pool: " + sum);
+  assert.ok(eq[0] > eq[1] && eq[1] > eq[2], "bigger stacks must hold more equity: " + eq.join(", "));
+  // the chip leader holds 50% of the chips but less than 50% of the money
+  assert.ok(eq[0] < 0.5, "ICM must penalise the leader, got " + eq[0]);
+  // and the short stack holds 20% of the chips but more than 20% of the money
+  assert.ok(eq[2] > 0.2, "ICM must reward the short stack, got " + eq[2]);
+});
+
+test("with equal stacks everyone holds an equal share", () => {
+  const eq = PE.icmEquity([100, 100, 100, 100], [0.4, 0.3, 0.2, 0.1]);
+  eq.forEach((e) => assert.ok(Math.abs(e - 0.25) < 1e-9, "unequal share: " + eq.join(", ")));
+});
+
+test("a winner-take-all ladder makes chips linear again", () => {
+  // one prize = chip equity, which is exactly the cash-game case
+  const stacks = [55, 25, 12, 8];
+  const eq = PE.icmEquity(stacks, [1]);
+  const total = stacks.reduce((a, b) => a + b, 0);
+  stacks.forEach((s, i) =>
+    assert.ok(Math.abs(eq[i] - s / total) < 1e-9,
+      `winner-take-all should be proportional: ${eq[i]} vs ${s / total}`));
+});
+
+test("a linear ladder reproduces the chip EV exactly", () => {
+  // Under winner-take-all the ICM pass must be a no-op: any other result
+  // means the transform is distorting EV rather than re-pricing it.
+  const tbl = { stacks: [40, 40, 40], payouts: [1] };
+  const v = PE.icmValuer(tbl);
+  const pot = 10;
+  const branches = [{ p: 0.4, x: pot + 8 }, { p: 0.6, x: -8 }];
+  const chip = branches.reduce((a, b) => a + b.p * b.x, 0);
+  const icm = PE.icmEv(v, pot, branches);
+  assert.ok(Math.abs(icm - chip) < 1e-6, `linear ladder changed the EV: ${icm} vs ${chip}`);
+});
+
+test("folding is the zero point under ICM too", () => {
+  const tbl = PE.icmTable({ stage: "bubble", heroStack: 20, vilStack: 30 });
+  const v = PE.icmValuer(tbl);
+  assert.equal(PE.icmEv(v, 12, [{ p: 1, x: 0 }]), 0);
+});
+
+test("ICM demands more equity to call off than pot odds do", () => {
+  // 20BB hero calling a 20BB shove into a 12BB pot, one off the money
+  const tbl = PE.icmTable({ stage: "bubble", heroStack: 20, vilStack: 25 });
+  const r = PE.icmRequired(tbl, 12, 20);
+  assert.ok(Math.abs(r.chip - 20 / 52) < 1e-9, "pot odds wrong: " + r.chip);
+  assert.ok(r.premium > 0.02,
+    `the bubble should carry a real risk premium, got ${(r.premium * 100).toFixed(1)}pp`);
+  assert.ok(r.icm < 1, "required equity must stay a probability: " + r.icm);
+});
+
+test("the risk premium grows as the ladder steepens", () => {
+  const at = (stage) => PE.icmRequired(
+    PE.icmTable({ stage, heroStack: 20, vilStack: 25 }), 12, 20).premium;
+  const early = at("early"), bubble = at("bubble");
+  assert.ok(bubble > early,
+    `the bubble must bite harder than the early stage: ${bubble} vs ${early}`);
+  // and with no ladder at all there is no premium
+  const flat = PE.icmRequired({ stacks: [20, 25, 22, 22], payouts: [1] }, 12, 20).premium;
+  assert.ok(Math.abs(flat) < 1e-6, "winner-take-all should carry no premium: " + flat);
+});
+
+test("a big stack pays less of a premium than a covered short stack", () => {
+  // same spot, but hero is the one at risk of busting vs the one who cannot
+  const short = PE.icmRequired(PE.icmTable({ stage: "final", heroStack: 12, vilStack: 60 }), 10, 12).premium;
+  const big = PE.icmRequired(PE.icmTable({ stage: "final", heroStack: 60, vilStack: 12 }), 10, 12).premium;
+  assert.ok(short > big,
+    `busting must cost more than covering: short ${short.toFixed(4)} vs big ${big.toFixed(4)}`);
+});
+
+test("ICM never makes a stack-risking call look better than chip EV", () => {
+  const tbl = PE.icmTable({ stage: "bubble", heroStack: 25, vilStack: 25 });
+  const pot = 14, B = 25;
+  const opts = [
+    { key: "fold", label: "fold", ev: 0, amount: 0 },
+    { key: "call", label: "call", ev: 0.55 * (pot + B) - 0.45 * B, amount: B, eq: 0.55 }
+  ];
+  const out = PE.applyIcm(opts, pot, tbl);
+  assert.equal(out[0].ev, 0, "fold must stay at zero");
+  assert.ok(out[1].ev < out[1].chipEv,
+    `ICM should shade a coinflip-for-your-life down: ${out[1].ev} vs ${out[1].chipEv}`);
+  assert.equal(out[1].chipEv, opts[1].ev, "the chip EV must be preserved for display");
+});
+
+test("option branches account for the whole distribution", () => {
+  const bet = { key: "betMid", label: "bet", amount: 7, fold: 0.4, raised: 0.1,
+    eqWhenCalled: 0.6, ev: 0 };
+  const br = PE.optionBranches(bet, 10);
+  const total = br.reduce((a, b) => a + b.p, 0);
+  assert.ok(Math.abs(total - 1) < 1e-9, "branch probabilities must sum to 1, got " + total);
+});
+
+test("the grouped ICM agrees with the exact recursion", () => {
+  const stacks = [50, 30, 20, 15];
+  const flat = PE.icmEquity(stacks, [0.5, 0.3, 0.2]);
+  const grouped = PE.icmEquityGrouped(stacks.map((s) => ({ stack: s, count: 1 })), [0.5, 0.3, 0.2]);
+  flat.forEach((e, i) => assert.ok(Math.abs(e - grouped[i]) < 1e-12,
+    `grouped disagrees at ${i}: ${e} vs ${grouped[i]}`));
+  // and with real multiplicity, where the grouping actually does something
+  const g = PE.icmEquityGrouped([{ stack: 40, count: 1 }, { stack: 20, count: 3 }], [0.6, 0.4]);
+  const f = PE.icmEquity([40, 20, 20, 20], [0.6, 0.4]);
+  assert.ok(Math.abs(g[0] - f[0]) < 1e-12, `leader: ${g[0]} vs ${f[0]}`);
+  assert.ok(Math.abs(g[1] - f[1]) < 1e-12, `member of the group: ${g[1]} vs ${f[1]}`);
+});
+
+test("a large field stays computable and near-linear far from the money", () => {
+  // 300 left and 45 paid must not cost more than the money itself does
+  const t0 = Date.now();
+  const tbl = PE.icmTable({ stage: "early", heroStack: 20, vilStack: 25 });
+  const r = PE.icmRequired(tbl, 12, 20);
+  const ms = Date.now() - t0;
+  assert.ok(ms < 500, "a 300-player field took " + ms + "ms");
+  assert.ok(r.premium < 0.05,
+    `300 from the money, chips are nearly linear; got +${(r.premium * 100).toFixed(1)}pp`);
+});
+
+test("risk premiums land where tournament players expect them", () => {
+  const at = (stage) => PE.icmRequired(
+    PE.icmTable({ stage, heroStack: 20, vilStack: 25 }), 12, 20).premium * 100;
+  const early = at("early"), middle = at("middle"), bubble = at("bubble");
+  assert.ok(early < middle && middle < bubble,
+    `stages out of order: early ${early} middle ${middle} bubble ${bubble}`);
+  assert.ok(early < 4, "the early stage should be nearly linear, got +" + early.toFixed(1) + "pp");
+  assert.ok(bubble > 8 && bubble < 30,
+    "a bubble premium should be big but not absurd, got +" + bubble.toFixed(1) + "pp");
+});
+
+test("the payout ladder is top-heavy and sums to the pool", () => {
+  const p = PE.mttPayouts(45);
+  assert.equal(p.length, 45);
+  assert.ok(Math.abs(p.reduce((a, b) => a + b, 0) - 1) < 1e-9, "ladder does not sum to 1");
+  for (let i = 1; i < p.length; i++) assert.ok(p[i] < p[i - 1], "ladder is not descending at " + i);
+  assert.ok(p[0] > 8 * p[44], "the ladder should be top-heavy: " + p[0] + " vs " + p[44]);
+});
+
+test("small pots stay linear while stack-offs do not", () => {
+  // The property that makes ICM worth modelling at all: shoving your stack in
+  // for a chip-EV-positive flip can be a large *loss* of real money, while a
+  // 1BB pot is priced the same as it would be in a cash game.
+  const v = PE.icmValuer(PE.icmTable({ stage: "bubble", heroStack: 24, vilStack: 24 }));
+  const tiny = PE.icmEv(v, 1, [{ p: 0.5, x: 1.2 }, { p: 0.5, x: -0.2 }]);
+  assert.ok(Math.abs(tiny - 0.5) < 0.02,
+    "a 1BB pot should price like chips, got " + tiny.toFixed(4));
+  const stackOff = PE.icmEv(v, 6, [{ p: 0.5, x: 30 }, { p: 0.5, x: -24 }]);
+  assert.ok(stackOff < 0,
+    "a +3BB chip-EV flip for the stack must be a loss on the bubble, got " + stackOff.toFixed(2));
+});
+
+test("tournament spots carry an ante and price every option under the ladder", () => {
+  const cash = PE.makeSpot({ seed: 4242, seats: 6, stack: 25, street: 0, villainType: "unknown" });
+  const mtt = PE.makeSpot({ seed: 4242, seats: 6, stack: 25, street: 0, villainType: "unknown",
+    game: "mtt", stage: "bubble" });
+  assert.equal(cash.ante, 0, "a cash game has no ante");
+  assert.equal(mtt.ante, 1, "a tournament spot should post a big-blind ante");
+  assert.ok(mtt.pot > cash.pot, `the ante must be in the pot: ${mtt.pot} vs ${cash.pot}`);
+
+  const fold = mtt.options.find((o) => o.key === "fold");
+  assert.equal(fold.ev, 0, "folding is still the zero point");
+  mtt.options.filter((o) => o.key !== "fold").forEach((o) => {
+    assert.ok(o.chipEv !== undefined, o.key + " lost its chip EV");
+    assert.ok(o.icm, o.key + " was not re-priced");
+  });
+  // the all-in is where the ladder bites hardest
+  const jam = mtt.options.find((o) => o.key === "allin");
+  if (jam) assert.ok(jam.ev < jam.chipEv,
+    `risking the stack on the bubble must cost: ${jam.ev} vs ${jam.chipEv}`);
+  // and a cash spot is untouched
+  cash.options.forEach((o) => assert.equal(o.chipEv, undefined, "cash options must not be re-priced"));
+});
+
+test("an ante widens the ranges that get dealt", () => {
+  const cash = PE.rangePct(PE.openRange(6, "CO", PE.VILLAIN_TYPES.unknown, 0));
+  const mtt = PE.rangePct(PE.openRange(6, "CO", PE.VILLAIN_TYPES.unknown, 1));
+  assert.ok(mtt > cash + 3,
+    `a 1BB ante should visibly widen the steal: ${mtt.toFixed(1)}% vs ${cash.toFixed(1)}%`);
+  assert.ok(mtt < 70, "but not absurdly: " + mtt.toFixed(1) + "%");
+});

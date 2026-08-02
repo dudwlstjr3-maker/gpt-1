@@ -146,9 +146,11 @@ test("hand analysis runs from the demo hand and produces street EV tables", asyn
   await page.waitForSelector("#h-demo");
   await page.click("#h-demo");
   await page.click("#h-run");
-  await page.waitForSelector("#h-out .st", { timeout: 30000 });
-  const streets = await page.$$eval("#h-out .st", (e) => e.length);
+  await page.waitForSelector("#h-out .stcard", { timeout: 30000 });
+  const streets = await page.$$eval("#h-out .stcard", (e) => e.length);
   assert.ok(streets >= 2, "expected flop and turn analysis, got " + streets);
+  // the EV table is behind a disclosure now
+  await page.$$eval("#h-out .stcard details.numd", (ds) => ds.forEach((d) => (d.open = true)));
   const evCells = await page.$$eval("#h-out .dtable .drow .dv", (e) => e.map((x) => x.textContent.trim()));
   assert.ok(evCells.length > 0, "no EV table in the analysis");
   evCells.forEach((c) => assert.match(c, /^[+-]\d/));
@@ -260,12 +262,17 @@ test("preflop all-in is analysed as an equity decision", async () => {
   await page.waitForSelector("#h-out .recbox", { timeout: 60000 });
 
   const text = await page.$eval("#h-out", (e) => e.innerText);
+  // actual and required equity are shown as one bar rather than two tiles
   assert.match(text, /Equity/, "no equity shown");
-  assert.match(text, /Equity needed/, "no required equity shown");
+  assert.ok(await page.$("#h-out .eqbar i"), "no equity bar");
+  assert.ok(await page.$("#h-out .eqbar u"), "no break-even marker on the bar");
+  const lab = await page.$eval("#h-out .eqlab", (e) => e.innerText);
+  assert.match(lab, /have\s+\d+%/i, "actual equity missing: " + lab);
+  assert.match(lab, /need\s+\d+%/i, "required equity missing: " + lab);
   // AKo against a 20BB shoving range is a clear call
   assert.match(text, /Calling is profitable/, "AKo should be a call: " + text.slice(0, 400));
-  // an all-in has no streets, so no per-street EV tables
-  assert.equal(await page.$$eval("#h-out .st", (e) => e.length), 0, "all-in should not render streets");
+  // an all-in has no streets, so no per-street cards
+  assert.equal(await page.$$eval("#h-out .stcard", (e) => e.length), 0, "all-in should not render streets");
   noErrors();
 });
 
@@ -381,8 +388,8 @@ test("seats take an opponent type, duplicates allowed", async () => {
   // and the analysis still runs off the designated opponent
   await page.click("#h-demo");
   await page.click("#h-run");
-  await page.waitForSelector("#h-out .st", { timeout: 60000 });
-  assert.ok((await page.$$eval("#h-out .st", (e) => e.length)) >= 2);
+  await page.waitForSelector("#h-out .stcard", { timeout: 60000 });
+  assert.ok((await page.$$eval("#h-out .stcard", (e) => e.length)) >= 2);
   noErrors();
 });
 
@@ -467,5 +474,49 @@ test("seats can be cleared in one go", async () => {
   assert.equal((await page.$$(".seat.vil")).length, 0, "table still shows opponents");
   assert.equal((await page.$$(".seat.me")).length, 1, "hero lost their seat");
   assert.equal(await page.$eval("#seat-reset", (e) => e.disabled), true, "clear stayed enabled after clearing");
+  noErrors();
+});
+
+test("hand analysis leads with the line and an equity bar", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="hand"]');
+  await page.waitForSelector("#h-demo");
+  await page.click("#h-demo");
+  await page.click("#h-run");
+  await page.waitForSelector("#h-out .stcard", { timeout: 60000 });
+
+  // the whole hand is summarised before any detail
+  const segs = await page.$$eval(".lseg", (e) => e.map((x) => x.innerText.replace(/\n/g, " ")));
+  assert.ok(segs.length >= 2, "line summary missing: " + segs.join(" | "));
+  segs.forEach((sg) => assert.ok(sg.trim().length > 3, "empty line segment"));
+
+  // streets collapse, and exactly one opens by default
+  const cards = await page.$$eval(".stcard", (e) => e.length);
+  const open = await page.$$eval(".stcard[open]", (e) => e.length);
+  assert.ok(cards >= 2, "expected a card per street");
+  assert.equal(open, 1, "exactly one street should start open, got " + open);
+
+  // equity against required, as one bar with a marker
+  assert.ok(await page.$(".stcard[open] .eqbar i"), "no equity bar");
+  const lab = await page.$eval(".stcard[open] .eqlab", (e) => e.innerText);
+  assert.match(lab, /have/i, "equity bar has no readout: " + lab);
+
+  // best and yours side by side
+  const cmp = await page.$$eval(".stcard[open] .cmpc", (e) => e.map((x) => x.innerText.replace(/\n/g, " ")));
+  assert.equal(cmp.length, 2, "expected best-vs-yours pair, got " + cmp.length);
+  assert.match(cmp[0], /Best/);
+  assert.match(cmp[1], /Yours/);
+
+  // and the villain read-out uses the same weights the EV did
+  assert.ok(await page.$(".stcard[open] .blk.vx .cb"), "no villain range read-out");
+  const labels = await page.$$eval(".stcard[open] .blk.vx .cb .cn", (e) => e.map((x) => x.innerText.trim()));
+  labels.forEach((l) => assert.ok(l.length > 0, "blank label in the read-out"));
+
+  // clicking a collapsed street opens it
+  await page.click(".stcard:first-of-type > summary");
+  await page.waitForTimeout(150);
+  assert.ok(await page.$$eval(".stcard[open]", (e) => e.length) >= 1);
   noErrors();
 });

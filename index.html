@@ -320,11 +320,52 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .rail span.on{background:var(--ac);color:var(--bg);font-weight:800;border-color:var(--ac)}
 .cbars{display:flex;flex-direction:column;gap:4px}
 .cb{display:flex;align-items:center;gap:8px;font-size:12.5px}
-.cb .cn{flex:0 0 46px;font-weight:700;font-variant-numeric:tabular-nums}
+.cb .cn{flex:0 0 auto;min-width:46px;max-width:120px;font-weight:700;font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cb .cf{flex:1;height:8px;background:var(--bg2);border-radius:5px;overflow:hidden}
 .cb .cf i{display:block;height:100%;background:var(--ac2);border-radius:5px}
 .cb .cv{flex:0 0 46px;text-align:right;color:var(--tx2);font-variant-numeric:tabular-nums}
 .seat.active{box-shadow:0 0 0 3px var(--ac2)}
+/* --- hand analysis --- */
+.linebar{display:flex;gap:6px;flex-wrap:wrap}
+.lseg{flex:1 1 110px;display:flex;flex-direction:column;gap:1px;padding:8px 10px;border-radius:9px;
+  background:var(--bg2);border:1px solid var(--line);text-decoration:none;color:inherit}
+.lseg:hover{border-color:var(--ac)}
+.lseg.ok{border-color:var(--hiline);background:var(--hi)}
+.lseg.bad{border-color:var(--wline);background:var(--wbg)}
+.lseg .ln{font-size:11px;color:var(--tx3);letter-spacing:.3px}
+.lseg .la{font-size:13px;font-weight:700;line-height:1.3}
+.lseg .lv{font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.lseg.bad .lv{color:var(--bad)}
+.lseg.ok .lv{color:var(--good)}
+.eqbar-wrap{display:flex;flex-direction:column;gap:5px}
+.eqbar{position:relative;height:16px;background:var(--bg2);border-radius:8px;overflow:hidden}
+.eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
+.eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
+.eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.cmp{grid-template-columns:1fr}}
+.cmpc{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.cmpc.best{border-color:var(--hiline);background:var(--hi)}
+.cmpc.ok{border-color:var(--hiline)}
+.cmpc.off{border-color:var(--wline)}
+.cmpc .cl{font-size:11px;color:var(--tx3);letter-spacing:.3px;margin-bottom:2px}
+.cmpc .ca{font-size:15px;font-weight:800;line-height:1.3}
+.cmpc .cv{font-size:13px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+details.stcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0;margin:0 0 12px}
+details.stcard>summary{list-style:none;cursor:pointer;padding:12px 15px;display:flex;align-items:center;
+  gap:10px;flex-wrap:wrap;font-size:14px}
+details.stcard>summary::-webkit-details-marker{display:none}
+details.stcard>summary:after{content:"▾";margin-left:auto;color:var(--tx3);font-size:12px}
+details.stcard[open]>summary{border-bottom:1px solid var(--line)}
+details.stcard[open]>summary:after{content:"▴"}
+details.stcard>summary .stn{font-weight:800;font-size:15px}
+details.stcard>summary .steq{font-size:12px;font-weight:700;color:var(--ac);
+  background:var(--hi);border-radius:20px;padding:2px 9px;white-space:nowrap}
+details.stcard>summary .stloss{font-size:12px;font-weight:800;color:var(--bad);
+  background:var(--pillb);border-radius:20px;padding:2px 9px;font-variant-numeric:tabular-nums}
+details.stcard>summary .stok{font-size:12px;font-weight:800;color:var(--good)}
+details.stcard>.bd{padding:14px 15px}
 </style>
 </head>
 <body>
@@ -1657,7 +1698,7 @@ const ko = {
   },
   positions: { UTG: "UTG", "UTG+1": "UTG+1", MP: "MP", "MP+1": "MP+1", HJ: "HJ", CO: "CO", BTN: "BTN", SB: "SB", BB: "BB", "BTN(SB)": "BTN(SB)" },
   categories: ["하이카드", "원페어", "투페어", "트립스", "스트레이트", "플러시", "풀하우스", "포카드", "스트레이트 플러시"],
-  draws: { flushDraw: "플러시 드로", oesd: "양차 스트레이트 드로", gutshot: "건샷", bdFlush: "백도어 플러시", twoOvers: "오버카드 2장" },
+  draws: { any: "드로", flushDraw: "플러시 드로", oesd: "양차 스트레이트 드로", gutshot: "건샷", bdFlush: "백도어 플러시", twoOvers: "오버카드 2장" },
   texture: {
     wet: "젖은(드로 많은) 보드", mid: "중간 텍스처", dry: "마른(드로 적은) 보드",
     mono: "모노톤", twotone: "투톤", rainbow: "레인보우",
@@ -1782,6 +1823,15 @@ const ko = {
     saveHand: "이 핸드 기록에 저장", handSaved: "핸드를 저장했습니다.",
     assumptionNote: "상대 레인지는 <b>{type}</b> 가정으로 구성한 근사치입니다(잔여 {n}콤보). 승률·EV는 그 레인지에 대해 정확히 계산한 값입니다.",
     yourActionTitle: "내가 한 액션", evLost: "EV 손실",
+    lineSummary: "이 핸드의 라인", totalEvLost: "총 EV 손실",
+    equityVsNeeded: "승률 vs 필요 승률",
+    youHave: "실제", youNeed: "필요", margin: "여유",
+    noActionYet: "액션 없음",
+    recommendedShort: "권장", yoursShort: "내 선택", matches: "일치",
+    villainHolds: "상대가 들고 있을 법한 핸드", villainMadeOf: "상대 레인지의 구성",
+    representNote: "내가 여기까지 온 액션으로 상대가 추론할 수 있는 내 핸드들입니다.",
+    equityBarNote: "막대가 눈금선을 넘으면 콜이 이득입니다.",
+    tapToExpand: "펼쳐서 자세히 보기",
     tagOverfold: "성급한 폴드", tagBadCall: "질 걸 알고 낸 콜", tagPassive: "소극적 라인",
     tagWildBluff: "근거 없는 블러프", tagMissedValue: "밸류벳 누락",
     tagSizeBig: "사이즈 과대", tagSizeSmall: "사이즈 과소"
@@ -1981,7 +2031,7 @@ const en = {
   },
   positions: { UTG: "UTG", "UTG+1": "UTG+1", MP: "MP", "MP+1": "MP+1", HJ: "HJ", CO: "CO", BTN: "BTN", SB: "SB", BB: "BB", "BTN(SB)": "BTN(SB)" },
   categories: ["High card", "One pair", "Two pair", "Three of a kind", "Straight", "Flush", "Full house", "Four of a kind", "Straight flush"],
-  draws: { flushDraw: "Flush draw", oesd: "Open-ended straight draw", gutshot: "Gutshot", bdFlush: "Backdoor flush", twoOvers: "Two overcards" },
+  draws: { any: "Draw", flushDraw: "Flush draw", oesd: "Open-ended straight draw", gutshot: "Gutshot", bdFlush: "Backdoor flush", twoOvers: "Two overcards" },
   texture: {
     wet: "Wet (draw-heavy) board", mid: "Medium texture", dry: "Dry (draw-light) board",
     mono: "Monotone", twotone: "Two-tone", rainbow: "Rainbow",
@@ -2106,6 +2156,15 @@ const en = {
     saveHand: "Save this hand to the log", handSaved: "Hand saved.",
     assumptionNote: "The villain range is built on the <b>{type}</b> assumption ({n} combos left). Equity and EV are computed exactly against that range.",
     yourActionTitle: "What you did", evLost: "EV lost",
+    lineSummary: "The line", totalEvLost: "Total EV lost",
+    equityVsNeeded: "Equity vs what you need",
+    youHave: "have", youNeed: "need", margin: "margin",
+    noActionYet: "no action",
+    recommendedShort: "Best", yoursShort: "Yours", matches: "match",
+    villainHolds: "What villain likely holds", villainMadeOf: "What that range is made of",
+    representNote: "The hands villain can infer from the way you played.",
+    equityBarNote: "Past the marker, calling is profitable.",
+    tapToExpand: "open for detail",
     tagOverfold: "Premature fold", tagBadCall: "Call that was already beaten", tagPassive: "Passive line",
     tagWildBluff: "Bluff without a reason", tagMissedValue: "Missed value bet",
     tagSizeBig: "Oversized", tagSizeSmall: "Undersized"
@@ -3400,7 +3459,11 @@ function analyzeHand() {
       alpha: facing ? vSize / (pot + vSize) : 0,
       bi, draw: dr, cat: PE.catOf(myScore),
       opts, best, mine, evLost: mine ? Math.max(0, best.ev - mine.ev) : 0,
-      villainCombos: res2.villainRangeSize, ip
+      villainCombos: res2.villainRangeSize, ip,
+      // kept so the read-out shows the very weights the EV was computed from
+      combos: ctx.table.combos, weights: facing
+        ? PE.actionWeights(ctx.rank, "bet", vSize, pot, vt, ctx.weights)
+        : ctx.weights
     });
 
     // advance the pot with what actually happened
@@ -3464,82 +3527,176 @@ function gridHTML(classes, highlight) {
   }
   return h + "</div>";
 }
+/* --- pieces of the analysis view ------------------------------------- */
+
+/** The whole hand as one strip: which street cost you what. */
+function lineStrip(res) {
+  const total = res.streets.reduce((a, st) => a + (st.mine ? st.evLost : 0), 0);
+  const segs = res.streets.map((st, i) => {
+    const has = !!st.mine;
+    const bad = has && st.evLost >= 0.02;
+    return '<a class="lseg' + (bad ? " bad" : has ? " ok" : "") + '" href="#st-' + i + '">' +
+      '<span class="ln">' + esc(t("common." + st.name)) + "</span>" +
+      '<span class="la">' + esc(has ? optLabel(st.mine) : t("hand.noActionYet")) + "</span>" +
+      '<span class="lv">' + (has ? (bad ? lossText(st.evLost) + "BB" : "✓") : "—") + "</span></a>";
+  }).join("");
+  return '<div class="blk"><div class="t">' + esc(t("hand.lineSummary")) + "</div>" +
+    '<div class="linebar">' + segs + "</div>" +
+    (total >= 0.02
+      ? '<div class="small" style="margin-top:6px">' + esc(t("hand.totalEvLost")) +
+        ' <b style="color:var(--bad)">' + lossText(total) + "BB</b></div>"
+      : "") + "</div>";
+}
+
+/** Equity against what you need — the one picture that decides a call. */
+function equityBar(eq, required) {
+  const have = Math.max(0, Math.min(1, eq));
+  const need = Math.max(0, Math.min(1, required || 0));
+  const ok = have >= need;
+  return '<div class="eqbar-wrap">' +
+    '<div class="small muted">' + esc(need > 0 ? t("hand.equityVsNeeded") : t("common.equity")) + "</div>" +
+    '<div class="eqbar">' +
+    '<i style="width:' + (have * 100).toFixed(1) + '%;background:' + (ok ? "var(--good)" : "var(--bad)") + '"></i>' +
+    (need > 0 ? '<u style="left:' + (need * 100).toFixed(1) + '%"></u>' : "") +
+    "</div><div class=\"eqlab\">" +
+      '<span>' + esc(t("hand.youHave")) + " <b>" + pct(have) + "</b></span>" +
+      (need > 0 ? '<span>' + esc(t("hand.youNeed")) + " <b>" + pct(need) + "</b></span>" +
+        '<span style="color:' + (ok ? "var(--good)" : "var(--bad)") + '">' + esc(t("hand.margin")) +
+        " <b>" + (have >= need ? "+" : "") + Math.round((have - need) * 100) + "%p</b></span>" : "") +
+    "</div>" + (need > 0 ? '<div class="small dim">' + esc(t("hand.equityBarNote")) + "</div>" : "") + "</div>";
+}
+
+/** Best line and the one you took, next to each other. */
+function compareBlock(st) {
+  const same = st.mine && st.evLost < 0.02;
+  return '<div class="cmp">' +
+    '<div class="cmpc best"><div class="cl">' + esc(t("hand.recommendedShort")) + "</div>" +
+      '<div class="ca">' + esc(optLabel(st.best)) + "</div>" +
+      '<div class="cv" style="color:var(--good)">' + signed(st.best.ev) + " BB</div></div>" +
+    '<div class="cmpc' + (same ? " ok" : st.mine ? " off" : "") + '"><div class="cl">' +
+      esc(t("hand.yoursShort")) + "</div>" +
+      '<div class="ca">' + esc(st.mine ? optLabel(st.mine) : t("hand.noActionYet")) + "</div>" +
+      '<div class="cv" style="color:' + (!st.mine ? "var(--tx3)" : st.mine.ev >= 0 ? "var(--good)" : "var(--bad)") + '">' +
+        (st.mine ? signed(st.mine.ev) + " BB" : "—") +
+        (same ? ' <span class="pill g">' + esc(t("hand.matches")) + "</span>" : "") + "</div></div>" +
+    "</div>" +
+    (st.mine && st.evLost >= 0.02
+      ? '<div class="small" style="margin-top:6px">' + esc(t("hand.evLost")) +
+        ' <b style="color:var(--bad)">' + lossText(st.evLost) + "BB</b></div>"
+      : "");
+}
+
+/** What the villain can hold here, read off the weights the EV used. */
+function villainReadout(st) {
+  if (!st.combos || !st.combos.length) return "";
+  const top = PE.topClasses(st.combos, st.weights, 6);
+  if (!top.length) return "";
+  const bars = (rows, scale) => '<div class="cbars">' + rows.map((x) =>
+    '<div class="cb"><span class="cn">' + esc(x.label) + '</span><span class="cf"><i style="width:' +
+    Math.round(x.share / scale * 100) + '%"></i></span><span class="cv">' +
+    (x.share * 100).toFixed(1) + "%</span></div>").join("") + "</div>";
+  let h = '<div class="blk vx"><div class="t">' + esc(t("hand.villainHolds")) + "</div>" +
+    bars(top.map((x) => ({ label: x.cls, share: x.share })), top[0].share);
+  if (st.board.length >= 3) {
+    const made = PE.categoryBreakdown(st.combos, st.weights, st.board).slice(0, 4);
+    if (made.length) {
+      h += '<div class="small muted" style="margin:10px 0 4px">' + esc(t("hand.villainMadeOf")) + "</div>" +
+        bars(made.map((x) => ({
+          label: x.key === "draw" ? t("draws.any") : catName(+x.key), share: x.share
+        })), 1);
+    }
+  }
+  return h + "</div>";
+}
+
 function renderAnalysis(res) {
   const out = $("h-out");
   if (!res) { out.innerHTML = ""; return; }
+
   let h = '<div class="card"><h2>' + esc(t("hand.resultTitle")) + "</h2>" +
     '<div class="stmeta"><span>' + esc(posName(res.pos)) + " <b>vs</b> " + esc(posName(res.vpos)) + "</span>" +
     "<span>" + esc(t("scenarios." + res.scenario)) + "</span>" +
-    "<span>" + esc(t("villain.label")) + " <b>" + esc(vtName(res.vt.id)) + "</b></span>" +
+    "<span>" + esc(vtName(res.vt.id)) + "</span>" +
     "<span>" + esc(res.ip ? t("common.inPosition") : t("common.outOfPosition")) + "</span></div>";
-  // preflop
-  h += '<div class="blk"><div class="t">' + esc(t("hand.preflopTitle")) + "</div>" +
+  if (res.streets.length) h += lineStrip(res);
+  h += "</div>";
+
+  // ---- preflop ----
+  h += '<div class="card"><h3>' + esc(t("hand.preflopTitle")) + "</h3>" +
     '<div class="facts">' +
     fact(t("hand.handClass"), res.cls, "") +
     fact(t("hand.handPctl"), nfmt(res.preflop.pctl) + "%", "") +
     fact(t("hand.openStd"), nfmt(res.preflop.openPct) + "%", posName(res.pos)) +
-    "</div><p style=\"margin-top:9px\">" + esc(res.preflop.inChart ? t("hand.inChart") : t("hand.notInChart")) + "</p>" +
-    gridHTML(res.preflop.chart, res.cls) + "</div></div>";
+    '</div><p style="margin-top:9px">' +
+      '<span class="pill ' + (res.preflop.inChart ? "g" : "w") + '">' +
+      esc(res.preflop.inChart ? t("hand.inChart") : t("hand.notInChart")) + "</span></p>" +
+    gridHTML(res.preflop.chart, res.cls) + "</div>";
 
-  // ---- preflop all-in: one equity question, no streets ----
+  // ---- preflop all-in resolves the hand on its own ----
   if (res.allin) {
-    const a = res.allin;
-    const isCall = a.mode === "call";
+    const a = res.allin, isCall = a.mode === "call";
     const ev = isCall ? a.evCall : a.evShove;
     const good = ev > 0;
-    h += '<div class="blk"><div class="t">' + esc(t("hand.allinTitle")) + '</div><div class="facts">' +
-      fact(t("common.equity"), pct(a.eq), "") +
-      (isCall ? fact(t("hand.reqEquity"), pct(a.required), t("hand.toCallSize") + " " + nfmt(a.toCall) + "BB")
+    h += '<div class="card"><h3>' + esc(t("hand.allinTitle")) + "</h3>" +
+      (isCall ? equityBar(a.eq, a.required) : equityBar(a.eqCalled, 0)) +
+      '<div class="facts" style="margin-top:10px">' +
+      (isCall ? fact(t("hand.toCallSize"), nfmt(a.toCall) + "BB", "")
               : fact(t("hand.allinFoldEq"), pct(a.foldFreq), t("hand.allinEqCalled") + " " + pct(a.eqCalled))) +
       fact(t("common.pot"), nfmt(a.pot) + "BB", isCall ? t("hand.potFacing") : t("hand.potIfAllFold")) +
       fact(t("common.ev"), signed(ev) + " BB", isCall ? t("common.call") : t("common.allin")) +
-      "</div></div>";
-    h += '<div class="recbox' + (good ? " good" : "") + '"><div class="rl">' + esc(t("hand.recTitle")) + "</div>" +
+      "</div>" +
+      '<div class="recbox' + (good ? " good" : "") + '" style="margin-top:12px"><div class="rl">' + esc(t("hand.recTitle")) + "</div>" +
       '<div class="ra">' + esc(good ? (isCall ? t("common.call") : t("common.allin")) : t("common.fold")) + "</div>" +
       '<div class="rs">' + (isCall
         ? t(good ? "hand.allinCallGood" : "hand.allinCallBad", { req: pct(a.required), eq: pct(a.eq) })
         : t(good ? "hand.allinShoveGood" : "hand.allinShoveBad", { fe: pct(a.foldFreq), eqc: pct(a.eqCalled) })) +
-      "</div></div>";
-    h += '<div class="blk"><div class="t">' + esc(isCall ? t("hand.allinVsRange") : t("hand.allinVsCallRange")) + "</div>" +
-      '<div class="small dim" style="margin-bottom:6px">' + nfmt(PE.rangePct(a.classes)) + "% · " + a.combos + " combos</div>" +
-      gridHTML(a.classes, res.cls) + "</div>";
-    h += '<div class="notice">' + esc(t("hand.allinNote")) + "</div></div>";
+      "</div></div>" +
+      '<details><summary>' + esc(isCall ? t("hand.allinVsRange") : t("hand.allinVsCallRange")) + "</summary>" +
+      '<div class="small dim" style="margin-bottom:6px">' + nfmt(PE.rangePct(a.classes)) + "% · " +
+      esc(t("range.combos", { n: a.combos })) + "</div>" + gridHTML(a.classes, res.cls) + "</details>" +
+      '<div class="notice">' + esc(t("hand.allinNote")) + "</div></div>";
     out.innerHTML = h;
     return;
   }
 
-  res.streets.forEach((s) => {
-    h += '<div class="st"><h3><span class="stn">' + esc(t("common." + s.name)) + "</span>" +
-      "<span>" + s.board.map((c) => cardHTML(c, true)).join("") + "</span>" +
-      '<span class="steq">' + esc(t("common.equity")) + " " + pct(s.eq) + "</span></h3><div class=\"bd\">";
-    h += '<div class="blk"><div class="t">' + esc(t("hand.numbersTitle")) + '</div><div class="facts">' +
-      fact(t("common.pot"), nfmt(s.pot) + "BB", "") +
-      fact(t("hand.spr"), nfmt(s.spr), "") +
-      fact(t("hand.myHandNow"), catName(s.cat), drawNames(s.draw.keys).join(" · ")) +
-      (s.facing ? fact(t("hand.reqEquity"), pct(s.required), t("hand.mdf") + " " + pct(s.mdf)) : "") +
-      fact(t("hand.villainCombos"), s.villainCombos, s.bi ? t("texture." + s.bi.texture) : "") +
-      "</div></div>";
-    h += '<div class="recbox good"><div class="rl">' + esc(t("hand.recTitle")) + "</div>" +
-      '<div class="ra">' + esc(optLabel(s.best)) + "</div>" +
-      '<div class="rs">' + esc(t("common.ev")) + " " + signed(s.best.ev) + " BB</div></div>";
-    h += '<div class="blk"><div class="t">' + esc(t("hand.evTitle")) + "</div>" + evTable(s.opts, s.mine) + "</div>";
-    if (s.mine) {
-      const lost = s.evLost;
-      h += '<div class="blk ' + (lost < 0.02 ? "hi" : "warn") + '"><div class="t">' + esc(t("hand.yourActionTitle")) + "</div>" +
-        "<p><b>" + esc(optLabel(s.mine)) + "</b> · " + esc(t("common.ev")) + " " + signed(s.mine.ev) + " BB" +
-        (lost >= 0.02 ? " · " + esc(t("hand.evLost")) + " <b>" + lossText(lost) + "BB</b>" : "") + "</p></div>";
-    }
-    h += '<div class="notice">' + t("hand.assumptionNote", { type: esc(vtName(res.vt.id)), n: s.villainCombos }) + "</div>";
-    h += "</div></div>";
+  // ---- streets: the one that cost the most opens by default ----
+  let worst = -1, worstLoss = 0.02;
+  res.streets.forEach((st, i) => { if (st.mine && st.evLost > worstLoss) { worstLoss = st.evLost; worst = i; } });
+
+  res.streets.forEach((st, i) => {
+    const open = i === worst || (worst < 0 && i === res.streets.length - 1);
+    h += '<details class="stcard" id="st-' + i + '"' + (open ? " open" : "") + '><summary>' +
+      '<span class="stn">' + esc(t("common." + st.name)) + "</span>" +
+      '<span class="stb">' + st.board.map((c) => cardHTML(c, true)).join("") + "</span>" +
+      '<span class="steq">' + esc(t("common.equity")) + " " + pct(st.eq) + "</span>" +
+      (st.mine && st.evLost >= 0.02
+        ? '<span class="stloss">' + lossText(st.evLost) + "BB</span>"
+        : st.mine ? '<span class="stok">✓</span>' : "") +
+      "</summary><div class=\"bd\">";
+
+    h += equityBar(st.eq, st.required);
+    h += '<div class="facts" style="margin-top:12px">' +
+      fact(t("common.pot"), nfmt(st.pot) + "BB", st.facing ? t("hand.reqEquity") + " " + pct(st.required) : "") +
+      fact(t("hand.spr"), nfmt(st.spr), st.facing ? t("hand.mdf") + " " + pct(st.mdf) : "") +
+      fact(t("hand.myHandNow"), catName(st.cat), drawNames(st.draw.keys).join(" · ")) +
+      "</div>";
+    h += '<div class="blk" style="margin-top:12px">' + compareBlock(st) + "</div>";
+    h += '<details class="numd"><summary><b>' + esc(t("hand.evTitle")) + "</b></summary>" +
+      evTable(st.opts, st.mine) + "</details>";
+    h += villainReadout(st);
+    h += '<div class="notice">' + t("hand.assumptionNote", {
+      type: esc(vtName(res.vt.id)), n: st.villainCombos }) + "</div>";
+    h += "</div></details>";
   });
+
   h += '<div class="card"><button class="btn" id="h-save">' + esc(t("hand.saveHand")) + "</button></div>";
   out.innerHTML = h;
   $("h-save").onclick = () => {
     const hands = DB.get("hands", []);
     hands.unshift({
       at: Date.now(), cls: res.cls, pos: res.pos, vpos: res.vpos, scenario: res.scenario,
-      vt: res.vt.id, streets: res.streets.map((s) => ({ name: s.name, evLost: s.evLost, eq: s.eq,
-        best: optLabel(s.best), mine: s.mine ? optLabel(s.mine) : null }))
+      vt: res.vt.id, streets: res.streets.map((st) => ({ name: st.name, evLost: st.evLost, eq: st.eq,
+        best: optLabel(st.best), mine: st.mine ? optLabel(st.mine) : null }))
     });
     DB.set("hands", hands.slice(0, 200)); toast(t("hand.handSaved")); renderHome();
   };
@@ -3931,7 +4088,7 @@ function renderHandReport(v) {
   if (made.length) {
     h += '<div class="small muted" style="margin:10px 0 4px">' + esc(t("drill.villainMade")) + "</div>" +
       '<div class="cbars">' + made.slice(0, 5).map((x) =>
-        '<div class="cb"><span class="cn">' + esc(x.key === "draw" ? drawNames(["oesd"])[0] || "draw" : catName(+x.key)) +
+        '<div class="cb"><span class="cn">' + esc(x.key === "draw" ? t("draws.any") : catName(+x.key)) +
         '</span><span class="cf"><i style="width:' + Math.round(x.share * 100) + '%"></i></span>' +
         '<span class="cv">' + Math.round(x.share * 100) + "%</span></div>").join("") + "</div>";
   }

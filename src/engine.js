@@ -1183,11 +1183,24 @@ const MTT_STAGES = {
   bubble: { id: "bubble", left: 46,  paid: 45 },   // one more out and the rest cash
   final:  { id: "final",  left: 9,   paid: 45 }    // the top nine of the same ladder
 };
+/* A single-table sit-and-go is the same maths on a far crueller ladder: nine
+ * players, three paid, and the whole prize pool riding on those three places.
+ * Calling it an MTT stage would understate the pressure by a wide margin —
+ * the bubble of a 9-man is the sharpest ICM spot in poker. */
+const SNG_STAGES = {
+  early:  { id: "early",  left: 9, paid: 3 },
+  middle: { id: "middle", left: 6, paid: 3 },
+  bubble: { id: "bubble", left: 4, paid: 3 },      // the classic 9-man bubble
+  final:  { id: "final",  left: 3, paid: 3 }       // in the money, playing the ladder
+};
+const STAGE_TABLES = { mtt: MTT_STAGES, sng: SNG_STAGES };
+const stagesFor = (format) => STAGE_TABLES[format] || MTT_STAGES;
 
 /** The field an ICM calculation runs on: hero, the villain in the hand, and
  *  the rest of the field on the average stack. Stacks are in BB.           */
 function icmTable(o) {
-  const stage = MTT_STAGES[o.stage] || MTT_STAGES.middle;
+  const table = stagesFor(o.format);
+  const stage = table[o.stage] || table.middle;
   const hero = Math.max(0.01, o.heroStack);
   const vil = Math.max(0.01, o.vilStack === undefined ? hero : o.vilStack);
   const left = Math.max(2, o.left || stage.left);
@@ -1198,7 +1211,7 @@ function icmTable(o) {
   return {
     groups: [{ stack: hero, count: 1 }, { stack: vil, count: 1 },
              { stack: avg, count: left - 2 }],
-    payouts: mttPayouts(paid), stage, left, paid
+    payouts: mttPayouts(paid), stage, left, paid, format: o.format || "mtt"
   };
 }
 
@@ -1337,7 +1350,8 @@ function makeSpot(cfg) {
   const L = posList(seats);
   // Tournament: a big-blind ante is dead money in every pot, and the chips
   // being won are worth less than the chips being risked.
-  const mtt = cfg.game === "mtt";
+  const format = cfg.game === "mtt" || cfg.game === "sng" ? cfg.game : null;
+  const mtt = !!format;
   const ante = mtt ? (cfg.ante === undefined ? 1 : cfg.ante) : 0;
   const stage = cfg.stage || "middle";
 
@@ -1451,7 +1465,7 @@ function makeSpot(cfg) {
   const effStack = Math.max(0.5, stack - heroInv);
   // The villain is in for the same as hero in every scenario here, so his
   // remaining stack is hero's — the ICM model needs both, not just hero's.
-  const icm = mtt ? icmTable({ stage, heroStack: effStack, vilStack: effStack }) : null;
+  const icm = mtt ? icmTable({ stage, format, heroStack: effStack, vilStack: effStack }) : null;
   const ctx = buildContext({
     hole, board: fullBoard, villainClasses, vt, ip, pot, effStack, history, rnd, icm
   });
@@ -1498,7 +1512,7 @@ function makeSpot(cfg) {
     story, prelude, facing, heroClasses, villainClasses,
     options: res.opts, eq: res.eq, villainRangeSize: res.villainRangeSize,
     required: res.required, mdf: res.mdf, ctx,
-    game: mtt ? "mtt" : "cash", ante, stage: mtt ? stage : null, icm,
+    game: format || "cash", ante, stage: mtt ? stage : null, icm,
     requiredIcm: res.requiredIcm, riskPremium: res.riskPremium
   };
 }
@@ -1536,7 +1550,7 @@ return {
   preflopLine, allInPreflop, shoveRange, callShoveRange, blindOf,
   // tournament
   icmEquity, icmEquityGrouped, mttPayouts, icmTable, icmValuer, icmEv, icmRequired,
-  applyIcm, optionBranches, MTT_STAGES,
+  applyIcm, optionBranches, MTT_STAGES, SNG_STAGES, stagesFor,
   SITUATIONS, situationRange, rangeNotation, openRange, flatRange, threeBetRange,
   topClasses, categoryBreakdown, perceivedRange, fourBetRange, callVs4betRange,
   // util

@@ -653,8 +653,8 @@ function renderPreflopSizes() {
     h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("drill.stageStep")) + "</div>" +
       '<div class="bg" id="pf-stage" style="display:flex;margin-bottom:8px">' +
       MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + (HI.stage === k ? "on" : "") + '">' +
-        esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
-      '<div class="small dim" style="margin:-4px 0 4px">' + esc(stageBlurb(HI.stage)) + "</div>";
+        esc(stageName(k)) + "</button>").join("") + "</div>" +
+      '<div class="small dim" style="margin:-4px 0 4px">' + esc(stageBlurb(HI.stage, setupGame())) + "</div>";
   }
   h += '<div class="small muted" style="margin:10px 0 6px">' + esc(t("hand.pfSizes")) +
     ' <span class="dim">' + esc(t("hand.pfSizesSub")) + "</span></div>";
@@ -776,10 +776,11 @@ function analyzeHand() {
   const ip = PE.isInPosition(seats, HI.pos, HI.vpos);
   // The setup's game type has always been on screen; until now nothing read
   // it, so a tournament hand was analysed as if a chip were worth a chip.
-  const mtt = setupGame() !== "cash";
+  const game = setupGame();
+  const mtt = game !== "cash";
   const ante = setupAnte();
   const res = { cls, ip, vt, scenario: HI.scenario, pos: HI.pos, vpos: HI.vpos, streets: [],
-    game: mtt ? "mtt" : "cash", stage: HI.stage, ante };
+    game, stage: HI.stage, ante };
 
   // preflop
   const chart = PE.rfiRange(seats, HI.pos);
@@ -837,7 +838,8 @@ function analyzeHand() {
     const effStack = Math.max(0.5, stack - heroInv);
 
     const icm = mtt
-      ? PE.icmTable({ stage: HI.stage, heroStack: effStack, vilStack: effStack }) : null;
+      ? PE.icmTable({ stage: HI.stage, format: game, heroStack: effStack, vilStack: effStack })
+      : null;
     const ctx = PE.buildContext({
       hole, board: bd, villainClasses, vt, ip, pot, effStack, history, icm,
       rnd: PE.mulberry32(PE.seedFrom(hole[0] * 53 + hole[1] * 7 + i))
@@ -908,15 +910,18 @@ function optNote(o) {
 /* --- tournament read-outs ---------------------------------------------- */
 /** A chip in the spot header naming the game and, in a tournament, the stage
  *  and the ante — the two things that make the numbers below differ. */
+const stageName = (k) => t("drill.stage" + k[0].toUpperCase() + k.slice(1));
 function gameChip(sp) {
-  if (!sp || sp.game !== "mtt") return "";
-  return '<span class="gm">' + esc(t("drill.gameMtt")) + " · " +
-    esc(t("drill.stage" + sp.stage[0].toUpperCase() + sp.stage.slice(1))) +
+  if (!sp || !sp.game || sp.game === "cash") return "";
+  return '<span class="gm">' + esc(t(sp.game === "sng" ? "hand.sng" : "drill.gameMtt")) + " · " +
+    esc(stageName(sp.stage)) +
     (sp.ante ? " · " + esc(t("drill.anteChip", { v: nfmt(sp.ante) })) : "") + "</span>";
 }
-/** "46 left, 45 paid — one more out and everyone else cashes." */
-function stageBlurb(stage) {
-  const s = PE.MTT_STAGES[stage] || PE.MTT_STAGES.middle;
+/** "46 left, 45 paid — one more out and everyone else cashes." A sit-and-go
+ *  runs the same four stages on a nine-handed, three-paid ladder. */
+function stageBlurb(stage, format) {
+  const table = PE.stagesFor(format);
+  const s = table[stage] || table.middle;
   return t("drill.stageBlurb", { left: s.left, paid: s.paid }) + " " +
     t("drill.stage" + stage[0].toUpperCase() + stage.slice(1) + "D");
 }
@@ -1397,8 +1402,8 @@ function renderDrill() {
         ? '<div class="step sub">' + esc(t("drill.stageStep")) + "</div>" +
           '<div class="bg" id="dr-stage" style="display:flex">' +
             MTT_STAGE_KEYS.map((k) => '<button data-k="' + k + '" class="' + ((cfg.stage || "middle") === k ? "on" : "") + '">' +
-              esc(t("drill.stage" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
-          '<div class="small dim" style="margin-top:5px">' + esc(stageBlurb(cfg.stage || "middle")) + "</div>"
+              esc(stageName(k)) + "</button>").join("") + "</div>" +
+          '<div class="small dim" style="margin-top:5px">' + esc(stageBlurb(cfg.stage || "middle", "mtt")) + "</div>"
         : "") +
       '<div class="step"><span class="num">2</span>' + esc(t("drill.step1")) + "</div>" +
       '<div class="bg" id="dr-n" style="display:flex">' +
@@ -1812,7 +1817,7 @@ function renderRange() {
     (mtt && shortStack
       ? '<div class="small muted" style="margin-bottom:4px">' + esc(t("drill.stageStep")) + "</div>" +
         chips("rg-stage", MTT_STAGE_KEYS.map((k) =>
-          ({ k, label: t("drill.stage" + k[0].toUpperCase() + k.slice(1)) })), R.stage)
+          ({ k, label: stageName(k) })), R.stage)
       : "") +
     '<div class="small muted" style="margin-bottom:4px">' + esc(t("range.situation")) + "</div>" +
     chips("rg-sit", PE.SITUATIONS.map((x) => ({ k: x.id, label: t("range.sit." + x.id) })), R.situation) +
@@ -1830,7 +1835,7 @@ function renderRange() {
       esc(t("range.sit." + R.situation)) + " · " + esc(posName(R.pos)) +
       (sit.needsVs ? " " + esc(t("common.vs")) + " " + esc(posName(R.vs)) : "") +
       (shortStack ? " · " + R.stack + "BB" : "") +
-      (mtt ? " · " + esc(t("drill.gameMtt")) + (icm ? " " + esc(t("drill.stage" + R.stage[0].toUpperCase() + R.stage.slice(1))) : "") : "") +
+      (mtt ? " · " + esc(t("drill.gameMtt")) + (icm ? " " + esc(stageName(R.stage)) : "") : "") +
       "</div>" +
     "<p>" + esc(t("range.sitNote." + R.situation)) + "</p>" +
     (mtt ? '<p class="small dim">' + t(icm ? "range.mttIcmNote" : "range.mttNote") + "</p>" : "") +

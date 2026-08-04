@@ -44,7 +44,8 @@ const HandRun = (function () {
 
     // Tournament: a big-blind ante sits in every pot, so opens are cheaper
     // relative to what they win and the ranges taking them are wider.
-    const mtt = cfg.game === "mtt";
+    const format = cfg.game === "mtt" || cfg.game === "sng" ? cfg.game : null;
+    const mtt = !!format;
     const ante = mtt ? (cfg.ante === undefined ? 1 : cfg.ante) : 0;
     const stage = cfg.stage || "middle";
 
@@ -70,7 +71,7 @@ const HandRun = (function () {
       seed, seats, stack, rnd, vt, heroPos, vilPos, hole,
       deck, board: [], street: 0, done: false,
       heroClasses, vilClasses, openSize,
-      game: mtt ? "mtt" : "cash", ante, stage: mtt ? stage : null,
+      game: format || "cash", ante, stage: mtt ? stage : null,
       pot: r1(openSize + heroBlind + dead + ante),
       heroInv: heroBlind, vilInv: openSize,
       facing: { size: r1(openSize - heroBlind) },
@@ -86,8 +87,8 @@ const HandRun = (function () {
     const eff = Math.max(0.5, run.stack - run.heroInv);
     // Both stacks shrink as the hand goes on, and ICM prices the chips that
     // are actually still behind — not the ones already in the middle.
-    const icm = run.game === "mtt"
-      ? PE.icmTable({ stage: run.stage, heroStack: eff,
+    const icm = run.game !== "cash"
+      ? PE.icmTable({ stage: run.stage, format: run.game, heroStack: eff,
                       vilStack: Math.max(0.5, run.stack - run.vilInv) })
       : null;
     const ctx = PE.buildContext({

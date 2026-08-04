@@ -625,3 +625,30 @@ test("an ante widens the ranges that get dealt", () => {
     `a 1BB ante should visibly widen the steal: ${mtt.toFixed(1)}% vs ${cash.toFixed(1)}%`);
   assert.ok(mtt < 70, "but not absurdly: " + mtt.toFixed(1) + "%");
 });
+
+test("a sit-and-go is a crueller ladder than an MTT at every stage", () => {
+  // Nine players and three paid concentrates the whole pool in three places,
+  // so the same spot costs more than it does in a field of hundreds. Treating
+  // a 9-man as an MTT stage would understate the pressure everywhere.
+  const at = (format, stage) => PE.icmRequired(
+    PE.icmTable({ stage, format, heroStack: 20, vilStack: 25 }), 12, 20).premium;
+  ["early", "middle", "bubble", "final"].forEach((stage) => {
+    const mtt = at("mtt", stage), sng = at("sng", stage);
+    assert.ok(sng > mtt,
+      `${stage}: sng ${(sng * 100).toFixed(1)}pp should exceed mtt ${(mtt * 100).toFixed(1)}pp`);
+  });
+  // the 9-man ladder should look like the standard 50/30/20
+  const pay = PE.mttPayouts(3);
+  assert.ok(pay[0] > 0.45 && pay[0] < 0.60, "winner's share off: " + pay[0]);
+  assert.ok(pay[2] > 0.14 && pay[2] < 0.24, "third place off: " + pay[2]);
+});
+
+test("the game format reaches the spot it produces", () => {
+  const sng = PE.makeSpot({ seed: 909, seats: 6, stack: 20, game: "sng", stage: "bubble" });
+  assert.equal(sng.game, "sng", "the spot forgot it was a sit-and-go");
+  assert.equal(sng.icm.format, "sng");
+  assert.equal(sng.icm.left, 4, "a 9-man bubble is four-handed, got " + sng.icm.left);
+  assert.equal(sng.icm.paid, 3);
+  const mtt = PE.makeSpot({ seed: 909, seats: 6, stack: 20, game: "mtt", stage: "bubble" });
+  assert.equal(mtt.icm.left, 46, "an MTT bubble is not four-handed");
+});

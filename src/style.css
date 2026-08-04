@@ -259,6 +259,8 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .kpi .k .kv{font-size:17px;font-weight:800}
 .sumcard .sr{display:flex;gap:9px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .sumcard .sr:last-child{border-bottom:0}
+/* in hand mode a run of rows belongs to one hand — mark where the next starts */
+.sumcard .sr.hsep{border-top:1px solid var(--line);margin-top:2px;padding-top:9px}
 /* street names are one word in every language we ship — never break them */
 .sumcard .sr .n{flex:0 0 auto;min-width:34px;font-weight:800;font-size:12.5px;color:var(--tx2);white-space:nowrap}
 .sumcard .sr .a{flex:1 1 130px;font-size:13px}

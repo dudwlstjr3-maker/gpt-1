@@ -1261,8 +1261,15 @@ function continueHand() {
 function nextHand() {
   const D = STATE.drill;
   D.i++;
-  D.log.push({ result: D.run.result, lost: D.run.log.reduce((a, l) => a + l.lost, 0),
-    street: D.run.street, mine: "hand", best: "hand", mineLabel: "", bestLabel: "" });
+  // Log the decisions, not the hand. A single "hand" entry left the by-action
+  // review with nothing to print, and gave the leak detector an action it
+  // could not classify, so every losing hand was blamed on sizing.
+  D.run.log.forEach((l) => D.log.push({
+    street: l.street, streetLabel: streetName(l.street), facing: !!l.facing,
+    mine: l.mine.key, mineLabel: optLabel(l.mine),
+    best: l.best.key, bestLabel: optLabel(l.best),
+    lost: l.lost, eq: l.eq, hand: D.i, result: D.run.result
+  }));
   if (D.i >= D.n) { D.done = true; saveDrill(); renderDrill(); } else loadHand();
 }
 function loadSpot() {
@@ -1293,6 +1300,7 @@ function answerSpot(i) {
   D.evBest += best;          // what perfect play would have been worth
   D.evCaptured += capture;
   if (lost < 0.02) D.correct++;
+  D.decisions = (D.decisions || 0) + 1;
   recordPlay(sp.options, mine, sp.options.find((o) => o.ev === best), !!sp.facing);
   D.log.push({
     street: sp.street, facing: !!sp.facing, mine: mine.key, mineLabel: optLabel(mine),
@@ -1689,8 +1697,13 @@ function storyText(s) {
 function renderDrillEnd(v) {
   const D = STATE.drill;
   const n = Math.max(1, D.i);
-  const perSpot = D.evLost / n;
-  const capture = D.evCaptured / n;
+  // Accuracy, capture and EV lost are accumulated once per DECISION. A whole
+  // hand is several decisions, so dividing them by the hand count reported
+  // accuracy above 100%. Everything per-decision divides by decisions.
+  const dec = Math.max(1, D.decisions || D.i);
+  const perSpot = D.evLost / dec;
+  const capture = D.evCaptured / dec;
+  const accuracy = Math.round(D.correct / dec * 100);
   const earned = D.evEarned, bestPossible = D.evBest;
   const sessionRate = D.potSum > 0 ? ratingOf(D.evLost / D.potSum) : ratingOfBB(perSpot);
   const grade = gradeFromRating(sessionRate);
@@ -1709,19 +1722,24 @@ function renderDrillEnd(v) {
   const leakText = counts[top] > 0 ? t("drill.leak" + top[0].toUpperCase() + top.slice(1)) : t("drill.endNoLeak");
 
   let h = '<div class="card"><h2>' + esc(t("drill.endTitle")) + "</h2>" +
-    '<div class="score"><div class="ring" style="--p:' + Math.round(D.correct / n * 100) + '"><b>' +
-      Math.round(D.correct / n * 100) + "%</b></div>" +
+    '<div class="score"><div class="ring" style="--p:' + Math.min(100, accuracy) + '"><b>' +
+      accuracy + "%</b></div>" +
     '<div><div class="small muted">' + esc(t("drill.grade")) + " · " + esc(t("drill.rating")) + "</div>" +
     '<div class="gv" style="color:' + gradeColor(grade) + '">' + grade +
       ' <span style="font-size:20px">' + sessionRate + "</span></div>" +
     '<div class="small dim">' + esc(t("drill.gradeNote")) + "</div></div></div>" +
     '<div class="kpi">' +
-      '<div class="k"><div class="kk">' + esc(t("drill.endSpots")) + '</div><div class="kv">' + D.i + "</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t(D.mode === "hand" ? "drill.endHands" : "drill.endSpots")) +
+        '</div><div class="kv">' + D.i + "</div></div>" +
+      (D.mode === "hand"
+        ? '<div class="k"><div class="kk">' + esc(t("drill.endDecisions")) + '</div><div class="kv">' + dec + "</div></div>"
+        : "") +
       '<div class="k"><div class="kk">' + esc(t("drill.endEarned")) + '</div><div class="kv" style="color:' +
         (earned >= 0 ? "var(--good)" : "var(--bad)") + '">' + signed(earned) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endBest")) + '</div><div class="kv">' + signed(bestPossible) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endEvLost")) + '</div><div class="kv">' + lossText(D.evLost) + "</div></div>" +
-      '<div class="k"><div class="kk">' + esc(t("drill.endPerSpot")) + '</div><div class="kv">' + lossText(perSpot) + "</div></div>" +
+      '<div class="k"><div class="kk">' + esc(t(D.mode === "hand" ? "drill.endPerDecision" : "drill.endPerSpot")) +
+        '</div><div class="kv">' + lossText(perSpot) + "</div></div>" +
       '<div class="k"><div class="kk">' + esc(t("drill.endCapture")) + '</div><div class="kv">' + Math.round(capture * 100) + "%</div></div>" +
     "</div>" +
     '<div class="blk hi" style="margin-top:14px"><p style="margin:0">' +
@@ -1730,10 +1748,21 @@ function renderDrillEnd(v) {
     '<div class="blk warn" style="margin-top:14px"><div class="t">' + esc(t("drill.endLeak")) + "</div><p>" + esc(leakText) + "</p></div>";
   // per-spot review
   h += '<div class="blk sumcard"><div class="t">' + esc(t("drill.endByAction")) + "</div>" +
-    D.log.map((l, i) => '<div class="sr"><span class="n">' + (i + 1) + "</span>" +
-      '<span class="a">' + esc(l.mineLabel) + (l.lost < 0.02 ? "" : " → <b>" + esc(l.bestLabel) + "</b>") + "</span>" +
-      '<span class="z" style="color:' + (l.lost < 0.02 ? "var(--good)" : "var(--bad)") + '">' +
-      (l.lost < 0.02 ? "✓" : lossText(l.lost) + "BB") + "</span></div>").join("") + "</div>";
+    (D.log.length
+      ? D.log.map((l, i) => {
+          // In hand mode several rows belong to one hand; label the first of
+          // each hand so a run of decisions reads as the hand it came from.
+          const newHand = l.hand !== undefined && (i === 0 || D.log[i - 1].hand !== l.hand);
+          const label = l.hand !== undefined
+            ? (newHand ? t("drill.handNo", { n: l.hand }) : "")
+            : String(i + 1);
+          return '<div class="sr' + (newHand && i > 0 ? " hsep" : "") + '"><span class="n">' + esc(label) + "</span>" +
+            '<span class="a">' + (l.streetLabel ? '<span class="dim">' + esc(l.streetLabel) + "</span> " : "") +
+              esc(l.mineLabel) + (l.lost < 0.02 ? "" : " → <b>" + esc(l.bestLabel) + "</b>") + "</span>" +
+            '<span class="z" style="color:' + (l.lost < 0.02 ? "var(--good)" : "var(--bad)") + '">' +
+            (l.lost < 0.02 ? "✓" : lossText(l.lost) + "BB") + "</span></div>";
+        }).join("")
+      : '<p class="small dim" style="margin:0">' + esc(t("drill.endNoActions")) + "</p>") + "</div>";
   h += '<div class="row" style="margin-top:12px">' +
     '<div style="flex:0 0 auto"><button class="btn" id="dr-again">' + esc(t("drill.again")) + "</button></div>" +
     '<div style="flex:0 0 auto"><button class="btn sec" id="dr-home">' + esc(t("drill.home")) + "</button></div></div></div>";

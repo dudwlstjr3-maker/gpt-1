@@ -784,3 +784,47 @@ test("choosing a tournament in setup posts an ante and asks for the stage", asyn
   assert.equal(await page.$eval("#s-ante", (e) => e.value), "0", "the ante should clear for cash");
   noErrors();
 });
+
+test("the whole-hand results screen shows the decisions it graded", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-mode button");
+  await page.click('#dr-game button[data-k="cash"]');
+  await page.click('#dr-mode button[data-k="hand"]');
+  await page.click('#dr-n button[data-n="5"]');
+  await page.click("#dr-go");
+
+  for (let g = 0; g < 90; g++) {
+    if (await page.$("#dr-again")) break;
+    if (await page.$("#dr-nexthand")) { await page.click("#dr-nexthand"); continue; }
+    if (await page.$("#dr-cont")) { await page.click("#dr-cont"); continue; }
+    await page.waitForSelector(".dopt, #dr-again, #dr-nexthand", { timeout: 60000 });
+    const opts = await page.$$(".dopt");
+    if (opts.length) await opts[Math.min(1, opts.length - 1)].click();
+  }
+  await page.waitForSelector("#dr-again", { timeout: 60000 });
+
+  // the reported bug: every by-action row was blank
+  const rows = await page.$$eval("#v-drill .sumcard .sr .a", (e) => e.map((x) => x.innerText.trim()));
+  assert.ok(rows.length >= 5, "expected a row per decision, got " + rows.length);
+  rows.forEach((r, i) => assert.ok(r.length > 0, "by-action row " + (i + 1) + " is blank"));
+  const body = await page.$eval("#v-drill .sumcard", (e) => e.innerText);
+  assert.match(body, /Hand 1/, "rows are not grouped by hand: " + body.slice(0, 200));
+  assert.match(body, /Preflop|Flop|Turn|River/, "rows do not say which street: " + body.slice(0, 200));
+
+  // accuracy is per decision, so it cannot exceed 100%
+  const ring = await page.$eval("#v-drill .ring", (e) => e.innerText);
+  const acc = parseInt(ring, 10);
+  assert.ok(acc >= 0 && acc <= 100, "accuracy out of range: " + ring);
+
+  // and the header counts hands and decisions separately
+  const kpi = await page.$eval("#v-drill .kpi", (e) => e.innerText.replace(/\n/g, " "));
+  assert.match(kpi, /Hands\s+5/, "hand count wrong: " + kpi);
+  const dm = kpi.match(/Decisions\s+(\d+)/);
+  assert.ok(dm, "no decision count: " + kpi);
+  assert.equal(+dm[1], rows.length, "the decision count disagrees with the rows listed");
+  assert.ok(+dm[1] > 5, "5 whole hands should be more than 5 decisions, got " + dm[1]);
+  noErrors();
+});

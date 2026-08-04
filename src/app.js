@@ -1154,6 +1154,71 @@ function renderAnalysis(res) {
 }
 function renderHand() { loadSetup(); buildHandInputs(); renderBankroll(); renderStackHint(); }
 
+/* ======================================================== CHALLENGE ======
+ * There is no server behind this page, so two people cannot see each other's
+ * records by opening the same link — every browser holds its own storage and
+ * nothing travels between them. What can travel is a short code.
+ *
+ * A challenge card carries the session SPEC and its SEED, which together
+ * reproduce the exact same hands on any device, plus the sender's result on
+ * those hands. Play it and the comparison is not an estimate over two
+ * different sets of spots: it is the same spots, decision for decision.
+ * ======================================================================== */
+const CHALLENGE_V = 1;
+/** Unicode-safe base64 that survives being pasted into a chat app. */
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64decode(code) {
+  const s = String(code).trim().replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(s + "===".slice((s.length + 3) % 4));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+const r2 = (x) => Math.round(x * 100) / 100;
+/** A finished session, compressed to what a comparison actually needs. */
+function resultOf(D) {
+  return {
+    nm: (D.who || "").slice(0, 16),
+    n: D.i, d: Math.max(1, D.decisions || D.i),
+    el: r2(D.evLost), ps: r2(D.potSum), ee: r2(D.evEarned), eb: r2(D.evBest),
+    cp: r2(D.evCaptured), cr: D.correct,
+    // per spot (or per hand) EV lost, so the card can name where it was decided
+    sp: perUnitLoss(D)
+  };
+}
+/** EV lost on each spot, or on each hand in whole-hand mode. */
+function perUnitLoss(D) {
+  if (D.mode !== "hand") return D.log.map((l) => r2(l.lost));
+  const byHand = [];
+  D.log.forEach((l) => {
+    const k = (l.hand || 1) - 1;
+    byHand[k] = r2((byHand[k] || 0) + l.lost);
+  });
+  return byHand;
+}
+function encodeChallenge(D) {
+  return "HS1." + b64encode(JSON.stringify({
+    v: CHALLENGE_V, seed: D.seed, spec: sessionSpec(D), from: resultOf(D)
+  }));
+}
+/** Returns the parsed card, or null with a reason the paste was rejected. */
+function decodeChallenge(code) {
+  const raw = String(code || "").trim().replace(/\s+/g, "");
+  if (!raw) return null;
+  try {
+    const body = raw.indexOf("HS1.") === 0 ? raw.slice(4) : raw;
+    const o = JSON.parse(b64decode(body));
+    if (!o || o.v !== CHALLENGE_V || !o.spec || !o.from) return null;
+    if (!(o.spec.n > 0) || typeof o.seed !== "number") return null;
+    return o;
+  } catch (e) { return null; }
+}
+
 /* ============================================================ DRILL ====== */
 const DIFFICULTY = { easy: "easy", normal: "normal", hard: "hard" };
 /* Stack depth changes the game more than anything else on this screen: at
@@ -1174,13 +1239,21 @@ const MIXED_DEPTHS = [100, 75, 50, 40, 30, 25, 20, 15, 12, 10];
 const MTT_DEPTHS = [60, 45, 35, 28, 22, 18, 15, 12, 10, 8];
 const MTT_STAGE_KEYS = ["early", "middle", "bubble", "final"];
 const isMtt = (cfg) => (cfg && cfg.game) === "mtt";
-/** Stack for the next spot: the chosen depth, or a draw from the mix. */
-function depthFor(cfg) {
+/** Stack for the next spot: the chosen depth, or a draw from the mix.
+ *  `rnd` makes the draw reproducible so a session can be replayed exactly. */
+function depthFor(cfg, rnd) {
   const chosen = DEPTHS.find((d) => d.k === (cfg.depth || "random"));
-  if (chosen && chosen.bb) return Math.min(chosen.bb, setupStack());
+  const cap = cfg.stack || setupStack();
+  if (chosen && chosen.bb) return Math.min(chosen.bb, cap);
   const mix = isMtt(cfg) ? MTT_DEPTHS : MIXED_DEPTHS;
-  const bb = mix[(Math.random() * mix.length) | 0];
-  return Math.min(bb, setupStack());
+  const bb = mix[((rnd ? rnd() : Math.random()) * mix.length) | 0];
+  return Math.min(bb, cap);
+}
+/* Every session is generated from one seed, so any session can be replayed
+ * move for move on another device. That is what makes a challenge exact
+ * rather than a rough comparison of two different sets of hands. */
+function spotRng(D, i) {
+  return PE.mulberry32(PE.seedFrom((D.seed | 0) + i * 7919 + 13));
 }
 function drillConfig() {
   return DB.get("drillcfg", { n: 10, vt: "random", diff: "normal", game: "cash", stage: "middle" });
@@ -1190,13 +1263,16 @@ function gameOpts(cfg) {
   return isMtt(cfg) ? { game: "mtt", stage: cfg.stage || "middle" } : { game: "cash" };
 }
 
-function makeDrillSpot(cfg, stack) {
+function makeDrillSpot(cfg, stack, seed) {
   // Difficulty filters on how close the top two options are: "easy" wants a
   // clear best line, "hard" wants genuinely close decisions.
-  const base = () => Object.assign({ villainType: cfg.vt, stack, seats: setupSeats() }, gameOpts(cfg));
+  const base = (attempt) => Object.assign(
+    { villainType: cfg.vt, stack, seats: cfg.seats || setupSeats() },
+    seed === undefined ? {} : { seed: seed + attempt * 104729 },
+    gameOpts(cfg));
   let best = null;
   for (let attempt = 0; attempt < (cfg.diff === "normal" ? 1 : 14); attempt++) {
-    const sp = PE.makeSpot(base());
+    const sp = PE.makeSpot(base(attempt));
     if (!sp) continue;
     const evs = sp.options.map((o) => o.ev).sort((a, b) => b - a);
     const gap = evs.length > 1 ? evs[0] - evs[1] : 99;
@@ -1205,14 +1281,23 @@ function makeDrillSpot(cfg, stack) {
     if (!best) best = sp;
     if (cfg.diff === "normal") return sp;
   }
-  return best || PE.makeSpot(base());
+  return best || PE.makeSpot(base(0));
 }
-function startDrill(cfg) {
-  STATE.drill = { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
-    depth: cfg.depth || "random", stack: setupStack(),
-    game: cfg.game || "cash", stage: cfg.stage || "middle",
+/** The settings that fully determine which hands a session deals. Two people
+ *  running the same spec with the same seed face the same spots. */
+function sessionSpec(cfg) {
+  return { n: cfg.n, vt: cfg.vt, diff: cfg.diff, mode: cfg.mode || "spot",
+    depth: cfg.depth || "random", stack: cfg.stack || setupStack(),
+    seats: cfg.seats || setupSeats(),
+    game: cfg.game || "cash", stage: cfg.stage || "middle" };
+}
+function startDrill(cfg, challenge) {
+  const spec = challenge ? challenge.spec : sessionSpec(cfg);
+  STATE.drill = Object.assign({}, spec, {
+    seed: challenge ? challenge.seed : (Math.random() * 1e9) | 0,
+    challenge: challenge || null,
     i: 0, evLost: 0, evEarned: 0, evBest: 0, evCaptured: 0, potSum: 0, correct: 0,
-    answered: null, log: [], done: false };
+    decisions: 0, answered: null, log: [], done: false });
   if (STATE.drill.mode === "hand") loadHand(); else loadSpot();
 }
 
@@ -1222,9 +1307,14 @@ function loadHand() {
   v.innerHTML = '<div class="card"><div class="empty">' + esc(t("drill.computing")) + "</div></div>";
   setTimeout(() => {
     const D = STATE.drill;
+    // Derive this hand's stack and seed from the session seed, so the same
+    // seed always deals the same hands — the basis of a challenge.
+    const rnd = spotRng(D, D.i);
+    const stack = depthFor(D, rnd);
+    const seed = ((rnd() * 1e9) | 0) + 1;
     D.run = HandRun.start(Object.assign(
-      { stack: depthFor(D), villainType: D.vt, seats: setupSeats() }, gameOpts(D)));
-    if (!D.run) { loadHand(); return; }
+      { stack, seed, villainType: D.vt, seats: D.seats || setupSeats() }, gameOpts(D)));
+    if (!D.run) { D.seed = (D.seed | 0) + 1; loadHand(); return; }
     D.dec = HandRun.decision(D.run);
     D.answered = null;
     renderDrill();
@@ -1279,7 +1369,8 @@ function loadSpot() {
     const D = STATE.drill;
     // D carries the session's settings; passing a hand-built subset here is
     // how the game type got silently dropped from every spot.
-    D.cur = makeDrillSpot(D, depthFor(D));
+    const rnd = spotRng(D, D.i);
+    D.cur = makeDrillSpot(D, depthFor(D, rnd), ((rnd() * 1e9) | 0) + 1);
     D.answered = null;
     renderDrill();
   }, 20);
@@ -1317,10 +1408,14 @@ function nextSpot() {
 function saveDrill() {
   const D = STATE.drill;
   const hist = DB.get("drills", []);
+  const dec = Math.max(1, D.decisions || D.i);
   hist.unshift({ at: Date.now(), n: D.i, vt: D.vt, diff: D.diff, mode: D.mode,
-    decisions: D.mode === "hand" ? (D.decisions || D.i) : D.i, potSum: D.potSum,
+    decisions: dec, potSum: D.potSum,
     evLost: D.evLost, evEarned: D.evEarned, evBest: D.evBest,
-    capture: D.i ? D.evCaptured / D.i : 0, correct: D.correct,
+    capture: D.evCaptured / dec, correct: D.correct,
+    // Enough to recognise a session someone challenges you back on, and to
+    // compare against it without having to play the same hands twice.
+    seed: D.seed, spec: sessionSpec(D), result: resultOf(D),
     log: D.log });
   DB.set("drills", hist.slice(0, 100));
 }
@@ -1437,6 +1532,7 @@ function renderDrill() {
           esc(t("drill.diff" + k[0].toUpperCase() + k.slice(1))) + "</button>").join("") + "</div>" +
       '<div class="small dim" style="margin-top:5px">' + esc(t("drill.diff" + cfg.diff[0].toUpperCase() + cfg.diff.slice(1) + "D")) + "</div>" +
       '<div style="margin-top:16px"><button class="btn" id="dr-go">' + esc(t("common.start")) + "</button></div></div>" +
+      challengeAcceptHTML() +
       drillHistoryHTML();
     v.querySelectorAll("#dr-n button").forEach((b) => (b.onclick = () => { cfg.n = +b.dataset.n; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-vt button").forEach((b) => (b.onclick = () => { cfg.vt = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
@@ -1446,6 +1542,7 @@ function renderDrill() {
     v.querySelectorAll("#dr-game button").forEach((b) => (b.onclick = () => { cfg.game = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     v.querySelectorAll("#dr-stage button").forEach((b) => (b.onclick = () => { cfg.stage = b.dataset.k; DB.set("drillcfg", cfg); renderDrill(); }));
     $("dr-go").onclick = () => startDrill(cfg);
+    bindChallengeAccept();
     return;
   }
   if (D.done) return renderDrillEnd(v);
@@ -1763,12 +1860,154 @@ function renderDrillEnd(v) {
             (l.lost < 0.02 ? "✓" : lossText(l.lost) + "BB") + "</span></div>";
         }).join("")
       : '<p class="small dim" style="margin:0">' + esc(t("drill.endNoActions")) + "</p>") + "</div>";
+  h += headToHeadHTML(D);
+  h += challengeShareHTML(D);
   h += '<div class="row" style="margin-top:12px">' +
     '<div style="flex:0 0 auto"><button class="btn" id="dr-again">' + esc(t("drill.again")) + "</button></div>" +
     '<div style="flex:0 0 auto"><button class="btn sec" id="dr-home">' + esc(t("drill.home")) + "</button></div></div></div>";
   v.innerHTML = h;
   $("dr-again").onclick = () => startDrill(drillConfig());
   $("dr-home").onclick = () => { STATE.drill = null; renderDrill(); };
+  bindChallengeShare(D);
+}
+
+/* --- head to head ------------------------------------------------------- */
+function headToHeadHTML(D) {
+  const ch = D.challenge;
+  if (!ch || !ch.from) return "";
+  return h2hBlock(resultOf(D), ch.from);
+}
+/** Both sides of a challenge, scored the same way on the same hands. */
+function h2hBlock(me, them) {
+  const rate = (r) => (r.ps > 0 ? ratingOf(r.el / r.ps) : ratingOfBB(r.el / Math.max(1, r.d)));
+  const mineRate = rate(me), theirRate = rate(them);
+  const name = them.nm || t("vs.them");
+
+  const row = (label, mv, tv, better, fmt) => {
+    const f = fmt || ((x) => nfmt(x, 2));
+    const win = better === 0 ? null : (better > 0 ? mv > tv : mv < tv);
+    const tie = Math.abs(mv - tv) < 1e-9;
+    return '<div class="h2h"><span class="hl">' + esc(label) + "</span>" +
+      '<span class="hv' + (!tie && win ? " w" : "") + '">' + esc(f(mv)) + "</span>" +
+      '<span class="hv' + (!tie && win === false ? " w" : "") + '">' + esc(f(tv)) + "</span></div>";
+  };
+
+  const gap = mineRate - theirRate;
+  const evGap = them.el - me.el;              // + means I gave away less
+  const verdict = Math.abs(gap) < 3 ? "h2hEven" : gap > 0 ? "h2hAhead" : "h2hBehind";
+
+  return '<div class="blk ' + (gap >= 0 ? "hi" : "warn") + '" style="margin-top:14px">' +
+    '<div class="t">' + esc(t("vs.title")) + "</div>" +
+    '<p style="margin:0 0 10px">' + t("vs." + verdict, {
+      who: esc(name), pts: Math.abs(Math.round(gap)), bb: nfmt(Math.abs(evGap), 2) }) + "</p>" +
+    '<div class="h2h head"><span class="hl"></span><span class="hv">' + esc(t("vs.me")) +
+      '</span><span class="hv">' + esc(name) + "</span></div>" +
+    row(t("drill.rating"), mineRate, theirRate, 1, (x) => Math.round(x) +
+      " " + gradeFromRating(x)) +
+    row(t("drill.endEvLost"), me.el, them.el, -1, (x) => lossText(x) + "BB") +
+    row(t("drill.endAccuracy"), me.cr / me.d * 100, them.cr / them.d * 100, 1,
+      (x) => Math.round(x) + "%") +
+    row(t("drill.endCapture"), me.cp / me.d * 100, them.cp / them.d * 100, 1,
+      (x) => Math.round(x) + "%") +
+    '<div class="small dim" style="margin-top:10px">' + esc(t("vs.sameSpots")) + "</div>" +
+    biggestGapsHTML(me, them) + "</div>";
+}
+/** Where the match was actually decided. */
+function biggestGapsHTML(me, them) {
+  const n = Math.min(me.sp.length, them.sp.length);
+  if (n < 2) return "";
+  const rows = [];
+  for (let i = 0; i < n; i++) rows.push({ i, d: (them.sp[i] || 0) - (me.sp[i] || 0) });
+  rows.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+  const top = rows.slice(0, 3).filter((r) => Math.abs(r.d) >= 0.05);
+  if (!top.length) return "";
+  return '<div class="blk sumcard" style="margin:10px 0 0">' +
+    '<div class="t">' + esc(t("vs.decidedBy")) + "</div>" +
+    top.map((r) => '<div class="sr"><span class="n">' + (r.i + 1) + "</span>" +
+      '<span class="a">' + esc(t(r.d > 0 ? "vs.wonSpot" : "vs.lostSpot")) + "</span>" +
+      '<span class="z" style="color:' + (r.d > 0 ? "var(--good)" : "var(--bad)") + '">' +
+      signed(r.d) + "BB</span></div>").join("") + "</div>";
+}
+
+/** Paste a friend's code and play their exact session. */
+function challengeAcceptHTML() {
+  return '<div class="card"><h3>' + esc(t("vs.acceptTitle")) + "</h3>" +
+    "<p>" + esc(t("vs.acceptNote")) + "</p>" +
+    '<div><label>' + esc(t("vs.pasteLabel")) + "</label>" +
+    '<textarea id="ch-in" rows="3" placeholder="HS1..." style="width:100%"></textarea></div>' +
+    '<div class="row" style="margin-top:10px">' +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="ch-load">' + esc(t("vs.loadCode")) + "</button></div>" +
+    "</div><div id=\"ch-preview\"></div></div>";
+}
+function bindChallengeAccept() {
+  const btn = $("ch-load"); if (!btn) return;
+  btn.onclick = () => {
+    const card = decodeChallenge($("ch-in").value);
+    const out = $("ch-preview");
+    if (!card) {
+      out.innerHTML = '<div class="notice" style="margin-top:10px">' + esc(t("vs.badCode")) + "</div>";
+      return;
+    }
+    const s = card.spec, f = card.from;
+    const rating = f.ps > 0 ? ratingOf(f.el / f.ps) : ratingOfBB(f.el / Math.max(1, f.d));
+    // have I already played these exact hands?
+    const mine = DB.get("drills", []).find((d) => d.seed === card.seed && d.result &&
+      d.spec && d.spec.n === s.n && d.spec.mode === s.mode);
+    out.innerHTML = '<div class="blk hi" style="margin-top:12px"><div class="t">' +
+      esc(t("vs.fromWho", { who: f.nm || t("vs.them") })) + "</div>" +
+      '<div class="stmeta">' +
+        "<span>" + esc(t(s.mode === "hand" ? "drill.modeHand" : "drill.modeSpot")) + "</span>" +
+        "<span>" + esc(t(s.mode === "hand" ? "drill.endHands" : "drill.endSpots")) + " <b>" + s.n + "</b></span>" +
+        "<span>" + esc(t(s.game === "cash" ? "drill.gameCash" : "drill.gameMtt")) + "</span>" +
+        "<span>" + esc(t("drill.rating")) + " <b>" + Math.round(rating) + " " + gradeFromRating(rating) + "</b></span>" +
+      "</div>" +
+      // If this is a challenge back on a session already played, there is
+      // nothing to replay — go straight to the comparison.
+      (mine
+        ? "<p>" + esc(t("vs.alreadyPlayed")) + "</p>" +
+          '<button class="btn" id="ch-compare">' + esc(t("vs.compareNow")) + "</button> " +
+          '<button class="btn sec" id="ch-start">' + esc(t("vs.playAgain")) + "</button>"
+        : "<p>" + esc(t("vs.acceptWarn")) + "</p>" +
+          '<button class="btn" id="ch-start">' + esc(t("vs.playIt")) + "</button>") +
+      "</div>";
+    $("ch-start").onclick = () => startDrill(null, card);
+    if (mine) {
+      $("ch-compare").onclick = () => {
+        out.innerHTML = '<div style="margin-top:12px">' + h2hBlock(mine.result, f) + "</div>";
+      };
+    }
+  };
+}
+
+/* --- making and accepting a challenge ----------------------------------- */
+function challengeShareHTML(D) {
+  return '<div class="blk" style="margin-top:14px"><div class="t">' + esc(t("vs.shareTitle")) + "</div>" +
+    "<p>" + esc(t(D.challenge ? "vs.shareBackNote" : "vs.shareNote")) + "</p>" +
+    '<div class="row" style="margin-top:8px">' +
+      '<div><label>' + esc(t("vs.yourName")) + '</label>' +
+      '<input id="ch-name" maxlength="16" value="' + esc(DB.get("who", "")) + '" placeholder="' + esc(t("vs.namePh")) + '"></div>' +
+    "</div>" +
+    '<div class="row" style="margin-top:10px">' +
+      '<div style="flex:0 0 auto"><button class="btn" id="ch-make">' + esc(t("vs.makeCode")) + "</button></div>" +
+    "</div><div id=\"ch-out\"></div></div>";
+}
+function bindChallengeShare(D) {
+  const btn = $("ch-make"); if (!btn) return;
+  btn.onclick = () => {
+    const who = ($("ch-name").value || "").trim().slice(0, 16);
+    DB.set("who", who);
+    D.who = who;
+    const code = encodeChallenge(D);
+    $("ch-out").innerHTML = '<div class="small muted" style="margin:12px 0 4px">' +
+      esc(t("vs.codeReady")) + "</div>" +
+      '<div class="notation" id="ch-code">' + esc(code) + "</div>" +
+      '<button class="btn sec sm" id="ch-copy" style="margin-top:8px">' + esc(t("vs.copyCode")) + "</button>" +
+      '<div class="small dim" style="margin-top:6px">' + esc(t("vs.codeHint")) + "</div>";
+    $("ch-copy").onclick = () => {
+      if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => toast(t("common.copied")), () => {});
+      else toast(t("common.copied"));
+    };
+  };
 }
 function drillHistoryHTML() {
   const hist = DB.get("drills", []);

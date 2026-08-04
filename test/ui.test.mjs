@@ -828,3 +828,146 @@ test("the whole-hand results screen shows the decisions it graded", async () => 
   assert.ok(+dm[1] > 5, "5 whole hands should be more than 5 decisions, got " + dm[1]);
   noErrors();
 });
+
+/* --- challenges: the only way two people can be compared without a server -- */
+
+/** Play the visible session to the end, always taking the same option slot. */
+async function playSession(pg, pickLast) {
+  for (let i = 0; i < 15; i++) {
+    if (await pg.$("#dr-again")) break;
+    await pg.waitForSelector(".dopt, #dr-again", { timeout: 60000 });
+    if (!(await pg.$(".dopt"))) break;
+    const opts = await pg.$$(".dopt");
+    await opts[pickLast ? opts.length - 1 : 0].click();
+    await pg.waitForSelector("#dr-next", { timeout: 60000 });
+    await pg.click("#dr-next");
+  }
+  await pg.waitForSelector("#dr-again", { timeout: 60000 });
+}
+async function makeCode(pg, name) {
+  await pg.fill("#ch-name", name);
+  await pg.click("#ch-make");
+  await pg.waitForSelector("#ch-code");
+  return (await pg.$eval("#ch-code", (e) => e.innerText)).trim();
+}
+/** The cards and board on screen — the identity of the spot being asked. */
+const spotFingerprint = (pg) =>
+  pg.$eval("#v-drill .dspot", (e) => e.innerText.replace(/\s+/g, " ").trim());
+
+test("a challenge deals the same hands to a different browser", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#dr-mode button");
+  await page.click('#dr-game button[data-k="cash"]');
+  await page.click('#dr-mode button[data-k="spot"]');
+  await page.click('#dr-n button[data-n="5"]');
+  await page.click("#dr-go");
+
+  const mine = [];
+  for (let i = 0; i < 5; i++) {
+    await page.waitForSelector(".dopt", { timeout: 60000 });
+    mine.push(await spotFingerprint(page));
+    await page.click(".dopt");
+    await page.waitForSelector("#dr-next", { timeout: 60000 });
+    await page.click("#dr-next");
+    if (await page.$("#dr-again")) break;
+  }
+  await page.waitForSelector("#ch-make", { timeout: 60000 });
+  const code = await makeCode(page, "Alex");
+  assert.match(code, /^HS1\./, "the code should be recognisable: " + code.slice(0, 20));
+  assert.ok(code.length < 2000, "a code has to be pasteable, got " + code.length + " chars");
+
+  // a genuinely separate browser profile — no shared storage of any kind
+  const ctx = await browser.newContext();
+  const other = await ctx.newPage();
+  const otherErrors = [];
+  other.on("pageerror", (e) => otherErrors.push(String(e)));
+  await other.goto(URL);
+  await other.waitForSelector("#nav button");
+  await other.selectOption("#langsel", "en");
+  await other.click('#nav button[data-v="drill"]');
+  await other.waitForSelector("#ch-in");
+  await other.fill("#ch-in", code);
+  await other.click("#ch-load");
+  await other.waitForSelector("#ch-start", { timeout: 30000 });
+  assert.match(await other.$eval("#ch-preview", (e) => e.innerText), /Alex/i,
+    "the preview should name who sent it");
+  await other.click("#ch-start");
+
+  const theirs = [];
+  for (let i = 0; i < 5; i++) {
+    await other.waitForSelector(".dopt", { timeout: 60000 });
+    theirs.push(await spotFingerprint(other));
+    const opts = await other.$$(".dopt");
+    await opts[opts.length - 1].click();          // deliberately a different line
+    await other.waitForSelector("#dr-next", { timeout: 60000 });
+    await other.click("#dr-next");
+    if (await other.$("#dr-again")) break;
+  }
+  assert.equal(theirs.length, mine.length, "the challenge dealt a different number of spots");
+  theirs.forEach((f, i) => assert.equal(f, mine[i],
+    `spot ${i + 1} differs.\n  A: ${mine[i]}\n  B: ${f}`));
+
+  // and the comparison shows both sides on those same hands
+  await other.waitForSelector("#dr-again", { timeout: 60000 });
+  const h2h = await other.$$eval("#v-drill .blk", (els) => {
+    const hit = els.find((e) => e.querySelector(".h2h"));
+    return hit ? hit.innerText : "";
+  });
+  assert.ok(h2h, "no head-to-head block after finishing a challenge");
+  assert.match(h2h, /Alex/i, "the opponent is not named: " + h2h.slice(0, 120));
+  assert.match(h2h, /Rating/i, "no rating row: " + h2h.slice(0, 200));
+  const scores = await other.$$eval("#v-drill .h2h .hv", (e) => e.map((x) => x.innerText.trim()));
+  assert.ok(scores.length >= 6, "expected two columns of scores, got " + scores.length);
+  assert.deepEqual(otherErrors, [], "second browser errors: " + otherErrors.join(" | "));
+  await ctx.close();
+  noErrors();
+});
+
+test("a challenge back on hands already played compares instead of replaying", async () => {
+  // page still holds the session it played above, stored in its history
+  await page.click("#dr-home");
+  await page.waitForSelector("#ch-in");
+
+  // build the opponent's card by hand: same seed and spec, a different score
+  const theirCode = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem("hb.drills"))[0];
+    const card = { v: 1, seed: d.seed, spec: d.spec,
+      from: { nm: "Sam", n: d.n, d: d.decisions, el: 0.4, ps: d.result.ps,
+        ee: 5, eb: 5.4, cp: d.decisions * 0.95, cr: d.decisions,
+        sp: d.result.sp.map(() => 0.08) } };
+    const bytes = new TextEncoder().encode(JSON.stringify(card));
+    let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
+    return "HS1." + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  });
+
+  await page.fill("#ch-in", theirCode);
+  await page.click("#ch-load");
+  await page.waitForSelector("#ch-preview .blk", { timeout: 30000 });
+  assert.ok(await page.$("#ch-compare"),
+    "already-played hands should offer a comparison, not a replay");
+  await page.click("#ch-compare");
+  await page.waitForSelector("#ch-preview .h2h", { timeout: 30000 });
+  const txt = await page.$eval("#ch-preview", (e) => e.innerText);
+  assert.match(txt, /Sam/i, "the opponent is not named: " + txt.slice(0, 120));
+  assert.match(txt, /same hands/i, "the comparison should say the hands were identical");
+  noErrors();
+});
+
+test("a corrupt challenge code is rejected, not acted on", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="drill"]');
+  await page.waitForSelector("#ch-in");
+  for (const bad of ["nonsense", "HS1.zzzz", "HS1." + btoa('{"v":9}')]) {
+    await page.fill("#ch-in", bad);
+    await page.click("#ch-load");
+    const out = await page.$eval("#ch-preview", (e) => e.innerText);
+    assert.match(out, /could not be read/i, `"${bad}" was not rejected: ` + out);
+    assert.equal(await page.$("#ch-start"), null, `"${bad}" offered to start a session`);
+  }
+  noErrors();
+});

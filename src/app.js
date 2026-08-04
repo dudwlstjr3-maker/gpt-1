@@ -2252,17 +2252,55 @@ function renderStats() {
 }
 
 /* ============================================================ HOME ======= */
+/* Home is the player's own record at a glance. The tendency profile has its
+ * own tab and used to be repeated here in full, which buried everything
+ * else — a summary of who you are, not a second copy of the profile. */
+function myInfoCard() {
+  const ov = overallRating();
+  const hands = DB.get("hands", []), drills = DB.get("drills", []);
+  const who = DB.get("who", "");
+  const lastAt = Math.max(drills.length ? drills[0].at || 0 : 0, hands.length ? hands[0].at || 0 : 0);
+
+  let h = '<div class="card"><div class="mehead">' +
+    '<div class="meid"><h3 style="margin:0">' + esc(who || t("home.meAnon")) + "</h3>" +
+    '<div class="small dim">' + esc(lastAt ? t("home.lastSeen", { d: new Date(lastAt).toLocaleDateString() })
+      : t("home.neverPlayed")) + "</div></div>" +
+    (ov ? gradeBadge(ov.grade, Math.round(ov.rating)) : "") + "</div>";
+
+  if (!ov && !hands.length) {
+    h += '<div class="empty">' + esc(t("home.meEmpty")) + "</div></div>";
+    return h;
+  }
+  h += '<div class="kpi" style="margin-top:12px">' +
+    '<div class="k"><div class="kk">' + esc(t("stats.overallRating")) + '</div><div class="kv">' +
+      (ov ? Math.round(ov.rating) : "—") + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("home.meSessions")) + '</div><div class="kv">' +
+      (ov ? ov.sessions : 0) + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("stats.decisions")) + '</div><div class="kv">' +
+      (ov ? ov.decisions : 0) + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("home.meHands")) + '</div><div class="kv">' +
+      hands.length + "</div></div>" +
+    "</div>";
+  if (ov && ov.per !== null) {
+    h += '<div class="small dim" style="margin-top:10px">' +
+      esc(t("home.meLoss", { v: (ov.per * 100).toFixed(1) })) + "</div>";
+  }
+  h += '<div class="row" style="margin-top:12px">' +
+    '<div style="flex:0 0 auto"><button class="btn sec sm" data-go="stats">' + esc(t("home.meMore")) + "</button></div>" +
+    "</div></div>";
+  return h;
+}
+
 function renderHome() {
   const v = $("v-home");
-  const p = effectiveProfile(), hands = DB.get("hands", []), drills = DB.get("drills", []);
+  const hands = DB.get("hands", []), drills = DB.get("drills", []);
   let h = '<div class="card"><h1>' + esc(t("home.h1")) + "</h1><p>" + t("home.lead") + "</p>" +
     '<div class="homecta">' +
       '<button data-go="quiz"><div class="ct">' + esc(t("home.cta1")) + '</div><div class="cd">' + esc(t("home.cta1d")) + "</div></button>" +
       '<button data-go="hand"><div class="ct">' + esc(t("home.cta2")) + '</div><div class="cd">' + esc(t("home.cta2d")) + "</div></button>" +
       '<button data-go="drill"><div class="ct">' + esc(t("home.cta3")) + '</div><div class="cd">' + esc(t("home.cta3d")) + "</div></button>" +
     "</div></div>";
-  if (p) h += profileCard(p);
-  else h += '<div class="card"><h3>' + esc(t("home.profileTitle")) + '</h3><div class="empty">' + esc(t("home.noProfile")) + "</div></div>";
+  h += myInfoCard();
   if (drills.length) {
     const last = drills[0];
     h += '<div class="card"><h3>' + esc(t("home.drillSummary")) + "</h3>" +

@@ -348,6 +348,10 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
 .eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
 .eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+/* home: who you are and how you are doing, on one line */
+.mehead{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.mehead .meid{min-width:0;flex:1 1 auto}
+.mehead .meid h3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* head to head: one label, two scores, the better one picked out */
 .h2h{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:baseline;
   padding:6px 0;border-bottom:1px solid var(--line)}

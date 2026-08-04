@@ -356,6 +356,10 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
 .eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
 .eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+/* home: who you are and how you are doing, on one line */
+.mehead{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+.mehead .meid{min-width:0;flex:1 1 auto}
+.mehead .meid h3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* head to head: one label, two scores, the better one picked out */
 .h2h{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:baseline;
   padding:6px 0;border-bottom:1px solid var(--line)}
@@ -2050,8 +2054,8 @@ const ko = {
   meta: { name: "한국어", htmlLang: "ko", dir: "ltr" },
   app: {
     title: "홀덤 <span>스튜디오</span>",
-    tagline: "성향 진단 · 핸드 분석 · EV 드릴",
-    docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 드릴"
+    tagline: "성향 진단 · 핸드 분석 · EV 채점",
+    docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 채점"
   },
   nav: { home: "홈", quiz: "성향", hand: "핸드 분석", stats: "리크 · 기록", drill: "핸드 연습", range: "레인지 랩", help: "도움말" },
   common: {
@@ -2091,12 +2095,16 @@ const ko = {
   },
   home: {
     h1: "무엇을 고치고 싶으신가요",
-    lead: "이 도구는 세 가지를 합니다. <b>성향을 진단</b>하고, <b>친 핸드의 EV를 계산</b>하고, <b>같은 실수를 반복하는지 드릴로 확인</b>합니다.",
+    lead: "이 도구는 세 가지를 합니다. <b>성향을 진단</b>하고, <b>친 핸드의 EV를 계산</b>하고, <b>핸드 연습으로 같은 실수를 반복하는지 확인</b>합니다.",
     cta1: "성향 진단부터", cta1d: "25문항이면 내 누수 축이 나옵니다.",
     cta2: "핸드 분석", cta2d: "방금 친 핸드를 넣고 스트리트별 EV를 봅니다.",
     cta3: "핸드 연습", cta3d: "임의 스팟에서 액션을 고르고 선택지별 EV로 채점받습니다.",
-    profileTitle: "내 성향",
-    noProfile: "아직 진단 기록이 없습니다.",
+    meAnon: "내 정보",
+    meEmpty: "아직 기록이 없습니다. 핸드 연습을 한 세션 해보면 여기에 성적이 쌓입니다.",
+    meSessions: "연습 세션", meHands: "분석한 핸드",
+    lastSeen: "마지막 기록 {d}", neverPlayed: "아직 플레이 기록이 없습니다",
+    meLoss: "결정마다 팟의 {v}%를 흘리고 있습니다.",
+    meMore: "기록 자세히 보기",
     recentHands: "최근 기록한 핸드", noHands: "아직 저장된 핸드가 없습니다.",
     drillSummary: "연습 성적", noDrill: "아직 연습 기록이 없습니다.",
     quickStats: "요약"
@@ -2505,8 +2513,12 @@ const en = {
     cta1: "Start with the profile", cta1d: "25 questions is enough to find your leak axis.",
     cta2: "Analyse a hand", cta2d: "Enter the hand you just played and see street-by-street EV.",
     cta3: "Hand practice", cta3d: "Pick an action in a random spot and get scored on every option's EV.",
-    profileTitle: "Your profile",
-    noProfile: "No profile yet.",
+    meAnon: "Your record",
+    meEmpty: "Nothing recorded yet. Play a practice session and your results will build up here.",
+    meSessions: "Sessions", meHands: "Hands analysed",
+    lastSeen: "Last played {d}", neverPlayed: "No sessions played yet",
+    meLoss: "You give away {v}% of the pot on an average decision.",
+    meMore: "See the full record",
     recentHands: "Recent hands", noHands: "No saved hands yet.",
     drillSummary: "Practice record", noDrill: "No practice sessions yet.",
     quickStats: "Summary"
@@ -5521,17 +5533,55 @@ function renderStats() {
 }
 
 /* ============================================================ HOME ======= */
+/* Home is the player's own record at a glance. The tendency profile has its
+ * own tab and used to be repeated here in full, which buried everything
+ * else — a summary of who you are, not a second copy of the profile. */
+function myInfoCard() {
+  const ov = overallRating();
+  const hands = DB.get("hands", []), drills = DB.get("drills", []);
+  const who = DB.get("who", "");
+  const lastAt = Math.max(drills.length ? drills[0].at || 0 : 0, hands.length ? hands[0].at || 0 : 0);
+
+  let h = '<div class="card"><div class="mehead">' +
+    '<div class="meid"><h3 style="margin:0">' + esc(who || t("home.meAnon")) + "</h3>" +
+    '<div class="small dim">' + esc(lastAt ? t("home.lastSeen", { d: new Date(lastAt).toLocaleDateString() })
+      : t("home.neverPlayed")) + "</div></div>" +
+    (ov ? gradeBadge(ov.grade, Math.round(ov.rating)) : "") + "</div>";
+
+  if (!ov && !hands.length) {
+    h += '<div class="empty">' + esc(t("home.meEmpty")) + "</div></div>";
+    return h;
+  }
+  h += '<div class="kpi" style="margin-top:12px">' +
+    '<div class="k"><div class="kk">' + esc(t("stats.overallRating")) + '</div><div class="kv">' +
+      (ov ? Math.round(ov.rating) : "—") + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("home.meSessions")) + '</div><div class="kv">' +
+      (ov ? ov.sessions : 0) + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("stats.decisions")) + '</div><div class="kv">' +
+      (ov ? ov.decisions : 0) + "</div></div>" +
+    '<div class="k"><div class="kk">' + esc(t("home.meHands")) + '</div><div class="kv">' +
+      hands.length + "</div></div>" +
+    "</div>";
+  if (ov && ov.per !== null) {
+    h += '<div class="small dim" style="margin-top:10px">' +
+      esc(t("home.meLoss", { v: (ov.per * 100).toFixed(1) })) + "</div>";
+  }
+  h += '<div class="row" style="margin-top:12px">' +
+    '<div style="flex:0 0 auto"><button class="btn sec sm" data-go="stats">' + esc(t("home.meMore")) + "</button></div>" +
+    "</div></div>";
+  return h;
+}
+
 function renderHome() {
   const v = $("v-home");
-  const p = effectiveProfile(), hands = DB.get("hands", []), drills = DB.get("drills", []);
+  const hands = DB.get("hands", []), drills = DB.get("drills", []);
   let h = '<div class="card"><h1>' + esc(t("home.h1")) + "</h1><p>" + t("home.lead") + "</p>" +
     '<div class="homecta">' +
       '<button data-go="quiz"><div class="ct">' + esc(t("home.cta1")) + '</div><div class="cd">' + esc(t("home.cta1d")) + "</div></button>" +
       '<button data-go="hand"><div class="ct">' + esc(t("home.cta2")) + '</div><div class="cd">' + esc(t("home.cta2d")) + "</div></button>" +
       '<button data-go="drill"><div class="ct">' + esc(t("home.cta3")) + '</div><div class="cd">' + esc(t("home.cta3d")) + "</div></button>" +
     "</div></div>";
-  if (p) h += profileCard(p);
-  else h += '<div class="card"><h3>' + esc(t("home.profileTitle")) + '</h3><div class="empty">' + esc(t("home.noProfile")) + "</div></div>";
+  h += myInfoCard();
   if (drills.length) {
     const last = drills[0];
     h += '<div class="card"><h3>' + esc(t("home.drillSummary")) + "</h3>" +

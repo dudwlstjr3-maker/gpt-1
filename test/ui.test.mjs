@@ -971,3 +971,31 @@ test("a corrupt challenge code is rejected, not acted on", async () => {
   }
   noErrors();
 });
+
+test("home shows your record; the tendency profile stays in its own tab", async () => {
+  await page.evaluate(() => localStorage.setItem("hb.profile", JSON.stringify({
+    axes: { A1: -20, A2: 35, A3: 10, A4: -15, A5: 30, B1: 12, B2: 18 },
+    conf: { A1: .9, A2: .9, A3: .8, A4: .8, A5: .9, B1: .8, B2: .7 },
+    cnt: {}, n: 28, archetype: "TAG", at: Date.now()
+  })));
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="home"]');
+  await page.waitForSelector("#v-home .card");
+
+  // the profile card used to be repeated in full on home
+  assert.equal((await page.$$("#v-home .axis")).length, 0, "home is still drawing the profile axes");
+  const home = await page.$eval("#v-home", (e) => e.innerText);
+  assert.ok(!/Archetype/i.test(home), "home should not name the archetype: " + home.slice(0, 200));
+  assert.match(home, /Sessions/, "home should show the record: " + home.slice(0, 200));
+  assert.match(home, /Decisions/, "home should show the decision count");
+
+  // and the profile is still fully present where it belongs
+  await page.click('#nav button[data-v="quiz"]');
+  await page.waitForSelector("#v-quiz .card");
+  assert.equal((await page.$$("#v-quiz .axis")).length, 7, "the profile tab lost its axes");
+  assert.match(await page.$eval("#v-quiz", (e) => e.innerText), /Archetype/i,
+    "the profile tab should still name the archetype");
+  noErrors();
+});

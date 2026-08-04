@@ -15,8 +15,8 @@ const ko = {
   meta: { name: "한국어", htmlLang: "ko", dir: "ltr" },
   app: {
     title: "홀덤 <span>스튜디오</span>",
-    tagline: "성향 진단 · 핸드 분석 · EV 드릴",
-    docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 드릴"
+    tagline: "성향 진단 · 핸드 분석 · EV 채점",
+    docTitle: "홀덤 스튜디오 — 핸드 분석 & EV 채점"
   },
   nav: { home: "홈", quiz: "성향", hand: "핸드 분석", stats: "리크 · 기록", drill: "핸드 연습", range: "레인지 랩", help: "도움말" },
   common: {
@@ -56,12 +56,16 @@ const ko = {
   },
   home: {
     h1: "무엇을 고치고 싶으신가요",
-    lead: "이 도구는 세 가지를 합니다. <b>성향을 진단</b>하고, <b>친 핸드의 EV를 계산</b>하고, <b>같은 실수를 반복하는지 드릴로 확인</b>합니다.",
+    lead: "이 도구는 세 가지를 합니다. <b>성향을 진단</b>하고, <b>친 핸드의 EV를 계산</b>하고, <b>핸드 연습으로 같은 실수를 반복하는지 확인</b>합니다.",
     cta1: "성향 진단부터", cta1d: "25문항이면 내 누수 축이 나옵니다.",
     cta2: "핸드 분석", cta2d: "방금 친 핸드를 넣고 스트리트별 EV를 봅니다.",
     cta3: "핸드 연습", cta3d: "임의 스팟에서 액션을 고르고 선택지별 EV로 채점받습니다.",
-    profileTitle: "내 성향",
-    noProfile: "아직 진단 기록이 없습니다.",
+    meAnon: "내 정보",
+    meEmpty: "아직 기록이 없습니다. 핸드 연습을 한 세션 해보면 여기에 성적이 쌓입니다.",
+    meSessions: "연습 세션", meHands: "분석한 핸드",
+    lastSeen: "마지막 기록 {d}", neverPlayed: "아직 플레이 기록이 없습니다",
+    meLoss: "결정마다 팟의 {v}%를 흘리고 있습니다.",
+    meMore: "기록 자세히 보기",
     recentHands: "최근 기록한 핸드", noHands: "아직 저장된 핸드가 없습니다.",
     drillSummary: "연습 성적", noDrill: "아직 연습 기록이 없습니다.",
     quickStats: "요약"
@@ -470,8 +474,12 @@ const en = {
     cta1: "Start with the profile", cta1d: "25 questions is enough to find your leak axis.",
     cta2: "Analyse a hand", cta2d: "Enter the hand you just played and see street-by-street EV.",
     cta3: "Hand practice", cta3d: "Pick an action in a random spot and get scored on every option's EV.",
-    profileTitle: "Your profile",
-    noProfile: "No profile yet.",
+    meAnon: "Your record",
+    meEmpty: "Nothing recorded yet. Play a practice session and your results will build up here.",
+    meSessions: "Sessions", meHands: "Hands analysed",
+    lastSeen: "Last played {d}", neverPlayed: "No sessions played yet",
+    meLoss: "You give away {v}% of the pot on an average decision.",
+    meMore: "See the full record",
     recentHands: "Recent hands", noHands: "No saved hands yet.",
     drillSummary: "Practice record", noDrill: "No practice sessions yet.",
     quickStats: "Summary"

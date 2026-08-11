@@ -348,6 +348,76 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .eqbar i{display:block;height:100%;border-radius:8px;transition:width .35s}
 .eqbar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.85}
 .eqlab{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);font-variant-numeric:tabular-nums}
+/* ---- tournament director ------------------------------------------------
+ * The board is read from across a room, off a TV or a projector, so it stays
+ * dark in both themes on purpose — a light background there is glare, not a
+ * preference. Its own colours are literal rather than themed for that reason.
+ * Everything below the board is an ordinary themed control panel.          */
+.tdwrap{background:#0b1016;border:1px solid #223046;border-radius:14px;
+  padding:20px 18px 22px;margin:0 0 14px;text-align:center;color:#e6edf5}
+.tdwrap:fullscreen{border-radius:0;border:0;display:flex;flex-direction:column;
+  justify-content:center;padding:3vh 4vw;background:#080c11}
+.tdtop{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.tdname{font-size:clamp(15px,2.4vw,30px);font-weight:800;color:#9fb0c4;text-align:left}
+.tdlv{font-size:clamp(15px,2.4vw,30px);font-weight:800;color:#4fd1a5;letter-spacing:1.5px}
+.tdlv .brk{color:#ffb648}
+.tdclock{margin:6px 0 2px}
+#td-time{font-size:clamp(66px,19vw,230px);font-weight:800;line-height:1.02;letter-spacing:-3px;
+  font-variant-numeric:tabular-nums;font-family:'Segoe UI',Arial,sans-serif}
+#td-time.hot{color:#ffb648}
+.tdbar{height:6px;background:#182231;border-radius:4px;overflow:hidden;margin:6px auto 0;max-width:78%}
+.tdbar i{display:block;height:100%;background:#4fd1a5;transition:width .3s linear}
+.tdblinds .lb{font-size:clamp(11px,1.4vw,16px);color:#6b7c91;letter-spacing:4px;margin-top:12px}
+.tdblinds .bl{font-size:clamp(30px,7.4vw,88px);font-weight:800;line-height:1.15;
+  font-variant-numeric:tabular-nums}
+.tdblinds .an{font-size:.46em;color:#9fb0c4;font-weight:700;white-space:nowrap}
+.tdnext{font-size:clamp(12px,1.8vw,22px);color:#9fb0c4;margin-top:10px}
+.tdpay{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px;
+  font-size:clamp(11px,1.3vw,17px);color:#9fb0c4}
+.tdpay span{background:#131b26;border-radius:7px;padding:4px 11px;font-variant-numeric:tabular-nums}
+.tdpay b{color:#4fd1a5;margin-right:5px}
+.tdprize{margin-top:18px;display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap}
+.tdprize .lb{font-size:clamp(11px,1.4vw,16px);color:#6b7c91;letter-spacing:3px}
+.tdprize .pv{font-size:clamp(26px,5vw,58px);font-weight:800;color:#4fd1a5;
+  font-variant-numeric:tabular-nums}
+.tdreg{margin-top:10px;display:inline-block;border-radius:20px;padding:3px 16px;
+  font-size:clamp(12px,1.7vw,20px);font-weight:800;letter-spacing:.5px}
+.tdreg.soon{background:#2a2113;color:#ffb648}
+.tdreg.now{background:#ffb648;color:#241a08}
+.tdreg.done{background:#231a1a;color:#6b7c91}
+.tdcount{margin-top:14px;font-size:clamp(12px,1.7vw,21px);color:#9fb0c4}
+.tdcount b{color:#e6edf5;font-variant-numeric:tabular-nums}
+/* the director's console, themed like the rest of the app */
+.tv{font-size:11.5px;color:var(--tx3);border-left:2px solid var(--line);padding-left:9px;margin:4px 0 0}
+.tplb,.cstb,.cstx{white-space:nowrap}
+.cstx{padding:6px 9px!important;color:var(--bad)!important}
+.paytbl input{width:80px}
+.poolcalc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg2);
+  border-radius:9px;padding:11px 13px;font-size:14px}
+.poolcalc b{font-size:16px}
+.poolcalc .op{color:var(--tx3);font-size:16px}
+.poolcalc input{width:70px;text-align:center}
+.poolcalc .res b{color:var(--ac)}
+.poolcalc .hs{margin-left:auto;font-size:12.5px;color:var(--tx3)}
+.hudline{display:flex;gap:10px;flex-wrap:wrap}
+.hudline>div{flex:1 1 190px;background:var(--bg2);border-radius:9px;padding:9px 11px;
+  display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.hudline .k{font-size:11.5px;color:var(--tx3)}
+.hudline b{font-size:17px;margin-right:auto}
+.hudline button{padding:5px 11px!important;font-size:12.5px!important}
+.hudline input{width:74px!important;font-size:16px!important;font-weight:700;text-align:center;
+  padding:4px 6px!important}
+.hudline .u{font-size:12px;color:var(--tx3);margin-right:auto}
+#td-lv input{width:82px}
+#td-lv input.lvmin{width:62px}
+tr.lvbrk td{background:var(--wbg)}
+tr.lvcur td{background:var(--hi);box-shadow:inset 0 0 0 1px var(--ac)}
+tr.lvbad td{background:var(--wbg);box-shadow:inset 0 0 0 1px var(--warn)}
+@media(max-width:640px){
+  .tdwrap{padding:16px 12px 18px}
+  .tdtop{justify-content:center}
+}
+
 /* home: who you are and how you are doing, on one line */
 .mehead{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
 .mehead .meid{min-width:0;flex:1 1 auto}

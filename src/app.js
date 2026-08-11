@@ -93,7 +93,7 @@ const posName = (p) => t("positions." + p) || p;
 const STATE = { view: "home", quiz: null, drill: null, analysis: null };
 
 /* ============================================================ CHROME ===== */
-const VIEWS = ["home", "quiz", "hand", "stats", "drill", "range", "help"];
+const VIEWS = ["home", "quiz", "hand", "stats", "drill", "range", "tour", "help"];
 function renderStorageBar() {
   const el = $("storagebar");
   if (!el) return;
@@ -147,7 +147,7 @@ function go(v) {
 }
 function renderView(v) {
   ({ home: renderHome, quiz: renderQuiz, hand: renderHand, stats: renderStats,
-     drill: renderDrill, range: renderRange, help: renderHelp }[v] || (() => {}))();
+     drill: renderDrill, range: renderRange, tour: renderTour, help: renderHelp }[v] || (() => {}))();
 }
 /* Effective theme: the viewer's explicit choice if they made one, otherwise
    whatever the OS asks for. Only an explicit choice stamps data-theme, which
@@ -2437,4 +2437,582 @@ function boot() {
   loadSetup();
   go("home");
 }
+/* ======================================================== TOURNAMENT =====
+ * Running a live game: pick a structure, open the tournament, and put the
+ * clock on a screen the room can see. The maths is in tourney.js; this is
+ * the board and the director's controls.
+ *
+ * The board deliberately stays dark in both themes — it is meant for a
+ * projector or a TV across a room, where a light background is glare.
+ * ======================================================================== */
+let TD = null, TDINT = null;
+const tdSave = () => { if (TD) { TD.at = Date.now(); DB.set("td", TD); } };
+const tdCustom = () => DB.get("tdcustom", []);
+const curLv = () => (TD && TD.levels[TD.lvl] ? TD.levels[TD.lvl] : null);
+const tdStructName = (id) => t("tour.struct." + id + ".n");
+
+/* Amounts are KRW. Korean reads them in 만 units the way a cash desk does;
+ * everywhere else gets grouped digits, which is unambiguous. */
+function money(n) {
+  n = n || 0;
+  if (LANG !== "ko") return "₩" + Math.round(n).toLocaleString();
+  // Past 1억, "54,600만원" is a wall of digits nobody reads off a board.
+  if (n >= 100000000) return (Math.round(n / 1000000) / 100).toLocaleString() + t("tour.eok");
+  const m = n / 10000;
+  const s = m >= 100 ? Math.round(m) : m >= 10 ? Math.round(m * 10) / 10 : Math.round(m * 100) / 100;
+  return s.toLocaleString() + t("tour.manwon");
+}
+/** Chip counts abbreviate too, but blinds never do — those must be read exactly. */
+function chipsOf(n) {
+  n = n || 0;
+  if (LANG !== "ko") return Math.round(n).toLocaleString();
+  if (n >= 10000) {
+    const m = n / 10000;
+    return (m >= 100 ? Math.round(m) : Math.round(m * 10) / 10).toLocaleString() + t("tour.man");
+  }
+  if (n >= 1000) return (Math.round(n / 100) / 10) + t("tour.cheon");
+  return Math.round(n).toLocaleString();
+}
+const numk = (n) => (n || 0).toLocaleString();
+
+function tdSaveCustom(name) {
+  const arr = tdCustom();
+  arr.unshift({ id: "c" + Date.now(), n: name, buyin: TD.buyin, stack: TD.startStack,
+    rebuyPrice: TD.rebuyPrice, rebuyStack: TD.rebuyStack,
+    payN: TD.payN, pay: TD.pay.slice(), payCurve: TD.payCurve, poolPct: TD.poolPct,
+    levels: JSON.parse(JSON.stringify(TD.levels)) });
+  DB.set("tdcustom", arr.slice(0, 20));
+}
+
+/* ---- the clock ------------------------------------------------------- */
+function beep(times, freq) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const A = new AC();
+    for (let i = 0; i < (times || 1); i++) {
+      const o = A.createOscillator(), g = A.createGain();
+      o.connect(g); g.connect(A.destination);
+      o.type = "sine"; o.frequency.value = freq || 880;
+      const at = A.currentTime + i * 0.34;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.35, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.30);
+      o.start(at); o.stop(at + 0.32);
+    }
+  } catch (e) { /* a silent clock is better than a broken one */ }
+}
+function tdStart() {
+  if (!TD.levels.length) return;
+  if (TD.remain <= 0) TD.remain = (curLv().min || 1) * 60000;
+  TD.endsAt = Date.now() + TD.remain;
+  TD.running = true; tdSave(); tdLoop();
+}
+function tdPause() {
+  if (TD.running) {
+    TD.remain = Math.max(0, TD.endsAt - Date.now());
+    TD.running = false; TD.endsAt = null; tdSave();
+  }
+  paintClock();
+}
+function tdGoto(i, keepRunning) {
+  TD.lvl = Math.max(0, Math.min(TD.levels.length - 1, i));
+  TD.remain = (curLv().min || 1) * 60000;
+  if (TD.running || keepRunning) { TD.endsAt = Date.now() + TD.remain; TD.running = true; }
+  else TD.endsAt = null;
+  tdSave(); renderTour();
+}
+function tdAdjust(ms) {
+  TD.remain = Math.max(0, (TD.running ? TD.endsAt - Date.now() : TD.remain) + ms);
+  if (TD.running) TD.endsAt = Date.now() + TD.remain;
+  tdSave(); paintClock();
+}
+function tdLoop() {
+  if (TDINT) clearInterval(TDINT);
+  TDINT = setInterval(() => {
+    if (!TD || !TD.running) return;
+    const left = TD.endsAt - Date.now();
+    if (left <= 0) {
+      beep(3, 1046);
+      if (TD.lvl < TD.levels.length - 1) tdGoto(TD.lvl + 1, true);
+      else { TD.running = false; TD.remain = 0; tdSave(); renderTour(); }
+      return;
+    }
+    if (left <= 60000 && left > 59000) beep(1, 660);   // one minute warning
+    TD.remain = left;
+    paintClock();
+  }, 250);
+}
+/* Repainting only the digits, so the clock does not rebuild the page 4x a second. */
+function paintClock() {
+  const el = $("td-time");
+  if (!el || !TD || !curLv()) return;
+  const left = TD.running ? Math.max(0, TD.endsAt - Date.now()) : TD.remain;
+  el.textContent = TOUR.mmss(left);
+  el.classList.toggle("hot", left <= 60000);
+  const pb = $("td-prog");
+  if (pb) {
+    const total = (curLv().min || 1) * 60000;
+    pb.style.width = Math.max(0, Math.min(100, (1 - left / total) * 100)) + "%";
+  }
+  const b = $("td-run");
+  if (b) b.textContent = TD.running ? t("tour.pause") : t("tour.start");
+}
+
+/* ---- screens --------------------------------------------------------- */
+function renderTour() {
+  const v = $("v-tour");
+  if (!v) return;
+  if (!TD) TD = DB.get("td", null);
+  if (TD && TD.started === undefined) TD.started = TD.levels.length > 0;   // older saves
+  if (!TD || !TD.levels.length || !TD.started) return renderTDSetup(v);
+  renderTDClock(v);
+}
+
+function renderTDSetup(v) {
+  if (!TD) TD = TOUR.blank();
+  const D = TD;
+  if (!D._tpl || !TOUR.TSTRUCT.some((s) => s.id === D._tpl)) D._tpl = "f9_daily";
+  if (!D._count) D._count = 20;
+  if (D._brkEvery === undefined) D._brkEvery = 4;
+  if (!D._brkMin) D._brkMin = 10;
+  const st = TOUR.structById(D._tpl);
+  const man = (n) => Math.round((n || 0) / 10000 * 100) / 100;
+  const groups = { pub: "tour.grpPub", series: "tour.grpSeries" };
+
+  let h = '<div class="card"><h2>' + esc(t("tour.h1")) + "</h2><p>" + t("tour.lead") + "</p>" +
+    '<div class="step"><span class="num">1</span>' + esc(t("tour.step1")) +
+      ' <span class="sub">' + esc(t("tour.step1sub")) + "</span></div>" +
+    Object.keys(groups).map((g) =>
+      '<div style="margin:0 0 9px"><div class="small dim" style="margin-bottom:5px">' +
+        esc(t(groups[g])) + "</div>" +
+      '<div class="bg" style="display:flex;flex-wrap:wrap">' +
+        TOUR.TSTRUCT.filter((s) => s.grp === g).map((s) =>
+          '<button class="tplb ' + (D._tpl === s.id ? "on" : "") + '" data-id="' + s.id + '">' +
+          esc(tdStructName(s.id)) + "</button>").join("") +
+      "</div></div>").join("") +
+    (tdCustom().length
+      ? '<div style="margin:0 0 9px"><div class="small dim" style="margin-bottom:5px">' +
+        esc(t("tour.myStructs")) + "</div>" +
+        '<div class="bg" style="display:flex;flex-wrap:wrap">' +
+          tdCustom().map((c) => '<button class="cstb" data-cid="' + c.id + '">' + esc(c.n) + "</button>" +
+            '<button class="cstx" data-cid="' + c.id + '" aria-label="' + esc(t("common.reset")) + '">×</button>').join("") +
+        "</div></div>"
+      : "") +
+    '<div class="tv">' + t("tour.struct." + st.id + ".note") + "</div>" +
+    '<div class="row" style="margin-top:12px"><div style="flex:0 0 auto">' +
+      '<button class="btn" id="td-quick" style="font-size:15px;padding:12px 22px">▶ ' +
+        esc(t("tour.openNow")) + "</button></div>" +
+      '<div class="small dim" style="align-self:center">' + esc(t("tour.openNowSub")) + "</div></div>" +
+
+    '<div class="step"><span class="num">2</span>' + esc(t("tour.step2")) +
+      ' <span class="sub">' + esc(t("tour.step2sub")) + "</span></div>" +
+    '<div class="grid g3">' +
+      '<div><label>' + esc(t("tour.fName")) + '</label><input id="td-name" value="' + esc(D.name) + '"></div>' +
+      '<div><label>' + esc(t("tour.fBuyin")) + '</label><input id="td-buyin" type="number" step="0.5" value="' + man(D.buyin) + '"></div>' +
+      '<div><label>' + esc(t("tour.fStack")) + '</label><input id="td-stack" type="number" step="10" value="' + man(D.startStack) + '"></div>' +
+      '<div><label>' + esc(t("tour.fRbPrice")) + '</label><input id="td-rbprice" type="number" step="0.5" value="' + man(D.rebuyPrice) + '"></div>' +
+      '<div><label>' + esc(t("tour.fRbStack")) + '</label><input id="td-rbstack" type="number" step="10" value="' + man(D.rebuyStack) + '"></div>' +
+      '<div><label>' + esc(t("tour.fEntries")) + '</label><input id="td-entries" type="number" min="0" value="' + D.entries + '"></div>' +
+    "</div>" +
+    '<div class="row" style="margin-top:10px">' +
+      '<div><label>' + esc(t("tour.fCount")) + '</label><input id="td-count" type="number" min="4" max="60" value="' + D._count + '"></div>' +
+      '<div><label>' + esc(t("tour.fBrkEvery")) + '</label><input id="td-brke" type="number" min="0" max="12" value="' + D._brkEvery + '"></div>' +
+      '<div><label>' + esc(t("tour.fBrkMin")) + '</label><input id="td-brkm" type="number" min="1" max="60" value="' + D._brkMin + '"></div>' +
+    "</div>" +
+    '<div class="notice">' + t("tour.regenNote") + "</div>" +
+    tdBadBanner() +
+    '<div class="row" style="margin-top:10px">' +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-lvtoggle">' +
+        (D._lvOpen ? "▲ " + esc(t("tour.hideLevels"))
+                   : "▼ " + esc(t("tour.showLevels", { n: D.levels.length }))) + "</button></div>" +
+      (D.levels.length ? '<div style="flex:0 0 auto">' +
+        '<button class="btn sec sm" id="td-savecst">' + esc(t("tour.saveStruct")) + "</button></div>" : "") +
+    "</div>" +
+    (D._lvOpen ? (D.levels.length ? tdLevelTable(true)
+      : '<div class="empty">' + esc(t("tour.noLevels")) + "</div>") : "") +
+    "</div>";
+  v.innerHTML = h;
+
+  const num = (id) => +$(id).value || 0;
+  const grab = () => {
+    D.name = $("td-name").value;
+    D.buyin = num("td-buyin") * 10000; D.startStack = num("td-stack") * 10000;
+    D.rebuyPrice = num("td-rbprice") * 10000; D.rebuyStack = num("td-rbstack") * 10000;
+    D.entries = num("td-entries");
+    D._count = Math.max(4, num("td-count"));
+    D._brkEvery = num("td-brke");
+    D._brkMin = Math.max(1, num("td-brkm"));
+  };
+  const applyTpl = (tpl) => {
+    D._tpl = tpl.id;
+    D.name = tdStructName(tpl.id);
+    D.buyin = tpl.buyin || D.buyin;
+    D.startStack = tpl.stack;
+    D.rebuyPrice = tpl.rebuyPrice !== undefined ? tpl.rebuyPrice : (tpl.buyin || 0);
+    D.rebuyStack = tpl.rebuyStack !== undefined ? tpl.rebuyStack : tpl.stack;
+    D.levels = TOUR.buildLevels(tpl, D._count, D._brkEvery, D._brkMin);
+    D.lvl = 0; D.remain = (D.levels[0].min || 1) * 60000; D.running = false; D.endsAt = null;
+  };
+  v.querySelectorAll(".tplb").forEach((b) => (b.onclick = () => {
+    grab(); applyTpl(TOUR.structById(b.dataset.id)); tdSave(); renderTDSetup(v);
+  }));
+  v.querySelectorAll(".cstb").forEach((b) => (b.onclick = () => {
+    const c = tdCustom().filter((x) => x.id === b.dataset.cid)[0];
+    if (!c) return;
+    grab();
+    D.name = c.n; D.levels = JSON.parse(JSON.stringify(c.levels));
+    if (c.buyin) D.buyin = c.buyin;
+    if (c.stack) D.startStack = c.stack;
+    if (c.rebuyPrice !== undefined) D.rebuyPrice = c.rebuyPrice;
+    if (c.rebuyStack !== undefined) D.rebuyStack = c.rebuyStack;
+    if (c.payN) { D.payN = c.payN; D.pay = (c.pay || []).slice(); D.payCurve = c.payCurve || 1; D.payManual = true; }
+    if (c.poolPct !== undefined) D.poolPct = c.poolPct;
+    D.lvl = 0; D.remain = (D.levels[0].min || 1) * 60000; D.running = false; D.endsAt = null;
+    tdSave(); renderTDSetup(v); toast(t("tour.loaded", { n: c.n }));
+  }));
+  v.querySelectorAll(".cstx").forEach((b) => (b.onclick = () => {
+    if (!confirm(t("tour.confirmDelStruct"))) return;
+    DB.set("tdcustom", tdCustom().filter((x) => x.id !== b.dataset.cid));
+    renderTDSetup(v);
+  }));
+  const regen = () => {
+    grab();
+    D.levels = TOUR.buildLevels(TOUR.structById(D._tpl), D._count, D._brkEvery, D._brkMin);
+    D.lvl = 0; D.remain = (D.levels[0].min || 1) * 60000; D.running = false; D.endsAt = null;
+    tdSave(); renderTDSetup(v);
+  };
+  ["td-count", "td-brke", "td-brkm"].forEach((id) => { const el = $(id); if (el) el.onchange = regen; });
+  $("td-lvtoggle").onclick = () => { grab(); D._lvOpen = !D._lvOpen; tdSave(); renderTDSetup(v); };
+  bindLevelTable(v);
+  const sc = $("td-savecst");
+  if (sc) sc.onclick = () => {
+    grab();
+    const nm = prompt(t("tour.nameStruct"), D.name || tdStructName(D._tpl));
+    if (!nm) return;
+    tdSaveCustom(nm.trim()); renderTDSetup(v); toast(t("tour.saved", { n: nm.trim() }));
+  };
+  $("td-quick").onclick = () => {
+    grab();
+    if (!D.levels.length) applyTpl(TOUR.structById(D._tpl));
+    if (!D.name) D.name = tdStructName(D._tpl);
+    D.players = D.entries; D.rebuys = 0; D.payManual = false; D.started = true;
+    TOUR.autoPay(D);
+    D.lvl = 0; D.remain = (D.levels[0].min || 1) * 60000; D.running = false; D.endsAt = null;
+    tdSave(); renderTour();
+  };
+}
+
+/* A folded table still has to admit it contains something wrong. */
+function tdBadBanner() {
+  const bad = TD.levels.filter(TOUR.lvBad).length;
+  return bad ? '<div class="blk warn" style="margin:10px 0 0"><div class="t">' +
+    esc(t("tour.checkNeeded")) + '</div><div>' + esc(t("tour.badLevels", { n: bad })) + "</div></div>" : "";
+}
+function tdLevelTable(editable) {
+  let h = '<div class="scrollx" style="margin-top:10px"><table id="td-lv"><tr><th>#</th>' +
+    "<th>SB</th><th>BB</th><th>" + esc(t("tour.ante")) + "</th><th>" + esc(t("tour.min")) +
+    "</th><th>" + esc(t("tour.reg")) + "</th><th></th></tr>";
+  TD.levels.forEach((l, i) => {
+    h += '<tr class="' + (l.brk ? "lvbrk" : (TOUR.lvBad(l) ? "lvbad" : "")) + '">' +
+      "<td>" + (l.brk ? '<b style="color:var(--warn)">' + esc(t("tour.break")) + "</b>"
+                      : TOUR.lvNumber(TD.levels, i)) + "</td>" +
+      (l.brk
+        ? '<td colspan="3" class="dim">' + esc(t("tour.rest")) + "</td>"
+        : '<td><input class="lvin" data-i="' + i + '" data-f="sb" type="number" value="' + l.sb + '"></td>' +
+          '<td><input class="lvin" data-i="' + i + '" data-f="bb" type="number" value="' + l.bb + '"></td>' +
+          '<td><input class="lvin" data-i="' + i + '" data-f="ante" type="number" value="' + l.ante + '"></td>') +
+      '<td><input class="lvin lvmin" data-i="' + i + '" data-f="min" type="number" value="' + l.min + '"></td>' +
+      '<td data-l="' + esc(t("tour.reg")) + '"><button class="btn ' + (l.reg ? "" : "sec") + ' sm lvreg" data-i="' + i + '">' +
+        (l.reg ? esc(t("tour.regClosed")) : "—") + "</button></td>" +
+      "<td>" + (editable ? '<button class="btn sec sm lvdel" data-i="' + i + '">' + esc(t("tour.del")) + "</button>" : "") +
+      "</td></tr>";
+  });
+  h += "</table></div>";
+  if (editable) h += '<div class="row" style="margin-top:8px">' +
+    '<div style="flex:0 0 auto"><button class="btn sec sm" id="lv-add">' + esc(t("tour.addLevel")) + "</button></div>" +
+    '<div style="flex:0 0 auto"><button class="btn sec sm" id="lv-brk">' + esc(t("tour.addBreak")) + "</button></div></div>";
+  return h;
+}
+function bindLevelTable(v) {
+  v.querySelectorAll(".lvin").forEach((inp) => (inp.onchange = () => {
+    const i = +inp.dataset.i;
+    TD.levels[i][inp.dataset.f] = +inp.value || 0;
+    if (i === TD.lvl && inp.dataset.f === "min" && !TD.running) TD.remain = (TD.levels[i].min || 1) * 60000;
+    tdSave(); renderTour();
+  }));
+  v.querySelectorAll(".lvreg").forEach((b) => (b.onclick = () => {
+    const i = +b.dataset.i, was = !!TD.levels[i].reg;
+    TD.levels.forEach((l) => { delete l.reg; });      // registration closes in one place only
+    if (!was) TD.levels[i].reg = true;
+    tdSave(); renderTour();
+  }));
+  v.querySelectorAll(".lvdel").forEach((b) => (b.onclick = () => {
+    if (TD.levels.length <= 1) { toast(t("tour.needOneLevel")); return; }
+    TD.levels.splice(+b.dataset.i, 1);
+    if (TD.lvl >= TD.levels.length) TD.lvl = TD.levels.length - 1;
+    tdSave(); renderTour();
+  }));
+  const add = $("lv-add");
+  if (add) add.onclick = () => {
+    const last = TD.levels.filter((l) => !l.brk).slice(-1)[0] || { sb: 100, bb: 200, ante: 200, min: 20 };
+    TD.levels.push({ sb: TOUR.niceChip(last.sb * 1.4), bb: TOUR.niceChip(last.bb * 1.4),
+      ante: TOUR.niceChip(last.bb * 1.4), min: last.min, brk: false });
+    tdSave(); renderTour();
+  };
+  const brk = $("lv-brk");
+  if (brk) brk.onclick = () => { TD.levels.push({ brk: true, min: 10, sb: 0, bb: 0, ante: 0 }); tdSave(); renderTour(); };
+}
+
+function renderTDClock(v) {
+  const l = curLv();
+  const nx = TOUR.nextPlayLv(TD.levels, TD.lvl), nb = TOUR.nextBreakIn(TD.levels, TD.lvl);
+  const pool = TOUR.pool(TD);
+  const left = TD.running ? Math.max(0, TD.endsAt - Date.now()) : TD.remain;
+  const r = TOUR.regInfo(TD.levels, TD.lvl);
+
+  /* ===== the board — only what the room should see ===== */
+  let h = '<div id="td-screen" class="tdwrap">' +
+    '<div class="tdtop">' +
+      '<div class="tdname">' + esc(TD.name || t("tour.untitled")) + "</div>" +
+      '<div class="tdlv">' + (l.brk ? '<span class="brk">' + esc(t("tour.breakCaps")) + "</span>"
+                                    : esc(t("tour.levelCaps")) + " " + TOUR.lvNumber(TD.levels, TD.lvl)) + "</div>" +
+    "</div>" +
+    '<div class="tdclock"><div id="td-time" class="' + (left <= 60000 ? "hot" : "") + '">' +
+      TOUR.mmss(left) + '</div><div class="tdbar"><i id="td-prog" style="width:0%"></i></div></div>' +
+    (l.brk
+      ? '<div class="tdblinds"><div class="lb">' + esc(t("tour.rest")) + "</div>" +
+        '<div class="bl">' + esc(t("tour.breakCaps")) + " " + l.min + esc(t("tour.minShort")) + "</div></div>"
+      : '<div class="tdblinds"><div class="lb">' + esc(t("tour.blindsCaps")) + "</div>" +
+        '<div class="bl">' + numk(l.sb) + " / " + numk(l.bb) +
+        (l.ante ? ' <span class="an">' + esc(t("tour.ante")) + " " + numk(l.ante) + "</span>" : "") +
+        "</div></div>") +
+    '<div class="tdnext">' +
+      (nx ? esc(t("tour.nextCaps")) + " &nbsp;" + numk(nx.sb) + " / " + numk(nx.bb) +
+            (nx.ante ? " (" + esc(t("tour.ante")) + " " + numk(nx.ante) + ")" : "")
+          : esc(t("tour.lastLevel"))) +
+      (nb ? " &nbsp;·&nbsp; " + esc(t("tour.toBreak", { n: nb.n })) : "") + "</div>" +
+    (r ? '<div class="tdreg ' + r.state + '">' + esc(
+      r.state === "done" ? t("tour.regDone")
+      : r.state === "now" ? t("tour.regNow")
+      : r.left <= 1 ? t("tour.regAfterThis") : t("tour.regIn", { n: r.left })) + "</div>" : "") +
+    (TD.showCount
+      ? '<div class="tdcount">' + t("tour.boardCount", { e: TD.entries, p: TD.players }) +
+        (TD.players > 0 ? " &nbsp;·&nbsp; " + esc(t("tour.avg")) + " <b>" + chipsOf(TOUR.avgStack(TD)) + "</b>" +
+          (l.bb > 0 ? " <b>(" + TOUR.avgBB(TD, l) + "BB)</b>" : "") : "") + "</div>"
+      : "") +
+    '<div class="tdprize"><span class="lb">' + esc(t("tour.totalPrize")) + '</span><span class="pv">' +
+      esc(money(pool)) + "</span></div>" +
+    '<div class="tdpay">' + TD.pay.map((p, i) =>
+      "<span><b>" + esc(t("tour.place", { n: i + 1 })) + "</b> " + esc(money(pool * p / 100)) + "</span>").join("") +
+    "</div></div>";
+
+  /* ===== below the fold is the director's own console ===== */
+  h += '<div class="card"><h3>' + esc(t("tour.controls")) + "</h3>" +
+    '<div class="row">' +
+      '<div style="flex:0 0 auto"><button class="btn" id="td-run">' + esc(TD.running ? t("tour.pause") : t("tour.start")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-prev">◀ ' + esc(t("tour.prevLevel")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-next">' + esc(t("tour.nextLevel")) + " ▶</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-m1">−1' + esc(t("tour.minShort")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-p1">+1' + esc(t("tour.minShort")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-full">' + esc(t("tour.fullscreen")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-showcnt">' +
+        esc(TD.showCount ? t("tour.hideCount") : t("tour.showCount")) + "</button></div>" +
+    "</div></div>";
+
+  h += '<div class="card"><h3>' + esc(t("tour.peopleTitle")) +
+      ' <span class="small dim">— ' + esc(t("tour.peopleSub")) + "</span></h3>" +
+    '<div class="hudline">' +
+      '<div><span class="k">' + esc(t("tour.entries")) + "</span>" +
+        '<input class="cntin" data-f="entries" type="number" min="0" value="' + TD.entries + '"><span class="u">' + esc(t("tour.people")) + "</span>" +
+        '<button class="btn sm" data-act="e+">+1</button><button class="btn sec sm" data-act="e-">−1</button></div>' +
+      '<div><span class="k">' + esc(t("tour.remaining")) + "</span>" +
+        '<input class="cntin" data-f="players" type="number" min="0" value="' + TD.players + '"><span class="u">' + esc(t("tour.people")) + "</span>" +
+        '<button class="btn sec sm" data-act="p+">+1</button><button class="btn sec sm" data-act="p-">' + esc(t("tour.bustOne")) + "</button></div>" +
+      '<div><span class="k">' + esc(t("tour.rebuys")) + "</span>" +
+        '<input class="cntin" data-f="rebuys" type="number" min="0" value="' + TD.rebuys + '"><span class="u">' + esc(t("tour.times")) + "</span>" +
+        '<button class="btn sm" data-act="r+">+1</button><button class="btn sec sm" data-act="r-">−1</button></div>' +
+    "</div>" +
+    '<div class="hudline" style="margin-top:9px">' +
+      '<div><span class="k">' + esc(t("tour.avgStack")) + "</span><b>" + esc(chipsOf(TOUR.avgStack(TD))) +
+        (l.bb > 0 ? " (" + TOUR.avgBB(TD, l) + "BB)" : "") + "</b></div>" +
+      '<div><span class="k">' + esc(t("tour.totalChips")) + "</span><b>" + esc(chipsOf(TOUR.chips(TD))) + "</b></div>" +
+      '<div><span class="k">' + esc(t("tour.collected")) + "</span><b>" + esc(money(TOUR.gross(TD))) + "</b></div>" +
+      '<div><span class="k">' + esc(t("tour.prizePct", { p: TD.poolPct === undefined ? 100 : TD.poolPct })) +
+        '</span><b style="color:var(--ac)">' + esc(money(pool)) + "</b></div>" +
+      '<div><span class="k">' + esc(t("tour.houseCut")) + "</span><b>" + esc(money(TOUR.house(TD))) + "</b></div>" +
+    "</div>" +
+    '<div class="notice">' + t("tour.countNote", {
+      buyin: esc(money(TD.buyin)), stack: esc(chipsOf(TD.startStack)),
+      rbPrice: esc(money(TD.rebuyPrice)), rbStack: esc(chipsOf(TD.rebuyStack)) }) + "</div>" +
+    '<div class="small dim">' + t("tour.keys") + "</div></div>";
+
+  /* ===== prize distribution ===== */
+  const sum = Math.round(TD.pay.reduce((a, b) => a + b, 0) * 10) / 10;
+  const pctOf = TD.entries ? Math.round(TD.payN / TD.entries * 100) : 0;
+  h += '<div class="card"><h3>' + esc(t("tour.payTitle")) +
+      ' <span class="small dim">— ' + esc(t("tour.paySub")) + "</span></h3>" +
+    '<div class="step" style="margin-top:2px"><span class="num">1</span>' + esc(t("tour.payStep1")) + "</div>" +
+    '<div class="poolcalc">' +
+      "<span>" + esc(t("tour.collected")) + " <b>" + esc(money(TOUR.gross(TD))) + "</b></span>" +
+      '<span class="op">×</span>' +
+      '<span><input id="td-poolpct" type="number" min="0" max="100" step="1" value="' +
+        (TD.poolPct === undefined ? 100 : TD.poolPct) + '"> %</span>' +
+      '<span class="op">=</span>' +
+      '<span class="res">' + esc(t("tour.prize")) + " <b>" + esc(money(pool)) + "</b></span>" +
+      '<span class="hs">' + esc(t("tour.houseCut")) + " " + esc(money(TOUR.house(TD))) + "</span>" +
+    "</div>" +
+    '<div class="bg" id="td-poolq" style="display:flex;margin-top:8px">' +
+      [100, 90, 85, 80, 70].map((x) => '<button data-p="' + x + '" class="' +
+        ((TD.poolPct === undefined ? 100 : TD.poolPct) === x ? "on" : "") + '">' + x + "%</button>").join("") +
+    "</div>" +
+    '<div class="small dim" style="margin-top:5px">' + t("tour.poolNote") + "</div>" +
+
+    '<div class="step"><span class="num">2</span>' + esc(t("tour.payStep2")) + "</div>" +
+    '<div class="row">' +
+      '<div style="flex:0 0 130px"><label>' + esc(t("tour.paidPlaces")) + "</label>" +
+        '<input id="td-payn" type="number" min="1" value="' + TD.payN + '"></div>' +
+      '<div style="flex:1 1 auto"><label>' + esc(t("tour.quickByField")) + '</label><div class="bg" id="td-payq" style="display:flex">' +
+        [10, 15, 20, 25].map((x) => '<button data-p="' + x + '">' + esc(t("tour.topPct", { p: x })) + "</button>").join("") +
+      "</div></div>" +
+    "</div>" +
+    '<div class="small dim" style="margin-top:5px">' +
+      esc(t("tour.payingNow", { e: TD.entries, n: TD.payN })) +
+      (TD.entries ? " (" + esc(t("tour.topPct", { p: pctOf })) + ")" : "") + "</div>" +
+
+    '<div class="step"><span class="num">3</span>' + esc(t("tour.payStep3")) + "</div>" +
+    '<div class="bg" id="td-curve" style="display:flex;flex-wrap:wrap">' +
+      [[0.7, "tour.curveFlat"], [1.0, "tour.curveNormal"], [1.4, "tour.curveSteep"]].map((c) =>
+        '<button data-c="' + c[0] + '" class="' + (Math.abs((TD.payCurve || 1) - c[0]) < 0.01 ? "on" : "") + '">' +
+        esc(t(c[1])) + "</button>").join("") +
+      '<button id="td-payflat">' + esc(t("tour.curveEven")) + "</button>" +
+      '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:6px">' +
+        '<span class="small dim">' + esc(t("tour.curveManual")) + "</span>" +
+        '<input id="td-curvein" type="number" step="0.1" min="0.2" max="3" value="' +
+          (TD.payCurve === undefined ? 1 : TD.payCurve) + '" style="width:74px">' +
+      "</span></div>" +
+    '<div class="small dim" style="margin-top:5px">' + esc(t("tour.curveNote")) + "</div>" +
+
+    '<div class="step"><span class="num">4</span>' + esc(t("tour.payStep4")) + "</div>" +
+    '<div class="scrollx"><table class="tstack paytbl"><tr><th>' + esc(t("tour.rank")) + "</th><th>" +
+      esc(t("tour.share")) + "</th><th>" + esc(t("tour.amount")) + "</th></tr>" +
+    TD.pay.map((p, i) => "<tr><td>" + esc(t("tour.place", { n: i + 1 })) + "</td>" +
+      '<td data-l="' + esc(t("tour.share")) + '"><input class="payin" data-i="' + i + '" type="number" step="0.1" min="0" value="' + p + '"> %</td>' +
+      '<td data-l="' + esc(t("tour.amount")) + '">' + esc(money(pool * p / 100)) + "</td></tr>").join("") +
+    "</table></div>" +
+    '<div class="row" style="margin-top:9px">' +
+      '<div style="flex:0 0 auto" class="' + (Math.abs(sum - 100) > 0.5 ? "" : "dim") + '">' +
+        esc(t("tour.sum")) + ' <b style="color:' + (Math.abs(sum - 100) > 0.5 ? "var(--warn)" : "var(--good)") + '">' + sum + "%</b></div>" +
+      (Math.abs(sum - 100) > 0.5 ? '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-pay100">' +
+        esc(t("tour.fixTo100")) + "</button></div>" : "") +
+    "</div>" +
+    (Math.abs(sum - 100) > 0.5 ? '<div class="notice">' + esc(t("tour.sumWarn")) + "</div>" : "") +
+    "</div>";
+
+  h += '<div class="card"><h3>' + esc(t("tour.levelTable")) + "</h3>" +
+    '<div class="small muted">' + t("tour.levelTableNote") + "</div>" +
+    tdBadBanner() +
+    '<div class="row" style="margin-top:9px">' +
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-lvtoggle2">' +
+        (TD._lvOpen ? "▲ " + esc(t("tour.hideLevels"))
+                    : "▼ " + esc(t("tour.showLevels", { n: TD.levels.length }))) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-savecst2">' + esc(t("tour.saveStruct")) + "</button></div>" +
+      '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-reset">' + esc(t("tour.endEvent")) + "</button></div>" +
+    "</div>" +
+    (TD._lvOpen ? tdLevelTable(true) : "") + "</div>";
+
+  v.innerHTML = h;
+
+  $("td-lvtoggle2").onclick = () => { TD._lvOpen = !TD._lvOpen; tdSave(); renderTour(); };
+  $("td-run").onclick = () => { TD.running ? tdPause() : tdStart(); paintClock(); };
+  $("td-prev").onclick = () => tdGoto(TD.lvl - 1);
+  $("td-next").onclick = () => tdGoto(TD.lvl + 1);
+  $("td-m1").onclick = () => tdAdjust(-60000);
+  $("td-p1").onclick = () => tdAdjust(60000);
+  $("td-showcnt").onclick = () => { TD.showCount = !TD.showCount; tdSave(); renderTour(); };
+  $("td-full").onclick = () => {
+    const el = $("td-screen");
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen();
+  };
+  v.querySelectorAll("[data-act]").forEach((b) => (b.onclick = () => tdCount(b.dataset.act)));
+  v.querySelectorAll(".cntin").forEach((inp) => (inp.onchange = () => {
+    TD[inp.dataset.f] = Math.max(0, Math.round(+inp.value || 0));
+    TOUR.autoPay(TD); tdSave(); renderTour();
+  }));
+
+  $("td-poolpct").onchange = (e) => {
+    TD.poolPct = Math.max(0, Math.min(100, +e.target.value || 0)); tdSave(); renderTour();
+  };
+  v.querySelectorAll("#td-poolq button").forEach((b) => (b.onclick = () => {
+    TD.poolPct = +b.dataset.p; tdSave(); renderTour();
+  }));
+  $("td-payn").onchange = (e) => {
+    TD.payManual = true; TD.payN = Math.max(1, +e.target.value || 1);
+    TD.pay = TOUR.payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour();
+  };
+  v.querySelectorAll("#td-payq button").forEach((b) => (b.onclick = () => {
+    TD.payManual = true;
+    TD.payN = Math.max(1, Math.round((TD.entries || 1) * (+b.dataset.p) / 100));
+    TD.pay = TOUR.payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour();
+  }));
+  v.querySelectorAll("#td-curve button[data-c]").forEach((b) => (b.onclick = () => {
+    TD.payCurve = +b.dataset.c; TD.pay = TOUR.payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour();
+  }));
+  $("td-curvein").onchange = (e) => {
+    TD.payCurve = Math.max(0.2, Math.min(3, +e.target.value || 1));
+    TD.pay = TOUR.payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour();
+  };
+  $("td-payflat").onclick = () => {
+    TD.pay = TOUR.normTo100(new Array(TD.payN).fill(1)); tdSave(); renderTour();
+  };
+  v.querySelectorAll(".payin").forEach((inp) => (inp.onchange = () => {
+    TD.payManual = true; TD.pay[+inp.dataset.i] = Math.max(0, +inp.value || 0); tdSave(); renderTour();
+  }));
+  const p100 = $("td-pay100");
+  if (p100) p100.onclick = () => { TD.pay = TOUR.normTo100(TD.pay); tdSave(); renderTour(); };
+
+  $("td-savecst2").onclick = () => {
+    const nm = prompt(t("tour.nameStruct"), TD.name || tdStructName(TD._tpl || "f9_daily"));
+    if (!nm) return;
+    tdSaveCustom(nm.trim()); toast(t("tour.saved", { n: nm.trim() }));
+  };
+  $("td-reset").onclick = () => {
+    if (!confirm(t("tour.confirmEnd"))) return;
+    if (TDINT) clearInterval(TDINT);
+    TD.levels = []; TD.running = false; TD.endsAt = null; TD.started = false;
+    tdSave(); renderTour();
+  };
+  bindLevelTable(v);
+  const rows = v.querySelectorAll("#td-lv tr");
+  if (rows[TD.lvl + 1]) rows[TD.lvl + 1].classList.add("lvcur");
+  if (TD.running) tdLoop();
+  paintClock();
+}
+
+/* A director runs this one-handed while dealing with the room, so the
+ * common actions are single keys. */
+function tdCount(act) {
+  if (act === "e+") { TD.entries++; TD.players++; }
+  else if (act === "e-") { if (TD.entries > 0) { TD.entries--; TD.players = Math.max(0, TD.players - 1); } }
+  else if (act === "p+") TD.players++;
+  else if (act === "p-") TD.players = Math.max(0, TD.players - 1);
+  else if (act === "r+") { TD.rebuys++; TD.players++; }
+  else if (act === "r-") { if (TD.rebuys > 0) { TD.rebuys--; TD.players = Math.max(0, TD.players - 1); } }
+  TOUR.autoPay(TD); tdSave(); renderTour();
+}
+document.addEventListener("keydown", (e) => {
+  if (STATE.view !== "tour" || !TD || !TD.levels.length || !TD.started) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "")) return;
+  const k = (e.key || "").toLowerCase();
+  if (e.code === "Space") { e.preventDefault(); TD.running ? tdPause() : tdStart(); paintClock(); }
+  else if (e.code === "ArrowRight") tdGoto(TD.lvl + 1);
+  else if (e.code === "ArrowLeft") tdGoto(TD.lvl - 1);
+  else if (k === "f") { const el = $("td-screen");
+    if (el) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen(); } }
+  else if (k === "b") tdCount("p-");
+  else if (k === "e") tdCount("e+");
+  else if (k === "r") tdCount("r+");
+});
+
 document.addEventListener("DOMContentLoaded", boot);

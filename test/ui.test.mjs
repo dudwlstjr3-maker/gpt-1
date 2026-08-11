@@ -42,7 +42,7 @@ test("boots with no runtime errors and renders the nav", async () => {
 });
 
 test("every view renders", async () => {
-  for (const v of ["quiz", "hand", "stats", "drill", "range", "help", "home"]) {
+  for (const v of ["quiz", "hand", "stats", "drill", "range", "tour", "help", "home"]) {
     await page.click(`#nav button[data-v="${v}"]`);
     await page.waitForSelector(`#v-${v}.on`);
     const html = await page.$eval(`#v-${v}`, (e) => e.innerHTML.trim());
@@ -997,5 +997,103 @@ test("home shows your record; the tendency profile stays in its own tab", async 
   assert.equal((await page.$$("#v-quiz .axis")).length, 7, "the profile tab lost its axes");
   assert.match(await page.$eval("#v-quiz", (e) => e.innerText), /Archetype/i,
     "the profile tab should still name the archetype");
+  noErrors();
+});
+
+/* --- tournament director ------------------------------------------------ */
+
+test("a tournament can be opened from a preset and the clock runs", async () => {
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.evaluate(() => { localStorage.removeItem("hb.td"); localStorage.removeItem("hb.tdcustom"); });
+  await page.reload();
+  await page.waitForSelector("#nav button");
+  await page.selectOption("#langsel", "en");
+  await page.click('#nav button[data-v="tour"]');
+  await page.waitForSelector("#td-quick", { timeout: 30000 });
+
+  // picking a structure fills the whole form in
+  await page.click('.tplb[data-id="wsop"]');
+  await page.waitForSelector("#td-quick");
+  assert.match(await page.$eval("#td-name", (e) => e.value), /WSOP/,
+    "choosing a preset should name the event");
+  assert.equal(await page.$eval("#td-stack", (e) => e.value), "6",
+    "the WSOP preset starts at 60,000 chips");
+  const note = await page.$eval("#v-tour .tv", (e) => e.innerText);
+  assert.match(note, /Confirmed/i, "the preset should say what is confirmed: " + note);
+
+  await page.fill("#td-entries", "42");
+  await page.click("#td-quick");
+  await page.waitForSelector("#td-time", { timeout: 30000 });
+
+  const board = await page.$eval("#td-screen", (e) => e.innerText);
+  assert.match(board, /LEVEL 1/, "the board should open on level 1: " + board.slice(0, 120));
+  assert.match(board, /100 \/ 200/, "the opening blinds are wrong: " + board.slice(0, 200));
+  assert.match(board, /120:00/, "WSOP levels are two hours: " + board.slice(0, 200));
+  assert.match(board, /NEXT/, "the board should show the next level");
+
+  // the clock actually counts down, and pauses
+  await page.click("#td-run");
+  const t1 = await page.$eval("#td-time", (e) => e.innerText);
+  await page.waitForFunction((prev) => document.getElementById("td-time").innerText !== prev,
+    t1, { timeout: 5000 });
+  await page.click("#td-run");
+  const paused = await page.$eval("#td-time", (e) => e.innerText);
+  await new Promise((r) => setTimeout(r, 900));
+  assert.equal(await page.$eval("#td-time", (e) => e.innerText), paused, "the clock kept running when paused");
+  noErrors();
+});
+
+test("entries, rebuys and the prize pool stay consistent", async () => {
+  // 42 entries at the WSOP buy-in from the previous test
+  const read = () => page.$eval(".hudline:nth-of-type(2)", (e) => e.innerText.replace(/\n/g, " "));
+  const before = await page.$$eval(".cntin", (els) => els.map((x) => +x.value));
+  await page.click('[data-act="e+"]');
+  const after = await page.$$eval(".cntin", (els) => els.map((x) => +x.value));
+  assert.equal(after[0], before[0] + 1, "an entry did not register");
+  assert.equal(after[1], before[1] + 1, "a new entry should also be a player still in");
+
+  await page.click('[data-act="p-"]');
+  const bust = await page.$$eval(".cntin", (els) => els.map((x) => +x.value));
+  assert.equal(bust[1], after[1] - 1, "a bust did not come off the remaining count");
+  assert.equal(bust[0], after[0], "a bust must not change the entry count");
+
+  // payouts always add to 100%
+  const sum = await page.$$eval(".payin", (els) => els.reduce((a, x) => a + parseFloat(x.value), 0));
+  assert.ok(Math.abs(sum - 100) < 0.5, "payouts do not sum to 100%: " + sum);
+
+  // and the house share is exactly what the players do not get
+  await page.fill("#td-poolpct", "85");
+  await page.dispatchEvent("#td-poolpct", "change");
+  await page.waitForSelector(".poolcalc");
+  const pool = await page.$eval(".poolcalc", (e) => e.innerText.replace(/\n/g, " "));
+  assert.match(pool, /85/, "the pool percentage did not take: " + pool);
+  noErrors();
+});
+
+test("the level sheet is editable and marks where registration closes", async () => {
+  await page.click("#td-lvtoggle2");
+  await page.waitForSelector("#td-lv");
+  const rows = await page.$$eval("#td-lv tr", (e) => e.length);
+  assert.ok(rows > 5, "expected a full level sheet, got " + rows + " rows");
+  assert.ok(await page.$("tr.lvcur"), "the current level is not highlighted");
+
+  // marking registration closed shows a countdown on the board
+  const regButtons = await page.$$(".lvreg");
+  await regButtons[3].click();
+  await page.waitForSelector("#td-screen");
+  const board = await page.$eval("#td-screen", (e) => e.innerText);
+  assert.match(board, /registration closes/i, "the board should count down to registration: " + board);
+
+  // an impossible level is flagged rather than run
+  await page.$$eval("#td-lv input[data-f='bb']", (els) => {
+    els[0].value = "0";
+    els[0].dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForSelector("#v-tour");
+  assert.ok(await page.$("tr.lvbad"), "a zero big blind was not flagged");
+  assert.match(await page.$eval("#v-tour", (e) => e.innerText), /Needs checking/i,
+    "no warning banner for a broken level");
   noErrors();
 });

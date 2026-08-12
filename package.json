@@ -1,0 +1,15 @@
+{
+  "name": "holdem-studio",
+  "version": "2.0.0",
+  "description": "No-Limit Hold'em study tool: tendency profiling, hand analysis and EV drills. Single self-contained HTML file.",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "npm run build && node --test test/engine.test.mjs && node --test test/tourney.test.mjs && node --test test/ui.test.mjs",
+    "test:engine": "node --test test/engine.test.mjs && node --test test/tourney.test.mjs",
+    "test:ui": "npm run build && node --test test/ui.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}

@@ -504,6 +504,40 @@ group('실전 드릴');
   }
 }
 
+/* ─────────── 홈: 오늘 대회 ─────────── */
+group('오늘 대회');
+{
+  await tab('home');
+  ok(await page.locator('.todaylist').count() === 0, '저장한 대회가 없으면 오늘 대회 카드가 안 뜬다');
+
+  await page.evaluate(() => {
+    const D = tdNew(), day = new Date().getDay();
+    tdProfilesSet([
+      tdProfileFrom(D, '밤 대회', [day], '23:59', ''),
+      tdProfileFrom(D, '아침 대회', [day], '00:01', ''),
+      tdProfileFrom(D, '내일 대회', [(day + 1) % 7], '19:30', ''),
+    ]);
+    renderHome();
+  });
+  await page.waitForTimeout(250);
+
+  ok(await page.locator('.todayrow').count() === 2, '오늘 것만 뜬다 — 내일 대회는 빠진다',
+    String(await page.locator('.todayrow').count()));
+  const rows = await page.locator('.todayrow').allInnerTexts();
+  ok(/아침 대회/.test(rows[0]) && /밤 대회/.test(rows[1]), '시각 순으로 줄 선다', rows.join(' | '));
+
+  // 홈에서 바로 그 대회를 연다
+  await page.click('.todayrow:nth-child(2) [data-open]');
+  await page.waitForTimeout(450);
+  ok(await page.evaluate(() => curView()) === 'tour', '열기를 누르면 토너먼트 탭으로 넘어간다',
+    await page.evaluate(() => curView()));
+  ok(await page.inputValue('#td-name') === '밤 대회', '누른 대회가 실제로 열린다',
+    await page.inputValue('#td-name'));
+
+  await page.evaluate(() => { tdProfilesSet([]); DB.del('td'); });
+  await page.reload({ waitUntil: 'networkidle' });
+}
+
 /* ─────────── 전적 ─────────── */
 group('전적');
 {
@@ -532,6 +566,26 @@ group('전적');
   ok(/\+16만원/.test(row), '손익은 상금 − 지출 (25 − 9 = +16만원)', row.replace(/\n/g, ' | '));
 
   ok((await view()).includes('출전'), '요약에 출전 수가 나온다');
+
+  // 대회가 열려 있으면 바이인 횟수에서 지출을 계산해 주되, 손으로 고친 값을 덮지 않는다.
+  // (예전엔 blur 에 걸려 있어서 바이인 → 지출로 넘어가는 순간 칸을 덮어썼다)
+  {
+    await page.evaluate(() => { go('tour'); });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { go('rec'); });
+    await page.waitForTimeout(300);
+    await page.fill('#rc-buyins', '3');
+    const auto = await page.inputValue('#rc-spent');
+    ok(auto !== '' && auto !== '0', '바이인을 바꾸면 지출이 대회 값으로 채워진다', auto);
+    await page.fill('#rc-spent', '9');
+    ok(await page.inputValue('#rc-spent') === '9', '지출에 친 값이 그대로 남는다',
+      await page.inputValue('#rc-spent'));
+    await page.fill('#rc-buyins', '5');
+    ok(await page.inputValue('#rc-spent') === '9', '손으로 고친 뒤엔 바이인을 바꿔도 지출을 안 덮는다',
+      await page.inputValue('#rc-spent'));
+    await page.evaluate(() => { DB.del('td'); TD = null; renderRec(); });
+    await page.waitForTimeout(250);
+  }
   ok(/바이인[\s\S]{0,40}3회/.test(await view()), '요약 바이인이 3회', (await view()).slice(0, 200).replace(/\n/g, ' | '));
 
   // 우승으로 기록 — 순위 칸을 안 건드려도 1위로 들어간다

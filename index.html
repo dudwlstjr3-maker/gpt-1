@@ -350,6 +350,22 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   opacity:0;pointer-events:none;transition:opacity .25s}
 .toast.on{opacity:1}
 
+/* --- 홈: 오늘 대회 --- */
+.todaylist{display:flex;flex-direction:column;gap:7px}
+.todayrow{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:10px;padding:9px 12px}
+.todayrow>b{flex:0 0 auto;font-variant-numeric:tabular-nums;font-size:15px;letter-spacing:-.01em}
+.todayrow>span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--tx2);font-size:13.5px}
+.todayrow>i{flex:0 0 auto;font-style:normal;font-size:12px;font-weight:700;color:var(--ac-tx)}
+.todayrow>i.dim{color:var(--tx3);font-weight:400}
+.todayrow.soon{border-color:var(--ac-bd);background:var(--ac-bg)}
+.todayrow.past{opacity:.55}
+@media (max-width:520px){
+  .todayrow{flex-wrap:wrap}
+  .todayrow>span{flex:1 1 100%;order:3}
+}
+
 /* --- 겹쳐 뜨는 창 (계정 등) --- */
 .modal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:18px}
 .modal[hidden]{display:none}
@@ -3423,6 +3439,24 @@ function renderHome(){
     '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'stats\')">내 리크 보기</button></div>'+
     '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'rec\')">전적 보기</button></div>'+
     '</div></div>';
+  /* 오늘 열리는 대회 — 매장에서 아침에 열어보는 화면이라 제일 위에 둔다 */
+  {
+    const td = tdToday();
+    if(td.length){
+      const next = td.filter(x=>!x.past)[0];
+      h += '<div class="card"><h2>오늘 대회 <span class="small dim">— ' +
+        DAYN[new Date().getDay()] + '요일</span></h2>' +
+        '<div class="todaylist">' + td.map(function(P){
+          const t = tdCleanTime(P.time);
+          const soon = next && P.id === next.id && P.inMin !== null && P.inMin <= 120;
+          return '<div class="todayrow' + (P.past ? ' past' : '') + (soon ? ' soon' : '') + '">' +
+            '<b>' + (t || "시각 미정") + '</b><span>' + esc(P.n) + '</span>' +
+            (soon ? '<i>' + (P.inMin <= 0 ? "시작 시각" : P.inMin + "분 뒤") + '</i>'
+                  : P.past ? '<i class="dim">지남</i>' : '') +
+            '<button class="btn sec sm" data-open="' + esc(P.id) + '">열기</button></div>';
+        }).join("") + '</div></div>';
+    }
+  }
   {
     const T = recTotals(), R = drillRank(DB.get("drills", []));
     if(T.n || R.rank)
@@ -3454,7 +3488,15 @@ function renderHome(){
     '<li><b>전적</b> — 대회에 나갈 때마다 순위·바이인·상금을 한 줄씩 남깁니다. 드릴 등급도 여기 모입니다.</li></ol>'+
     '<p class="muted small" style="margin-top:10px">위 다섯 가지는 <b>내 실력과 내 기록</b>을 위한 것이고, '+
     '<b>6 · 토너먼트</b>는 성격이 다릅니다 — 오프라인 대회를 직접 열 때 화면에 띄워놓는 <b>운영용 클락·전광판</b>입니다.</p></div>';
-  document.getElementById("v-home").innerHTML = h;
+  const hv = document.getElementById("v-home");
+  hv.innerHTML = h;
+  hv.querySelectorAll("[data-open]").forEach(b => b.onclick = function(){
+    const P = tdProfiles().filter(x=>x.id === b.dataset.open)[0];
+    if(!P) return;
+    tdProfileApply(P);
+    go("tour");
+    toast(P.n + " 를 열었습니다");
+  });
 }
 
 /* ============================================================
@@ -4048,6 +4090,9 @@ function tdProfileApply(P){
    "ladderOn","ladderFree","ladderEvery","ladderAmt"].forEach(k=>{
     if(P[k] !== undefined) TD[k] = P[k];
   });
+  /* 일정표에 적힌 이름이 전광판에도 떠야 한다.
+     둘이 갈리면 손님이 보는 TV 와 벽에 붙은 일정표가 다른 대회를 가리킨다. */
+  if(P.n) TD.name = P.n;
   TD.levels = Array.isArray(P.levels) ? JSON.parse(JSON.stringify(P.levels)) : [];
   TD.pay    = Array.isArray(P.pay)    ? P.pay.slice() : [];
   TD.payManual = false; TD.started = false;
@@ -4067,6 +4112,18 @@ function tdWeek(){
   for(const P of tdProfiles())
     for(const d of (P.days||[])) if(d>=0 && d<=6) wk[d].push(P);
   return wk.map(list => list.sort((a,b)=> tdMinOfDay(a.time) - tdMinOfDay(b.time) || a.n.localeCompare(b.n)));
+}
+
+/* 오늘 열리는 대회를 시각 순으로. now 는 검사에서 시각을 고정하려고 받는다. */
+function tdToday(now){
+  const d = now ? new Date(now) : new Date();
+  const list = tdWeek()[d.getDay()];
+  const cur = d.getHours()*60 + d.getMinutes();
+  return list.map(P => Object.assign({}, P, {
+    /* 시각이 없으면 «지났다»고 단정하지 않는다 */
+    past: tdCleanTime(P.time) ? tdMinOfDay(P.time) < cur : false,
+    inMin: tdCleanTime(P.time) ? tdMinOfDay(P.time) - cur : null
+  }));
 }
 
 /* ============================================================
@@ -4711,7 +4768,7 @@ function tdScheduleCard(){
   /* 저장 줄 */
   h += '<hr><div class="row" style="align-items:flex-end">'+
     '<div style="flex:1 1 180px"><label>지금 설정을 이 이름으로 저장</label>'+
-      '<input id="td-pr-name" placeholder="예: 금요일 몬스터" value=""></div>'+
+      '<input id="td-pr-name" placeholder="예: 금요일 몬스터" value="'+esc(TD ? (TD.name||"") : "")+'"></div>'+
     '<div style="flex:0 0 auto"><label>시각</label><input id="td-pr-time" type="time" style="width:120px"></div>'+
     '<div style="flex:0 0 auto"><button class="btn" id="td-pr-save">이 대회 저장</button></div>'+
     '</div>'+
@@ -5919,17 +5976,26 @@ function renderRec(){
   if(ab) ab.onclick = ()=>add(false);
   const wb = document.getElementById("rc-win");
   if(wb) wb.onclick = ()=>add(true);
-  /* 바이인 횟수를 바꾸면 지출을 대회 값으로 다시 계산해 준다 — 손으로 고칠 수도 있게 둔다 */
+  /* 바이인 횟수를 바꾸면 지출을 대회 값으로 다시 계산해 준다.
+     change(포커스가 빠질 때)가 아니라 input(치는 즉시)으로 받는다 —
+     blur 에 걸어 두면 «바이인 → 탭 → 지출» 로 넘어가는 순간 지출 칸을 덮어써서
+     사용자가 치던 숫자 뒤에 계산값이 붙는다.
+     그리고 지출을 한 번이라도 손으로 고쳤으면 다시는 건드리지 않는다. */
   const bi = document.getElementById("rc-buyins");
-  if(bi && pf) bi.onchange = function(){
+  const sp = document.getElementById("rc-spent");
+  if(sp) sp.addEventListener("input", function(){ sp.dataset.touched = "1"; });
+  if(bi && sp && pf) bi.addEventListener("input", function(){
     const n = Math.max(1, Math.round(Number(bi.value) || 1));
     const won = (pf.buyin || 0) + Math.max(0, n - 1) * (pf.rebuyPrice || 0);
-    const sp = document.getElementById("rc-spent");
-    if(sp) sp.value = Math.round(won / 10000);
     const hint = document.getElementById("rc-hint");
+    if(sp.dataset.touched){
+      if(hint) hint.textContent = "대회 값으로 치면 " + manwon(won) + " 입니다 — 지출은 적으신 값을 씁니다.";
+      return;
+    }
+    sp.value = Math.round(won / 10000);
     if(hint) hint.textContent = "엔트리 " + manwon(pf.buyin) + " + 리바이 " + (n-1) + "회 = " + manwon(won) +
       " — 다르면 직접 고치세요.";
-  };
+  });
   const cs = document.getElementById("rc-csv");
   if(cs) cs.onclick = function(){
     saveFile("holdem-record-" + acctFileTag() + "-" + todayISO() + ".csv", recCSV(list), "text/csv");

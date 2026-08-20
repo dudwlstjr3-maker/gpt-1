@@ -354,8 +354,8 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
   await page.close();
 }
 
-/* ── 전적: 기록이 쌓인 상태 ──
-   탭 순회 때는 비어 있어서 표도 등급표도 안 그려진다. 채워 놓고 한 번 더 본다. */
+/* ── 전적 · 홈: 기록이 쌓인 상태 ──
+   탭 순회 때는 비어 있어서 표도 등급표도 «오늘 대회»도 안 그려진다. 채워 놓고 한 번 더 본다. */
 for (const vp of WIDTHS) {
   const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1 });
   const errs = [];
@@ -406,6 +406,32 @@ for (const vp of WIDTHS) {
       await page.waitForTimeout(400);
       await scanContrast(page, `${where} · ${th === 'light' ? '밝게' : '어둡게'}`);
       if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${th}-rec-full.png`), fullPage: true });
+    }
+  }
+
+  // 홈의 «오늘 대회» — 지난 것 · 곧 시작 · 시각 미정을 한 번에 그려 본다
+  await page.evaluate(() => {
+    const D = tdNew(), day = new Date().getDay();
+    tdProfilesSet([
+      tdProfileFrom(D, '아침 대회', [day], '00:01', ''),
+      tdProfileFrom(D, '이름이 아주아주 긴 저녁 토너먼트입니다', [day], '23:59', ''),
+      tdProfileFrom(D, '시각 미정 대회', [day], '', ''),
+    ]);
+    go('home');
+  });
+  await page.waitForTimeout(250);
+
+  const hw = `${vp.n} ${vp.w}px · 홈(오늘 대회)`;
+  checks++;
+  if (await page.locator('.todayrow').count() !== 3) add(hw, `오늘 대회 줄이 3개가 아닙니다 (${await page.locator('.todayrow').count()})`);
+  await scanText(page, hw);
+  await scanOverflow(page, hw, vp.w);
+  await scanClipped(page, hw);
+  if (vp.w === 1440) {
+    for (const th of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), th);
+      await page.waitForTimeout(400);
+      await scanContrast(page, `${hw} · ${th === 'light' ? '밝게' : '어둡게'}`);
     }
   }
 
@@ -479,4 +505,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 전적 · 계정 창)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 전적 · 홈 · 계정 창)\n`);

@@ -977,6 +977,41 @@ group('대회 프로필');
   tdProfilesSet(new Array(100).fill(0).map((_, i) => Object.assign({}, P, { id: 'z' + i })));
   ok(tdProfiles().length === 60, `저장 한도 60개로 잘림 (실제 ${tdProfiles().length})`);
   tdProfilesSet([]);
+
+  // ── 오늘 열리는 대회 (홈 화면). 시각을 고정해서 본다.
+  {
+    const { tdToday } = app;
+    // 2026-08-20 은 목요일(4)
+    const THU = Date.parse('2026-08-20T15:00:00');
+    const mk = (id, n, days, time) => Object.assign({}, P, { id, n, days, time });
+    tdProfilesSet([
+      mk('a', '점심 대회', [4], '12:00'),
+      mk('b', '저녁 대회', [4], '19:30'),
+      mk('c', '시각 미정 대회', [4], ''),
+      mk('d', '금요일 대회', [5], '19:30'),
+    ]);
+
+    const t = tdToday(THU);
+    ok(t.length === 3, '오늘(목) 대회만 나온다 — 금요일 것은 빠진다', t.map((x) => x.n).join(', '));
+    ok(t[0].n === '점심 대회' && t[1].n === '저녁 대회', '시각 순으로 줄 선다', t.map((x) => x.n).join(', '));
+    ok(t[2].n === '시각 미정 대회', '시각이 없는 대회는 맨 뒤', t[2].n);
+    ok(t[0].past === true, '15시엔 12시 대회가 지났다');
+    ok(t[1].past === false, '15시엔 19:30 대회가 아직 안 지났다');
+    ok(t[2].past === false, '시각이 없으면 지났다고 단정하지 않는다');
+    ok(t[1].inMin === 4 * 60 + 30, '19:30 까지 남은 분을 센다', String(t[1].inMin));
+    ok(t[2].inMin === null, '시각이 없으면 남은 분도 없다', String(t[2].inMin));
+
+    // 시작 시각 정각에는 «지남»이 아니다 — 그 순간이 제일 중요하다
+    const at1930 = tdToday(Date.parse('2026-08-20T19:30:00'));
+    ok(at1930[1].past === false && at1930[1].inMin === 0, '시작 정각은 0분 뒤이고 지나지 않았다',
+      `past=${at1930[1].past} inMin=${at1930[1].inMin}`);
+
+    ok(tdToday(Date.parse('2026-08-22T12:00:00')).length === 0,
+      '대회가 없는 요일(토)은 빈 목록', String(tdToday(Date.parse('2026-08-22T12:00:00')).length));
+
+    tdProfilesSet([]);
+    ok(tdToday(THU).length === 0, '저장한 대회가 없으면 빈 목록');
+  }
 }
 
 /* ───────────────── 성향 진단 ───────────────── */

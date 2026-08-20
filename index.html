@@ -1,0 +1,3651 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>홀덤 핸드 분석 — 성향 기반 복기 도구</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#10151c; --bg2:#161d27; --card:#1b2431; --line:#2a3646;
+  --tx:#e6edf5; --tx2:#9fb0c4; --tx3:#6b7c91;
+  --ac:#4fd1a5; --ac2:#3aa8ff; --warn:#ffb648; --bad:#ff6b6b; --good:#4fd1a5;
+  --sp:#e6edf5; --hd:#ff6b6b; --dm:#ff6b6b; --cl:#4fd1a5;
+}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font-family:'Malgun Gothic','맑은 고딕',-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;line-height:1.65}
+a{color:var(--ac2)}
+h1,h2,h3,h4{margin:0 0 .5em;line-height:1.3}
+h1{font-size:20px}h2{font-size:17px}h3{font-size:15px}h4{font-size:13.5px;color:var(--tx2)}
+p{margin:0 0 .7em}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px 80px}
+header{position:sticky;top:0;z-index:50;background:rgba(16,21,28,.96);
+  border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
+.hd{max-width:960px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{font-weight:700;font-size:15px;letter-spacing:-.3px;white-space:nowrap}
+.logo span{color:var(--ac)}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:none;border:0;color:var(--tx2);padding:6px 11px;border-radius:7px;
+  cursor:pointer;font-size:13px;font-family:inherit}
+nav button:hover{background:var(--bg2);color:var(--tx)}
+nav button.on{background:var(--ac);color:#07120e;font-weight:700}
+.view{display:none;padding-top:18px}
+.view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+.card.tight{padding:12px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){.g2,.g3{grid-template-columns:1fr}}
+label{display:block;font-size:12px;color:var(--tx2);margin:0 0 4px}
+select,input,textarea{width:100%;background:var(--bg2);border:1px solid var(--line);
+  color:var(--tx);padding:8px 10px;border-radius:8px;font-family:inherit;font-size:13.5px}
+select:focus,input:focus{outline:1px solid var(--ac)}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.row>div{flex:1;min-width:90px}
+button.btn{background:var(--ac);color:#07120e;border:0;padding:10px 18px;border-radius:9px;
+  font-weight:700;cursor:pointer;font-family:inherit;font-size:14px}
+button.btn:hover{filter:brightness(1.1)}
+button.btn.sec{background:var(--bg2);color:var(--tx);border:1px solid var(--line)}
+button.btn.sm{padding:6px 12px;font-size:12.5px}
+button.btn:disabled{opacity:.4;cursor:not-allowed}
+.muted{color:var(--tx2)}.dim{color:var(--tx3)}
+.small{font-size:12px}
+.tag{display:inline-block;background:var(--bg2);border:1px solid var(--line);
+  border-radius:20px;padding:2px 10px;font-size:11.5px;color:var(--tx2);margin:0 4px 4px 0}
+.tag.b{border-color:var(--bad);color:var(--bad)}
+.tag.g{border-color:var(--good);color:var(--good)}
+.tag.w{border-color:var(--warn);color:var(--warn)}
+hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--tx2);font-weight:600;font-size:12px}
+.scrollx{overflow-x:auto}
+/* 카드 표기 */
+.pc{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:38px;
+  background:#f4f7fb;color:#111;border-radius:5px;font-weight:800;font-size:16px;
+  margin-right:4px;padding:0 4px;font-family:'Segoe UI',sans-serif}
+.pc.h,.pc.d{color:#d81b3a}
+.pc.sm{min-width:22px;height:27px;font-size:12.5px;border-radius:4px}
+.pc.ph{background:var(--bg2);color:var(--tx3);border:1px dashed var(--line)}
+/* 진행 바 */
+.bar{height:7px;background:var(--bg2);border-radius:5px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ac);border-radius:5px;transition:width .3s}
+.axis{margin:0 0 11px}
+.axis .lb{display:flex;justify-content:space-between;font-size:12px;color:var(--tx2);margin-bottom:3px}
+.axbar{position:relative;height:9px;background:var(--bg2);border-radius:5px}
+.axbar i{position:absolute;top:-3px;width:5px;height:15px;background:var(--ac);border-radius:3px;transition:left .4s}
+.axbar u{position:absolute;left:50%;top:0;width:1px;height:9px;background:var(--line)}
+/* 선택지 */
+.opt{display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid var(--line);
+  color:var(--tx);padding:11px 14px;border-radius:9px;margin:0 0 8px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;line-height:1.5}
+.opt:hover{border-color:var(--ac);background:#1d2836}
+.opt b{color:var(--ac);margin-right:6px}
+/* 분석 결과 블록 */
+.st{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}
+.st>h3{margin:0;padding:11px 15px;background:var(--bg2);font-size:14px;
+  border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.st>.bd{padding:14px 15px}
+.blk{margin:0 0 13px}
+.blk:last-child{margin-bottom:0}
+.blk>.t{font-size:11.5px;font-weight:700;color:var(--ac);letter-spacing:.4px;margin:0 0 6px;text-transform:uppercase}
+.blk.hi{background:#16241f;border:1px solid #2c5546;border-radius:9px;padding:12px 13px}
+.blk.hi>.t{color:var(--ac)}
+.blk.warn{background:#251d16;border:1px solid #55432c;border-radius:9px;padding:12px 13px}
+.blk.warn>.t{color:var(--warn)}
+.blk.vx{background:#1e1a2b;border:1px solid #3d3352;border-radius:9px;padding:12px 13px}
+.blk.vx>.t{color:#b39dff}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.fact{background:var(--bg2);border-radius:8px;padding:8px 10px}
+.fact .k{font-size:11px;color:var(--tx3)}
+.fact .v{font-size:16px;font-weight:700}
+.fact .s{font-size:10.5px;color:var(--tx3)}
+details{background:var(--bg2);border-radius:8px;padding:9px 12px;margin:8px 0 0}
+details summary{cursor:pointer;font-size:12.5px;color:var(--tx2);outline:none}
+details[open] summary{margin-bottom:8px;color:var(--tx)}
+/* 13x13 그리드 */
+.g13{display:grid;grid-template-columns:repeat(13,1fr);gap:1px;max-width:420px;font-size:9px}
+.g13 div{aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);color:var(--tx3);border-radius:2px}
+.g13 div.in{background:var(--ac);color:#07120e;font-weight:700}
+.g13 div.pt{background:#2c6e58;color:#cfe}
+.notice{font-size:11.5px;color:var(--tx3);border-left:2px solid var(--line);padding-left:9px;margin:10px 0 0}
+.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.pill.g{background:#1c3b31;color:var(--good)}
+.pill.w{background:#3a2f1c;color:var(--warn)}
+.pill.b{background:#3b1f21;color:var(--bad)}
+.empty{text-align:center;color:var(--tx3);padding:34px 10px;font-size:13px}
+/* --- 직관형 핸드 입력 --- */
+.step{display:flex;align-items:center;gap:8px;margin:20px 0 8px;font-weight:700;font-size:14px}
+.step:first-of-type{margin-top:6px}
+.step .num{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;
+  border-radius:50%;background:var(--ac);color:#07120e;font-size:12px;font-weight:800;flex:0 0 auto}
+.step .sub{font-weight:400;font-size:12px;color:var(--tx3)}
+.seatmap{position:relative;width:100%;max-width:340px;height:190px;margin:4px auto 0}
+.seatmap .felt{position:absolute;left:14%;top:20%;right:14%;bottom:20%;
+  background:#17332b;border:2px solid #24483d;border-radius:50%}
+.seatmap .felt span{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+  text-align:center;color:#2f5d4e;font-size:11px;letter-spacing:1px}
+.seat{position:absolute;transform:translate(-50%,-50%);background:var(--bg2);
+  border:1px solid var(--line);color:var(--tx2);border-radius:8px;padding:4px 7px;font-size:11.5px;
+  cursor:pointer;font-family:inherit;white-space:nowrap;line-height:1.25;text-align:center}
+.seat:hover{border-color:var(--ac)}
+.seat b{display:block;font-size:9.5px;font-weight:800}
+.seat.me{background:var(--ac);color:#07120e;border-color:var(--ac);font-weight:700}
+.seat.vil{background:var(--warn);color:#241a08;border-color:var(--warn);font-weight:700}
+.slotrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin:2px 0 12px}
+.slotgrp{}
+.slotgrp>.gl{font-size:11.5px;color:var(--tx2);margin:0 0 4px}
+.slotgrp>.gc{display:flex;gap:5px}
+.slot{width:38px;height:50px;border-radius:7px;background:var(--bg2);border:1px dashed var(--line);
+  color:var(--tx3);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;
+  cursor:pointer;font-family:'Segoe UI',sans-serif;padding:0}
+.slot.filled{background:#f4f7fb;color:#111;border:1px solid #f4f7fb}
+.slot.filled.h,.slot.filled.d{color:#d81b3a}
+.slot.tgt{border:2px solid var(--ac);box-shadow:0 0 0 3px rgba(79,209,165,.18)}
+.slot.off{opacity:.32;cursor:not-allowed}
+.deck{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px;margin:0 0 4px}
+.deck .dr{display:grid;grid-template-columns:repeat(13,1fr);gap:3px;margin-bottom:3px}
+.deck .dr:last-child{margin-bottom:0}
+.dc{background:#f4f7fb;color:#111;border:0;border-radius:4px;padding:5px 0;font-size:12px;
+  font-weight:800;cursor:pointer;font-family:'Segoe UI',sans-serif;line-height:1.1}
+.dc.h,.dc.d{color:#d81b3a}
+.dc:hover{outline:2px solid var(--ac)}
+.dc.used{opacity:.16;cursor:not-allowed;outline:0}
+.dc small{display:block;font-size:8px;opacity:.65;font-weight:600}
+.bg{display:inline-flex;gap:4px;flex-wrap:wrap}
+.bg button{background:var(--bg2);border:1px solid var(--line);color:var(--tx2);border-radius:7px;
+  padding:6px 12px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.bg button:hover{border-color:var(--ac);color:var(--tx)}
+.bg button.on{background:var(--ac2);border-color:var(--ac2);color:#04121f;font-weight:700}
+.bg button.on.neg{background:var(--bad);border-color:var(--bad);color:#2a0b0b}
+.acard{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin:0 0 9px;background:var(--bg2)}
+.acard>.ah{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;font-weight:700;font-size:13.5px}
+.acard>.ah .pt{margin-left:auto;font-weight:400;font-size:12px;color:var(--tx2)}
+.arow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 7px}
+.arow:last-child{margin-bottom:0}
+.arow>.al{flex:0 0 40px;font-size:12px;color:var(--tx3)}
+.szin{width:74px!important;padding:5px 8px!important;font-size:12.5px!important}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ac);
+  color:#07120e;padding:9px 20px;border-radius:22px;font-weight:700;font-size:13px;z-index:99;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+.toast.on{opacity:1}
+
+/* --- 토너먼트 전광판 --- */
+.tv{font-size:11.5px;color:var(--tx3);border-left:2px solid var(--line);padding-left:9px}
+.tdwrap{position:relative;background:#07090d;border:1px solid var(--line);border-radius:14px;
+  padding:0 0 16px;margin:0 0 14px;text-align:center}
+.tdwrap:fullscreen{border:0;border-radius:0;padding:0 0 2vh;background:#07090d;
+  height:100vh;display:flex;flex-direction:column;justify-content:space-between}
+
+.bhead{display:grid;grid-template-columns:clamp(150px,18%,260px) 1fr clamp(150px,18%,260px);
+  align-items:center;background:#0e1218;border-bottom:1px solid #1b2230;
+  padding:clamp(8px,1.1vw,16px) clamp(10px,1.4vw,20px);
+  min-height:clamp(96px,12vw,176px)}
+.blogo{display:flex;align-items:center;justify-content:flex-start;min-height:0;height:100%;overflow:visible;
+  padding:4px 0;box-sizing:border-box}
+.blogo img{display:block;width:min(100%,clamp(150px,17vw,240px));max-width:100%;height:auto;max-height:none;
+  object-fit:contain;object-position:center;overflow:visible}
+.btitle{min-width:0}
+.bname{font-size:clamp(26px,4.4vw,60px);font-weight:800;letter-spacing:-.5px;line-height:1.1;
+  color:#f2f6fb}
+.bsub{font-size:clamp(14px,1.9vw,26px);font-weight:700;color:#b8c6d6;letter-spacing:2px;margin-top:4px}
+.bmini{justify-self:end;display:flex;flex-direction:column;gap:6px;min-width:clamp(132px,15vw,205px);
+  text-align:right;font-variant-numeric:tabular-nums}
+.bmini .mi{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:4px 7px;border-radius:7px;background:#0a0d12}
+.bmini .mk{font-size:clamp(8px,.82vw,12px);color:#6f8093;letter-spacing:.3px;white-space:nowrap}
+.bmini .mv{font-size:clamp(12px,1.22vw,18px);font-weight:800;color:#dbe6f2;white-space:nowrap}
+.bmini .reg .mv{color:var(--warn)}
+
+.bmid{display:block;padding:clamp(12px,1.8vw,26px) clamp(10px,1.8vw,26px) 0}
+.bclock{width:100%;min-width:0}
+#td-time{font-size:clamp(108px,18.5vw,270px);font-weight:800;line-height:.88;letter-spacing:-6px;
+  color:#fff;font-variant-numeric:tabular-nums;font-family:'Segoe UI',Arial,sans-serif}
+#td-time.hot{color:var(--warn)}
+.tdbar{height:5px;background:#141c27;border-radius:4px;overflow:hidden;margin:10px auto 0;max-width:62%}
+.tdbar i{display:block;height:100%;background:var(--ac);transition:width .3s linear}
+
+.blower{position:relative;z-index:1;display:grid;
+  grid-template-columns:minmax(190px,260px) minmax(0,1fr);
+  justify-content:stretch;column-gap:clamp(26px,4vw,56px);align-items:start;width:100%;
+  margin:clamp(34px,4vw,58px) auto 0;clear:both}
+.bblindside{justify-self:stretch;width:100%;max-width:none;min-width:0}
+.bblind{display:flex;flex-direction:column;justify-content:center;width:100%;height:clamp(250px,27vw,390px);
+  box-sizing:border-box;background:#0e1218;border:0;border-radius:14px;
+  padding:clamp(14px,1.6vw,24px) clamp(22px,3vw,48px);margin:0}
+.lvrow{font-size:clamp(24px,3.5vw,50px);font-weight:800;color:var(--ac);line-height:1.15;
+  text-align:center;padding-bottom:8px;margin-bottom:8px;border-bottom:0;
+  white-space:nowrap}
+.lvrow.brkc{color:var(--warn);font-size:clamp(84px,12vw,168px);font-weight:900;line-height:.9;letter-spacing:.04em}
+.brow{display:grid;grid-template-columns:clamp(90px,12vw,170px) clamp(210px,34vw,520px);
+  justify-content:center;gap:0 clamp(12px,1.6vw,26px);align-items:center;text-align:center}
+.bblind .k{font-size:clamp(13px,1.5vw,22px);color:var(--tx3);justify-self:center;text-align:center;letter-spacing:1px}
+.bblind .v{font-size:clamp(38px,6vw,88px);font-weight:800;line-height:1.15;color:#fff;
+  justify-self:center;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bblind .v3{font-size:clamp(18px,2.4vw,34px);font-weight:600;color:#9fb0c4;
+  justify-self:center;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+.blindvals,.antevals{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:baseline;width:100%;column-gap:.18em}
+.blindvals .sb{text-align:right}.blindvals .slash{font-style:normal;text-align:center}
+.blindvals .bb,.antevals .av{text-align:left}.antevals .av{grid-column:3}
+
+.bregwrap{margin-top:clamp(8px,1vw,14px)}
+.tdreg{display:inline-block;border-radius:20px;padding:4px 18px;font-weight:800;letter-spacing:1px;
+  font-size:clamp(12px,1.5vw,22px)}
+.tdreg.soon{background:#2a2113;color:var(--warn)}
+.tdreg.now{background:var(--warn);color:#241a08}
+.tdreg.done{background:#1c1a1a;color:var(--tx3)}
+
+.bprize{background:#0e1218;border:1px solid #23405c;border-radius:14px;
+  padding:clamp(9px,1.1vw,16px) clamp(10px,1.2vw,18px);text-align:left;align-self:start;
+  justify-self:start;width:100%;max-width:260px;box-sizing:border-box;margin:0}
+.bprize.locked{display:flex;min-height:92px;flex-direction:column;align-items:flex-start;justify-content:center;
+  border-color:#1b2633;color:#59697a}
+.bprize.locked span{font-size:clamp(9px,1vw,13px);letter-spacing:2px}
+.bprize.locked b{margin-top:5px;font-size:clamp(12px,1.25vw,18px);color:#7c8b9b}
+.ptot{border-bottom:1px solid #1b2230;padding-bottom:8px;margin-bottom:8px}
+.ptot .k{display:block;font-size:clamp(10px,1.05vw,15px);color:#7fb8ee;letter-spacing:2px}
+.ptot .v{display:block;font-size:clamp(19px,2.5vw,38px);font-weight:800;color:#fff;
+  font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
+.plist{list-style:none;margin:0;padding:0}
+.plist li{display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding:2px 0;
+  font-variant-numeric:tabular-nums}
+.plist .r{font-size:clamp(10px,1.1vw,16px);color:var(--tx3);flex:0 0 auto}
+.plist b{font-size:clamp(12px,1.45vw,22px);font-weight:700;color:#e6edf5;white-space:nowrap}
+.plist li.more{font-size:clamp(10px,1.05vw,15px);color:var(--tx3);justify-content:flex-end;
+  border-top:1px solid #16202c;margin-top:3px;padding-top:4px}
+
+.bstats{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(6px,1vw,14px);
+  margin:clamp(12px,1.6vw,22px) clamp(10px,1.6vw,22px) 0}
+.bstats.compactstats{grid-template-columns:repeat(3,1fr)}
+.bstats.breakstats{grid-template-columns:repeat(3,1fr)}
+.bstats>div{background:#0e1218;border:1px solid #1b2230;border-radius:11px;padding:9px 6px}
+.bstats .k{display:block;font-size:clamp(10px,1.15vw,16px);color:var(--tx3);letter-spacing:1px}
+.bstats .dim2{color:#5a6a7d}
+.bstats .v{display:block;font-size:clamp(18px,2.6vw,36px);font-weight:800;color:#eef4fa;
+  font-variant-numeric:tabular-nums;line-height:1.25}
+.bstats .v u{text-decoration:none;font-size:.5em;font-weight:600;color:var(--tx3);margin-left:3px}
+
+.bfoot{margin-top:12px;font-size:clamp(10px,1.1vw,15px);color:#46586b;letter-spacing:3px}
+
+.tdpause{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+  background:rgba(2,5,9,.30);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .16s ease}
+.tdpause.on{opacity:1;visibility:visible}
+.tdpause b{display:block;padding:.18em .55em .24em;border:2px solid rgba(255,255,255,.84);
+  border-radius:14px;background:rgba(6,10,15,.68);box-shadow:0 10px 36px rgba(0,0,0,.35);
+  color:#fff;font-size:clamp(72px,13vw,180px);font-weight:900;line-height:1;letter-spacing:.08em}
+
+.tdwrap:fullscreen #td-time{font-size:clamp(150px,29vh,370px)}
+.tdwrap:fullscreen .bname{font-size:clamp(26px,5.5vh,66px)}
+.tdwrap:fullscreen .blogo img{width:min(100%,clamp(170px,18vh,260px));height:auto;max-height:none}
+.tdwrap:fullscreen .lvrow{font-size:clamp(20px,4.4vh,50px)}
+.tdwrap:fullscreen .lvrow.brkc{font-size:clamp(96px,18vh,200px)}
+.tdwrap:fullscreen .bblind .v{font-size:clamp(30px,8vh,96px)}
+.tdwrap:fullscreen .bblind .v3{font-size:clamp(15px,3vh,34px)}
+.tdwrap:fullscreen .bstats .v{font-size:clamp(18px,4vh,44px)}
+.tdwrap:fullscreen .ptot .v{font-size:clamp(19px,4.4vh,48px)}
+.tdwrap:fullscreen .plist b{font-size:clamp(12px,2.6vh,28px)}
+
+@media(max-width:880px){
+  .bhead{grid-template-columns:70px 1fr 138px;padding:9px 10px;min-height:64px}
+  .blogo img{width:70px;height:auto}
+  .bmini{min-width:132px;gap:3px}.bmini .mi{padding:2px 5px;gap:5px}
+  .bmini .mk{font-size:8px}.bmini .mv{font-size:11px}
+  .bmid{display:block;padding:10px 10px 0}
+  #td-time{font-size:clamp(86px,24vw,170px);letter-spacing:-4px}
+  .blower{grid-template-columns:1fr;column-gap:0;row-gap:16px;margin-top:28px}
+  .bprize{margin-top:0}
+  .bprize,.bblindside{justify-self:stretch;width:100%;max-width:none}
+  .plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0 14px}
+  .bstats{grid-template-columns:repeat(2,1fr)}
+  .bstats.compactstats{grid-template-columns:repeat(3,1fr)}
+  .bstats.breakstats{grid-template-columns:repeat(3,1fr)}
+  .tdbar{max-width:82%}
+}
+
+/* --- 토너먼트 운영 화면 압축형 --- */
+.tdops,.tdcounts,.tdpayout,.tdlevels{width:min(100%,780px);box-sizing:border-box;
+  padding:8px 10px;margin:0 auto 7px;border-radius:9px}
+.tdops h3,.tdcounts h3,.tdpayout h3,.tdlevels h3{margin-bottom:5px;font-size:13.5px}
+.tdops .row{gap:5px}
+.tdops button.btn{padding:7px 11px;border-radius:7px;font-size:12.5px}
+.tdops .tdsep{flex:0 0 auto;width:1px;align-self:stretch;background:var(--line);margin:0 7px;min-height:26px}
+.tdops .tdglab{font-size:11.5px;color:var(--tx3);letter-spacing:1px;align-self:center;padding:0 3px}
+.tdops button.btn.tdmin{min-width:72px}
+.tdops .row{row-gap:8px}
+.tdreghint{align-self:center;margin-left:auto;font-size:11.5px;color:var(--tx3)}
+.tdcounts .hudline{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.tdcounts .hudline>div{display:flex;flex:0 0 auto;align-items:center;gap:4px;min-height:29px;padding:3px 6px;
+  background:var(--bg2);border:1px solid var(--line);border-radius:7px;white-space:nowrap}
+.tdcounts .hudline .k{font-size:11px;color:var(--tx2);margin-right:auto}
+.tdcounts .cntin{width:58px;padding:4px 5px;border-radius:6px;font-size:12px}
+.tdcounts button.btn.sm{padding:4px 7px;font-size:11px;border-radius:6px}
+.tdcounts .hudline+.hudline{margin-top:5px!important}
+.tdhelp{padding:5px 8px;margin-top:6px;border:1px solid var(--line);background:transparent}
+.tdhelp summary{font-size:11px;color:var(--tx3)}
+.tdhelp .small{margin-top:5px;font-size:10.5px;line-height:1.45;color:var(--tx3)}
+.tdpayout .step{margin:10px 0 5px;font-size:12.5px;gap:5px}
+.tdpayout .step:first-of-type{margin-top:2px}
+.tdpayout .step .num{width:18px;height:18px;font-size:10.5px}
+.tdpayout input,.tdpayout select{padding:5px 7px;font-size:12px;border-radius:6px}
+.tdpayout .row{justify-content:flex-start;gap:6px}
+.tdpayout .row>div{flex:0 1 auto!important;min-width:0}
+.tdpayout .poolcalc{display:flex;align-items:center;flex-wrap:wrap;gap:4px;width:max-content;max-width:100%}
+.tdpayout .poolcalc input{width:62px}
+.tdpayout #td-payn,.tdpayout #td-payshow{width:82px}
+.tdpayout .bg button{padding:4px 8px;font-size:11.5px}
+.tdpayout .small{font-size:10.5px}
+.tdpayout .notice{margin-top:5px;font-size:10.5px}
+.tdpayout .paytbl th,.tdpayout .paytbl td{padding:3px 6px;font-size:11.5px;vertical-align:middle}
+.tdpayout .paytbl{width:360px;max-width:100%}
+.tdpayout .paytbl input{width:72px;padding:3px 5px}
+.tdlevels>.small{font-size:10.5px;line-height:1.35}
+.tdlevels .row{gap:5px}
+.tdlevels button.btn{padding:6px 9px;font-size:11.5px;border-radius:6px}
+.tdlevels #td-lv{width:auto;min-width:620px;font-size:11.5px;white-space:nowrap}
+.tdlevels #td-lv th,.tdlevels #td-lv td{padding:3px 4px;vertical-align:middle}
+.tdlevels #td-lv .lvin{width:66px!important;height:28px;padding:3px 5px;font-size:11.5px;border-radius:5px}
+.tdlevels #td-lv button.btn.sm{padding:4px 7px;font-size:10.5px}
+.tdlevels .scrollx{margin-top:6px!important}
+.lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
+  padding:5px 8px;background:var(--bg2);border:1px solid var(--line);border-radius:7px;font-size:11.5px}
+.lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:4px 7px;font-size:11.5px}
+.lvdrag{cursor:grab;user-select:none}.lvdrag:active{cursor:grabbing}
+#td-lv tr.lvdragging{opacity:.42}#td-lv tr.lvdragover td{border-top:2px solid var(--ac)}
+@media(max-width:640px){
+  .tdcounts .hudline{align-items:flex-start}
+  .tdreghint{width:100%;margin-left:0}
+}
+
+/* 휴대폰 전체화면 — 가로 화면 한 장에 자연스럽게 맞춘다 */
+@media(orientation:landscape) and (max-height:600px){
+  .tdwrap:fullscreen{height:100dvh;min-height:0;padding:0;overflow:hidden;justify-content:flex-start}
+  .tdwrap:fullscreen .bhead{grid-template-columns:80px 1fr minmax(126px,160px);min-height:50px;padding:3px 8px}
+  .tdwrap:fullscreen .blogo{padding:1px 0}
+  .tdwrap:fullscreen .blogo img{width:76px;height:46px;object-fit:contain}
+  .tdwrap:fullscreen .bname{font-size:clamp(20px,5.5vh,30px)}
+  .tdwrap:fullscreen .bsub{font-size:clamp(11px,3.3vh,17px);margin-top:1px}
+  .tdwrap:fullscreen .bmini{min-width:126px;gap:2px}
+  .tdwrap:fullscreen .bmini .mi{padding:1px 4px}.tdwrap:fullscreen .bmini .mk{font-size:7px}
+  .tdwrap:fullscreen .bmini .mv{font-size:10px}
+  .tdwrap:fullscreen .bmid{padding:3px 8px 0}
+  .tdwrap:fullscreen #td-time{font-size:clamp(64px,24vh,118px);line-height:.82;letter-spacing:-4px}
+  .tdwrap:fullscreen .tdbar{height:3px;max-width:54%;margin-top:3px}
+  .tdwrap:fullscreen .blower{grid-template-columns:minmax(120px,190px) minmax(0,1fr);
+    column-gap:14px;row-gap:0;margin-top:6px}
+  .tdwrap:fullscreen .bprize{max-width:190px;padding:5px 7px;border-radius:8px}
+  .tdwrap:fullscreen .ptot{padding-bottom:3px;margin-bottom:3px}
+  .tdwrap:fullscreen .ptot .k{font-size:9px}.tdwrap:fullscreen .ptot .v{font-size:clamp(15px,4.5vh,24px)}
+  .tdwrap:fullscreen .plist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 7px}
+  .tdwrap:fullscreen .plist li{padding:0}.tdwrap:fullscreen .plist .r{font-size:9px}
+  .tdwrap:fullscreen .plist b{font-size:clamp(10px,3vh,15px)}
+  .tdwrap:fullscreen .bblind{height:clamp(120px,31vh,190px);padding:5px 12px;border-radius:8px}
+  .tdwrap:fullscreen .lvrow{font-size:clamp(16px,5vh,24px);padding-bottom:2px;margin-bottom:2px}
+  .tdwrap:fullscreen .lvrow.brkc{font-size:clamp(68px,18vh,96px)}
+  .tdwrap:fullscreen .bblind .k{font-size:clamp(9px,2.7vh,13px)}
+  .tdwrap:fullscreen .bblind .v{font-size:clamp(25px,7.5vh,38px)}
+  .tdwrap:fullscreen .bblind .v3{font-size:clamp(11px,3.4vh,17px)}
+  .tdwrap:fullscreen .bregwrap{margin-top:3px}.tdwrap:fullscreen .tdreg{padding:2px 9px;font-size:10px}
+  .tdwrap:fullscreen .bstats{grid-template-columns:repeat(4,1fr);gap:4px;margin:5px 8px 0}
+  .tdwrap:fullscreen .bstats.compactstats{grid-template-columns:repeat(3,1fr)}
+  .tdwrap:fullscreen .bstats.breakstats{grid-template-columns:repeat(3,1fr)}
+  .tdwrap:fullscreen .bstats>div{padding:3px 4px;border-radius:6px}
+  .tdwrap:fullscreen .bstats .k{font-size:8px}.tdwrap:fullscreen .bstats .v{font-size:clamp(13px,4vh,20px)}
+  .tdwrap:fullscreen .bfoot{display:none}
+  .tdwrap:fullscreen .tdpause b{font-size:clamp(56px,18vh,100px)}
+}
+
+/* --- 실전 드릴 --- */
+.dopt{display:flex;width:100%;text-align:left;align-items:center;gap:10px;background:var(--bg2);
+  border:1px solid var(--line);color:var(--tx);padding:13px 14px;border-radius:10px;margin:0 0 8px;
+  cursor:pointer;font-family:inherit;font-size:14.5px;font-weight:700}
+.dopt:hover{border-color:var(--ac);background:#1d2836}
+.dopt .kn{flex:0 0 22px;height:22px;border-radius:50%;background:var(--line);color:var(--tx2);
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+.dtable{margin:0 0 6px}
+.drow{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;margin:0 0 5px;
+  background:var(--bg2);border:1px solid transparent;flex-wrap:wrap}
+.drow.best{border-color:var(--ac);background:#16241f}
+.drow.mine{border-color:var(--ac2)}
+.drow.mine.best{border-color:var(--ac)}
+.drow .dk{flex:1 1 120px;font-weight:700;font-size:13.5px}
+.drow .dv{font-weight:800;font-size:14.5px;white-space:nowrap}
+.drow .dn{flex:1 1 100%;font-size:11px;color:var(--tx3);margin-top:-2px}
+.dbadge{font-size:10.5px;font-weight:800;border-radius:20px;padding:1px 8px;white-space:nowrap}
+.dbadge.b{background:#1c3b31;color:var(--good)}
+.dbadge.m{background:#12293f;color:#7fb8ee}
+.dspot{background:#132234;border:1px solid #2a4a6b;border-radius:11px;padding:13px;margin:0 0 14px;text-align:center}
+.dspot .dq{font-size:12px;color:#7fb8ee;font-weight:700;letter-spacing:.4px;margin-bottom:8px}
+.dspot .dh{margin:6px 0}
+.dspot .dvs{font-size:15px;font-weight:800;margin-top:9px}
+.dprog{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.dprog .bar{flex:1}
+@media(max-width:640px){ .dopt{font-size:14px;padding:12px} }
+
+/* --- 결과 화면 가독성 --- */
+.stmeta{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}
+.stmeta span{background:var(--bg2);border-radius:6px;padding:3px 8px;font-size:11.5px;color:var(--tx2)}
+.stmeta span b{color:var(--tx)}
+.st>h3{flex-wrap:wrap}
+.st>h3 .stn{font-size:15px;font-weight:800}
+.st>h3 .steq{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--ac);
+  background:#16241f;border-radius:20px;padding:2px 10px;white-space:nowrap}
+.recbox{background:#132234;border:1px solid #2a4a6b;border-radius:10px;padding:12px 13px;margin:0 0 13px}
+.recbox .rl{font-size:11.5px;font-weight:700;color:#7fb8ee;letter-spacing:.4px;margin-bottom:5px}
+.recbox .ra{font-size:19px;font-weight:800;color:#9fd0ff;line-height:1.35}
+.recbox .rs{font-size:12px;color:var(--tx3);margin-top:3px}
+.evlist{margin-top:9px;border-top:1px solid var(--line);padding-top:8px}
+.evrow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.evrow .k{flex:1 1 auto;font-size:13px}
+.evrow .v{font-weight:800;font-size:14px;white-space:nowrap}
+.evrow+.evn{font-size:11px;color:var(--tx3);margin:0 0 7px}
+.rx{background:#1b2431;border-left:3px solid var(--ac);border-radius:0 8px 8px 0;
+  padding:10px 12px;margin:0;font-size:13.5px}
+details.numd{background:var(--bg2);border-radius:9px;padding:9px 11px;margin:0 0 13px}
+details.numd summary{font-size:12.5px;color:var(--tx2)}
+details.numd summary b{color:var(--ac);margin-right:5px}
+.sumcard .sr{display:flex;gap:9px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.sumcard .sr:last-child{border-bottom:0}
+.sumcard .sr .n{flex:0 0 34px;font-weight:800;font-size:12.5px;color:var(--tx2)}
+.sumcard .sr .a{flex:1 1 130px;font-size:13px}
+.sumcard .sr .a b{color:var(--ac2)}
+.sumcard .sr .z{margin-left:auto;font-size:12px;white-space:nowrap}
+
+@media(max-width:640px){
+  body{font-size:15px;line-height:1.72}
+  .wrap{padding:0 12px 70px}
+  nav button i{display:none}
+  nav button{padding:6px 9px;font-size:13.5px}
+  .hd{padding:9px 12px;gap:9px}
+  .card{padding:14px 13px;border-radius:11px}
+  .st>.bd{padding:13px 12px}
+  .st>h3{padding:10px 12px;font-size:14px}
+  h1{font-size:19px}h2{font-size:16.5px}h3{font-size:15px}
+  /* 숫자 타일: 2열, 한 줄에 라벨+값 */
+  .facts{grid-template-columns:1fr 1fr;gap:6px}
+  .fact{padding:7px 9px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+  .fact .k{font-size:11.5px;flex:0 0 auto}
+  .fact .v{font-size:14.5px;margin-left:auto}
+  .fact .s{font-size:10px;flex:1 1 100%;margin-top:-2px}
+  /* 표를 카드로 세움 */
+  .tstack tr:first-child{display:none}
+  .tstack tr{display:block;border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;margin:0 0 8px;background:var(--bg2)}
+  .tstack td{display:block;border:0;padding:1px 0;font-size:13.5px}
+  .tstack td:before{content:attr(data-l);display:block;font-size:10.5px;color:var(--tx3);
+    letter-spacing:.3px;margin-top:5px}
+  .tstack td:first-child{font-weight:800;color:var(--ac);font-size:14px}
+  .tstack td:first-child:before{display:none}
+  .g13{font-size:8px;max-width:100%}
+  .deck{padding:7px}
+  .deck .dr{gap:2px}
+  .dc{font-size:11.5px;padding:4px 0}
+  .dc small{font-size:7.5px}
+  .blk{margin-bottom:12px}
+  .blk.hi,.blk.warn,.blk.vx{padding:11px 12px}
+  .recbox .ra{font-size:17.5px}
+  .arow>.al{flex:0 0 100%;margin-bottom:-2px}
+  .szin{width:66px!important}
+  .seatmap{height:175px}
+  table{font-size:13px}
+  th,td{padding:6px 6px}
+}
+</style>
+</head>
+<body>
+<header><div class="hd">
+  <div class="logo">홀덤 <span>핸드 분석</span> <i class="ver" id="app-ver"></i></div>
+  <nav id="nav">
+    <button data-v="home" class="on">홈</button>
+    <button data-v="quiz"><i>1 · </i>성향 진단</button>
+    <button data-v="hand"><i>2 · </i>핸드 분석</button>
+    <button data-v="stats"><i>3 · </i>리크<i> · 기록</i></button>
+    <button data-v="drill"><i>4 · </i>드릴</button>
+    <button data-v="tour"><i>5 · </i>토너먼트</button>
+    <button data-v="help">도움말</button>
+  </nav>
+</div></header>
+
+<div class="wrap">
+
+<!-- ================= 홈 ================= -->
+<section class="view on" id="v-home"></section>
+
+<!-- ================= 성향 진단 ================= -->
+<section class="view" id="v-quiz"></section>
+
+<!-- ================= 핸드 분석 ================= -->
+<section class="view" id="v-hand">
+  <div class="card">
+    <h2>세션 세팅</h2>
+    <p class="muted small">한 번 저장하면 다음부터 자동으로 불러옵니다.</p>
+    <div class="grid g3" style="margin-top:10px">
+      <div><label>게임 타입</label><select id="s-gt">
+        <option value="cash">캐시 게임</option><option value="mtt">토너먼트(MTT)</option>
+        <option value="sng">SNG</option></select></div>
+      <div><label>테이블 인원</label><select id="s-seats">
+        <option value="6">6맥스</option><option value="9">9맥스(풀링)</option>
+        <option value="2">헤즈업</option></select></div>
+      <div><label>유효 스택 (BB)</label><input id="s-stack" type="number" value="100" min="5" step="1"></div>
+      <div><label>블라인드 (SB/BB, 원)</label><input id="s-bl" value="500/1000"></div>
+      <div><label>앤티 (BB 단위, 없으면 0)</label><input id="s-ante" type="number" value="0" step="0.1"></div>
+      <div><label>뱅크롤 (총액, 원)</label><input id="s-br" type="number" value="0" step="10000"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div style="flex:2"><label>이번 세션 목표</label><select id="s-goal">
+        <option>연습 · 복기 위주</option><option>수익 목표</option><option>특정 리크 교정</option></select></div>
+      <div style="flex:0 0 auto"><button class="btn sec sm" id="s-save">세팅 저장</button></div>
+    </div>
+    <div id="br-advice"></div>
+  </div>
+
+  <div class="card">
+    <h2>핸드 입력</h2>
+
+    <div class="step"><span class="num">1</span> 자리 고르기</div>
+    <div class="sub" id="seat-hint" style="margin:-4px 0 4px;font-size:12px;color:var(--tx3)"></div>
+    <div class="seatmap" id="seat-map"></div>
+
+    <div class="step"><span class="num">2</span> 상대는 어떤 사람인가요 <span class="sub">모르면 그대로 두세요</span></div>
+    <div class="bg" id="vt-chips" style="display:flex"></div>
+    <div class="small dim" id="vt-desc" style="margin-top:6px"></div>
+
+    <div class="step"><span class="num">3</span> 프리플랍은 어떻게 됐나요</div>
+    <div class="bg" id="pf-chips" style="display:flex"></div>
+
+    <div class="step"><span class="num">4</span> 카드 고르기 <span class="sub">아래 덱에서 탭하세요 · 이미 놓은 카드를 탭하면 지워집니다</span></div>
+    <div class="slotrow" id="slots"></div>
+    <div class="deck" id="deck"></div>
+
+    <div class="step"><span class="num">5</span> 액션 넣기 <span class="sub">단위는 BB</span></div>
+    <div id="acts2"></div>
+
+    <div class="row" style="margin-top:16px">
+      <div style="flex:0 0 auto"><button class="btn" id="h-run">분석하기</button></div>
+      <div style="flex:0 0 auto"><button class="btn sec" id="h-clear">초기화</button></div>
+      <div style="flex:0 0 auto"><button class="btn sec" id="h-demo">예시 채우기</button></div>
+    </div>
+  </div>
+  <div id="h-out"></div>
+</section>
+
+<!-- ================= 리크/기록 ================= -->
+<section class="view" id="v-stats"></section>
+
+<!-- ================= 실전 드릴 ================= -->
+<section class="view" id="v-drill"></section>
+
+<!-- ================= 토너먼트 ================= -->
+<section class="view" id="v-tour"></section>
+
+<!-- ================= 도움말 ================= -->
+<section class="view" id="v-help">
+  <div class="card">
+    <h2>이 앱은 무엇인가</h2>
+    <p>친 핸드를 다시 넣어보고 <b>(1)</b> 내 성향을 진단하고 <b>(2)</b> 그 성향에 맞춘 실행 가능한 지침을 받고
+    <b>(3)</b> 같은 스팟을 상위권 스타일은 어떻게 풀었을지 비교해 보는 <b>학습·복기 도구</b>입니다.</p>
+    <h3 style="margin-top:16px">계산은 어디까지 진짜인가</h3>
+    <ul class="muted" style="padding-left:18px;margin:0 0 10px">
+      <li><b>정확한 계산:</b> 팟 오즈, 필요 에퀴티, SPR, MDF, EV 비교 — 전부 공식 그대로 계산합니다.</li>
+      <li><b>정확한 계산:</b> 내 핸드 vs 상대 <i>레인지</i> 승률 — 남은 카드를 전부(또는 몬테카를로로) 돌려서 구합니다.</li>
+      <li><b>가정이 들어간 값:</b> 상대의 레인지 자체. "표준적인 레귤러"를 가정한 근사치이며 화면에 항상 가정을 표시합니다.</li>
+      <li><b>권장 액션:</b> 위 숫자들에서 규칙으로 도출한 것이지 솔버 출력이 아닙니다. 방향은 맞지만 소수점까지 믿지 마세요.</li>
+    </ul>
+    <h3 style="margin-top:16px">탑 플레이어 렌즈에 대해</h3>
+    <p class="muted">실존 선수의 발언이나 생각을 지어내지 않습니다. 널리 알려진 <b>플레이 스타일 유형</b>을 재구성해
+    보여주는 것이며, 특정 인물의 실제 사고를 옮긴 것이 아닙니다.</p>
+    <h3 style="margin-top:16px">데이터</h3>
+    <p class="muted">모든 기록은 이 브라우저 안에만 저장됩니다(localStorage). 서버로 보내지 않습니다.
+    브라우저 데이터를 지우면 함께 사라지니 아래에서 백업하세요.</p>
+    <div class="row" style="margin-top:10px">
+      <div style="flex:0 0 auto"><button class="btn sec sm" id="ex-json">데이터 내보내기</button></div>
+      <div style="flex:0 0 auto"><button class="btn sec sm" id="im-json">데이터 불러오기</button></div>
+      <div style="flex:0 0 auto"><button class="btn sec sm" id="rs-all">전체 초기화</button></div>
+    </div>
+    <input type="file" id="im-file" accept=".json" style="display:none">
+    <hr>
+    <p class="small dim">이 도구는 학습·복기용이며 실제 도박 자금 운용에 대한 조언이 아닙니다.
+    잃어도 생활에 지장이 없는 돈만 쓰고, 통제가 어렵다고 느껴지면 도박문제 상담(한국도박문제예방치유원 국번없이 1336)에 연락하세요.</p>
+  </div>
+</section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* 이 파일의 버전. 수정할 때마다 올리고 버전\ 폴더에 복사본을 남긴다. */
+const LOGO_DEFAULT = "finalnine-logo.png";
+const APP_VER = "3.1";
+const APP_VER_NOTE = "드릴 정리 · 팟 계산 수정";
+/* ============================================================
+   PART 1. 포커 엔진 — 전부 결정론적 계산 (추정·짐작 없음)
+   ============================================================ */
+const R = "23456789TJQKA";
+const SU = "shdc";              // 스페이드 하트 다이아 클럽
+const SUCH = {s:"♠",h:"♥",d:"♦",c:"♣"};
+const rk = c => c >> 2, st = c => c & 3;
+const cid = (r,s) => R.indexOf(r)*4 + SU.indexOf(s);
+const cstr = c => R[rk(c)] + SU[st(c)];
+function cardHTML(c, sm){
+  if(c==null) return '<span class="pc ph'+(sm?' sm':'')+'">?</span>';
+  const s = SU[st(c)];
+  return '<span class="pc '+s+(sm?' sm':'')+'">'+R[rk(c)]+SUCH[s]+'</span>';
+}
+
+/* ---- 7장(또는 5·6장) 평가기 ---- */
+function straightHigh(m){
+  for(let h=12; h>=4; h--){
+    let ok = true;
+    for(let i=0;i<5;i++) if(!((m>>(h-i))&1)){ ok=false; break; }
+    if(ok) return h;
+  }
+  if((m>>12&1)&&(m&1)&&(m>>1&1)&&(m>>2&1)&&(m>>3&1)) return 3; // A2345
+  return -1;
+}
+function mkScore(cat, ks){
+  let v = cat;
+  for(let i=0;i<5;i++) v = v*13 + ((ks[i]===undefined?0:ks[i]));
+  return v;
+}
+function evalHand(cs){
+  const rc = new Array(13).fill(0), sc = new Array(4).fill(0), bys = [[],[],[],[]];
+  for(let i=0;i<cs.length;i++){ const r=rk(cs[i]), s=st(cs[i]); rc[r]++; sc[s]++; bys[s].push(r); }
+  let fs = -1;
+  for(let s=0;s<4;s++) if(sc[s]>=5) fs = s;
+  if(fs>=0){
+    const rs = bys[fs].slice().sort((a,b)=>b-a);
+    let fm = 0; for(let i=0;i<rs.length;i++) fm |= 1<<rs[i];
+    const sf = straightHigh(fm);
+    if(sf>=0) return mkScore(8,[sf]);
+    return mkScore(5, rs.slice(0,5));
+  }
+  let m = 0; for(let r=0;r<13;r++) if(rc[r]) m |= 1<<r;
+  const sh = straightHigh(m);
+  const q=[],t=[],p=[],k=[];
+  for(let r=12;r>=0;r--){
+    if(rc[r]===4) q.push(r); else if(rc[r]===3) t.push(r);
+    else if(rc[r]===2) p.push(r); else if(rc[r]===1) k.push(r);
+  }
+  if(q.length){
+    const rest=[].concat(t,p,k).sort((a,b)=>b-a);
+    return mkScore(7,[q[0], rest.length?rest[0]:0]);
+  }
+  if(t.length>=2) return mkScore(6,[t[0], Math.max(t[1], p.length?p[0]:-1)]);
+  if(t.length===1 && p.length) return mkScore(6,[t[0], p[0]]);
+  if(sh>=0) return mkScore(4,[sh]);
+  if(t.length===1) return mkScore(3, [t[0]].concat(k.slice(0,2)));
+  if(p.length>=2){
+    const rest = [].concat(p.slice(2), k).sort((a,b)=>b-a);
+    return mkScore(2,[p[0],p[1], rest.length?rest[0]:0]);
+  }
+  if(p.length===1) return mkScore(1, [p[0]].concat(k.slice(0,3)));
+  return mkScore(0, k.slice(0,5));
+}
+const CATNAME = ["하이카드","원페어","투페어","트립스","스트레이트","플러시","풀하우스","포카드","스트레이트 플러시"];
+const catOf = sc => Math.floor(sc / Math.pow(13,5));
+
+/* ---- 169 핸드 클래스 & 표준 강도 순위(근사) ---- */
+const RANKED = ("AA KK QQ JJ AKs TT AQs AKo 99 AJs KQs 88 ATs AQo KJs 77 QJs KTs AJo A9s JTs ATo KQo 66 "+
+"QTs A8s K9s A5s J9s A7s KJo 55 Q9s A4s T9s A6s A3s QJo K8s JTo A2s 44 KTo 98s T8s K7s Q8s J8s QTo A9o "+
+"K6s 33 87s 97s K5s 22 J9o T9o A8o Q7s K4s 76s 86s K3s Q6s J7s A7o T7s K2s Q5s 65s A5o 96s K9o Q4s 75s "+
+"J6s A6o Q3s 54s 85s T6s Q2s J5s A4o J8o T8o 64s J4s 95s A3o Q9o 74s J3s 53s 98o A2o T5s J2s K8o 84s "+
+"T4s 43s 63s 87o T3s 94s K7o T2s 52s Q8o 73s J7o 93s K6o 42s 62s 76o 83s 92s K5o T7o 97o 32s 82s K4o "+
+"J6o Q7o 72s 65o K3o T6o 86o Q6o K2o 96o J5o 75o Q5o 54o T5o J4o 85o Q4o 64o J3o 95o T4o Q3o J2o 53o "+
+"74o Q2o T3o 84o 43o 63o T2o 94o 52o 93o 73o 42o 62o 83o 92o 32o 82o 72o").split(/\s+/);
+const combosOf = cl => cl[0]===cl[1] ? 6 : (cl[2]==="s" ? 4 : 12);
+const TOTCOMBO = 1326;
+function classToCombos(cl){
+  const a = R.indexOf(cl[0]), b = R.indexOf(cl[1]), out = [];
+  if(a===b){ for(let i=0;i<4;i++) for(let j=i+1;j<4;j++) out.push([a*4+i, a*4+j]); }
+  else if(cl[2]==="s"){ for(let i=0;i<4;i++) out.push([a*4+i, b*4+i]); }
+  else { for(let i=0;i<4;i++) for(let j=0;j<4;j++) if(i!==j) out.push([a*4+i, b*4+j]); }
+  return out;
+}
+function handClass(c1,c2){
+  let a=rk(c1), b=rk(c2), sm = st(c1)===st(c2);
+  if(a<b){ const t=a; a=b; b=t; }
+  return a===b ? R[a]+R[a] : R[a]+R[b]+(sm?"s":"o");
+}
+/* 상위 pct% 레인지(콤보 기준). skip을 주면 그 위쪽은 제외(플랫콜 레인지용) */
+function rangeClasses(pct, skip){
+  skip = skip || 0;
+  const need = TOTCOMBO*pct/100, skipN = TOTCOMBO*skip/100;
+  let acc = 0; const out = [];
+  for(let i=0;i<RANKED.length;i++){
+    const c = combosOf(RANKED[i]), mid = acc + c/2;
+    if(mid > skipN && mid <= need) out.push(RANKED[i]);
+    acc += c;
+    if(acc > need) break;
+  }
+  return out;
+}
+function expandRange(classes, dead){
+  const bad = {}; for(let i=0;i<dead.length;i++) bad[dead[i]] = 1;
+  const out = [];
+  for(let i=0;i<classes.length;i++){
+    const cs = classToCombos(classes[i]);
+    for(let j=0;j<cs.length;j++) if(!bad[cs[j][0]] && !bad[cs[j][1]]) out.push(cs[j]);
+  }
+  return out;
+}
+/* 보드에서의 현재 핸드 강도 상위 keep 비율만 남김 (상대가 강하게 나올 때) */
+function filterByStrength(combos, board, keep){
+  if(keep>=1 || board.length<3) return combos;
+  const scored = combos.map(c => [evalHand([c[0],c[1]].concat(board)), c]);
+  scored.sort((a,b)=>b[0]-a[0]);
+  const n = Math.max(4, Math.round(scored.length*keep));
+  return scored.slice(0,n).map(x=>x[1]);
+}
+
+/* ---- 에퀴티: 내 핸드 vs 상대 레인지 ---- */
+function equityVsRange(hero, board, combos){
+  const dead = {};
+  hero.forEach(c=>dead[c]=1); board.forEach(c=>dead[c]=1);
+  const deck = [];
+  for(let c=0;c<52;c++) if(!dead[c]) deck.push(c);
+  const need = 5 - board.length;
+  const valid = combos.filter(c=>!dead[c[0]] && !dead[c[1]]);
+  if(!valid.length) return {eq:0.5, n:0, exact:false};
+  let win=0, tie=0, n=0;
+  const runoutCount = need===0?1 : need===1?deck.length : need===2?deck.length*(deck.length-1)/2 : 1e9;
+  const exact = valid.length*runoutCount <= 90000;
+  if(exact){
+    for(let i=0;i<valid.length;i++){
+      const v = valid[i];
+      const d2 = deck.filter(c=>c!==v[0] && c!==v[1]);
+      const runs = [];
+      if(need===0) runs.push([]);
+      else if(need===1) for(let a=0;a<d2.length;a++) runs.push([d2[a]]);
+      else for(let a=0;a<d2.length;a++) for(let b=a+1;b<d2.length;b++) runs.push([d2[a],d2[b]]);
+      for(let x=0;x<runs.length;x++){
+        const bd = board.concat(runs[x]);
+        const h = evalHand(hero.concat(bd)), o = evalHand([v[0],v[1]].concat(bd));
+        if(h>o) win++; else if(h===o) tie++;
+        n++;
+      }
+    }
+  } else {
+    const N = 12000;
+    for(let i=0;i<N;i++){
+      const v = valid[(Math.random()*valid.length)|0];
+      const d2 = deck.slice();
+      for(let z=d2.length-1;z>=0;z--) if(d2[z]===v[0]||d2[z]===v[1]) d2.splice(z,1);
+      const bd = board.slice();
+      for(let x=0;x<need;x++){
+        const j = (Math.random()*d2.length)|0;
+        bd.push(d2[j]); d2.splice(j,1);
+      }
+      const h = evalHand(hero.concat(bd)), o = evalHand([v[0],v[1]].concat(bd));
+      if(h>o) win++; else if(h===o) tie++;
+      n++;
+    }
+  }
+  return {eq:(win + tie/2)/n, n:n, exact:exact, combos:valid.length};
+}
+
+/* 멀티웨이: 상대가 여러 명이면 '모두를 이겨야' 한다.
+   상대별 레인지에서 각각 한 조합씩 뽑아 돌리는 몬테카를로. 동점은 인원수로 나눈다. */
+function equityVsRanges(hero, board, ranges){
+  if(ranges.length === 1) return equityVsRange(hero, board, ranges[0]);
+  const dead = {};
+  hero.forEach(c=>dead[c]=1); board.forEach(c=>dead[c]=1);
+  const deck = [];
+  for(let c=0;c<52;c++) if(!dead[c]) deck.push(c);
+  const need = 5 - board.length, N = 9000;
+  let win = 0, share = 0, n = 0;
+  for(let i=0;i<N;i++){
+    const used = Object.assign({}, dead);
+    const vh = []; let ok = true;
+    for(let r=0;r<ranges.length;r++){
+      let got = null;
+      for(let t=0;t<30;t++){
+        const cd = ranges[r][(Math.random()*ranges[r].length)|0];
+        if(cd && !used[cd[0]] && !used[cd[1]]){ got = cd; break; }
+      }
+      if(!got){ ok = false; break; }
+      used[got[0]] = 1; used[got[1]] = 1; vh.push(got);
+    }
+    if(!ok) continue;
+    const pool = deck.filter(c=>!used[c]), bd = board.slice();
+    for(let x=0;x<need;x++){ const j=(Math.random()*pool.length)|0; bd.push(pool[j]); pool.splice(j,1); }
+    const hs = evalHand(hero.concat(bd));
+    let best = -1, ties = 0;
+    for(let r=0;r<vh.length;r++){
+      const s = evalHand([vh[r][0],vh[r][1]].concat(bd));
+      if(s > best) best = s;
+    }
+    if(hs > best) win++;
+    else if(hs === best){
+      for(let r=0;r<vh.length;r++) if(evalHand([vh[r][0],vh[r][1]].concat(bd)) === hs) ties++;
+      share += 1/(ties+1);
+    }
+    n++;
+  }
+  return {eq: n? (win+share)/n : 0, n:n, exact:false,
+          combos: ranges.reduce((a,r)=>a+r.length, 0)};
+}
+
+/* ---- 보드 텍스처 & 드로 ---- */
+function boardInfo(board){
+  if(board.length<3) return null;
+  const rs = board.map(rk), ss = board.map(st);
+  const sc = {}; ss.forEach(s=>sc[s]=(sc[s]||0)+1);
+  const maxS = Math.max.apply(null, Object.keys(sc).map(k=>sc[k]));
+  const rc = {}; rs.forEach(r=>rc[r]=(rc[r]||0)+1);
+  const paired = Object.keys(rc).some(k=>rc[k]>=2);
+  const trips = Object.keys(rc).some(k=>rc[k]>=3);
+  const u = Array.from(new Set(rs)).sort((a,b)=>a-b);
+  let conn = 0;
+  for(let i=0;i<u.length;i++) for(let j=i+1;j<u.length;j++) if(u[j]-u[i]<=4) conn++;
+  const hi = Math.max.apply(null, rs);
+  const wet = (maxS>=3?3:maxS>=2?1.4:0) + (conn>=3?1.6:conn>=2?1:0) + (hi>=10?0.4:0);
+  return {
+    maxSuit:maxS, paired:paired, trips:trips, hi:hi, conn:conn,
+    wet: wet, tex: wet>=3 ? "젖은(드로 많은) 보드" : wet>=1.6 ? "중간 텍스처" : "마른(드로 적은) 보드",
+    suitTxt: maxS>=3?"모노톤":maxS===2?"투톤":"레인보우",
+    hiTxt: hi>=11?"하이카드 보드":hi>=8?"미들 보드":"로우 보드"
+  };
+}
+function drawInfo(hero, board){
+  if(board.length<3 || board.length>4) return {fd:false,oesd:false,gs:false,txt:[]};
+  const all = hero.concat(board);
+  const sc = {}; all.forEach(c=>sc[st(c)]=(sc[st(c)]||0)+1);
+  let fd=false, fdMine=false;
+  for(const s in sc) if(sc[s]===4){ fd=true; if(hero.some(c=>st(c)==s)) fdMine=true; }
+  let m=0; all.forEach(c=>m|=1<<rk(c));
+  let oesd=false, gs=false;
+  if(straightHigh(m)<0){
+    let outs=0;
+    for(let r=0;r<13;r++){ if(m>>r&1) continue; if(straightHigh(m|(1<<r))>=0) outs++; }
+    if(outs>=2) oesd=true; else if(outs===1) gs=true;
+  }
+  const txt=[];
+  if(fd&&fdMine) txt.push("플러시 드로");
+  if(oesd) txt.push("양차 스트레이트 드로");
+  else if(gs) txt.push("건샷");
+  return {fd:fd&&fdMine, oesd:oesd, gs:gs, txt:txt};
+}
+
+/* ---- 포지션 ---- */
+const POS6 = ["UTG","HJ","CO","BTN","SB","BB"];
+const POS9 = ["UTG","UTG+1","MP","MP+1","HJ","CO","BTN","SB","BB"];
+const POS2 = ["BTN(SB)","BB"];
+function posList(seats){ return seats==9?POS9:seats==2?POS2:POS6; }
+function ipVs(seats, me, vil){
+  const L = posList(seats), a = L.indexOf(me), b = L.indexOf(vil);
+  const ord = p => { const i=L.indexOf(p); return p==="SB"||p==="BTN(SB)" ? -2 : p==="BB" ? -1 : i; };
+  // 포스트플랍 순서: SB, BB가 가장 먼저 액션 → BTN이 마지막
+  const post = p => p==="SB"||p==="BTN(SB)" ? 0 : p==="BB" ? 1 : L.indexOf(p)+2;
+  return post(me) > post(vil);
+}
+const OPEN_PCT = {"UTG":15,"UTG+1":16,"MP":18,"MP+1":20,"HJ":21,"CO":27,"BTN":44,"SB":38,"BB":100,"BTN(SB)":75};
+
+/* ============================================================
+   PART 2. 저장소 · 성향 진단(모듈 A)
+   ============================================================ */
+const DB = {
+  get(k,d){ try{ const v=localStorage.getItem("hb."+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("hb."+k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem("hb."+k); }catch(e){} }
+};
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),1600); }
+const esc = s => String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+const AXES = {
+  A1:{n:"진입 폭",     lo:"타이트",   hi:"루즈",     d:"어떤 핸드로 팟에 들어가는가"},
+  A2:{n:"공격성",      lo:"패시브",   hi:"어그레시브", d:"콜·체크로 가는가, 벳·레이즈로 가는가"},
+  A3:{n:"리스크 감내",  lo:"회피",     hi:"감수",     d:"분산 큰 라인을 얼마나 감당하는가"},
+  A4:{n:"압박 저항",    lo:"쉽게 접음", hi:"끝까지 버팀", d:"큰 벳·3벳을 맞았을 때 물러서는가"},
+  A5:{n:"사고 스타일",  lo:"직관형",   hi:"계산형",   d:"오즈·빈도를 실제로 따지는가"},
+  B1:{n:"감정 회복력",  lo:"흔들림",   hi:"단단함",   d:"배드빗·연패 직후에도 판단이 유지되는가"},
+  B2:{n:"일관성",      lo:"들쭉날쭉",  hi:"일관됨",   d:"같은 구조의 스팟에 같은 답을 하는가"}
+};
+
+/* ---- 진단 문항 (문항별 축 가중치) ---- */
+const Q = [
+{id:1,c:"프리플랍",p:"A1",q:"9맥스 캐시, 100BB. UTG(가장 앞자리)에서 A♠J♦를 받았습니다. 앞은 전부 폴드.",
+ o:[{t:"폴드한다",w:{A1:-2}},{t:"2.5BB 오픈",w:{A1:0,A2:1}},{t:"3BB 오픈",w:{A1:1,A2:2}},{t:"림프(1BB)로 들어간다",w:{A1:1,A2:-2}}]},
+{id:2,c:"프리플랍",p:"A1",q:"6맥스 캐시, 100BB. BTN까지 전부 폴드. 내 핸드는 K♠8♠.",
+ o:[{t:"폴드",w:{A1:-2}},{t:"2.2BB 오픈",w:{A1:1,A2:1}},{t:"3BB 오픈",w:{A1:1,A2:2}}]},
+{id:3,c:"프리플랍",p:"A3",q:"CO가 2.5BB 오픈. 나는 BTN에 5♥5♣, 스택 100BB.",
+ o:[{t:"폴드",w:{A1:-2,A3:-1}},{t:"콜(셋 노리고)",w:{A1:1,A3:1}},{t:"3벳 8BB",w:{A2:2,A3:2}}]},
+{id:4,c:"프리플랍",p:"A1",pair:"P1",q:"BTN이 2.5BB 오픈, SB 폴드. 나는 BB에 Q♦9♦.",
+ o:[{t:"폴드",w:{A1:-2,A4:-1}},{t:"콜(디펜스)",w:{A1:1,A4:1}},{t:"3벳 11BB",w:{A1:1,A2:2,A4:2}}]},
+{id:5,c:"프리플랍",p:"A2",q:"UTG가 2.5BB 오픈. 나는 HJ에 A♥Q♣, 100BB.",
+ o:[{t:"폴드",w:{A1:-2,A4:-2}},{t:"콜",w:{A2:-1}},{t:"3벳 8BB",w:{A2:2}}]},
+{id:6,c:"프리플랍",p:"A4",q:"내가 CO에서 2.5BB 오픈했는데 BTN이 8BB로 3벳. 내 핸드 A♥K♠, 100BB.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:1,A2:-1}},{t:"4벳 20BB",w:{A2:2,A4:2,A3:1}}]},
+{id:7,c:"프리플랍",p:"A3",q:"내가 BTN 오픈, BB가 12BB로 3벳. 내 핸드 7♠7♦, 100BB.",
+ o:[{t:"폴드",w:{A3:-2,A4:-2}},{t:"콜(셋 마이닝)",w:{A3:1,A4:1}},{t:"4벳 블러프성",w:{A2:2,A3:2}}]},
+{id:8,c:"프리플랍",p:"A2",q:"3명이 림프로 들어왔습니다. 나는 SB에 A♣T♣.",
+ o:[{t:"나도 림프",w:{A2:-2,A1:1}},{t:"폴드",w:{A1:-2}},{t:"6BB로 아이솔레이트 레이즈",w:{A2:2,A3:1}}]},
+{id:9,c:"프리플랍",p:"A3",q:"MTT 버블 근처, 스택 22BB. HJ에서 A♦9♦, 앞은 전부 폴드.",
+ o:[{t:"폴드",w:{A1:-2,A3:-2}},{t:"2.2BB 오픈",w:{A2:1,A5:1}},{t:"올인 푸시",w:{A2:2,A3:2}}]},
+{id:10,c:"프리플랍",p:"A1",q:"헤즈업이 아닌 6맥스. SB가 3BB 오픈, 나는 BB에 J♠4♠.",
+ o:[{t:"폴드",w:{A1:-2}},{t:"콜",w:{A1:2,A4:1}},{t:"3벳",w:{A1:1,A2:2}}]},
+
+{id:11,c:"플랍",p:"A2",q:"내가 BTN 오픈, BB 콜. 플랍 K♠7♥2♦(마른 보드). BB 체크. 내 핸드 A♠Q♠.",
+ o:[{t:"체크(무료 카드)",w:{A2:-2}},{t:"팟 1/3 c-벳",w:{A2:1,A5:1}},{t:"팟 3/4 c-벳",w:{A2:2,A3:1}}]},
+{id:12,c:"플랍",p:"A3",q:"BB에서 콜. 플랍 9♥8♥3♣, 내 핸드 J♥T♥(플러시드로+양차). 상대 팟 1/2 벳.",
+ o:[{t:"폴드",w:{A3:-2,A4:-2}},{t:"콜",w:{A3:1,A2:-1}},{t:"체크레이즈",w:{A2:2,A3:2}}]},
+{id:13,c:"플랍",p:"A5",q:"내가 3벳, 상대 콜. 플랍 A♦5♣2♠. 내 핸드 K♣K♦. 상대 체크.",
+ o:[{t:"체크(팟 컨트롤)",w:{A2:-1,A5:1}},{t:"팟 1/4 작은 벳",w:{A5:2,A2:1}},{t:"팟 2/3 벳",w:{A2:2,A5:-1}}]},
+{id:14,c:"플랍",p:"A2",q:"플랍 J♥9♥6♣에서 셋(9♠9♦)을 맞췄습니다. 드로가 많은 보드, 상대 체크.",
+ o:[{t:"체크(슬로플레이)",w:{A2:-2,A3:1}},{t:"팟 1/2 벳",w:{A2:1,A5:1}},{t:"팟 사이즈 벳",w:{A2:2,A5:1}}]},
+{id:15,c:"플랍",p:"A4",pair:"P2",q:"내 Q♠Q♦로 3벳 팟. 플랍 8♣6♦3♥. 내가 c-벳했는데 상대가 체크레이즈.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜하고 턴 본다",w:{A4:1,A5:1}},{t:"3벳으로 되받는다",w:{A4:2,A2:2}}]},
+{id:16,c:"플랍",p:"A2",q:"내가 오픈, BB 콜. 플랍 T♠6♦4♣. 내 핸드 A♥3♥(완전 미스). 상대 체크.",
+ o:[{t:"체크",w:{A2:-2}},{t:"팟 1/3 블러프 벳",w:{A2:2,A5:1}}]},
+{id:17,c:"플랍",p:"A3",q:"SPR 3(스택이 팟의 3배)인 상황. 플랍에서 플러시드로+오버카드 2장. 상대가 팟 1/2 벳.",
+ o:[{t:"폴드",w:{A3:-2,A4:-2}},{t:"콜",w:{A3:0}},{t:"올인 체크레이즈",w:{A2:2,A3:2}}]},
+{id:18,c:"플랍",p:"A4",q:"내가 프리플랍 레이저인데 플랍에서 상대가 먼저 팟 사이즈로 리드벳. 내 핸드는 탑페어 굿키커.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:1,A2:-1}},{t:"레이즈",w:{A4:2,A2:2}}]},
+
+{id:19,c:"턴",p:"A4",q:"플랍 K♦8♦4♠에서 내가 K♠J♣로 탑페어. 턴 2♦로 플러시 완성 가능. 상대가 팟 사이즈 벳.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:2,A3:1}},{t:"레이즈",w:{A2:2,A3:2,A4:2}}]},
+{id:20,c:"턴",p:"A2",q:"내 드로가 턴에서 미스. 상대가 체크로 넘겼습니다. 팟은 큽니다.",
+ o:[{t:"체크(쇼다운 보러 감)",w:{A2:-2}},{t:"팟 2/3 블러프",w:{A2:2,A3:2}},{t:"팟 1/3 작은 블러프",w:{A2:1,A5:2}}]},
+{id:21,c:"턴",p:"A2",q:"플랍 c-벳이 콜됐습니다. 턴은 아무 상관 없는 브릭 카드. 내 핸드는 여전히 오버카드 2장뿐.",
+ o:[{t:"체크",w:{A2:-1,A5:1}},{t:"두 번째 배럴을 친다",w:{A2:2,A3:1}},{t:"체크한 뒤 리버에서 친다",w:{A5:2,A2:0}}]},
+{id:22,c:"턴",p:"A5",q:"턴에서 상대가 정확히 최소 레이즈(미니레이즈)를 했습니다. 이때 가장 먼저 하는 생각은?",
+ o:[{t:"뭔가 강한 것 같다, 접자",w:{A5:-2,A4:-2}},{t:"이 사이즈로 뭘 하려는지 상대 레인지를 나눠본다",w:{A5:2}},{t:"오즈가 좋으니 일단 콜",w:{A5:0,A4:1}}]},
+{id:23,c:"턴",p:"A5",q:"턴에서 벳할지 말지 고민할 때, 리버까지의 계획을 미리 세우나요?",
+ o:[{t:"보통 그 순간만 보고 결정한다",w:{A5:-2}},{t:"리버에 뭐가 나오면 어떻게 할지 대충 그려본다",w:{A5:1}},{t:"리버 카드 종류별로 액션을 미리 정해둔다",w:{A5:2}}]},
+
+{id:24,c:"리버",p:"A2",q:"리버에서 내가 확실히 이기는 핸드입니다. 상대는 중간 강도 핸드로 보입니다.",
+ o:[{t:"체크(못 이길까 봐)",w:{A2:-2}},{t:"팟 1/3 작게 밸류벳",w:{A2:1,A5:2}},{t:"팟 3/4 크게 밸류벳",w:{A2:2,A3:1}}]},
+{id:25,c:"리버",p:"A5",pair:"P3",q:"리버에서 상대가 팟 사이즈 벳. 내 핸드는 블러프캐처(중간 페어)입니다.",
+ o:[{t:"느낌상 강해 보여서 폴드",w:{A5:-2,A4:-2}},{t:"팟오즈상 33% 이기면 되니 상대 블러프 빈도를 따져 콜",w:{A5:2,A4:1}},{t:"일단 콜, 판단은 나중에",w:{A5:-1,A4:2}}]},
+{id:26,c:"리버",p:"A4",q:"리버에서 상대가 오버벳 올인. 내 핸드는 두 번째 넛(넛은 아님).",
+ o:[{t:"폴드",w:{A4:-2,A3:-2}},{t:"콜",w:{A4:2,A3:2}}]},
+{id:27,c:"리버",p:"A2",q:"리버에서 내 핸드가 상대 레인지의 절반 조금 넘게 이깁니다. 상대는 체크.",
+ o:[{t:"체크백(얇은 밸류는 위험)",w:{A2:-2}},{t:"작게 얇은 밸류벳",w:{A2:2,A5:2}}]},
+{id:28,c:"리버",p:"A3",q:"턴까지 두 번 블러프했는데 리버에서도 미스. 여기서 세 번째 배럴을 치면 스택의 절반이 갑니다.",
+ o:[{t:"포기하고 체크",w:{A2:-2,A3:-2}},{t:"계획대로 친다",w:{A2:2,A3:2}},{t:"상대 폴드 빈도를 추정해보고 결정",w:{A5:2,A3:1}}]},
+
+{id:29,c:"사고",p:"A5",q:"어려운 스팟에서 결정할 때, 가장 먼저 보는 것은?",
+ o:[{t:"내 핸드가 얼마나 센가",w:{A5:-2}},{t:"상대가 어떤 핸드들로 여기까지 왔을까(레인지)",w:{A5:2}},{t:"상대 표정·타이밍·습관",w:{A5:-1}}]},
+{id:30,c:"사고",p:"A5",q:"상대 레인지를 실제로 세어보나요?",
+ o:[{t:"거의 안 센다",w:{A5:-2}},{t:"대충 '넓다/좁다' 정도로만",w:{A5:0}},{t:"콤보 단위로 대략 헤아려본다",w:{A5:2}}]},
+{id:31,c:"사고",p:"A5",q:"콜할지 말지 고민할 때 팟 오즈를 계산하나요?",
+ o:[{t:"거의 안 한다",w:{A5:-2}},{t:"큰 벳일 때만 한다",w:{A5:1}},{t:"거의 매번 한다",w:{A5:2}}]},
+{id:32,c:"사고",p:"A5",q:"게임 외 시간에 차트·솔버·복기를 하나요?",
+ o:[{t:"거의 안 한다",w:{A5:-2}},{t:"가끔 유튜브·글로 본다",w:{A5:0}},{t:"주기적으로 복기하고 차트를 외운다",w:{A5:2}}]},
+
+{id:33,c:"감정",p:"B1",q:"리버에서 2아웃츠 배드빗으로 큰 팟을 잃었습니다. 바로 다음 핸드는?",
+ o:[{t:"평소보다 넓게 들어간다",w:{B1:-2,A1:2}},{t:"평소와 똑같이 한다",w:{B1:2}},{t:"한두 핸드 쉬고 호흡을 고른다",w:{B1:2,A5:1}}]},
+{id:34,c:"감정",p:"B1",q:"큰 팟 3연패. 지금 스택은 바이인의 60%. 어떻게 하나요?",
+ o:[{t:"본전 생각에 계속한다",w:{B1:-2}},{t:"평소대로 계속한다",w:{B1:1}},{t:"미리 정한 스톱로스라면 자리를 뜬다",w:{B1:2,A5:2}}]},
+{id:35,c:"감정",p:"B1",q:"크게 이겨서 스택이 3배가 됐습니다.",
+ o:[{t:"기세를 타서 더 공격적으로",w:{B1:-1,A2:2,A3:2}},{t:"똑같은 기준으로 계속",w:{B1:2}},{t:"딴 만큼 지킬 생각에 소극적으로",w:{B1:-1,A2:-2}}]},
+{id:36,c:"감정",p:"B1",q:"세션 시작 전에 손실 한도(스톱로스)를 정해두나요?",
+ o:[{t:"정하지 않는다",w:{B1:-2,A5:-1}},{t:"머릿속으로만 대충",w:{B1:0}},{t:"숫자로 정하고 지킨다",w:{B1:2,A5:2}}]},
+{id:37,c:"감정",p:"B1",q:"상대가 채팅으로 도발하며 계속 나를 노립니다.",
+ o:[{t:"본때를 보여준다",w:{B1:-2,A2:2}},{t:"신경 끄고 하던 대로",w:{B1:2}},{t:"오히려 그 상대에 대한 정보로 활용",w:{B1:2,A5:2}}]},
+
+{id:38,c:"프리플랍",p:"A1",pair:"P1",q:"CO가 2.5BB 오픈, 뒤는 전부 폴드. 나는 BB에 J♥T♥.",
+ o:[{t:"폴드",w:{A1:-2,A4:-1}},{t:"콜",w:{A1:1,A4:1}},{t:"3벳 11BB",w:{A1:1,A2:2,A4:2}}]},
+{id:39,c:"플랍",p:"A4",pair:"P2",q:"내 J♠J♦로 3벳 팟. 플랍 9♥5♣2♠. 내 c-벳에 상대가 체크레이즈.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜하고 턴 본다",w:{A4:1,A5:1}},{t:"3벳으로 되받는다",w:{A4:2,A2:2}}]},
+{id:40,c:"리버",p:"A5",pair:"P3",q:"리버에서 상대가 팟 사이즈로 밀었습니다. 내 핸드는 탑페어 약한 키커 — 딱 블러프캐처입니다.",
+ o:[{t:"강해 보여서 폴드",w:{A5:-2,A4:-2}},{t:"필요 승률 33%를 두고 상대 블러프 조합을 세어 콜",w:{A5:2,A4:1}},{t:"고민 없이 콜",w:{A5:-1,A4:2}}]}
+,
+{id:41,c:"프리플랍",p:"A1",q:"9맥스 100BB. MP에서 K♣Q♦. 앞은 전부 폴드.",
+ o:[{t:"폴드",w:{A1:-2}},{t:"2.5BB 오픈",w:{A1:1,A2:1}},{t:"3BB 오픈",w:{A1:1,A2:2}}]},
+{id:42,c:"프리플랍",p:"A4",q:"내가 BTN 오픈, SB가 3벳, BB가 콜드콜까지 했습니다. 내 핸드 A♦Q♣.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:1}},{t:"4벳",w:{A4:2,A2:2,A3:1}}]},
+{id:43,c:"프리플랍",p:"A3",q:"MTT 12BB. CO에서 K♠J♦, 앞은 폴드.",
+ o:[{t:"폴드",w:{A3:-2,A1:-2}},{t:"2BB 오픈",w:{A5:1}},{t:"올인",w:{A2:2,A3:2}}]},
+{id:44,c:"프리플랍",p:"A2",q:"상대가 계속 내 블라인드를 스틸합니다. 이번에도 BTN 오픈, 나는 BB에 Q♣8♥.",
+ o:[{t:"또 폴드",w:{A1:-2,A4:-2}},{t:"콜해서 플랍 본다",w:{A1:1,A4:1}},{t:"3벳으로 되받는다",w:{A2:2,A4:2}}]},
+{id:45,c:"플랍",p:"A2",q:"내가 3벳 팟 공격자. 플랍 J♠6♦3♣에 내 핸드 A♥K♣(완전 미스). 상대 체크.",
+ o:[{t:"체크",w:{A2:-2}},{t:"팟 1/3 c-벳",w:{A2:2,A5:1}},{t:"팟 3/4 c-벳",w:{A2:2,A3:2}}]},
+{id:46,c:"플랍",p:"A3",q:"플랍에서 넛 플러시 드로만 있습니다. 상대가 팟 사이즈로 밀었고 콜하면 스택 절반이 갑니다.",
+ o:[{t:"폴드",w:{A3:-2,A4:-2}},{t:"콜",w:{A3:1,A4:1}},{t:"올인 레이즈",w:{A2:2,A3:2}}]},
+{id:47,c:"플랍",p:"A4",q:"내 A♠A♦로 오픈-콜. 플랍 9♥8♥7♠. 상대가 팟 사이즈 리드벳.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:1,A5:1}},{t:"레이즈",w:{A4:2,A2:2}}]},
+{id:48,c:"플랍",p:"A5",q:"플랍에서 상대가 아주 작게(팟 1/5) 벳했습니다. 무슨 생각을 먼저 하나요?",
+ o:[{t:"싸니까 일단 콜",w:{A5:-2,A4:1}},{t:"약하다는 뜻, 레이즈로 뺏는다",w:{A2:2,A5:0}},{t:"이 사이즈로 뭘 하려는지 레인지를 나눠본다",w:{A5:2}}]},
+{id:49,c:"턴",p:"A2",q:"턴에 내가 플러시를 완성했습니다. 상대는 계속 콜만 해왔습니다.",
+ o:[{t:"체크해서 리버에 크게",w:{A2:-1,A5:1}},{t:"팟 1/2 벳",w:{A2:1}},{t:"팟 사이즈로 크게",w:{A2:2,A3:1}}]},
+{id:50,c:"턴",p:"A4",q:"턴에서 상대가 팟의 1.5배 오버벳을 했습니다. 내 핸드는 탑페어입니다.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"콜",w:{A4:2,A3:1}},{t:"올인 레이즈",w:{A2:2,A3:2,A4:2}}]},
+{id:51,c:"턴",p:"A5",q:"턴에서 상대가 오래 고민하다 체크했습니다.",
+ o:[{t:"약하다고 보고 무조건 친다",w:{A2:2,A5:-1}},{t:"타이밍은 신경 안 쓰고 원래 계획대로",w:{A5:1}},{t:"그 레인지에 뭐가 남았는지 다시 센다",w:{A5:2}}]},
+{id:52,c:"리버",p:"A2",q:"리버에서 내가 두 번째 넛입니다. 상대가 체크했습니다.",
+ o:[{t:"체크백",w:{A2:-2}},{t:"작게 밸류벳",w:{A2:1,A5:1}},{t:"크게 밸류벳",w:{A2:2,A3:1}}]},
+{id:53,c:"리버",p:"A3",q:"리버 블러프를 하면 스택 전부가 걸립니다. 성공하면 큰 팟, 실패하면 오늘 세션 끝입니다.",
+ o:[{t:"포기하고 체크",w:{A3:-2,A2:-2}},{t:"작게라도 시도",w:{A2:1,A3:1}},{t:"계획대로 올인",w:{A2:2,A3:2}}]},
+{id:54,c:"리버",p:"A4",q:"리버에서 내 핸드는 보드를 플레이하는 수준입니다. 상대가 작게 벳했습니다.",
+ o:[{t:"폴드",w:{A4:-2}},{t:"오즈가 좋으니 콜",w:{A4:2,A5:1}},{t:"블러프 레이즈",w:{A2:2,A3:2}}]},
+{id:55,c:"사고",p:"A5",q:"세션이 끝나면 무엇을 하나요?",
+ o:[{t:"그냥 끝낸다",w:{A5:-2}},{t:"기억나는 큰 핸드만 떠올려본다",w:{A5:0}},{t:"애매했던 핸드를 적어두고 나중에 본다",w:{A5:2}}]},
+{id:56,c:"사고",p:"A5",q:"상대가 예상 밖의 액션을 했을 때",
+ o:[{t:"운이 없다고 넘긴다",w:{A5:-2}},{t:"그 사람 스타일로 기억해둔다",w:{A5:1}},{t:"내 레인지 가정이 틀렸는지 되짚는다",w:{A5:2}}]},
+{id:57,c:"감정",p:"B1",q:"같은 상대에게 세 번 연속 당했습니다.",
+ o:[{t:"그 사람만 노린다",w:{B1:-2,A2:2}},{t:"똑같이 대한다",w:{B1:2}},{t:"자리를 옮기거나 잠시 쉰다",w:{B1:2,A5:1}}]},
+{id:58,c:"감정",p:"B1",q:"실수인 걸 알면서도 콜을 눌렀습니다. 바로 다음 핸드는?",
+ o:[{t:"만회하려고 더 크게 간다",w:{B1:-2,A3:2}},{t:"평소대로",w:{B1:2}},{t:"한 호흡 쉬고 기준을 되새긴다",w:{B1:2,A5:1}}]},
+{id:59,c:"감정",p:"B1",q:"오늘 이미 목표 수익을 넘겼습니다. 게임은 아직 좋습니다.",
+ o:[{t:"바로 일어난다",w:{B1:0,A3:-2}},{t:"게임이 좋으니 계속한다",w:{B1:2,A5:1}},{t:"딴 돈이 아까워 소극적으로 친다",w:{B1:-2,A2:-2}}]},
+{id:60,c:"프리플랍",p:"A1",q:"한 시간 동안 프리미엄이 하나도 안 왔습니다.",
+ o:[{t:"기준을 낮춰 들어간다",w:{A1:2,B1:-2}},{t:"그대로 기다린다",w:{A1:-1,B1:2}},{t:"포지션 좋은 자리에서만 조금 넓힌다",w:{A1:1,A5:2}}]}
+];
+
+/* ---- 진단 상태 & 채점 ----
+   답은 그때그때 누적 저장한다. 중간에 그만둬도 거기까지가 남고, 다음에 이어서 쌓인다. */
+const QMIN = 25, QMAX = Q.length;
+const bankGet = () => DB.get("quizans", {});
+function bankPut(qid, choice){
+  const b = bankGet(); b[qid] = choice; DB.set("quizans", b);
+  saveProfileFromBank();
+}
+const bankCount = () => Object.keys(bankGet()).length;
+function bankReset(){ DB.del("quizans"); DB.del("drillaxis"); DB.del("profile"); }
+
+/* 드릴에서 모은 성향 근거. 문항 하나보다 가볍게 반영한다(가중치 0.35). */
+const DRILL_W = 0.35;
+const daGet = () => DB.get("drillaxis", {});
+function daAdd(axis, val){
+  const d = daGet();
+  d[axis] = d[axis] || {s:0, n:0};
+  d[axis].s += val; d[axis].n += 1;
+  DB.set("drillaxis", d);
+}
+const daCount = () => { const d = daGet(); let m = 0;
+  for(const k in d) m = Math.max(m, d[k].n); return m; };
+
+function newQuiz(){ return {asked:[], ans:{}, done:false}; }
+function axisStats(ans){
+  const sum={}, wsum={}, cnt={}, dirs={};
+  for(const k in AXES){ sum[k]=0; wsum[k]=0; cnt[k]=0; dirs[k]=[]; }
+  for(const qid in ans){
+    const q = Q.find(x=>x.id==qid); if(!q) continue;
+    const opt = q.o[ans[qid]]; if(!opt) continue;
+    const maxw = {};
+    for(const k in AXES){ let m=0; q.o.forEach(o=>{ if(o.w[k]!==undefined) m=Math.max(m,Math.abs(o.w[k])); }); maxw[k]=m; }
+    for(const k in AXES){
+      // 고른 선택지가 그 축에 대해 아무 말도 하지 않으면(가중치 미정의) 표본에서 제외한다.
+      // 예: "폴드"는 타이트함을 말해줄 뿐 공격성에 대한 정보가 아니다.
+      if(maxw[k]===0 || opt.w[k]===undefined) continue;
+      const v = opt.w[k];
+      sum[k]+=v; wsum[k]+=maxw[k]; cnt[k]++; dirs[k].push(v);
+    }
+  }
+  // 드릴에서 모은 근거를 같은 축에 얹는다 (문항보다 가볍게)
+  const da = daGet();
+  for(const k in da){
+    if(!AXES[k] || !da[k].n) continue;
+    const w = DRILL_W * da[k].n;
+    sum[k] = (sum[k]||0) + da[k].s * DRILL_W;
+    wsum[k] = (wsum[k]||0) + w * 2;
+    cnt[k] = (cnt[k]||0) + da[k].n * DRILL_W;
+    for(let z=0; z<Math.min(6, da[k].n); z++) dirs[k].push(da[k].s/da[k].n);
+  }
+  const score={}, conf={};
+  for(const k in AXES){
+    score[k] = wsum[k] ? Math.round(sum[k]/wsum[k]*100) : 0;
+    if(!cnt[k]){ conf[k]=0; continue; }
+    // 신뢰도 = 표본 수 × 방향 일관성. 답의 '세기'가 들쭉날쭉한 건 상관없고,
+    // 한쪽 방향으로 일관되게 답했는지가 중요하다(그래야 성향이라 부를 수 있다).
+    const mean = dirs[k].reduce((a,b)=>a+b,0)/dirs[k].length;
+    const meanAbs = dirs[k].reduce((a,b)=>a+Math.abs(b),0)/dirs[k].length;
+    const stable = meanAbs>0 ? Math.min(1, Math.abs(mean)/meanAbs) : 0.5;
+    conf[k] = Math.min(1, (cnt[k]/6)) * (0.6 + 0.4*stable);
+  }
+  // B2 일관성: 페어 문항 간 답의 방향 차이
+  const pairs = {};
+  Q.forEach(q=>{ if(q.pair && ans[q.id]!==undefined){ (pairs[q.pair]=pairs[q.pair]||[]).push(q.o[ans[q.id]].w[q.p]||0); }});
+  let pc=0, ps=0;
+  for(const p in pairs) if(pairs[p].length>=2){ ps += 1 - Math.min(1, Math.abs(pairs[p][0]-pairs[p][1])/4); pc++; }
+  if(pc){ score.B2 = Math.round((ps/pc)*200-100); conf.B2 = Math.min(1, pc/3); }
+  return {score:score, conf:conf, cnt:cnt};
+}
+function archetype(s){
+  const t = s.A1, a = s.A2;
+  let base;
+  if(Math.abs(t)<20 && Math.abs(a)<20) base = "밸런스형";
+  else if(t<=0 && a>0) base = a>55 ? "TAG (타이트 어그레시브)" : "약한 TAG";
+  else if(t>0 && a>0) base = (t>50&&a>60) ? "매니악 성향" : "LAG (루즈 어그레시브)";
+  else if(t<=0 && a<=0) base = t<-45 ? "락 · 니트" : "타이트 패시브";
+  else base = "콜링 스테이션 성향";
+  return base;
+}
+function profileSummary(s){
+  const L = [];
+  if(s.A1<-25 && s.A2>25) L.push("들어갈 핸드를 잘 고르고, 들어간 다음엔 밀어붙입니다. 가장 돈 되는 조합입니다.");
+  if(s.A1<-25 && s.A2<-15) L.push("핸드 선택은 좋은데 들어간 다음이 소극적입니다. <b>이길 판에서 덜 벌고 있습니다</b> — 가장 큰 누수 지점입니다.");
+  if(s.A1>25 && s.A2<-15) L.push("너무 많이 들어가고, 들어가서는 콜만 합니다. 장기적으로 가장 손해가 큰 조합이니 <b>진입 폭부터</b> 줄이세요.");
+  if(s.A1>25 && s.A2>45) L.push("공격적이고 압박은 잘 넣지만 분산이 큽니다. 상대가 잡아채기 시작하면 손실이 빠릅니다.");
+  if(s.A4<-30) L.push("큰 벳을 맞으면 쉽게 물러섭니다. 관찰력 있는 상대에게는 <b>블러프로 계속 털립니다</b>.");
+  if(s.A4>50) L.push("잘 안 접습니다. 블러프는 못 뚫리지만 <b>이미 진 핸드에 계속 돈을 냅니다</b>.");
+  if(s.A5<-25) L.push("느낌으로 결정하는 편입니다. 감각은 자산이지만, 오즈 계산만 붙여도 승률이 붙습니다.");
+  if(s.A5>45) L.push("근거를 따져 결정합니다. 이 성향은 이 앱의 숫자 파트를 그대로 흡수할 수 있습니다.");
+  if(s.B1<-20) L.push("배드빗·연패 뒤 판단이 흔들립니다. 스톱로스를 <b>숫자로</b> 정하는 것만으로 큰 효과가 있습니다.");
+  if(s.B2<-20) L.push("같은 구조의 스팟에 다르게 답했습니다. 기준이 아직 안 잡혔다는 뜻이고, 이건 나쁜 게 아니라 <b>공부 지점</b>입니다.");
+  if(!L.length) L.push("전 축이 중간대입니다. 뚜렷한 약점이 없다는 뜻이기도 하고, 아직 표본이 얇다는 뜻이기도 합니다.");
+  return L;
+}
+function nextQuestion(qz){
+  const bank = bankGet();
+  const st = axisStats(bank);
+  /* 이번 회차에 안 낸 것 중, 아직 답한 적 없는 문항을 먼저 */
+  let rest = Q.filter(q=>qz.asked.indexOf(q.id)<0 && bank[q.id]===undefined);
+  if(!rest.length) rest = Q.filter(q=>qz.asked.indexOf(q.id)<0);
+  if(!rest.length) return null;
+  rest.sort((a,b)=>(st.conf[a.p]||0)-(st.conf[b.p]||0));
+  const lowest = st.conf[rest[0].p]||0;
+  const pool = rest.filter(q=>(st.conf[q.p]||0) <= lowest+0.06);
+  return pool[(Math.random()*pool.length)|0];
+}
+function quizDone(qz){
+  if(Object.keys(qz.ans).length >= QMAX) return true;
+  const total = bankCount();
+  if(total >= QMAX) return true;
+  if(total < QMIN) return false;
+  const st = axisStats(bankGet());
+  return CORE.every(k=>st.conf[k]>=0.8);
+}
+const CORE = ["A1","A2","A3","A4","A5","B1"];
+function saveProfileFromBank(){
+  const ans = bankGet(), nq = Object.keys(ans).length, nd = daCount();
+  if(!nq && !nd) return null;
+  const st = axisStats(ans);
+  const p = {axes:st.score, conf:st.conf, cnt:st.cnt, n:nq, drills:nd,
+             archetype:archetype(st.score), at:Date.now()};
+  DB.set("profile", p); return p;
+}
+function saveProfile(){ return saveProfileFromBank(); }
+const getProfile = () => DB.get("profile", null);
+
+/* ============================================================
+   PART 3. 핸드 분석 엔진 (모듈 B) + 탑 플레이어 렌즈 (모듈 C)
+   ============================================================ */
+const cap = x => Math.max(1, Math.min(100, x));
+const PFS = [
+ {id:"open_call", t:"내가 오픈 → 상대 콜",        pot:5.5, agg:true,  hInv:2.5, vInv:2.5,
+  hR:p=>rangeClasses(OPEN_PCT[p]||25),   vR:(p,w)=>rangeClasses(cap(30*w), 8*w)},
+ {id:"call_open", t:"상대 오픈 → 내가 콜",        pot:5.5, agg:false, hInv:2.5, vInv:2.5,
+  hR:p=>rangeClasses(30,8),              vR:(p,w)=>rangeClasses(cap((OPEN_PCT[p]||25)*w))},
+ {id:"3b_call",   t:"내가 3벳 → 상대 콜",         pot:19,  agg:true,  hInv:9,   vInv:9,
+  hR:p=>rangeClasses(11),                vR:(p,w)=>rangeClasses(cap(15*w), 3*w)},
+ {id:"call_3b",   t:"상대 3벳 → 내가 콜",         pot:19,  agg:false, hInv:9,   vInv:9,
+  hR:p=>rangeClasses(15,3),              vR:(p,w)=>rangeClasses(cap(10*w))},
+ {id:"limp",      t:"림프 팟 (여러 명이 콜)",      pot:4.5, agg:false, hInv:1,   vInv:1,
+  hR:p=>rangeClasses(45,5),              vR:(p,w)=>rangeClasses(cap(50*w), 6*w)},
+ {id:"pf_only",   t:"프리플랍 결정만 분석",        pot:0,   agg:false, hInv:0,   vInv:0, hR:null, vR:null}
+];
+
+/* ---- 상대 성향 유형 ----
+   w    : 프리플랍 레인지 폭 배수 (1 = 표준 레귤러)
+   keep : 상대가 벳/레이즈했을 때 레인지를 얼마나 덜 좁힐지 (1보다 크면 "이 사람 벳은 강함을 뜻하지 않는다")
+   fold : 내 벳에 접는 빈도 배수 (1보다 작으면 블러프가 안 통한다)                                */
+const VTYPE = {
+ unknown:{id:"unknown", n:"모름 / 표준 레귤러", w:1.00, keep:1.00, fold:1.00,
+   d:"기본값. 이론 기준 그대로 봅니다."},
+ nit:    {id:"nit",     n:"락 (타이트·패시브)",  w:0.55, keep:0.72, fold:1.40,
+   d:"거의 안 들어오고, 들어오면 진짜입니다. 이 사람의 벳은 강함을 뜻합니다."},
+ tag:    {id:"tag",     n:"TAG (타이트·어그로)", w:0.75, keep:0.90, fold:1.12,
+   d:"핸드 선택이 좋고 압박도 넣습니다. 가장 까다로운 상대이며 이론값에 가깝게 대해야 합니다."},
+ station:{id:"station", n:"콜링 스테이션 (루즈·패시브)", w:1.65, keep:1.30, fold:0.42,
+   d:"많이 들어오고 거의 안 접습니다. 블러프가 통하지 않으니 밸류로만 벌어야 합니다."},
+ lag:    {id:"lag",     n:"LAG · 매니악 (루즈·어그로)", w:1.95, keep:1.50, fold:0.80,
+   d:"넓게 들어오고 자주 칩니다. 벳이 강함을 뜻하지 않으므로 더 자주 받아줘야 합니다."},
+ fish:   {id:"fish",    n:"초보 (예측 불가)",    w:1.70, keep:1.18, fold:0.62,
+   d:"레인지가 뒤죽박죽입니다. 블러프는 줄이고 밸류는 두껍게 가져가세요."}
+};
+function handPct(cl){
+  let acc=0;
+  for(let i=0;i<RANKED.length;i++){ acc += combosOf(RANKED[i]); if(RANKED[i]===cl) return acc/TOTCOMBO*100; }
+  return 100;
+}
+/* 상대 액션 → 레인지 좁히기 비율 */
+/* 상대가 접는 빈도.
+   기준선 alpha = 걸린 돈 /(걸기 전 팟 + 걸린 돈) — 이 값이면 순수 블러프의 EV가 정확히 0이 된다.
+   성향은 그 기준선을 밀고 당기되 절반만 반영하고(과신 방지), 최대 70%로 묶는다.
+   어떤 상대도 사이즈가 크다는 이유만으로 무한정 접지는 않기 때문. */
+function foldFreq(risk, potBefore, vt, isRaise){
+  const alpha = risk/(potBefore+risk);
+  const t = (vt ? vt.fold : 1) - 1;
+  // 벳: 상대는 아직 이 스트리트에 돈을 넣지 않았다 → 이론 기준선을 그대로 쓴다(순수 블러프 EV = 0).
+  // 레이즈: 상대는 이미 벳으로 레인지를 좁힌 뒤다. 좁고 강한 레인지는 레이즈에 덜 접는다.
+  //         성향 반영을 줄이고 상한도 낮춘다 — 안 그러면 큰 블러프 레이즈가 항상 정답이 된다.
+  const mult = 1 + t*(isRaise ? 0.25 : 0.5);
+  // 상한도 성향을 따라간다. 고정 상한이면 큰 사이즈에서 모든 상대가 같은 값으로 뭉개져
+  // 정작 성향 차이가 사라진다.
+  const cap  = isRaise ? Math.max(0.35, Math.min(0.62, 0.45 + 0.15*t)) : 0.70;
+  return {a:alpha, f:Math.max(0.02, Math.min(cap, alpha*mult))};
+}
+function keepFor(act, size, pot, vt){
+  const k = vt ? vt.keep : 1;
+  let base;
+  if(act==="raise") base = 0.22;
+  else if(act==="bet"){ const r = size/Math.max(pot,0.01);
+    base = r>0.85 ? 0.40 : r>0.55 ? 0.52 : r>0.3 ? 0.68 : 0.80; }
+  else if(act==="call") base = 0.62;
+  else return 1;
+  return Math.max(0.10, Math.min(1, base*k));
+}
+const nfmt = (x,d)=> (Math.round(x*Math.pow(10,d===undefined?1:d))/Math.pow(10,d===undefined?1:d)).toString();
+const pct = x => Math.round(x*100)+"%";
+
+function analyze(inp){
+  const scen = PFS.find(s=>s.id===inp.pf) || PFS[0];
+  const vt = VTYPE[inp.vt] || VTYPE.unknown;
+  const res = {scen:scen, vt:vt, pf:{}, streets:[], warn:[]};
+  const hole = inp.hole, cl = handClass(hole[0], hole[1]);
+  const seats = inp.seats;
+
+  /* ---------- 프리플랍 ---------- */
+  const p = handPct(cl);
+  const openP = OPEN_PCT[inp.pos]!==undefined ? OPEN_PCT[inp.pos] : 25;
+  const ip = ipVs(seats, inp.pos, inp.vpos);
+  res.pf = {cls:cl, pct:p, openPct:openP, ip:ip};
+  res.pf.rec = p <= openP*0.55 ? {a:"오픈 · 3벳 후보", why:"상위 "+nfmt(p)+"% 핸드입니다. "+inp.pos+"에서 충분히 강합니다."}
+             : p <= openP      ? {a:"오픈 (2.2~2.5BB)", why:inp.pos+" 표준 오픈 레인지(상위 "+openP+"%) 안에 들어옵니다."}
+             : p <= openP*1.3  ? {a:"경계선 — 상황에 따라", why:"표준 레인지 바로 바깥(상위 "+nfmt(p)+"%)입니다. 뒷사람이 타이트하면 오픈, 공격적이면 폴드."}
+             :                   {a:"폴드", why:inp.pos+"에서 상위 "+nfmt(p)+"% 핸드는 넓습니다. 표준은 "+openP+"%까지입니다."};
+  if(scen.id==="pf_only"){ res.pfOnly = true; return res; }
+
+  /* 멀티웨이: 상대가 여러 명일 수 있다. agg = 액션을 넣은 상대, 나머지는 콜러로 본다. */
+  const vils = (inp.vils && inp.vils.length) ? inp.vils : [{pos:inp.vpos, vt:inp.vt}];
+  const nV = vils.length, aggI = Math.min(inp.agg||0, nV-1);
+  const vtOf = k => VTYPE[vils[k].vt] || VTYPE.unknown;
+  res.vils = vils.map((v,k)=>({pos:v.pos, vt:vtOf(k)}));
+  res.nV = nV; res.aggI = aggI;
+  const B0 = 1/(nV+1);                       // 아무 우위 없을 때의 승률
+  const T_RAISE = Math.min(0.95, B0*1.44), T_BIG = Math.min(0.92, B0*1.40),
+        T_THIN  = Math.min(0.85, B0*1.12), T_CHK = B0*0.88;
+
+  let vilR = vils.map((v,k)=>expandRange(scen.vR(v.pos, vtOf(k).w), hole));
+  res.pf.vilClasses = scen.vR(vils[aggI].pos, vtOf(aggI).w);
+  res.pf.heroClasses = scen.hR(inp.pos);
+  const pfEq = equityVsRanges(hole, [], vilR);
+  res.pf.eq = pfEq.eq; res.pf.eqInfo = pfEq;
+
+  /* ---------- 포스트플랍 ---------- */
+  /* 참가자가 늘면 프리플랍에 들어온 돈도 그만큼 늘어난다 */
+  let pot = scen.pot + (nV-1)*scen.vInv, hInv = scen.hInv, vInv = scen.vInv;
+  const names = ["플랍","턴","리버"];
+  const boards = [inp.flop, inp.flop.concat(inp.turn||[]), inp.flop.concat(inp.turn||[]).concat(inp.river||[])];
+  const prof = getProfile();
+
+  for(let i=0;i<3;i++){
+    const bd = boards[i];
+    const needLen = 3+i;
+    if(bd.length < needLen) break;
+    const a = inp.acts[i] || {};
+    const vAct = a.v || "check", vSize = +a.vs || 0, mAct = a.m || "check", mSize = +a.ms || 0;
+
+    /* 상대 액션 반영해 레인지 좁히기 */
+    vilR = vilR.map((rg,k)=>{
+      let r = rg;
+      if(i>0) r = filterByStrength(r, boards[i-1], keepFor("call",0,1,vtOf(k)));
+      return r.filter(c=>bd.indexOf(c[0])<0 && bd.indexOf(c[1])<0);
+    });
+    /* 액션한 상대는 그 액션대로, 나머지는 '따라온 콜러'로 좁힌다 */
+    const vilNowAll = vilR.map((rg,k)=> k===aggI
+      ? filterByStrength(rg, bd, keepFor(vAct==="bet"?"bet":vAct==="raise"?"raise":"check", vSize, pot, vtOf(k)))
+      : filterByStrength(rg, bd, keepFor("call", 0, 1, vtOf(k))));
+    const vilNow = vilNowAll[aggI];
+
+    const eqR = equityVsRanges(hole, bd, vilNowAll);
+    const eq = eqR.eq;
+    const effStack = Math.max(0, inp.stack - hInv);
+    const spr = pot>0 ? effStack/pot : 0;
+    const bi = boardInfo(bd), dr = drawInfo(hole, bd);
+    const myScore = evalHand(hole.concat(bd)), myCat = catOf(myScore);
+
+    const facing = (vAct==="bet"||vAct==="raise") && vSize>0;
+    // pot 은 상대가 베팅하기 "전"의 팟. 콜하면 pot+vSize 를 걸고 vSize 를 낸다.
+    //   손익분기 승률 = vSize / (pot + 2*vSize)   ← 콜 후 최종 팟 기준
+    //   MDF          = pot   / (pot + vSize)     ← 수비자가 최소한 지켜야 할 빈도
+    const reqE = facing ? vSize/(pot + 2*vSize) : 0;
+    const mdf  = facing ? pot/(pot+vSize) : 0;
+    const alpha= facing ? vSize/(pot+vSize) : 0;
+
+    /* ---- 권장 액션 ---- */
+    const wet = bi ? bi.wet : 0;
+    let rec, size=0, freq="", why=[], kind="";
+    if(facing){
+      const evCall = eq*(pot+vSize) - (1-eq)*vSize;
+      const edge = eq - reqE;
+      if(eq>=T_RAISE && i<2){ rec="레이즈 (밸류)"; kind="raise"; size=Math.round(vSize*3*10)/10; freq="레이즈 70% / 콜 30%";
+        why.push("승률 "+pct(eq)+"는 상대 콜 레인지 상대로도 앞섭니다. 여기서 안 키우면 리버에서 팟이 작아집니다."); }
+      else if(edge>=0.06){ rec="콜"; kind="call"; freq="콜 100%";
+        why.push("필요 승률 "+pct(reqE)+"보다 실제 승률 "+pct(eq)+"가 "+Math.round(edge*100)+"%p 높습니다. 명확한 콜입니다."); }
+      else if(edge>=-0.02){ rec="콜 (경계선)"; kind="marginal"; freq="콜 60~70% / 폴드 30~40%";
+        why.push("필요 "+pct(reqE)+" vs 실제 "+pct(eq)+" — 거의 동전 던지기입니다. 상대가 블러프를 많이 하면 콜, 얌전하면 폴드."); }
+      else if((dr.fd||dr.oesd) && spr>=2.2 && i<2){ rec="세미블러프 레이즈 또는 콜"; kind="semibluff"; size=Math.round(vSize*2.8*10)/10;
+        freq="레이즈 40% / 콜 40% / 폴드 20%";
+        why.push("당장 승률("+pct(eq)+")은 모자라지만 "+dr.txt.join("·")+"가 있어 <b>맞았을 때 더 받을 여지</b>가 있습니다. 스택이 팟의 "+nfmt(spr)+"배라 뒤 스트리트에서 회수 가능합니다."); }
+      else { rec="폴드"; kind="fold"; freq="폴드 100%";
+        why.push("필요 승률 "+pct(reqE)+"에 실제 "+pct(eq)+"로 못 미칩니다. 여기서 내는 돈은 장기적으로 돌아오지 않습니다."); }
+    } else {
+      const bigSz = wet>=2.6 ? 0.75 : 0.55, smSz = 0.33;
+      if(eq>=T_BIG){ const sz = wet>=2.2?0.75:0.6; rec="밸류 벳"; kind="value"; size=Math.round(pot*sz*10)/10;
+        freq="벳 80% / 체크 20%";
+        why.push("승률 "+pct(eq)+". 상대가 콜할 수 있는 핸드가 아직 남아 있으니 <b>지금 받아내야</b> 합니다."+(wet>=2.2?" 보드가 젖어 있어 크게 쳐서 드로에 값을 매깁니다.":"")); }
+      else if(eq>=T_THIN){ rec="작은 밸류 벳"; kind="thin"; size=Math.round(pot*smSz*10)/10; freq="벳 60% / 체크 40%";
+        why.push("이기고는 있지만("+pct(eq)+") 크게 치면 약한 핸드가 다 도망갑니다. 작게 쳐서 <b>얇게</b> 받아냅니다."); }
+      else if(eq>=T_CHK){ rec="체크"; kind="check"; freq="체크 70% / 작은 벳 30%";
+        why.push("승률 "+pct(eq)+"로 애매합니다. 팟을 키우면 이길 때 조금 벌고 질 때 크게 잃습니다. 팟 컨트롤."); }
+      else if(dr.fd||dr.oesd){ rec="세미블러프 벳"; kind="semibluff"; size=Math.round(pot*bigSz*10)/10; freq="벳 65% / 체크 35%";
+        why.push(dr.txt.join("·")+"가 있습니다. 지금 접히면 좋고, 콜 받아도 맞출 카드가 남아 있어 <b>두 가지로 이깁니다</b>."); }
+      // 레인지 전체로 치는 c-벳은 상대가 한 명일 때만 성립한다. 멀티웨이면 전원이 접어야 해서 성공률이 급락.
+      else if(scen.agg && bi && bi.hi>=10 && wet<2.2 && i===0 && nV===1){ rec="작은 블러프 c-벳"; kind="bluff"; size=Math.round(pot*smSz*10)/10;
+        freq="벳 55% / 체크 45%";
+        why.push("이 보드는 <b>레이즈한 쪽(나)</b>이 더 자주 맞는 보드입니다. 마른 보드라 작은 사이즈로도 많이 접힙니다."); }
+      else { rec="체크"; kind="check"; freq="체크 90%";
+        why.push("승률 "+pct(eq)+"에 드로도 없습니다. 여기서 치는 건 이길 수 있는 핸드로 팟을 포기하는 것과 같습니다."); }
+    }
+
+    if(nV > 1) why.push("<b>상대가 "+nV+"명</b>이라 기준이 올라갑니다. 아무 우위 없을 때의 승률이 "+
+      pct(B0)+"뿐이라, 헤즈업이면 밸류였을 핸드도 여기서는 아닙니다. 블러프는 <b>전원이 접어야</b> 성공합니다.");
+
+    /* ---- 상대 성향에 맞춘 조정 (익스플로잇) ---- */
+    let vAdj = null, recStd = rec, sizeStd = size;
+    if(vt.id !== "unknown"){
+      const notes = [];
+      if(!facing){
+        if((kind==="bluff"||kind==="semibluff") && vt.fold < 0.7){
+          notes.push({t:"이 상대에게는 블러프를 접으세요",
+            b:"<b>"+vt.n+"</b>은 접는 빈도가 표준의 "+Math.round(vt.fold*100)+"% 수준입니다. "+
+              "블러프는 상대가 접어줘야 돈이 되는데, 이 상대는 안 접습니다.",
+            c: kind==="semibluff"
+              ? "드로가 있으니 <b>체크로 무료 카드</b>를 보세요. 맞으면 이 상대가 알아서 지불합니다 — 블러프로 벌 필요가 없습니다."
+              : "체크하고 포기하세요. 이 상대에게 낸 블러프는 그냥 기부입니다."});
+          rec = "체크"; size = 0; freq = "체크 100%"; kind = "check";
+        }
+        else if(kind==="check" && eq < B0 && vt.fold >= 1.2 && wet < 2.4 && nV===1){
+          notes.push({t:"이 상대에게는 오히려 쳐야 합니다",
+            b:"<b>"+vt.n+"</b>은 표준보다 "+Math.round((vt.fold-1)*100)+"% 더 자주 접습니다. "+
+              "이론상으로는 체크할 승률("+pct(eq)+")이지만, 접는 상대에게는 승률이 아니라 <b>폴드 빈도</b>가 수익원입니다.",
+            c:"팟의 40% 정도로 치세요. 이 상대가 접는 빈도만으로 이미 이득입니다."});
+          rec = "블러프 벳"; kind = "bluff"; size = Math.round(pot*0.4*10)/10; freq = "벳 70% / 체크 30%";
+        }
+        else if((kind==="check") && eq >= B0 && vt.fold < 0.7){
+          notes.push({t:"얇은 밸류를 더 가져가세요",
+            b:"이론상 애매한 승률("+pct(eq)+")이라 체크 자리지만, <b>"+vt.n+"</b>은 나보다 나쁜 핸드로도 콜합니다.",
+            c:"작게(팟의 1/3) 밸류벳하세요. 이 상대 상대로는 이게 공짜 수익입니다."});
+          rec = "작은 밸류 벳"; kind = "thin"; size = Math.round(pot*0.33*10)/10; freq = "벳 75% / 체크 25%";
+        }
+        else if((kind==="value"||kind==="thin") && vt.fold < 0.7){
+          const nz = Math.round(pot*(wet>=2.2?0.9:0.7)*10)/10;
+          if(rec.indexOf("작은")===0) rec = "밸류 벳 (사이즈 업)";
+          notes.push({t:"사이즈를 키우세요",
+            b:"<b>"+vt.n+"</b>은 사이즈를 봐도 잘 안 접습니다. 표준 사이즈로 치는 건 <b>돈을 남기고 나오는 것</b>입니다.",
+            c:"권장 "+nfmt(size)+"BB 대신 <b>"+nfmt(nz)+"BB</b>까지 올리세요. 어차피 콜할 상대에게는 크게 치는 게 정답입니다."});
+          size = nz;
+        }
+        else if((kind==="value"||kind==="thin") && vt.fold >= 1.3){
+          notes.push({t:"밸류가 안 받힐 수 있습니다",
+            b:"<b>"+vt.n+"</b>은 나쁜 핸드를 빨리 버립니다. 크게 치면 콜해줄 핸드가 남지 않습니다.",
+            c:"사이즈를 줄여(팟의 1/3 이하) <b>콜할 수 있는 범위 안</b>에서 받아내세요."});
+          size = Math.round(pot*0.3*10)/10;
+        }
+      } else {
+        if(vt.keep > 1.15) notes.push({t:"이 상대의 벳은 강함을 뜻하지 않습니다",
+          b:"<b>"+vt.n+"</b>이라서 벳을 맞았을 때 레인지를 표준보다 <b>덜</b> 좁혔습니다"+
+            "(잔여 "+vilNow.length+"콤보). 그 결과 내 승률은 "+pct(eq)+"로 계산됐습니다.",
+          c:"표준 레귤러 상대였다면 접었을 자리도 이 상대에게는 <b>받아주는 게 맞습니다</b>. 필요 승률은 "+pct(reqE)+"뿐입니다."});
+        else if(vt.keep < 0.85) notes.push({t:"이 상대가 칠 때는 진짜입니다",
+          b:"<b>"+vt.n+"</b>이라서 레인지를 표준보다 <b>크게</b> 좁혔습니다(잔여 "+vilNow.length+"콤보). "+
+            "그래서 내 승률이 "+pct(eq)+"까지 떨어집니다.",
+          c:"평소 같으면 콜할 자리라도 이 상대에게는 <b>접는 게 이득</b>입니다. 블러프캐치는 블러프를 하는 상대에게만 통합니다."});
+      }
+      if(notes.length) vAdj = notes;
+    }
+    const recAdjusted = (rec !== recStd || size !== sizeStd);
+
+    /* ---- EV 비교 ---- */
+    const ev = [];
+    if(facing){
+      const evCall = eq*(pot+vSize) - (1-eq)*vSize;
+      ev.push({k:"콜", v:evCall}); ev.push({k:"폴드", v:0});
+    } else if(size>0){
+      const ff = foldFreq(size, pot, vt), alpha = ff.a;
+      /* 멀티웨이면 '전원이' 접어야 팟을 가져온다 → 폴드 성공 확률은 곱으로 줄어든다 */
+      const fe = Math.pow(ff.f, nV);
+      const contAll = vilNowAll.map((rg,k)=>filterByStrength(rg, bd, 1-ff.f));
+      const eqC = equityVsRanges(hole, bd, contAll).eq;
+      const evBet = fe*pot + (1-fe)*(eqC*(pot+2*size) - (1-eqC)*size);
+      ev.push({k:"벳 "+nfmt(size)+"BB", v:evBet,
+        note: nV>1 ? "상대 "+nV+"명이 전부 접을 확률 "+pct(fe)+" 가정 (1명 기준 "+pct(ff.f)+")"
+            : vt.id==="unknown" ? "상대가 이론적 최소 방어(MDF)만큼만 받는다고 가정"
+                                : "이 상대의 폴드 빈도 "+pct(fe)+" 가정 (이론값 "+pct(alpha)+")"});
+      ev.push({k:"체크", v:eq*pot, note:"쇼다운까지 간다는 근사"});
+    }
+
+    /* ---- 내 실제 액션 평가 ---- */
+    const tags = [];
+    const recAgg = /벳|레이즈/.test(rec), myAgg = (mAct==="bet"||mAct==="raise");
+    let evLoss = 0;
+    if(facing){
+      const evCall = eq*(pot+vSize) - (1-eq)*vSize;
+      if(mAct==="fold" && evCall>0.35){ tags.push(["성급한 폴드","b"]); evLoss = evCall; }
+      if(mAct==="call" && evCall<-0.35){ tags.push(["질 걸 알고 낸 콜","b"]); evLoss = -evCall; }
+      if(mAct==="call" && rec.indexOf("레이즈")>=0){ tags.push(["소극적 라인 (레이즈 자리)","w"]); }
+      if(mAct==="raise" && rec==="폴드"){ tags.push(["무리한 블러프 레이즈","b"]); }
+    } else {
+      if(!myAgg && recAgg && eq>=T_THIN){ tags.push(["밸류벳 누락","b"]); evLoss = Math.max(0, (ev[0]?ev[0].v:0)-(ev[1]?ev[1].v:0)); }
+      if(myAgg && rec==="체크" && eq<T_CHK && !(dr.fd||dr.oesd)){ tags.push(["근거 없는 블러프","w"]); }
+      if(myAgg && size>0 && mSize>0){
+        const r = mSize/size;
+        if(r>1.7) tags.push(["사이즈 과대","w"]);
+        else if(r<0.55) tags.push(["사이즈 과소","w"]);
+      }
+    }
+
+    /* ---- 성향 보정판 ---- */
+    const bias = biasAdvice(prof, {rec:rec, recAgg:recAgg, facing:facing, eq:eq, reqE:reqE,
+      size:size, pot:pot, spr:spr, street:i, draw:dr, myAct:mAct, evLoss:evLoss});
+
+    res.streets.push({
+      name:names[i], board:bd.slice(), pot:pot, potStart:pot, spr:spr, eq:eq, eqInfo:eqR,
+      facing:facing, vAct:vAct, vSize:vSize, mAct:mAct, mSize:mSize,
+      reqE:reqE, mdf:mdf, alpha:alpha, bi:bi, dr:dr, myCat:myCat, catName:CATNAME[myCat],
+      rec:rec, size:size, freq:freq, why:why, ev:ev, tags:tags, evLoss:evLoss,
+      vAdj:vAdj, recStd:recStd, sizeStd:sizeStd, recAdjusted:recAdjusted, vt:vt,
+      nV:nV, B0:B0, vilAll:vilNowAll.map((r,k)=>({pos:vils[k].pos, n:r.length, vt:vtOf(k)})),
+      bias:bias, hasProfile:!!prof, vilCount:vilNow.length, ip:ip, effStack:effStack,
+      lens: topLens(prof, {eq:eq, bi:bi, dr:dr, rec:rec, facing:facing, reqE:reqE, spr:spr,
+                           street:i, agg:scen.agg, ip:ip, cls:cl, catName:CATNAME[myCat],
+                           vilCount:vilNow.length, vt:vt})
+    });
+
+    /* 팟 갱신 */
+    let add = 0;
+    if(facing){
+      add += vSize;
+      if(mAct==="call"){ add += vSize; hInv += vSize; vInv += vSize; }
+      else if(mAct==="raise"){ add += mSize + mSize; hInv += mSize; vInv += mSize; }
+      else { break; }
+    } else {
+      if(myAgg && mSize>0){ add += mSize*2; hInv += mSize; vInv += mSize; }
+    }
+    pot += add;
+    vilR = vilNowAll;
+  }
+  return res;
+}
+
+/* ---- 성향 보정: 이론 → 당신 → 처방 ---- */
+function biasAdvice(prof, s){
+  if(!prof) return null;
+  const a = prof.axes, out = [];
+  const half = x => Math.round(x*0.45*10)/10;
+  if(s.recAgg && a.A2 <= -15){
+    out.push({t:"이론은 공격, 당신은 패시브",
+      b:"이 스팟의 정답은 <b>"+s.rec+"</b>인데, 당신은 공격성 축이 "+a.A2+"로 소극적인 쪽입니다. 실전에서 이 버튼을 못 누릅니다.",
+      c:"권장 "+nfmt(s.size)+"BB 대신 <b>"+half(s.size)+"BB(작은 사이즈)</b>부터 시작하세요. EV는 조금 낮지만, 못 누르는 최적해보다 누를 수 있는 차선이 낫습니다. 이 사이즈가 손에 붙으면 그때 키우세요."});
+  }
+  if(!s.recAgg && s.rec.indexOf("체크")>=0 && a.A2 >= 40){
+    out.push({t:"여기는 참는 자리",
+      b:"당신은 공격성 "+a.A2+"로 눌러야 직성이 풀리는 쪽입니다. 이 스팟은 승률 "+pct(s.eq)+"로 <b>칠 근거가 없습니다</b>.",
+      c:"체크하고 상대가 뭘 하는지 보세요. '체크 = 포기'가 아니라 <b>정보를 싸게 사는 것</b>입니다. 이번 판만 이걸 지켜보세요."});
+  }
+  if(s.facing && s.rec.indexOf("콜")>=0 && a.A4 <= -25){
+    out.push({t:"접고 싶겠지만 숫자는 콜",
+      b:"당신은 압박 저항 "+a.A4+"로 큰 벳 앞에서 잘 물러섭니다. 상대가 그걸 알면 <b>계속 블러프로 털립니다</b>.",
+      c:"필요 승률 "+pct(s.reqE)+", 실제 "+pct(s.eq)+". 이건 용기 문제가 아니라 산수 문제입니다. 이런 스팟 10번 중 "+Math.round(s.eq*10)+"번은 당신이 이깁니다 — 그거면 남습니다."});
+  }
+  if(s.facing && s.rec==="폴드" && a.A4 >= 45){
+    out.push({t:"당신이 가장 자주 돈을 흘리는 지점",
+      b:"압박 저항 "+a.A4+" — 잘 안 접는 성향입니다. 블러프에는 안 당하지만 <b>이미 진 핸드에 계속 냅니다</b>.",
+      c:"필요 "+pct(s.reqE)+"에 실제 "+pct(s.eq)+"로 미달입니다. 여기서 아낀 "+nfmt(s.pot*s.reqE)+"BB가 한 달이면 큰 차이입니다."});
+  }
+  if(s.recAgg && a.A3 <= -30 && s.spr < 3 && s.spr > 0){
+    out.push({t:"분산 경고",
+      b:"스택이 팟의 "+nfmt(s.spr)+"배뿐이라 여기서 치면 사실상 스택 전체가 걸립니다. 당신은 리스크 감내 "+a.A3+"로 이런 판을 불편해합니다.",
+      c:"불편하면 사이즈를 줄이되 <b>액션 자체를 바꾸지는 마세요</b>. 체크로 도망가면 상대가 무료 카드를 받습니다."});
+  }
+  if(a.A1 >= 30 && s.street===0 && s.eq < 0.45){
+    out.push({t:"이 핸드는 애초에 들어오지 말았어야",
+      b:"진입 폭 "+a.A1+"로 넓게 들어오는 편입니다. 이런 플랍이 자주 오는 건 <b>플랍이 나빠서가 아니라 프리플랍이 넓어서</b>입니다.",
+      c:"플랍 판단을 고치는 것보다 프리플랍 레인지를 좁히는 게 10배 빠릅니다. 홈 화면의 오픈 레인지 기준을 한 주만 지켜보세요."});
+  }
+  if(a.B1 <= -25 && s.evLoss > 1){
+    out.push({t:"틸트 주의 구간",
+      b:"감정 회복력 "+a.B1+". 이런 큰 팟을 잃은 직후가 당신에게 가장 위험한 구간입니다.",
+      c:"이 핸드 다음 2핸드는 무조건 프리미엄만 치세요. 규칙으로 정해두면 감정이 끼어들 틈이 없습니다."});
+  }
+  return out.length ? out : null;
+}
+
+/* ---- 탑 플레이어 렌즈 ---- */
+const PERSONA = {
+  agg:{n:"압박형 (공격적 레귤러)", d:"상대가 접을 수 있는 모든 지점에 값을 매긴다. 사이즈를 크게 쓰고, 레인지 우위가 있는 보드에서 계속 밀어붙인다."},
+  bal:{n:"균형형 (밸런스 지향)",   d:"내 레인지 전체가 어떻게 보이는지를 먼저 본다. 밸류와 블러프의 비율을 맞춰, 상대가 뭘 해도 크게 손해 보지 않는 구조를 만든다."},
+  exp:{n:"익스플로잇형 (상대 맞춤)", d:"이론값에서 의도적으로 벗어난다. 이 상대가 너무 접으면 블러프를 늘리고, 너무 콜하면 블러프를 0으로 만든다."}
+};
+function matchPersona(prof){
+  if(!prof) return ["bal","agg"];
+  const a = prof.axes, sc = {
+    agg: a.A2*1.0 + a.A3*0.5,
+    bal: 60 - Math.abs(a.A2)*0.6 + a.A5*0.5,
+    exp: a.A5*0.8 + Math.max(0,a.A1)*0.4
+  };
+  return Object.keys(sc).sort((x,y)=>sc[y]-sc[x]).slice(0,2);
+}
+function topLens(prof, s){
+  const keys = matchPersona(prof);
+  const bd = s.bi;
+  const think = [];
+  think.push({h:"① 내 핸드가 아니라 내 <b>레인지 전체</b>로 본다",
+    b:"'나는 "+s.cls+"를 들고 있다'가 아니라 '이 자리에서 이 액션까지 온 <b>내 모든 핸드</b>가 어떻게 보이는가'로 시작합니다. "+
+      (s.agg ? "내가 프리플랍 공격자였으니 이 보드에서 강한 핸드는 내 쪽에 더 많습니다 — 그 우위를 쓸 자격이 있습니다."
+             : "상대가 공격자였으니 강한 핸드는 상대 쪽에 더 많습니다. 내 역할은 지키는 쪽이고, 무리하게 밀 자리가 아닙니다.")});
+  think.push({h:"② 상대 레인지 + <b>상대가 나를 어떻게 보는지</b>",
+    b:"상대에게 남은 조합은 지금 약 "+ (s.vilCount||"") +"가지 수준으로 좁혀졌습니다."+
+      (s.vt && s.vt.id!=="unknown"
+        ? " 다만 상대가 <b>"+s.vt.n+"</b>이라는 걸 알고 있다면, 상위권은 여기서 이론값을 버립니다 — "+
+          "'평균적인 상대'가 아니라 <b>이 사람</b>이 이 액션을 할 핸드가 뭔지만 봅니다."
+        : " 상대 유형을 모르면 여기서는 표준 레귤러를 가정할 수밖에 없습니다. 상위권이 관찰에 시간을 쓰는 이유가 이겁니다.")+
+      " 동시에 반대로 묻습니다 — "+
+      "'상대 눈에 내 액션은 어떻게 보이는가?' "+(s.agg?"내가 계속 주도했으니 상대는 나를 강하게 봅니다. 그래서 블러프가 통합니다."
+      :"내가 계속 받기만 했으니 상대는 나를 약하게 봅니다. 그래서 여기서의 공격이 오히려 안 믿깁니다.")});
+  think.push({h:"③ 이 액션이 내 레인지에서 <b>어떤 역할</b>인가",
+    b:(s.eq>=0.6 ? "이건 밸류 액션입니다. 질문은 '이길까?'가 아니라 <b>'나보다 나쁜 핸드가 콜해줄까?'</b> 입니다. 콜해줄 핸드가 없으면 벳은 의미가 없습니다."
+      : (s.dr && (s.dr.fd||s.dr.oesd)) ? "이건 블러프 후보입니다. 그리고 <b>블러프는 아무 핸드로나 하는 게 아닙니다</b> — "+s.dr.txt.join("·")+"가 있는 이 조합이 1순위입니다. 접히면 좋고 콜 받아도 아웃츠가 있으니까요."
+      : "밸류도 아니고 좋은 블러프 후보도 아닙니다. 이런 핸드는 <b>쇼다운 가치를 지키는 역할</b>이 맞습니다. 아무 핸드로나 블러프하면 정작 블러프해야 할 때 조합이 없습니다.")});
+  const nx = s.street===0 ? "턴" : s.street===1 ? "리버" : null;
+  think.push({h:"④ "+(nx? nx+"까지의 계획을 <b>지금</b> 세운다":"이 핸드에서 배울 것을 정리한다"),
+    b: nx ? ("좋은 플레이어는 "+nx+" 카드를 보고 생각하지 않고, 치기 전에 이미 나눠둡니다.<br>"+
+      "· <b>내 편인 카드</b>("+(s.dr&&s.dr.fd?"플러시 완성, ":"")+(bd&&bd.hi>=10?"오버카드":"낮은 브릭")+") → 계속 밀어붙인다<br>"+
+      "· <b>상대 편인 카드</b>("+(bd&&bd.maxSuit>=2?"세 번째 무늬, ":"")+"연결되는 카드) → 속도를 줄이고 팟을 지킨다<br>"+
+      "· <b>아무 상관 없는 카드</b> → 원래 계획대로 간다<br>이걸 미리 정해두면 "+nx+"에서 고민 시간이 사라지고, 그 고민 시간 자체가 상대에게 주는 정보였습니다.")
+      : "리버까지 왔습니다. 여기서 배울 것은 '이 핸드를 이겼나'가 아니라 <b>'같은 상황이 100번 오면 이 라인이 남는가'</b>입니다. 결과가 아니라 과정으로 채점하세요."});
+
+  const three = [
+    {k:"공격형", a: s.facing ? (s.eq>=0.58?"레이즈":s.eq>=s.reqE?"콜":"폴드") : (s.eq>=0.5?"크게 벳":"블러프 벳"),
+     b: s.facing ? "상대가 접을 여지가 있으면 일단 압박한다. 실수하더라도 공격 쪽으로 실수한다." : "레인지 우위가 있으면 사이즈를 키워 상대의 모든 결정을 어렵게 만든다."},
+    {k:"균형형", a: s.rec,
+     b:"이 액션을 <b>밸류와 블러프를 섞어</b> 같은 빈도로 쓴다. 그래서 어떤 상대에게도 크게 지지 않는다. 이 앱의 권장값이 여기에 해당합니다."},
+    {k:"익스플로잇형", a: s.facing ? "상대가 블러프를 하는 타입이면 "+(s.eq>=s.reqE-0.08?"콜":"콜")+", 얌전한 타입이면 폴드"
+       : "상대가 잘 접으면 "+(s.rec.indexOf("체크")>=0?"블러프 벳":"그대로 벳")+", 잘 안 접으면 밸류만",
+     b:"이론값은 <b>모르는 상대용 기본값</b>일 뿐. 상대를 알면 그 방향으로 과감하게 치우친다. 대신 상대를 잘못 읽으면 손실도 크다."}
+  ];
+
+  let gap = [];
+  if(prof){
+    const a = prof.axes;
+    if(a.A2 <= -15) gap.push({t:"공격 버튼을 덜 누른다", w:"공격성 축 "+a.A2+". 상위권은 같은 승률에서 <b>더 자주 벳·레이즈</b>합니다.", h:"한 세션 동안 '체크할까 벳할까' 고민되면 무조건 팟 1/3 벳. 사이즈가 작아 손실은 제한되고, 공격 감각이 붙습니다."});
+    if(a.A4 <= -25) gap.push({t:"압박에 먼저 물러선다", w:"압박 저항 "+a.A4+". 상위권은 접기 전에 <b>필요 승률을 먼저 계산</b>합니다.", h:"큰 벳을 맞으면 접기 전에 무조건 '필요 승률 몇 %지?'를 소리 내어 말하세요. 이것만 해도 폴드 실수가 줄어듭니다."});
+    if(a.A4 >= 45) gap.push({t:"너무 안 접는다", w:"압박 저항 "+a.A4+". 상위권은 <b>이길 수 없는 핸드를 빨리 버립니다</b>.", h:"'상대가 어떤 핸드로 이 벳을 하나?'를 3개만 대보세요. 3개 다 나를 이긴다면 그건 폴드입니다."});
+    if(a.A5 <= -20) gap.push({t:"숫자를 안 쓴다", w:"사고 스타일 "+a.A5+". 감각형입니다. 상위권도 감각을 쓰지만 <b>숫자로 검산</b>합니다.", h:"팟 오즈 하나만 습관화하세요. '상대 벳 ÷ (팟 + 상대 벳)' — 이 한 줄이 콜/폴드 실수의 절반을 없앱니다."});
+    if(a.A1 >= 30) gap.push({t:"너무 많이 들어간다", w:"진입 폭 "+a.A1+". 어려운 스팟이 자주 오는 <b>진짜 원인</b>입니다.", h:"포지션별 오픈 % 기준을 지키세요. 앞자리는 좁게, BTN은 넓게 — 이 하나가 가장 큰 승률 개선입니다."});
+    if(a.A3 >= 55) gap.push({t:"분산을 즐긴다", w:"리스크 감내 "+a.A3+". 큰 판을 좋아하는 만큼 하방도 큽니다.", h:"뱅크롤 기준을 먼저 세우세요. 성향은 안 바꿔도 되고, <b>스테이크만 낮추면</b> 같은 스타일이 안전해집니다."});
+  }
+  gap = gap.slice(0,3);
+  return {keys:keys, personas:keys.map(k=>PERSONA[k]), think:think, three:three, gap:gap};
+}
+
+/* ============================================================
+   PART 4. 핸드 분석 화면
+   ============================================================ */
+/* ---- 입력 상태 (드롭다운 대신 탭으로 고른다) ---- */
+const SLOTS = ["h0","h1","f0","f1","f2","t0","r0"];
+const SLOTG = [
+  {k:"내 카드", s:["h0","h1"]},
+  {k:"플랍",   s:["f0","f1","f2"]},
+  {k:"턴",     s:["t0"]},
+  {k:"리버",   s:["r0"]}
+];
+const HI = {
+  pos:"BTN", vils:[{pos:"BB", vt:"unknown"}], agg:0, mode:"vil", pf:"open_call", target:"h0",
+  c:{h0:null,h1:null,f0:null,f1:null,f2:null,t0:null,r0:null},
+  acts:[{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0}]
+};
+const flopDone = () => HI.c.f0!=null && HI.c.f1!=null && HI.c.f2!=null;
+function slotOn(k){
+  if(k==="t0") return flopDone();
+  if(k==="r0") return flopDone() && HI.c.t0!=null;
+  return true;
+}
+function usedCards(){ return SLOTS.map(k=>HI.c[k]).filter(c=>c!=null); }
+function boardCards(){
+  const b = [];
+  if(flopDone()) b.push(HI.c.f0, HI.c.f1, HI.c.f2);
+  if(b.length===3 && HI.c.t0!=null) b.push(HI.c.t0);
+  if(b.length===4 && HI.c.r0!=null) b.push(HI.c.r0);
+  return b;
+}
+function nextTarget(from){
+  const i0 = SLOTS.indexOf(from)+1;
+  for(let i=i0;i<SLOTS.length;i++) if(slotOn(SLOTS[i]) && HI.c[SLOTS[i]]==null) return SLOTS[i];
+  for(let i=0;i<SLOTS.length;i++)  if(slotOn(SLOTS[i]) && HI.c[SLOTS[i]]==null) return SLOTS[i];
+  return from;
+}
+
+/* ---- 1. 자리: 테이블 그림에서 탭. 탭할 때마다 빈자리 → 나 → 상대 → 빈자리 ---- */
+const vilIdx = p => HI.vils.findIndex(v=>v.pos===p);
+function renderSeats(){
+  const seats = +document.getElementById("s-seats").value;
+  const L = posList(seats);
+  HI.vils = HI.vils.filter(v=>L.indexOf(v.pos)>=0 && v.pos!==HI.pos);
+  if(L.indexOf(HI.pos)<0) HI.pos = L[Math.max(0, L.length-3)];
+  if(!HI.vils.length){
+    const cand = L.filter(p=>p!==HI.pos);
+    HI.vils = [{pos:(cand.indexOf("BB")>=0?"BB":cand[cand.length-1]), vt:"unknown"}];
+  }
+  if(HI.agg >= HI.vils.length) HI.agg = 0;
+  const btn = L.indexOf("BTN")>=0 ? L.indexOf("BTN") : L.length-2;
+  let h = '<div class="felt"><span>'+seats+'인 테이블</span></div>';
+  L.forEach((p,i)=>{
+    const ang = (90 + (i-btn)*(360/L.length)) * Math.PI/180;
+    const x = 50 + 44*Math.cos(ang), y = 50 + 42*Math.sin(ang);
+    const vi = vilIdx(p);
+    const cls = p===HI.pos ? "me" : vi>=0 ? "vil" : "";
+    h += '<button class="seat '+cls+'" style="left:'+x.toFixed(1)+'%;top:'+y.toFixed(1)+'%" data-p="'+p+'">'+
+         '<b>'+(p===HI.pos?"나":vi>=0?"상대":"&nbsp;")+'</b>'+p+'</button>';
+  });
+  const map = document.getElementById("seat-map");
+  map.innerHTML = h;
+  map.querySelectorAll(".seat").forEach(b=>b.onclick=()=>{
+    const p = b.dataset.p, vi = vilIdx(p);
+    if(HI.mode === "me"){                       // 내 자리 지정
+      if(vi >= 0) HI.vils.splice(vi,1);
+      HI.pos = p;
+      if(!HI.vils.length){ toast("상대가 최소 한 명은 있어야 합니다"); HI.vils=[{pos:L.filter(q=>q!==p)[0], vt:"unknown"}]; }
+    } else {                                    // 상대 추가 / 제거
+      if(p === HI.pos){ toast("여긴 내 자리입니다 — 위에서 '내 자리' 모드로 바꾸세요"); return; }
+      if(vi >= 0){
+        if(HI.vils.length === 1){ toast("상대가 최소 한 명은 있어야 합니다"); return; }
+        HI.vils.splice(vi,1);
+      } else {
+        HI.vils.push({pos:p, vt:"unknown"});
+        HI.vils.sort((a,b2)=>L.indexOf(a.pos)-L.indexOf(b2.pos));
+      }
+    }
+    if(HI.agg >= HI.vils.length) HI.agg = 0;
+    renderSeats(); renderVT(); renderActs();
+  });
+  document.getElementById("seat-hint").innerHTML =
+    '<span class="bg" style="display:inline-flex;margin-right:8px">'+
+      '<button data-m="me"  class="'+(HI.mode==="me" ?"on":"")+'">내 자리</button>'+
+      '<button data-m="vil" class="'+(HI.mode!=="me"?"on":"")+'">상대 추가·제거</button>'+
+    '</span>'+
+    '나 <b>'+esc(HI.pos)+'</b> · 상대 <b>'+HI.vils.length+'명</b> ('+HI.vils.map(v=>esc(v.pos)).join(", ")+')';
+  document.getElementById("seat-hint").querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{
+    HI.mode = b.dataset.m; renderSeats(); });
+}
+
+/* ---- 2. 상대별 성향 ---- */
+function renderVT(){
+  const el = document.getElementById("vt-chips");
+  el.style.display = "block";
+  el.innerHTML = HI.vils.map((v,i)=>
+    '<div class="arow" style="margin-bottom:7px">'+
+      '<span class="al" style="flex:0 0 46px;font-weight:700;color:var(--warn)">'+esc(v.pos)+'</span>'+
+      '<select data-i="'+i+'" class="vt-sel" style="max-width:250px">'+
+        Object.keys(VTYPE).map(k=>'<option value="'+k+'"'+(v.vt===k?" selected":"")+'>'+VTYPE[k].n+'</option>').join("")+
+      '</select>'+
+      (HI.vils.length>1 ? '<button class="btn '+(HI.agg===i?"":"sec")+' sm" data-agg="'+i+'">'+
+        (HI.agg===i?"★ 액션한 상대":"이 사람이 액션")+'</button>' : '')+
+    '</div>').join("");
+  el.querySelectorAll(".vt-sel").forEach(s=>s.onchange=()=>{
+    HI.vils[+s.dataset.i].vt = s.value; renderVT(); });
+  el.querySelectorAll("[data-agg]").forEach(b=>b.onclick=()=>{ HI.agg = +b.dataset.agg; renderVT(); });
+  const cur = VTYPE[HI.vils[HI.agg] ? HI.vils[HI.agg].vt : "unknown"];
+  document.getElementById("vt-desc").innerHTML =
+    (HI.vils.length>1
+      ? '상대 '+HI.vils.length+'명. <b>5번의 액션 입력</b>은 ★ 표시된 <b>'+esc(HI.vils[HI.agg].pos)+
+        '</b> 기준이고, 나머지는 <b>따라 들어온 콜러</b>로 계산합니다. 멀티웨이라 같은 핸드도 승률이 크게 떨어집니다.'
+      : esc(cur.d)) +
+    (cur.id==="unknown" ? "" :
+     ' <span class="dim">— 레인지 폭 ×'+cur.w.toFixed(2)+' · 벳 해석 ×'+cur.keep.toFixed(2)+' · 폴드 빈도 ×'+cur.fold.toFixed(2)+'</span>');
+}
+
+/* ---- 3. 프리플랍 진행 ---- */
+function renderPF(){
+  const el = document.getElementById("pf-chips");
+  el.innerHTML = PFS.map(s=>'<button data-id="'+s.id+'" class="'+(HI.pf===s.id?"on":"")+'">'+s.t+'</button>').join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ HI.pf=b.dataset.id; renderPF(); renderActs(); });
+}
+
+/* ---- 3. 카드: 슬롯 + 덱 ---- */
+function renderSlots(){
+  if(!slotOn(HI.target) || HI.c[HI.target]!=null) HI.target = nextTarget(HI.target);
+  let h = "";
+  SLOTG.forEach(g=>{
+    h += '<div class="slotgrp"><div class="gl">'+g.k+
+         (g.k==="플랍"?' <span class="dim">(비우면 프리플랍만)</span>':'')+'</div><div class="gc">';
+    g.s.forEach(k=>{
+      const c = HI.c[k], on = slotOn(k);
+      const cls = "slot" + (c!=null ? " filled "+SU[st(c)] : "") + (HI.target===k?" tgt":"") + (on?"":" off");
+      h += '<button class="'+cls+'" data-k="'+k+'"'+(on?"":" disabled")+'>'+
+           (c!=null ? R[rk(c)]+SUCH[SU[st(c)]] : "+")+'</button>';
+    });
+    h += '</div></div>';
+  });
+  const sl = document.getElementById("slots");
+  sl.innerHTML = h;
+  sl.querySelectorAll(".slot").forEach(b=>b.onclick=()=>{
+    const k = b.dataset.k;
+    if(HI.c[k]!=null){ HI.c[k]=null; if(k==="f0"||k==="f1"||k==="f2"){ HI.c.t0=null; HI.c.r0=null; }
+                       if(k==="t0") HI.c.r0=null; }
+    HI.target = k;
+    renderSlots(); renderDeck(); renderActs();
+  });
+}
+function renderDeck(){
+  const used = usedCards();
+  let h = "";
+  for(let s=0;s<4;s++){
+    h += '<div class="dr">';
+    for(let r=12;r>=0;r--){
+      const c = r*4+s, u = used.indexOf(c)>=0;
+      h += '<button class="dc '+SU[s]+(u?" used":"")+'" data-c="'+c+'"'+(u?" disabled":"")+'>'+
+           R[r]+'<small>'+SUCH[SU[s]]+'</small></button>';
+    }
+    h += '</div>';
+  }
+  const dk = document.getElementById("deck");
+  dk.innerHTML = h;
+  dk.querySelectorAll(".dc").forEach(b=>b.onclick=()=>{
+    HI.c[HI.target] = +b.dataset.c;
+    HI.target = nextTarget(HI.target);
+    renderSlots(); renderDeck(); renderActs();
+  });
+}
+
+/* ---- 4. 액션: 상황에 맞는 버튼만 노출 ---- */
+function heroInvBefore(i){
+  const sc = PFS.filter(s=>s.id===HI.pf)[0] || PFS[0];
+  let inv = sc.hInv;
+  for(let k=0;k<i;k++){
+    const a = HI.acts[k], facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
+    if(facing){ if(a.m==="call") inv += +a.vs; else if(a.m==="raise") inv += +a.ms; }
+    else if((a.m==="bet"||a.m==="raise") && +a.ms>0) inv += +a.ms;
+  }
+  return inv;
+}
+function potBefore(i){
+  const sc = PFS.filter(s=>s.id===HI.pf)[0] || PFS[0];
+  let pot = sc.pot;
+  for(let k=0;k<i;k++){
+    const a = HI.acts[k], facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
+    if(facing){ pot += +a.vs; if(a.m==="call") pot += +a.vs; else if(a.m==="raise") pot += (+a.ms)*2; }
+    else if((a.m==="bet"||a.m==="raise") && +a.ms>0) pot += (+a.ms)*2;
+  }
+  return pot;
+}
+function renderActs(){
+  const bd = boardCards(), el = document.getElementById("acts2");
+  if(bd.length < 3){
+    el.innerHTML = '<div class="notice">플랍 3장을 넣으면 여기에 스트리트별 액션 입력이 열립니다. '+
+      '플랍 없이 <b>분석하기</b>를 누르면 프리플랍 판단만 보여드립니다.</div>';
+    return;
+  }
+  const stack = +document.getElementById("s-stack").value || 100;
+  const NM = ["플랍","턴","리버"];
+  let h = "";
+  for(let i=0;i<3;i++){
+    if(bd.length < 3+i) break;
+    const a = HI.acts[i], pot = potBefore(i);
+    const facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
+    const eff = Math.max(0, stack - heroInvBefore(i));
+    h += '<div class="acard"><div class="ah">'+NM[i]+' '+
+      bd.slice(0,3+i).map(c=>cardHTML(c,true)).join("")+
+      '<span class="pt">팟 '+nfmt(pot)+'BB · 내 잔여 '+nfmt(eff)+'BB</span></div>';
+
+    h += '<div class="arow"><span class="al">상대</span><div class="bg" data-i="'+i+'" data-k="v">'+
+      [["check","체크 / 액션 없음"],["bet","벳"],["raise","내 벳에 레이즈"]].map(o=>
+        '<button data-a="'+o[0]+'" class="'+(a.v===o[0]?"on":"")+'">'+o[1]+'</button>').join("")+'</div></div>';
+    if(a.v!=="check")
+      h += sizeRow(i,"vs",+a.vs, pot, eff, "상대가 넣은 금액");
+
+    const opts = facing ? [["call","콜"],["raise","레이즈"],["fold","폴드"]]
+                        : [["check","체크"],["bet","벳"]];
+    if(facing && (a.m==="check"||a.m==="bet")) a.m = "call";
+    if(!facing && (a.m==="call"||a.m==="fold"||a.m==="raise")) a.m = "check";
+    h += '<div class="arow"><span class="al">나</span><div class="bg" data-i="'+i+'" data-k="m">'+
+      opts.map(o=>'<button data-a="'+o[0]+'" class="'+(a.m===o[0]?"on"+(o[0]==="fold"?" neg":""):"")+'">'+o[1]+'</button>').join("")+
+      '</div></div>';
+    if(a.m==="bet"||a.m==="raise")
+      h += sizeRow(i,"ms",+a.ms, facing? pot + (+a.vs) : pot, eff, a.m==="raise"?"레이즈해서 총 얼마까지":"내가 넣은 금액");
+    h += '</div>';
+    if(a.m==="fold") break;
+  }
+  el.innerHTML = h;
+  el.querySelectorAll(".bg[data-k]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    const i=+g.dataset.i, k=g.dataset.k, a=b.dataset.a, A=HI.acts[i], p=potBefore(i);
+    A[k] = a;
+    // 액션을 고르면 흔한 사이즈를 미리 채운다 (금액을 넣기 전에도 다음 선택지가 바로 맞게 뜨도록)
+    if(k==="v"){
+      if(a==="check") A.vs = 0;
+      else if(!(+A.vs>0)) A.vs = Math.round(p*0.5*10)/10;
+    } else {
+      if(a==="bet"   && !(+A.ms>0)) A.ms = Math.round(p*0.5*10)/10;
+      else if(a==="raise" && !(+A.ms>0)) A.ms = Math.round((+A.vs||p*0.5)*3*10)/10;
+      else if(a==="check"||a==="call"||a==="fold") A.ms = 0;
+    }
+    renderActs();
+  }));
+  el.querySelectorAll("[data-sz]").forEach(b=>b.onclick=()=>{
+    const [i,k,val] = b.dataset.sz.split("|");
+    HI.acts[+i][k] = Math.round((+val)*10)/10; renderActs();
+  });
+  el.querySelectorAll("[data-szin]").forEach(inp=>inp.oninput=()=>{
+    const [i,k] = inp.dataset.szin.split("|");
+    HI.acts[+i][k] = +inp.value || 0;
+    inp.parentNode.parentNode.querySelectorAll("[data-sz]").forEach(x=>x.classList.remove("on"));
+  });
+}
+function sizeRow(i, key, cur, base, eff, label){
+  const chips = [["1/3",base/3],["1/2",base/2],["2/3",base*2/3],["팟",base],["올인",eff]];
+  return '<div class="arow"><span class="al">'+(key==="vs"?"금액":"금액")+'</span><div class="bg">'+
+    chips.map(c=>'<button data-sz="'+i+'|'+key+'|'+c[1]+'" class="'+
+      (Math.abs(cur-Math.round(c[1]*10)/10)<0.05 && cur>0 ?"on":"")+'">'+c[0]+'</button>').join("")+
+    '</div><input class="szin" data-szin="'+i+'|'+key+'" type="number" step="0.5" min="0" value="'+
+    (cur||"")+'" placeholder="BB"><span class="small dim">'+esc(label)+'</span></div>';
+}
+function buildHandInputs(){ renderSeats(); renderVT(); renderPF(); renderSlots(); renderDeck(); renderActs(); }
+function readHandInput(){
+  if(HI.c.h0==null || HI.c.h1==null) return {err:"내 홀카드 2장을 골라주세요."};
+  if(!HI.pos || !HI.vils.length) return {err:"내 자리와 상대 자리를 모두 골라주세요."};
+  const hole = [HI.c.h0, HI.c.h1];
+  const nf = [HI.c.f0,HI.c.f1,HI.c.f2].filter(c=>c!=null).length;
+  if(nf>0 && nf<3) return {err:"플랍은 3장 모두 넣거나 전부 비워주세요."};
+  const flop = nf===3 ? [HI.c.f0,HI.c.f1,HI.c.f2] : [];
+  const turn = (flop.length===3 && HI.c.t0!=null) ? [HI.c.t0] : [];
+  const river = (turn.length===1 && HI.c.r0!=null) ? [HI.c.r0] : [];
+  for(let i=0;i<3;i++){
+    const a = HI.acts[i];
+    if(flop.length && (3+i)<=flop.concat(turn,river).length){
+      if(a.v!=="check" && !(+a.vs>0)) return {err:["플랍","턴","리버"][i]+"에서 상대 액션이 '"+
+        (a.v==="bet"?"벳":"레이즈")+"'인데 금액이 비어 있습니다."};
+      if((a.m==="bet"||a.m==="raise") && !(+a.ms>0)) return {err:["플랍","턴","리버"][i]+"에서 내 "+
+        (a.m==="bet"?"벳":"레이즈")+" 금액이 비어 있습니다."};
+    }
+  }
+  return {
+    seats:+document.getElementById("s-seats").value,
+    gt:document.getElementById("s-gt").value,
+    stack:+document.getElementById("s-stack").value || 100,
+    pos:HI.pos, vpos:HI.vils[HI.agg].pos, pf:HI.pf, vt:HI.vils[HI.agg].vt,
+    vils:HI.vils.map(v=>({pos:v.pos, vt:v.vt})), agg:HI.agg,
+    hole:hole, flop:flop, turn:turn, river:river,
+    board:flop.concat(turn,river),
+    acts:HI.acts.map(a=>({v:a.v, vs:a.vs, m:a.m, ms:a.ms}))
+  };
+}
+function gridHTML(classes, hero){
+  const inR = {}; classes.forEach(c=>inR[c]=1);
+  let h = '<div class="g13">';
+  for(let i=12;i>=0;i--) for(let j=12;j>=0;j--){
+    const hi = Math.max(i,j), lo = Math.min(i,j);
+    const cl = i===j ? R[i]+R[i] : (i>j ? R[hi]+R[lo]+"s" : R[hi]+R[lo]+"o");
+    const on = inR[cl] ? (cl===hero ? "pt" : "in") : (cl===hero ? "pt" : "");
+    h += '<div class="'+on+'" title="'+cl+'">'+cl.slice(0,2)+'</div>';
+  }
+  return h + '</div>';
+}
+/* 결과 맨 위 한눈에 보기 — 모바일에서 첫 화면만으로 전체를 파악하게 한다 */
+function overviewHTML(res){
+  if(!res.streets.length) return "";
+  const tot = res.streets.reduce((a,s)=>a+s.evLoss,0);
+  return '<div class="card sumcard"><h2>이 핸드 한눈에</h2>'+
+    res.streets.map(s=>{
+      const bad = s.evLoss>0.35, warn = s.tags.length && !bad;
+      return '<div class="sr"><span class="n">'+s.name+'</span>'+
+        '<span class="a">내 액션 '+actName(s.mAct)+(s.mSize?' '+nfmt(s.mSize)+'BB':'')+
+        ' → 권장 <b>'+esc(s.rec)+(s.size?' '+nfmt(s.size)+'BB':'')+'</b></span>'+
+        '<span class="z">'+(bad?'<span class="pill b">-'+nfmt(s.evLoss,1)+'BB</span>'
+          : warn?'<span class="pill w">주의</span>':'<span class="pill g">문제 없음</span>')+'</span></div>';
+    }).join("")+
+    '<div style="margin-top:10px;font-size:13.5px">총 EV 손실 <b style="color:'+
+      (tot>0.5?"var(--bad)":"var(--good)")+'">'+nfmt(tot,2)+' BB</b>'+
+    '<span class="dim"> · 아래에서 스트리트별로 자세히</span></div></div>';
+}
+function evHTML(ev){
+  if(!ev.length) return "";
+  const best = Math.max.apply(null, ev.map(e=>e.v));
+  return '<div class="evlist">'+ ev.map(e=>
+    '<div class="evrow"><span class="k">'+esc(e.k)+'</span>'+
+    '<span class="v" style="color:'+(e.v===best?"var(--good)":"var(--tx2)")+'">'+(e.v>=0?"+":"")+nfmt(e.v,2)+' BB</span>'+
+    (e.v===best?'<span class="pill g">최선</span>':'')+'</div>'+
+    (e.note?'<div class="evn">'+esc(e.note)+'</div>':'')).join("") + '</div>';
+}
+function renderStreet(s, i){
+  const wide = window.innerWidth > 640;
+  let h = '<div class="st"><h3><span class="stn">'+s.name+'</span>'+
+    '<span>'+s.board.map(c=>cardHTML(c,true)).join("")+'</span>'+
+    '<span class="steq">내 승률 '+pct(s.eq)+'</span></h3><div class="bd">';
+
+  h += '<div class="stmeta">'+
+    '<span>팟 <b>'+nfmt(s.potStart)+'BB</b></span>'+
+    (s.facing?'<span>상대 벳 <b>'+nfmt(s.vSize)+'BB</b></span><span>필요 승률 <b>'+pct(s.reqE)+'</b></span>':'<span>상대 <b>체크</b></span>')+
+    '<span>SPR <b>'+nfmt(s.spr)+'</b></span>'+
+    '<span>'+(s.ip?'포지션 <b>유리</b>':'포지션 <b>불리</b>')+'</span>'+
+    '<span>내 핸드 <b>'+esc(s.catName)+(s.dr.txt.length?" + "+esc(s.dr.txt.join("·")):"")+'</b></span>'+
+    (s.nV>1?'<span style="background:#2a1f3a;color:#b39dff">멀티웨이 <b>'+s.nV+'명</b></span>':'')+
+    '</div>';
+  if(s.nV > 1) h += '<div class="blk vx"><div class="t">◆ 멀티웨이 — 상대 '+s.nV+'명</div>'+
+    '<div>'+s.vilAll.map(v=>esc(v.pos)+' <span class="dim">'+esc(v.vt.n)+' · 잔여 '+v.n+'콤보</span>').join(" &nbsp;/&nbsp; ")+'</div>'+
+    '<div style="margin-top:6px">아무 우위가 없을 때의 승률이 <b>'+pct(s.B0)+'</b>입니다. '+
+    '내 승률 '+pct(s.eq)+'를 이 기준과 비교해야 합니다 — 헤즈업의 50% 감각을 그대로 쓰면 안 됩니다.</div></div>';
+
+  /* 결론을 맨 위에 */
+  h += '<div class="recbox"><div class="rl">'+(s.recAdjusted?'상대 성향까지 반영한 권장 액션':'권장 액션')+'</div>'+
+    '<div class="ra">'+esc(s.rec)+(s.size?' <span style="font-size:15px">'+nfmt(s.size)+'BB</span>':'')+'</div>'+
+    (s.size?'<div class="rs">팟의 '+Math.round(s.size/s.potStart*100)+'%'+(s.freq?' · '+esc(s.freq):'')+'</div>'
+           :(s.freq?'<div class="rs">'+esc(s.freq)+'</div>':''))+
+    (s.recAdjusted?'<div class="rs">표준 상대였다면 <s>'+esc(s.recStd)+(s.sizeStd?' '+nfmt(s.sizeStd)+'BB':'')+'</s></div>':'')+
+    '</div>';
+
+  h += '<div class="blk"><div class="t">왜 그런가</div>'+
+    s.why.map(w=>'<div>'+w+'</div>').join("")+ evHTML(s.ev) +'</div>';
+
+  h += '<details class="numd"'+(wide?" open":"")+'><summary><b>숫자</b> 승률 '+pct(s.eq)+
+    (s.facing?' · 필요 '+pct(s.reqE)+' · MDF '+pct(s.mdf):'')+' · SPR '+nfmt(s.spr)+
+    ' <span class="dim">— 눌러서 자세히</span></summary>'+
+    '<div class="facts" style="margin-top:8px">'+
+    fact("내 승률", pct(s.eq), s.eqInfo.exact?"전수 계산":"몬테카를로 "+s.eqInfo.n.toLocaleString()+"회") +
+    (s.facing ? fact("필요 승률", pct(s.reqE), nfmt(s.vSize)+" 내고 "+nfmt(s.potStart+s.vSize)+" 먹는 값") +
+                fact("MDF", pct(s.mdf), "이만큼은 안 접어야 함") : "") +
+    fact("SPR", nfmt(s.spr), "스택 ÷ 팟") +
+    fact("보드", s.bi?s.bi.suitTxt:"-", s.bi?s.bi.tex:"") +
+    fact("상대 조합", s.vilCount+"개", "이 액션 뒤 남은 수") +
+    '</div>'+
+    (s.bi?'<div class="notice">가정: 상대는 <b>'+esc(s.vt.n)+'</b>. '+esc(s.vt.d)+
+      ' 레인지는 포지션·액션·사이즈·성향으로 좁힌 <b>근사치</b>입니다.'+
+      (s.vt.id==="unknown"?' 상대 성향을 지정하면 이 추정이 훨씬 정확해집니다.':'')+'</div>':'')+
+    '</details>';
+
+  if(s.vAdj) s.vAdj.forEach(a=>{
+    h += '<div class="blk vx"><div class="t">◆ 상대 맞춤 조정 — '+esc(a.t)+'</div>'+
+      '<div style="margin-bottom:6px">'+a.b+'</div>'+
+      '<div style="border-top:1px solid #3d3352;padding-top:7px"><b>그래서 이렇게:</b> '+a.c+'</div></div>';
+  });
+
+  if(s.bias) s.bias.forEach(b=>{
+    h += '<div class="blk hi"><div class="t">★ 당신 성향 보정판 — '+esc(b.t)+'</div>'+
+      '<div style="margin-bottom:6px">'+b.b+'</div>'+
+      '<div style="border-top:1px solid #2c5546;padding-top:7px"><b>이번엔 이렇게:</b> '+b.c+'</div></div>';
+  });
+  else if(s.hasProfile) h += '<div class="blk"><div class="t">★ 당신 성향 보정판</div><div>'+
+    '<span class="pill g">성향과 일치</span> 이 스팟은 이론상 권장 액션이 <b>당신이 평소 하던 방식과 같습니다</b>. '+
+    '따로 고칠 게 없으니 그대로 하세요.</div></div>';
+  else h += '<div class="blk"><div class="t">성향 보정판</div><div class="muted small">'+
+    '성향 진단을 먼저 하면 여기서 <b>당신 성향에 맞춘 실행 지침</b>이 나옵니다. '+
+    '<a href="#" onclick="go(\'quiz\');return false">1 · 성향 진단으로 가기</a></div></div>';
+
+  if(s.tags.length || s.evLoss>0.05){
+    h += '<div class="blk warn"><div class="t">내 실제 액션 평가</div>'+
+      '<div style="margin-bottom:6px">내가 한 액션: <b>'+actName(s.mAct)+(s.mSize?" "+nfmt(s.mSize)+"BB":"")+'</b></div>'+
+      (s.tags.length?'<div>'+s.tags.map(t=>'<span class="tag '+t[1]+'">'+esc(t[0])+'</span>').join("")+'</div>':'')+
+      (s.evLoss>0.05?'<div style="margin-top:5px">이 선택으로 <b style="color:var(--bad)">약 '+nfmt(s.evLoss,2)+'BB</b> 손해 본 것으로 계산됩니다. 100번 반복하면 '+nfmt(s.evLoss*100,0)+'BB 차이입니다.</div>':'')+
+      '</div>';
+  } else {
+    h += '<div class="blk"><div class="t">내 실제 액션 평가</div><div>내가 한 액션: <b>'+actName(s.mAct)+(s.mSize?" "+nfmt(s.mSize)+"BB":"")+'</b> — <span class="pill g">문제 없음</span></div></div>';
+  }
+
+  h += '<div class="blk"><div class="t">한 줄 처방</div><div class="rx">'+prescribe(s)+'</div></div>';
+
+  /* 탑 플레이어 렌즈 */
+  const L = s.lens;
+  h += '<details><summary><b>3 · 탑 플레이어라면 이 스팟을 어떻게 봤을까</b> (펼치기)</summary>';
+  h += '<div class="small muted" style="margin-bottom:8px">당신 성향과 가까운 유형: '+
+    L.personas.map(p=>'<span class="tag g">'+esc(p.n)+'</span>').join("")+
+    '<br>'+L.personas.map(p=>'· <b>'+esc(p.n)+'</b> — '+esc(p.d)).join("<br>")+'</div>';
+  h += L.think.map(t=>'<div class="blk"><div class="t">'+t.h+'</div><div>'+t.b+'</div></div>').join("");
+  h += '<div class="blk"><div class="t">같은 스팟, 세 가지 스타일</div><div class="scrollx"><table class="tstack">'+
+    '<tr><th>스타일</th><th>액션</th><th>이유</th></tr>'+
+    L.three.map(t=>'<tr><td>'+esc(t.k)+'</td><td data-l="액션">'+esc(t.a)+
+      '</td><td data-l="이유" class="muted">'+t.b+'</td></tr>').join("")+
+    '</table></div></div>';
+  if(L.gap.length) h += '<div class="blk"><div class="t">당신과의 차이 '+L.gap.length+'가지</div>'+
+    L.gap.map((g,i)=>'<div style="margin-bottom:8px"><b>'+(i+1)+'. '+esc(g.t)+'</b><br><span class="muted">'+g.w+'</span><br>→ <b>훈련:</b> '+g.h+'</div>').join("")+'</div>';
+  h += '<div class="notice">실존 선수의 발언이나 생각을 옮긴 것이 아니라, 널리 알려진 <b>플레이 스타일 유형</b>을 재구성한 것입니다.</div>';
+  h += '</details>';
+
+  return h + '</div></div>';
+}
+function fact(k,v,s){ return '<div class="fact"><div class="k">'+esc(k)+'</div><div class="v">'+esc(v)+'</div><div class="s">'+esc(s||"")+'</div></div>'; }
+function actName(a){ return {check:"체크",bet:"벳",call:"콜",raise:"레이즈",fold:"폴드"}[a]||a; }
+function prescribe(s){
+  if(s.facing && s.rec==="폴드") return "같은 스팟이 또 오면 <b>접으세요</b>. 필요 승률에 못 미치는 콜은 매번 조금씩 새는 구멍입니다.";
+  if(s.facing && s.rec.indexOf("레이즈")>=0) return "같은 스팟이 또 오면 <b>콜에서 멈추지 말고 키우세요</b>. 이 승률에서 콜만 하면 리버 팟이 작아져 벌 돈을 못 법니다.";
+  if(s.facing) return "같은 스팟이 또 오면 <b>콜</b>. 필요 "+pct(s.reqE)+" vs 실제 "+pct(s.eq)+" — 이 차이가 수익입니다.";
+  if(s.rec.indexOf("체크")>=0) return "같은 스팟이 또 오면 <b>체크</b>. 여기서 아낀 벳이 진짜 좋은 스팟에서 칠 실탄이 됩니다.";
+  return "같은 스팟이 또 오면 <b>"+s.rec+" "+nfmt(s.size)+"BB</b>. 사이즈까지 같이 외우세요 — 액션만 맞고 사이즈가 틀리면 절반만 맞은 겁니다.";
+}
+function renderAnalysis(res, inp){
+  let h = overviewHTML(res);
+  /* 프리플랍 */
+  h += '<div class="card"><h2>프리플랍</h2>'+
+    '<div style="margin:6px 0 10px">'+inp.hole.map(c=>cardHTML(c)).join("")+
+    ' <span class="tag">'+esc(res.pf.cls)+'</span><span class="tag">상위 '+nfmt(res.pf.pct)+'%</span>'+
+    '<span class="tag">'+esc(inp.pos)+'</span>'+(res.pf.ip?'<span class="tag g">포지션 유리</span>':'<span class="tag w">포지션 불리</span>')+'</div>'+
+    '<div class="blk"><div class="t">프리플랍 판단</div>'+
+    '<div style="font-size:16px;font-weight:800;color:var(--ac2)">'+esc(res.pf.rec.a)+'</div>'+
+    '<div>'+esc(res.pf.rec.why)+'</div></div>';
+  if(!res.pfOnly){
+    const rw = res.pf.vilClasses.reduce((a,c)=>a+combosOf(c),0)/TOTCOMBO*100;
+    h += '<div class="blk"><div class="t">프리플랍 승률 · 상대 레인지</div><div>'+
+      '이 시나리오("'+esc(res.scen.t)+'")에서 상대 레인지 상대 승률은 <b>'+pct(res.pf.eq)+'</b>입니다. '+
+      '팟은 '+nfmt(res.scen.pot)+'BB에서 시작합니다.</div>'+
+      '<div style="margin-top:5px">'+(res.nV>1
+        ? '상대 <b>'+res.nV+'명</b>: '+res.vils.map((v,k)=>esc(v.pos)+' <span class="dim">'+esc(v.vt.n)+'</span>'+
+            (k===res.aggI?' <span class="pill w">액션 기준</span>':'')).join(", ")+
+          '<br>아래 13×13은 액션한 상대('+esc(res.vils[res.aggI].pos)+') 기준이며, 승률은 <b>'+res.nV+'명 전부를 상대로</b> 계산했습니다.'
+        : '상대를 <b>'+esc(res.vt.n)+'</b>로 보고 레인지를 <b>상위 '+nfmt(rw)+'%</b>'+
+          '('+res.pf.vilClasses.length+'개 핸드 유형)로 잡았습니다. '+esc(res.vt.d))+'</div>'+
+      '<details><summary>상대의 가정 레인지 보기 (13×13)</summary>'+
+      '<div class="small muted" style="margin-bottom:6px">초록 = 상대 레인지에 포함 · 밝은 초록 = 내 핸드 위치</div>'+
+      gridHTML(res.pf.vilClasses, res.pf.cls)+'</details></div>';
+  } else {
+    h += '<div class="notice">"프리플랍 결정만 분석"을 골랐습니다. 플랍 이후를 보려면 위에서 프리플랍 진행 방식을 고르세요.</div>';
+  }
+  h += '</div>';
+  res.streets.forEach((s,i)=>{ h += renderStreet(s,i); });
+  if(!res.pfOnly && !res.streets.length)
+    h += '<div class="card"><div class="empty">플랍 3장을 넣으면 스트리트별 분석이 나옵니다.</div></div>';
+  if(res.streets.length){
+    h += '<div class="card"><button class="btn" id="h-save">이 핸드 기록에 저장</button>'+
+      '<p class="muted small" style="margin:10px 0 0">EV 손실은 "이 선택 대신 권장 액션을 했다면 장기적으로 얼마나 더 벌었을까"의 근사치입니다. '+
+      '한 핸드의 결과(이겼나 졌나)와는 무관합니다.</p></div>';
+  }
+  return h;
+}
+function runAnalysis(){
+  const inp = readHandInput();
+  const out = document.getElementById("h-out");
+  if(inp.err){ out.innerHTML = '<div class="card"><div class="empty" style="color:var(--bad)">'+esc(inp.err)+'</div></div>'; return; }
+  out.innerHTML = '<div class="card"><div class="empty">계산 중… (승률을 전수 계산 중입니다)</div></div>';
+  setTimeout(function(){
+    let res;
+    try{ res = analyze(inp); }
+    catch(e){ out.innerHTML = '<div class="card"><div class="empty" style="color:var(--bad)">분석 중 오류: '+esc(e.message)+'</div></div>'; return; }
+    out.innerHTML = renderAnalysis(res, inp);
+    const sv = document.getElementById("h-save");
+    if(sv) sv.onclick = function(){
+      const hands = DB.get("hands", []);
+      hands.unshift({
+        at:Date.now(), cls:res.pf.cls, pos:inp.pos, vpos:inp.vpos, pf:inp.pf, vt:res.vt.n,
+        hole:inp.hole, board:inp.board,
+        streets:res.streets.map(s=>({n:s.name, rec:s.rec, my:s.mAct, eq:s.eq, evLoss:s.evLoss,
+                                     tags:s.tags.map(t=>t[0])}))
+      });
+      DB.set("hands", hands.slice(0,300));
+      toast("기록에 저장했습니다"); renderStats();
+    };
+    out.scrollIntoView({behavior:"smooth", block:"start"});
+  }, 30);
+}
+
+/* ============================================================
+   PART 5. 홈 · 진단 화면 · 리크 대시보드 · 뱅크롤 · 라우팅
+   ============================================================ */
+function axisBar(k, v, c){
+  const A = AXES[k], left = (v+100)/2;
+  return '<div class="axis"><div class="lb"><span>'+A.lo+'</span>'+
+    '<span style="color:var(--tx)"><b>'+A.n+'</b> '+(v>0?"+":"")+v+
+    (c!==undefined?' <span class="dim">· 신뢰도 '+Math.round(c*100)+'%</span>':'')+'</span>'+
+    '<span>'+A.hi+'</span></div>'+
+    '<div class="axbar"><u></u><i style="left:calc('+left+'% - 2px)"></i></div></div>';
+}
+function quadrant(a){
+  const x = 20 + (a.A1+100)/200*200, y = 220 - (20 + (a.A2+100)/200*200);
+  return '<svg viewBox="0 0 240 240" style="width:100%;max-width:260px">'+
+   '<rect x="20" y="20" width="200" height="200" fill="#161d27" stroke="#2a3646"/>'+
+   '<line x1="120" y1="20" x2="120" y2="220" stroke="#2a3646"/>'+
+   '<line x1="20" y1="120" x2="220" y2="120" stroke="#2a3646"/>'+
+   '<text x="120" y="14" fill="#6b7c91" font-size="10" text-anchor="middle">어그레시브</text>'+
+   '<text x="120" y="234" fill="#6b7c91" font-size="10" text-anchor="middle">패시브</text>'+
+   '<text x="16" y="124" fill="#6b7c91" font-size="10" text-anchor="end">타이트</text>'+
+   '<text x="224" y="124" fill="#6b7c91" font-size="10">루즈</text>'+
+   '<text x="70" y="48" fill="#3f5063" font-size="11">TAG</text>'+
+   '<text x="168" y="48" fill="#3f5063" font-size="11">LAG</text>'+
+   '<text x="66" y="200" fill="#3f5063" font-size="11">락·니트</text>'+
+   '<text x="150" y="200" fill="#3f5063" font-size="11">콜링스테이션</text>'+
+   '<circle cx="'+x+'" cy="'+y+'" r="7" fill="#4fd1a5"/>'+
+   '<circle cx="'+x+'" cy="'+y+'" r="13" fill="none" stroke="#4fd1a5" stroke-opacity=".4"/></svg>';
+}
+function profileCard(p){
+  if(!p) return '<div class="card"><h2>1 · 성향 진단이 아직 없습니다</h2>'+
+    '<p class="muted">핸드 시나리오를 풀면 5개 축으로 당신의 성향을 잡아냅니다. '+
+    '<b>중간에 그만둬도 저장</b>되고 다음에 이어서 쌓입니다. 드릴에서 고른 액션도 함께 반영됩니다. (전체 '+QMAX+'문항)</p>'+
+    '<button class="btn" onclick="go(\'quiz\')">진단 시작하기</button></div>';
+  const a = p.axes;
+  return '<div class="card"><h2>내 성향 — '+esc(p.archetype)+'</h2>'+
+    '<div class="grid g2"><div>'+quadrant(a)+'</div><div>'+
+    Object.keys(AXES).map(k=>axisBar(k, a[k]===undefined?0:a[k], p.conf[k])).join("")+
+    '</div></div>'+
+    '<div style="margin-top:6px">'+profileSummary(a).map(x=>'<div>· '+x+'</div>').join("")+'</div>'+
+    '<div class="small dim" style="margin-top:8px">'+p.n+'문항'+(p.drills?' + 드릴 '+p.drills+'스팟':'')+' · '+new Date(p.at).toLocaleDateString()+' 갱신'+
+    (Object.keys(AXES).some(k=>p.conf[k]<0.6)?' · <span class="pill w">신뢰도 낮은 축 있음</span>':'')+'</div>'+
+    '<button class="btn sec sm" style="margin-top:10px" onclick="go(\'quiz\')">다시 진단</button></div>';
+}
+function bankrollAdvice(){
+  const el = document.getElementById("br-advice"); if(!el) return;
+  const br = +document.getElementById("s-br").value || 0;
+  const bl = (document.getElementById("s-bl").value||"").split("/");
+  const bb = +bl[1] || 0, gt = document.getElementById("s-gt").value;
+  if(!br || !bb){ el.innerHTML = '<div class="notice">뱅크롤과 블라인드를 넣으면 적정 스테이크 · 스톱로스를 계산해 드립니다.</div>'; return; }
+  const p = getProfile();
+  const risky = p ? p.axes.A3 : 0;
+  const needBI = gt==="cash" ? (risky>30?45:risky<-30?25:35) : (risky>30?150:80);
+  const buyin = gt==="cash" ? bb*100 : bb*100;
+  const have = br/buyin;
+  // 계산값을 실제로 존재하는 스테이크 단계로 내림 (660원짜리 블라인드는 없다)
+  const STEPS = [100,200,300,500,1000,2000,3000,5000,10000,20000,30000,50000,100000];
+  const raw = br/(needBI*100);
+  let okBB = 0; STEPS.forEach(s=>{ if(s<=raw) okBB = s; });
+  const ok = have >= needBI;
+  el.innerHTML = '<div class="blk '+(ok?"hi":"warn")+'" style="margin-top:12px">'+
+    '<div class="t">뱅크롤 판정</div>'+
+    '<div>현재 뱅크롤은 이 스테이크 기준 <b>'+nfmt(have,1)+' 바이인</b>입니다. '+
+    (gt==="cash"?"캐시":"토너먼트")+'에서 '+(p?'당신의 리스크 감내 축('+risky+')을 반영한 ':'')+
+    '권장 기준은 <b>'+needBI+' 바이인</b>입니다.</div>'+
+    (ok ? '<div style="margin-top:5px">기준을 충족합니다. 이 스테이크를 유지해도 좋습니다.</div>'
+        : '<div style="margin-top:5px"><b>기준 미달입니다.</b> 권장: 블라인드 <b>'+(okBB>0?okBB.toLocaleString()+"원":"더 낮은 스테이크")+
+          '</b> 이하. 지금 스테이크를 유지하면 실력과 무관하게 <b>운만으로 파산할 확률</b>이 커집니다.</div>')+
+    '<div style="margin-top:5px" class="small muted">이번 세션 스톱로스 권장: <b>'+nfmt(buyin*(risky>30?3:2)/10000,0)+'만원</b>'+
+    ' (바이인 '+(risky>30?3:2)+'개) · 이 선을 넘으면 자리를 뜨세요.'+
+    (p&&p.axes.B1<-20?' 당신은 감정 회복력 축이 낮게 나왔으므로 이 규칙이 특히 중요합니다.':'')+'</div></div>';
+}
+
+/* ---- 진단 화면 ---- */
+let QZ = null;
+function renderQuiz(){
+  const v = document.getElementById("v-quiz");
+  if(!QZ){
+    const p = getProfile();
+    const done = bankCount(), left = QMAX - done, dn = daCount();
+    v.innerHTML = '<div class="card"><h2>1 · 내 성향 파악</h2>'+
+      '<p>실제 핸드 상황을 보여드립니다. <b>정답을 맞히는 시험이 아닙니다</b> — 평소에 진짜로 할 법한 선택을 고르세요. 이상적인 답을 고르면 진단이 틀어집니다.</p>'+
+      '<p class="muted small">전체 '+QMAX+'문항이고, 최소 '+QMIN+'문항이면 성향이 잡힙니다. '+
+        '<b>중간에 그만둬도 거기까지 저장</b>되고 다음에 이어서 쌓입니다. 많이 풀수록 정확해집니다.</p>'+
+      '<div class="bar" style="margin:10px 0 6px"><i style="width:'+Math.round(done/QMAX*100)+'%"></i></div>'+
+      '<div class="small muted">지금까지 <b>'+done+' / '+QMAX+'문항</b>'+
+        (dn?' · 드릴에서 모인 근거 <b>'+dn+'스팟</b>':'')+'</div>'+
+      (done>=QMAX
+        ? '<div class="notice">문항을 전부 풀었습니다. 더 쌓으려면 <b>4 · 드릴</b>을 돌리세요 — 거기서 고른 액션도 성향에 반영됩니다.</div>'
+        : '')+
+      '<div class="row" style="margin-top:14px">'+
+        (left>0 ? '<div style="flex:0 0 auto"><button class="btn" onclick="startQuiz()">'+
+            (done? '이어서 하기 (남은 '+left+'문항)' : '시작하기')+'</button></div>' : '')+
+        (done ? '<div style="flex:0 0 auto"><button class="btn sec" id="qz-reset">처음부터 다시</button></div>' : '')+
+      '</div></div>';
+    if(p) v.innerHTML += profileCard(p).replace('<button class="btn sec sm" style="margin-top:10px" onclick="go(\'quiz\')">다시 진단</button>','');
+    const rb = document.getElementById("qz-reset");
+    if(rb) rb.onclick = ()=>{
+      if(!confirm("지금까지 쌓인 답과 드릴 근거를 모두 지우고 처음부터 시작합니다. 계속할까요?")) return;
+      bankReset(); renderQuiz(); renderHome();
+    };
+    return;
+  }
+  if(QZ.done){
+    const p = saveProfile();
+    const remain = QMAX - bankCount();
+    v.innerHTML = '<div class="card"><h2>여기까지 저장했습니다</h2><p class="muted">누적 '+p.n+'문항'+
+      (p.drills?' + 드릴 '+p.drills+'스팟':'')+'으로 주요 6개 축 중 '+
+      CORE.filter(k=>p.conf[k]>=0.8).length+'개가 충분한 신뢰도에 도달했습니다.'+
+      (remain>0 ? ' 남은 '+remain+'문항을 더 풀면 더 정확해집니다.' : '')+'</p>'+
+      (remain>0 ? '<button class="btn sec sm" style="margin-top:8px" onclick="startQuiz()">이어서 '+remain+'문항 더</button>' : '')+
+      '</div>'+
+      profileCard(p)+
+      '<div class="card"><h3>이제 뭘 하면 되나</h3>'+
+      '<p>이 성향은 <b>2 · 핸드 분석</b>의 "★ 당신 성향 보정판"과 <b>3 · 탑 플레이어 렌즈</b>에 그대로 반영됩니다. '+
+      '핸드를 하나 넣어보세요.</p><button class="btn" onclick="go(\'hand\')">핸드 분석으로 가기</button></div>';
+    QZ = null; renderHome(); return;
+  }
+  const q = QZ.cur;
+  const n = bankCount();
+  const st = axisStats(bankGet());
+  const avg = CORE.reduce((a,k)=>a+st.conf[k],0)/CORE.length;
+  v.innerHTML = '<div class="card">'+
+    '<div class="row" style="align-items:center;margin-bottom:10px">'+
+      '<div><div class="small muted">누적 '+n+' / '+QMAX+'문항 · '+esc(q.c)+'</div>'+
+      '<div class="bar" style="margin-top:5px"><i style="width:'+Math.round(Math.max(n/QMIN, avg)*100)+'%"></i></div></div>'+
+      '<div style="flex:0 0 auto" class="small muted">성향 파악 '+Math.round(Math.max(n/QMIN, avg)*100)+'%</div>'+
+    '</div>'+
+    '<h3 style="line-height:1.6">'+q.q+'</h3>'+
+    '<div style="margin-top:12px">'+q.o.map((o,i)=>
+      '<button class="opt" onclick="answer('+i+')"><b>'+String.fromCharCode(65+i)+'</b>'+esc(o.t)+'</button>').join("")+'</div>'+
+    '<div class="row" style="margin-top:6px"><div style="flex:0 0 auto">'+
+    '<button class="btn sec sm" onclick="saveProfile();QZ=null;renderQuiz();renderHome()">여기까지 저장하고 나가기</button></div>'+
+    (n>=QMIN?'<div style="flex:0 0 auto"><button class="btn sec sm" onclick="QZ.done=true;renderQuiz()">여기서 끝내고 결과 보기</button></div>':'')+
+    '</div></div>';
+}
+function startQuiz(){ QZ = newQuiz(); QZ.cur = nextQuestion(QZ); renderQuiz(); }
+function answer(i){
+  QZ.ans[QZ.cur.id] = i; QZ.asked.push(QZ.cur.id);
+  bankPut(QZ.cur.id, i);            // 중간에 그만둬도 여기까지는 남는다
+  if(quizDone(QZ)){ QZ.done = true; }
+  else { QZ.cur = nextQuestion(QZ); if(!QZ.cur) QZ.done = true; }
+  renderQuiz();
+}
+
+/* ---- 리크 대시보드 / 기록 ---- */
+function renderStats(){
+  const v = document.getElementById("v-stats");
+  const hands = DB.get("hands", []);
+  if(!hands.length){ v.innerHTML = '<div class="card"><h2>3 · 리크 · 기록</h2>'+
+    '<div class="empty">아직 저장된 핸드가 없습니다.<br>핸드를 분석한 뒤 "기록에 저장"을 누르면 여기에 쌓입니다.</div>'+
+    '<button class="btn" onclick="go(\'hand\')">핸드 분석하러 가기</button></div>'; return; }
+  const tc = {}; let totLoss = 0, sc = 0;
+  hands.forEach(h=>h.streets.forEach(s=>{
+    totLoss += s.evLoss||0; sc++;
+    (s.tags||[]).forEach(t=>{ tc[t] = tc[t] || {n:0, ev:0}; tc[t].n++; tc[t].ev += s.evLoss||0; });
+  }));
+  const leaks = Object.keys(tc).map(k=>({k:k, n:tc[k].n, ev:tc[k].ev})).sort((a,b)=>b.ev-a.ev || b.n-a.n);
+  let h = '<div class="card"><h2>내 EV 누수 랭킹</h2>'+
+    '<p class="muted small">저장된 '+hands.length+'개 핸드 · '+sc+'개 스트리트 기준. EV 손실이 큰 순서입니다.</p>';
+  h += leaks.length ? '<div class="scrollx"><table class="tstack"><tr><th>실수 유형</th><th>횟수</th><th>누적 손실</th><th>비중</th></tr>'+
+    leaks.slice(0,8).map((l,i)=>'<tr><td>'+(i+1)+'. '+esc(l.k)+'</td><td data-l="횟수">'+l.n+'회</td>'+
+    '<td data-l="누적 손실" style="color:var(--bad)">'+nfmt(l.ev,2)+' BB</td>'+
+    '<td data-l="비중">'+(totLoss?Math.round(l.ev/totLoss*100):0)+'%</td></tr>').join("")+'</table></div>'
+    : '<div class="empty">아직 잡힌 실수 태그가 없습니다.</div>';
+  h += '<p style="margin-top:10px">총 EV 손실 <b style="color:var(--bad)">'+nfmt(totLoss,2)+' BB</b>'+
+    (leaks.length?' · 가장 큰 구멍은 <b>'+esc(leaks[0].k)+'</b>입니다. 여기 하나만 고쳐도 손실의 '+
+      Math.round(leaks[0].ev/Math.max(totLoss,0.01)*100)+'%가 사라집니다.':'')+'</p></div>';
+
+  h += '<div class="card"><h2>핸드 기록</h2><div class="scrollx"><table class="tstack">'+
+    '<tr><th>핸드</th><th>보드</th><th>상황</th><th>스트리트별</th><th>손실</th><th></th></tr>'+
+    hands.slice(0,60).map((x,i)=>{
+      const loss = x.streets.reduce((a,s)=>a+(s.evLoss||0),0);
+      return '<tr><td>'+x.hole.map(c=>cardHTML(c,true)).join("")+
+        ' <span class="dim" style="font-size:11px;font-weight:400">'+new Date(x.at).toLocaleDateString()+'</span></td>'+
+      '<td data-l="보드">'+(x.board.length?x.board.map(c=>cardHTML(c,true)).join(""):'<span class="dim small">-</span>')+'</td>'+
+      '<td data-l="상황" class="small">'+esc(x.pos)+' vs '+esc(x.vpos)+(x.vt?' · '+esc(x.vt):'')+'</td>'+
+      '<td data-l="내 액션 → 권장" class="small">'+x.streets.map(s=>s.n+": "+actName(s.my)+" → "+esc(s.rec)).join("<br>")+'</td>'+
+      '<td data-l="EV 손실" class="small" style="color:'+(loss>0.5?"var(--bad)":"var(--tx2)")+'">'+nfmt(loss,2)+' BB</td>'+
+      '<td><button class="btn sec sm" onclick="delHand('+i+')">삭제</button></td></tr>';
+    }).join("")+'</table></div></div>';
+  v.innerHTML = h;
+}
+function delHand(i){ const a = DB.get("hands",[]); a.splice(i,1); DB.set("hands",a); renderStats(); renderHome(); }
+
+/* ---- 홈 ---- */
+function renderHome(){
+  const p = getProfile(), hands = DB.get("hands", []);
+  let h = profileCard(p);
+  h += '<div class="card"><h2>빠른 시작</h2><div class="row">'+
+    '<div style="flex:0 0 auto"><button class="btn" onclick="go(\'hand\')">핸드 하나 넣어보기</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'quiz\')">'+(p?'성향 재진단':'성향 진단')+'</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'drill\')">실전 드릴 돌리기</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'tour\')">토너먼트 클락 열기</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'stats\')">내 리크 보기</button></div>'+
+    '</div></div>';
+  if(hands.length){
+    const tot = hands.reduce((a,x)=>a+x.streets.reduce((b,s)=>b+(s.evLoss||0),0),0);
+    const tc = {}; hands.forEach(x=>x.streets.forEach(s=>(s.tags||[]).forEach(t=>tc[t]=(tc[t]||0)+1)));
+    const top = Object.keys(tc).sort((a,b)=>tc[b]-tc[a]).slice(0,3);
+    h += '<div class="card"><h2>기록 요약</h2><div class="facts">'+
+      fact("저장 핸드", hands.length+"개","") + fact("총 EV 손실", nfmt(tot,1)+" BB","권장 액션 대비") +
+      fact("최다 실수", top[0]||"-", top[0]?tc[top[0]]+"회":"") + '</div>'+
+      (top.length?'<div style="margin-top:8px">'+top.map(t=>'<span class="tag b">'+esc(t)+' '+tc[t]+'회</span>').join("")+'</div>':'')+
+      '</div>';
+  }
+  h += '<div class="card"><h3>이 도구를 쓰는 순서</h3><ol class="muted" style="padding-left:20px;margin:0">'+
+    '<li><b>성향 진단</b> — 핸드 시나리오로 5축 성향을 잡습니다.</li>'+
+    '<li><b>세션 세팅 + 핸드 입력</b> — 팟 오즈·SPR·승률을 계산하고, <b>당신 성향에 맞춘</b> 실행 지침을 냅니다.</li>'+
+    '<li><b>탑 플레이어 렌즈</b> — 같은 스팟을 다른 스타일은 어떻게 푸는지, 당신과 뭐가 다른지 봅니다.</li>'+
+    '<li><b>리크 대시보드</b> — 반복되는 실수를 쌓아 어디서 새는지 보여줍니다.</li>'+
+    '<li><b>실전 드릴</b> — 임의 스팟을 받고 액션을 고르면 선택지별 EV로 채점합니다. 배운 걸 손에 붙이는 단계입니다.</li></ol>'+
+    '<p class="muted small" style="margin-top:10px">위 네 가지는 <b>내 실력</b>을 위한 것이고, '+
+    '<b>5 · 토너먼트</b>는 성격이 다릅니다 — 오프라인 대회를 직접 열 때 화면에 띄워놓는 <b>운영용 클락·전광판</b>입니다.</p></div>';
+  document.getElementById("v-home").innerHTML = h;
+}
+
+/* ============================================================
+   PART 6. 실전 드릴 — 임의 스팟을 받아 액션을 고르고, 선택지별 EV로 채점
+   ============================================================ */
+let DR = null;
+const ri = n => Math.floor(Math.random()*n);
+const pickOne = a => a[ri(a.length)];
+function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=ri(i+1); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+
+/* 임의 스팟 생성: 시나리오 → 포지션 → 내 핸드(그 시나리오의 내 레인지에서) → 보드 → 이전 스트리트 히스토리 */
+function spotOptions(sp){
+  const dead = sp.hole.concat(sp.board);
+  let vil = expandRange(sp.scen.vR(sp.vpos, sp.vt.w), dead);
+  for(let k=0;k<sp.streetIdx;k++)
+    vil = filterByStrength(vil, sp.board.slice(0,3+k), keepFor("call",0,1,sp.vt));
+  const facing = sp.vAct==="bet" && sp.vSize>0;
+  const vilNow = filterByStrength(vil, sp.board, keepFor(facing?"bet":"check", sp.vSize, sp.pot, sp.vt));
+  const eq = equityVsRange(sp.hole, sp.board, vilNow).eq;
+  const P = sp.pot, opts = [];
+  const foldEq = (risk, potBefore, isRaise) => foldFreq(risk, potBefore, sp.vt, isRaise);
+  if(!facing){
+    opts.push({k:"체크", ev: eq*P, note:"쇼다운까지 간다는 근사 · 내 승률 "+pct(eq)});
+    [[0.33,"1/3"],[0.66,"2/3"],[1.0,"팟"]].forEach(z=>{
+      const X = Math.min(sp.eff, Math.round(P*z[0]*10)/10);
+      if(X <= 0) return;
+      const fe = foldEq(X, P);
+      const cont = filterByStrength(vilNow, sp.board, 1-fe.f);
+      const eqc = equityVsRange(sp.hole, sp.board, cont).eq;
+      opts.push({k:"벳 "+z[1]+" · "+nfmt(X)+"BB",
+        ev: fe.f*P + (1-fe.f)*(eqc*(P+2*X) - (1-eqc)*X),
+        note:"상대 폴드 "+pct(fe.f)+" 가정 · 콜 받으면 내 승률 "+pct(eqc)});
+    });
+  } else {
+    const B = sp.vSize, need = B/(P+2*B);
+    opts.push({k:"폴드", ev:0, note:"기준점 — 여기서 멈추면 손익 0"});
+    opts.push({k:"콜 "+nfmt(B)+"BB", ev: eq*(P+B) - (1-eq)*B,
+      note:"내 승률 "+pct(eq)+" · 손익분기 "+pct(need)});
+    const X = Math.min(sp.eff, Math.round(B*3*10)/10);
+    if(X > B){
+      const fe = foldEq(X, P+B, true);
+      const cont = filterByStrength(vilNow, sp.board, 1-fe.f);
+      const eqc = equityVsRange(sp.hole, sp.board, cont).eq;
+      opts.push({k:"레이즈 "+nfmt(X)+"BB", ev: fe.f*(P+B) + (1-fe.f)*(eqc*(P+X) - (1-eqc)*X),
+        note:"상대 폴드 "+pct(fe.f)+" 가정 · 콜 받으면 내 승률 "+pct(eqc)});
+    }
+  }
+  return {opts, eq, vilCount:vilNow.length, facing};
+}
+const isAggr = k => /벳|레이즈/.test(k);
+/* ---- 스택 상황 ---- */
+const DEPTHS = {
+  short:{id:"short", n:"숏칩 (12~18BB)", lo:12, hi:18,
+    d:"거의 모든 결정이 올인이냐 아니냐입니다. 잘못 접는 것보다 늦게 접는 게 더 비쌉니다."},
+  mid:  {id:"mid",   n:"미들 (30~50BB)", lo:30, hi:50,
+    d:"한 번의 큰 액션이면 스택이 다 들어갑니다. 플랍에서 이미 리버까지 계산해야 합니다."},
+  deep: {id:"deep",  n:"롱칩 (90~140BB)", lo:90, hi:140,
+    d:"세 스트리트를 다 쓸 수 있습니다. 포지션과 사이즈 조절이 가장 크게 작용합니다."}
+};
+function pickDepth(k){
+  const d = DEPTHS[k==="random" || !DEPTHS[k] ? pickOne(Object.keys(DEPTHS)) : k];
+  return {k:d.id, bb: d.lo + Math.round(Math.random()*(d.hi-d.lo))};
+}
+
+/* ---- 한 핸드를 통째로 만든다 (플랍부터 리버까지 같은 보드로 진행) ---- */
+function makeHand(cfg){
+  const scenId = pickOne(["open_call","call_open","3b_call","call_3b"]);
+  const scen = PFS.filter(s=>s.id===scenId)[0];
+  let pos, vpos;
+  do { pos = pickOne(["HJ","CO","BTN","SB","BB"]); vpos = pickOne(["UTG","HJ","CO","BTN","SB","BB"]); }
+  while(pos===vpos);
+  const vt = VTYPE[cfg.vt==="random" ? pickOne(Object.keys(VTYPE)) : cfg.vt];
+  const dep = pickDepth(cfg.depth);
+  const cls = pickOne(scen.hR(pos));
+  const hole = pickOne(classToCombos(cls));
+  const deck = [];
+  for(let c=0;c<52;c++) if(c!==hole[0] && c!==hole[1]) deck.push(c);
+  shuffleArr(deck);
+  const full = deck.slice(0,5);                    // 리버까지 미리 깔아둔다
+  const vHole = [deck[5], deck[6]];
+  /* 토너먼트면 앤티가 붙어 팟이 더 크다 */
+  const ante = cfg.mode==="tour" ? Math.round(scen.pot*0.18*10)/10 : 0;
+  return {
+    scen, pos, vpos, vt, cls, hole, vHole, full, dep, mode:cfg.mode,
+    street:0, pot:Math.round((scen.pot+ante)*10)/10, hInv:scen.hInv,
+    eff:Math.max(2, dep.bb - scen.hInv), story:[], over:false, result:null,
+    loss:0, steps:[]
+  };
+}
+/* 현재 스트리트의 상황(상대 액션 포함)을 정한다 */
+function openStreet(H){
+  const ip = ipVs(6, H.pos, H.vpos);
+  let vAct = "check", vSize = 0;
+  if(ip && Math.random() < 0.55){
+    vAct = "bet";
+    vSize = Math.min(H.eff, Math.round(H.pot*pickOne([0.33,0.5,0.75,1.0])*10)/10);
+  }
+  H.ip = ip; H.vAct = vAct; H.vSize = vSize;
+  H.spot = {scen:H.scen, pos:H.pos, vpos:H.vpos, vt:H.vt, cls:H.cls, hole:H.hole,
+            board:H.full.slice(0, 3+H.street), streetIdx:H.street,
+            pot:H.pot, hInv:H.hInv, eff:H.eff, ip:ip, vAct:vAct, vSize:vSize, story:H.story};
+  H.opts = spotOptions(H.spot);
+  return H;
+}
+/* 내 액션을 처리하고 다음 스트리트로 넘기거나 핸드를 끝낸다 */
+function playAction(H, idx){
+  const o = H.opts, mine = o.opts[idx];
+  const best = Math.max.apply(null, o.opts.map(x=>x.ev));
+  const bestOpt = o.opts.filter(x=>x.ev===best)[0];
+  const loss = best - mine.ev;
+  H.loss += loss;
+  const kind = loss<0.02 ? "ok"
+    : (isAggr(bestOpt.k) && !isAggr(mine.k)) ? "passive"
+    : (!isAggr(bestOpt.k) && isAggr(mine.k)) ? "aggro"
+    : (/폴드/.test(bestOpt.k) && /콜/.test(mine.k)) ? "loose"
+    : (/콜/.test(bestOpt.k) && /폴드/.test(mine.k)) ? "tight" : "size";
+  H.steps.push({street:["플랍","턴","리버"][H.street], chosen:mine.k, best:bestOpt.k,
+                loss:loss, eq:o.eq, kind:kind, facing:o.facing,
+                vt:H.vt.n, dep:DEPTHS[H.dep.k].n.split(" ")[0]+" "+H.dep.bb+"BB"});
+  drillToProfile(kind);
+
+  const B = H.vSize, P = H.pot;
+  let note = "";
+  if(/폴드/.test(mine.k)){
+    H.over = true; H.result = {win:false, folded:true, delta:0};
+    note = "폴드했습니다. 여기서 핸드 종료.";
+  } else if(/체크/.test(mine.k)){
+    note = "체크 — 상대도 체크했습니다.";
+  } else if(/^콜/.test(mine.k)){
+    H.pot = Math.round((P + 2*B)*10)/10;
+    H.eff = Math.max(0, H.eff - B); H.hInv += B;
+    note = "콜했습니다. 팟 "+nfmt(H.pot)+"BB.";
+  } else {
+    /* 벳 또는 레이즈 → 상대가 접는지 본다 */
+    const amt = (mine.k.match(/([\d.]+)BB/)||[])[1];
+    const X = Math.min(H.eff, +amt || Math.round(P*0.5*10)/10);
+    const ff = foldFreq(X, o.facing ? P+B : P, H.vt, o.facing);
+    if(Math.random() < ff.f){
+      const wonPot = o.facing ? P + B : P;
+      H.over = true;
+      H.result = {win:true, folded:true, pot:wonPot};
+      note = "상대가 접었습니다. 팟 "+nfmt(wonPot)+"BB를 가져옵니다.";
+    } else {
+      /* 콜 받으면 나도 X, 상대도 X 를 넣은 셈이라 팟은 P + 2X (상대 벳 B 는 P 에 안 들어있다) */
+      H.pot = Math.round((P + 2*X)*10)/10;
+      H.eff = Math.max(0, H.eff - X); H.hInv += X;
+      note = "상대가 콜했습니다. 팟 "+nfmt(H.pot)+"BB.";
+      if(H.eff <= 0){ H.over = true; H.result = showdown(H); note += " 올인 — 쇼다운으로 갑니다."; }
+    }
+  }
+  H.lastNote = note;
+  H.lastPick = {mine, bestOpt, loss, all:o.opts.slice()};
+  if(!H.over){
+    if(H.street >= 2){ H.over = true; H.result = showdown(H); }
+    else { H.street++; openStreet(H); }
+  }
+  return H;
+}
+function showdown(H){
+  const bd = H.full;
+  const mine = evalHand(H.hole.concat(bd)), vil = evalHand(H.vHole.concat(bd));
+  return {win: mine>vil, tie: mine===vil, folded:false,
+          board:bd.slice(), vHole:H.vHole.slice(), pot:H.pot};
+}
+/* 드릴에서 나온 실수 성향을 진단에 쌓는다 */
+function drillToProfile(kind){
+  if(kind==="passive") daAdd("A2", -2);
+  else if(kind==="aggro") daAdd("A2", +2);
+  else if(kind==="loose") daAdd("A4", +2);
+  else if(kind==="tight") daAdd("A4", -2);
+  else if(kind==="ok") { daAdd("A5", +1); }
+}
+
+
+/* ---- 드릴 화면 ---- */
+function renderDrill(){
+  const v = document.getElementById("v-drill");
+  if(!DR){
+    const cfg = DB.get("drillcfg", {n:5, vt:"random", depth:"random", mode:"cash"});
+    if(!cfg.depth) cfg.depth = "random";
+    if(!cfg.mode) cfg.mode = "cash";
+    v.innerHTML =
+      '<div class="card"><h2>4 · 실전 드릴</h2>'+
+      '<p>한 핸드를 <b>플랍 → 턴 → 리버</b>까지 이어서 칩니다. 매 스트리트마다 고를 수 있었던 '+
+      '선택지의 EV를 계산해 내 선택이 얼마나 손해였는지 보여주고, 마지막엔 쇼다운으로 결과까지 확인합니다.</p>'+
+      '<div class="notice">여기서 고른 액션은 <b>1 · 성향 진단</b>에 그대로 쌓입니다. 많이 돌릴수록 성향이 정확해집니다.</div>'+
+      '<div class="step"><span class="num">1</span> 몇 핸드 볼까요</div>'+
+      '<div class="bg" id="dr-n" style="display:flex">'+
+        [3,5,10].map(n=>'<button data-n="'+n+'" class="'+(cfg.n===n?"on":"")+'">'+n+'핸드</button>').join("")+
+      '</div>'+
+      '<div class="step"><span class="num">2</span> 내 스택 상황</div>'+
+      '<div class="bg" id="dr-dep" style="display:flex">'+
+        '<button data-k="random" class="'+(cfg.depth==="random"?"on":"")+'">매번 랜덤</button>'+
+        Object.keys(DEPTHS).map(k=>'<button data-k="'+k+'" class="'+(cfg.depth===k?"on":"")+'">'+
+          DEPTHS[k].n+'</button>').join("")+
+      '</div>'+
+      '<div class="small dim" style="margin-top:5px">'+
+        (DEPTHS[cfg.depth] ? esc(DEPTHS[cfg.depth].d) : '숏·미들·롱이 섞여서 나옵니다.')+'</div>'+
+      '<div class="step"><span class="num">3</span> 게임 종류</div>'+
+      '<div class="bg" id="dr-mode" style="display:flex">'+
+        '<button data-k="cash" class="'+(cfg.mode==="cash"?"on":"")+'">캐시</button>'+
+        '<button data-k="tour" class="'+(cfg.mode==="tour"?"on":"")+'">토너먼트 (앤티 포함)</button>'+
+      '</div>'+
+      '<div class="step"><span class="num">4</span> 상대는</div>'+
+      '<div class="bg" id="dr-vt" style="display:flex">'+
+        '<button data-k="random" class="'+(cfg.vt==="random"?"on":"")+'">매번 랜덤</button>'+
+        Object.keys(VTYPE).map(k=>'<button data-k="'+k+'" class="'+(cfg.vt===k?"on":"")+'">'+VTYPE[k].n+'</button>').join("")+
+      '</div>'+
+      '<div style="margin-top:16px"><button class="btn" id="dr-go">시작하기</button></div></div>'+
+      drillHistoryHTML();
+    const set = (id,key,num)=>v.querySelectorAll("#"+id+" button").forEach(b=>b.onclick=()=>{
+      cfg[key] = num ? +(b.dataset.n) : b.dataset.k; DB.set("drillcfg",cfg); renderDrill(); });
+    set("dr-n","n",true); set("dr-dep","depth"); set("dr-mode","mode"); set("dr-vt","vt");
+    document.getElementById("dr-go").onclick = ()=>startDrill(cfg);
+    return;
+  }
+  if(DR.done) return renderDrillEnd(v);
+
+  const H = DR.H, o = H.opts, nm = ["플랍","턴","리버"][H.street];
+  const picked = DR.picked;
+  let h = '<div class="card">'+
+    '<div class="dprog"><span class="small muted">'+(DR.i+1)+' / '+DR.n+'핸드</span>'+
+    '<div class="bar"><i style="width:'+Math.round((DR.i + H.street/3)/DR.n*100)+'%"></i></div>'+
+    '<span class="small muted">누적 '+(DR.loss>0?"-":"")+nfmt(DR.loss,2)+'BB</span></div>'+
+    '<div class="stmeta">'+
+      '<span>'+esc(H.pos)+' <b>vs</b> '+esc(H.vpos)+'</span>'+
+      '<span>'+esc(H.scen.t)+'</span>'+
+      '<span>상대 <b>'+esc(H.vt.n)+'</b></span>'+
+      '<span>'+(H.mode==="tour"?'토너먼트':'캐시')+' · <b>'+DEPTHS[H.dep.k].n.split(" ")[0]+' '+H.dep.bb+'BB</b></span>'+
+      '<span>팟 <b>'+nfmt(H.pot)+'BB</b></span>'+
+      '<span>내 잔여 <b>'+nfmt(H.eff)+'BB</b></span>'+
+      '<span>'+(H.ip?'포지션 <b>유리</b>':'포지션 <b>불리</b>')+'</span>'+
+    '</div>'+
+    (H.story.length?'<div class="small muted" style="margin:-4px 0 10px">'+H.story.map(esc).join(" · ")+'</div>':'')+
+    '<div class="dspot"><div class="dq">'+nm+' — 내 카드</div>'+
+      '<div class="dh">'+H.hole.map(c=>cardHTML(c)).join("")+'</div>'+
+      '<div class="dq" style="margin-top:10px">보드</div>'+
+      '<div class="dh">'+H.spot.board.map(c=>cardHTML(c)).join("")+'</div>'+
+      '<div class="dvs">'+(o.facing
+        ? '상대가 <span style="color:var(--warn)">'+nfmt(H.vSize)+'BB</span> 벳했습니다. 어떻게 하시겠습니까?'
+        : '상대 체크. 어떻게 하시겠습니까?')+'</div></div>';
+
+  if(!picked){
+    h += o.opts.map((x,i)=>'<button class="dopt" data-i="'+i+'"><span class="kn">'+
+      String.fromCharCode(65+i)+'</span><span class="kk">'+esc(x.k)+'</span></button>').join("");
+    h += '<div class="row" style="margin-top:6px"><div style="flex:0 0 auto">'+
+      '<button class="btn sec sm" id="dr-quit">중단하고 결과 보기</button></div></div>';
+  } else {
+    const best = Math.max.apply(null, picked.all.map(x=>x.ev));
+    h += '<div class="recbox"><div class="rl">'+esc(picked.st)+' — 내 선택</div>'+
+      '<div class="ra">'+esc(picked.mine.k)+'</div>'+
+      '<div class="rs">'+(picked.loss<0.02 ? '최선입니다 — EV 손실 0'
+        : 'EV 손실 <b style="color:var(--bad)">-'+nfmt(picked.loss,2)+'BB</b> · 최선은 '+esc(picked.bestOpt.k))+
+      '</div></div>'+
+      '<div class="blk"><div class="t">선택지별 기대값</div><div class="dtable">'+
+      picked.all.slice().sort((a,b)=>b.ev-a.ev).map(x=>{
+        const isBest = x.ev===best, isMine = x===picked.mine;
+        return '<div class="drow'+(isBest?" best":"")+(isMine?" mine":"")+'">'+
+          '<span class="dk">'+esc(x.k)+'</span>'+
+          '<span class="dv" style="color:'+(x.ev>=0?"var(--good)":"var(--bad)")+'">'+
+            (x.ev>=0?"+":"")+nfmt(x.ev,2)+' BB</span>'+
+          (isBest?'<span class="dbadge b">최선</span>':'')+
+          (isMine?'<span class="dbadge m">내 선택</span>':'')+
+          '<span class="dn">'+esc(x.note)+'</span></div>';
+      }).join("")+'</div></div>'+
+      '<div class="blk"><div class="t">진행</div><div class="rx">'+esc(H.lastNote||"")+'</div></div>';
+
+    if(H.over){
+      const r = H.result;
+      h += '<div class="blk '+(r.win?"hi":"warn")+'"><div class="t">핸드 종료</div>'+
+        (r.folded
+          ? '<div>'+(r.win ? '상대가 접어 팟을 가져왔습니다.' : '내가 접었습니다. 더 잃지 않은 것도 결과입니다.')+'</div>'
+          : '<div>쇼다운 — 내 '+H.hole.map(c=>cardHTML(c,true)).join("")+
+            ' vs 상대 '+r.vHole.map(c=>cardHTML(c,true)).join("")+
+            '<br>보드 '+r.board.map(c=>cardHTML(c,true)).join("")+
+            '<br><b style="color:'+(r.win?"var(--good)":r.tie?"var(--tx2)":"var(--bad)")+'">'+
+            (r.win?"이겼습니다":r.tie?"무승부":"졌습니다")+'</b> — 팟 '+nfmt(r.pot)+'BB</div>')+
+        '<div class="small muted" style="margin-top:6px">이 핸드에서 잃은 EV '+
+          nfmt(H.loss,2)+'BB. 결과와 판단의 옳고 그름은 별개입니다.</div></div>';
+      h += '<button class="btn" id="dr-next">'+(DR.i+1>=DR.n?"결과 보기":"다음 핸드")+'</button>';
+    } else {
+      h += '<button class="btn" id="dr-next">'+["턴","리버"][H.street-1]+' 보기</button>';
+    }
+  }
+  v.innerHTML = h + '</div>';
+
+  if(!picked){
+    v.querySelectorAll(".dopt").forEach(b=>b.onclick=()=>answerSpot(+b.dataset.i));
+    document.getElementById("dr-quit").onclick = ()=>{ DR.n = DR.i; DR.done = true; saveDrill(); renderDrill(); };
+  } else {
+    document.getElementById("dr-next").onclick = ()=>{
+      if(H.over) nextSpot();
+      else { DR.picked = null; renderDrill(); }
+    };
+  }
+}
+function startDrill(cfg){
+  DR = {n:cfg.n, vt:cfg.vt, depth:cfg.depth, mode:cfg.mode,
+        i:0, loss:0, picked:null, log:[], done:false};
+  loadSpot();
+}
+function loadSpot(){
+  const v = document.getElementById("v-drill");
+  v.innerHTML = '<div class="card"><div class="empty">핸드를 만들고 EV를 계산하는 중…</div></div>';
+  setTimeout(()=>{
+    DR.H = openStreet(makeHand({vt:DR.vt, depth:DR.depth, mode:DR.mode}));
+    DR.picked = null;
+    renderDrill();
+  }, 20);
+}
+function answerSpot(i){
+  const H = DR.H, st = ["플랍","턴","리버"][H.street];
+  const before = H.loss;
+  playAction(H, i);
+  DR.loss += (H.loss - before);
+  DR.picked = Object.assign({st:st}, H.lastPick);
+  renderDrill();
+}
+function nextSpot(){
+  DR.log.push.apply(DR.log, DR.H.steps);
+  DR.i++;
+  if(DR.i >= DR.n){ DR.done = true; saveDrill(); renderDrill(); }
+  else loadSpot();
+}
+function saveDrill(){
+  if(DR.H && DR.H.steps.length && DR.log.indexOf(DR.H.steps[0])<0)
+    DR.log.push.apply(DR.log, DR.H.steps);
+  if(!DR.log.length) return;
+  const all = DB.get("drills", []);
+  const cnt = k => DR.log.filter(x=>x.kind===k).length;
+  all.unshift({at:Date.now(), n:DR.log.length, loss:DR.loss,
+    ok:cnt("ok"), passive:cnt("passive"), aggro:cnt("aggro"),
+    loose:cnt("loose"), tight:cnt("tight"), size:cnt("size")});
+  DB.set("drills", all.slice(0,60));
+  saveProfileFromBank();
+}
+
+function renderDrillEnd(v){
+  const L = DR.log, n = L.length;
+  if(!n){ DR = null; renderDrill(); return; }
+  const ok = L.filter(x=>x.kind==="ok").length;
+  const pas = L.filter(x=>x.kind==="passive").length;
+  const agg = L.filter(x=>x.kind==="aggro").length;
+  const sz  = L.filter(x=>x.kind==="size").length;
+  const lo  = L.filter(x=>x.kind==="loose").length;
+  const ti  = L.filter(x=>x.kind==="tight").length;
+  const prof = getProfile();
+  let verdict = "";
+  if(pas > agg && pas >= 2){
+    verdict = "<b>소극적으로 틀린 게 "+pas+"번</b>으로 가장 많습니다. 쳐야 할 자리에서 체크·콜로 물러섰다는 뜻입니다."+
+      (prof && prof.axes.A2 <= -15 ? " 성향 진단의 공격성 축("+prof.axes.A2+")과 정확히 같은 방향입니다 — 우연이 아니라 <b>습관</b>입니다." : "");
+  } else if(agg > pas && agg >= 2){
+    verdict = "<b>과하게 쳐서 틀린 게 "+agg+"번</b>으로 가장 많습니다. 근거 없이 공격한 자리가 있었다는 뜻입니다."+
+      (prof && prof.axes.A2 >= 40 ? " 성향 진단의 공격성 축("+prof.axes.A2+")과 같은 방향입니다." : "");
+  } else if(lo > ti && lo >= 2){
+    verdict = "<b>접어야 할 자리에서 콜한 게 "+lo+"번</b>입니다. 필요 승률에 못 미치는데 받아준 것이라, "+
+      "한 번에 크게 잃진 않아도 계속 새는 구멍입니다."+
+      (prof && prof.axes.A4 >= 40 ? " 성향 진단의 압박 저항 축("+prof.axes.A4+")과 같은 방향입니다." : "");
+  } else if(ti > lo && ti >= 2){
+    verdict = "<b>받아도 될 자리에서 접은 게 "+ti+"번</b>입니다. 상대에게 공짜 팟을 준 셈입니다."+
+      (prof && prof.axes.A4 <= -25 ? " 성향 진단의 압박 저항 축("+prof.axes.A4+")과 같은 방향입니다." : "");
+  } else if(sz >= 2){
+    verdict = "액션 방향은 맞는데 <b>사이즈에서 "+sz+"번</b> 갈렸습니다. 가장 고치기 쉬운 종류의 실수입니다.";
+  } else {
+    verdict = "뚜렷하게 치우친 실수 유형은 없습니다. 표본을 더 쌓아보세요.";
+  }
+  const avg = DR.loss/n;
+  v.innerHTML = '<div class="card"><h2>드릴 결과</h2>'+
+    '<div class="facts">'+
+      fact("친 핸드", DR.i+"핸드", n+"번 판단") +
+      fact("최선 선택", ok+"/"+n, Math.round(ok/n*100)+"%") +
+      fact("총 EV 손실", "-"+nfmt(DR.loss,2)+"BB","") +
+      fact("판단당 평균", "-"+nfmt(avg,2)+"BB","낮을수록 좋음") +
+    '</div>'+
+    '<p style="margin-top:12px">'+verdict+'</p>'+
+    '<div style="margin-top:6px">'+
+      (pas?'<span class="tag b">소극적 오답 '+pas+'</span>':'')+
+      (agg?'<span class="tag w">과공격 오답 '+agg+'</span>':'')+
+      (sz?'<span class="tag w">사이즈 오답 '+sz+'</span>':'')+
+      (lo?'<span class="tag b">접을 자리에서 콜 '+lo+'</span>':'')+
+      (ti?'<span class="tag w">받을 자리에서 폴드 '+ti+'</span>':'')+
+      (ok?'<span class="tag g">최선 '+ok+'</span>':'')+
+    '</div>'+
+    '<div class="notice">여기서 나온 '+n+'개 판단이 <b>1 · 성향 진단</b>에 쌓였습니다. '+
+      '<a href="#" onclick="go(\'quiz\');return false">성향 보러 가기</a></div></div>'+
+    '<div class="card"><h3>스팟별</h3><div class="scrollx"><table class="tstack">'+
+    '<tr><th>스트리트</th><th>내 선택</th><th>최선</th><th>손실</th></tr>'+
+    L.map((x,i)=>'<tr><td>'+(i+1)+'. '+esc(x.street)+
+      '<span class="dim" style="font-weight:400;font-size:11px;display:block">'+
+      esc(x.dep||"")+(x.vt?" · "+esc(x.vt):"")+'</span></td>'+
+      '<td data-l="내 선택">'+esc(x.chosen)+'</td>'+
+      '<td data-l="최선">'+esc(x.best)+'</td>'+
+      '<td data-l="EV 손실" style="color:'+(x.loss>0.02?"var(--bad)":"var(--good)")+'">'+
+        (x.loss>0.02?"-"+nfmt(x.loss,2)+" BB":"0")+'</td></tr>').join("")+
+    '</table></div></div>'+
+    '<div class="row"><div style="flex:0 0 auto"><button class="btn" id="dr-again">한 세션 더</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" id="dr-home">드릴 첫 화면</button></div></div>';
+  document.getElementById("dr-again").onclick = ()=>startDrill({n:DR.n, vt:DR.vt});
+  document.getElementById("dr-home").onclick = ()=>{ DR=null; renderDrill(); };
+}
+function drillHistoryHTML(){
+  const all = DB.get("drills", []);
+  if(!all.length) return "";
+  const tot = all.reduce((a,x)=>a+x.n,0), okv = all.reduce((a,x)=>a+x.ok,0);
+  const ls = all.reduce((a,x)=>a+x.loss,0);
+  const pas = all.reduce((a,x)=>a+x.passive,0), agg = all.reduce((a,x)=>a+x.aggro,0);
+  return '<div class="card"><h3>드릴 누적</h3><div class="facts">'+
+    fact("총 판단", tot+"개", all.length+"세션") +
+    fact("최선 선택률", Math.round(okv/tot*100)+"%","") +
+    fact("판단당 손실", "-"+nfmt(ls/tot,2)+"BB","") +
+    fact("치우침", pas>agg?"소극적":agg>pas?"과공격":"균형", "소극 "+pas+" / 과공격 "+agg) +
+    '</div></div>';
+}
+
+/* ============================================================
+   PART 7. 토너먼트 — 실제 대회 구조를 골라 블라인드 압박 속에서 진행
+   ============================================================ */
+const LADMULT = [1,1.5,2,2.5,3,4,5,6,8,10,12.5,15,20,25,30,40,50,60,80,100,125,150,200,250,300,400,500,600,800,1000];
+/* 트리톤은 공식 구조표의 실제 사다리 (BB = 앤티) */
+const TRITON_LAD = [[500,1000],[500,1000],[1000,1500],[1000,2000],[1000,2500],[1500,3000],[2000,4000],
+  [2500,5000],[3000,6000],[4000,8000],[5000,10000],[6000,12000],[8000,16000],[10000,20000],[10000,25000],
+  [15000,30000],[20000,40000],[25000,50000],[30000,60000],[40000,80000]];
+function niceChip(x){
+  if(x < 100)    return Math.max(25, Math.round(x/25)*25);
+  if(x < 1000)   return Math.round(x/50)*50;
+  if(x < 10000)  return Math.round(x/100)*100;
+  if(x < 100000) return Math.round(x/1000)*1000;
+  return Math.round(x/5000)*5000;
+}
+function blindsAt(st, lvl){
+  /* 몬스터는 확인한 첫 6레벨 리듬을 5배 단위 블록으로 이어간다. */
+  if(st.pattern6){
+    const i = (lvl-1) % st.pattern6.length;
+    const block = Math.floor((lvl-1) / st.pattern6.length);
+    const scale = Math.pow(st.patternScale || 5, block);
+    return {sb:Math.round(st.pattern6[i][0]*scale), bb:Math.round(st.pattern6[i][1]*scale)};
+  }
+  if(st.ladder){
+    const i = Math.min(lvl-1, st.ladder.length-1);
+    const g = Math.pow(1.3, Math.max(0, lvl - st.ladder.length));
+    return {sb:niceChip(st.ladder[i][0]*g), bb:niceChip(st.ladder[i][1]*g)};
+  }
+  const m = LADMULT[Math.min(lvl-1, LADMULT.length-1)] * Math.pow(1.3, Math.max(0, lvl-LADMULT.length));
+  const bb = niceChip(st.bb*m);
+  return {sb:niceChip(bb/2), bb:bb};
+}
+
+/* 구조 프리셋.
+   note 에 "무엇이 확인된 사실이고 무엇이 근사인지"를 반드시 적는다.
+   grp: pub = 국내 홀덤펍 / series = 해외·대형 시리즈
+   금액은 원, 스택은 칩 단위로 저장하고 화면에서만 만 단위로 표시한다.            */
+const TSTRUCT = [
+ /* ---------- 국내 홀덤펍 ---------- */
+ {id:"f9_daily", grp:"pub", n:"파이널나인 데일리형", tag:"데일리 · 리바이", stack:2000000, bb:200,
+  min:6, hph:12, seats:9, noAnte:true, buyin:10000, rebuyPrice:10000, rebuyStack:3000000,
+  d:"매일 도는 기본 게임. 100/200에 200만 스택으로 시작하고, 레벨이 짧아 블라인드가 빠르게 따라붙습니다.",
+  note:"확인: 바이인 1만원 · 시작 스택 200만 · 리바이 1만원에 300만 (리바이가 시작보다 50% 많음) · 1레벨 100/200. "+
+       "레벨 시간과 블라인드 사다리는 아직 확인 못 해 통상값으로 넣었으니 매장 표로 덮어쓰세요."},
+ {id:"f9_monster", grp:"pub", n:"파이널나인 몬스터형", tag:"몬스터 · 딥스택", stack:5000000, bb:200,
+  pattern6:[[100,200],[150,300],[200,400],[250,500],[300,600],[400,800]], patternScale:5,
+  min:8, hph:16, seats:9, buyin:30000, rebuyPrice:30000, rebuyStack:7500000,
+  d:"데일리보다 바이인이 크고 스택도 깊습니다(500만). 앤티가 붙어 팟이 커지고 레벨도 길어 플레이할 여지가 있습니다.",
+  note:"확인: 바이인 3만원 · 앤티 있음 · 1레벨 100/200. 앤티는 BB와 같은 금액으로 1레벨부터 넣어뒀으니, "+
+       "매장이 특정 레벨부터 받는다면 레벨 표에서 앞 레벨의 앤티를 0으로 지우세요. "+
+       "1~6레벨의 블라인드 흐름을 기준으로 아래 레벨도 같은 6단계 패턴으로 이어집니다. "+
+       "시작 스택·리바이·레벨 시간은 아직 확인 못 한 추정값입니다."},
+ {id:"f9_main", grp:"pub", n:"파이널나인 위클리·메인형", tag:"주말 대회", stack:10000000, bb:200,
+  min:12, hph:24, seats:9, buyin:50000, rebuyPrice:50000, rebuyStack:15000000,
+  d:"주간 대회급. 1000만 스택에 12분 레벨이라 실력이 반영될 시간이 있습니다. 후반에 앤티가 붙습니다.",
+  note:"파이널나인이 주간 데일리·몬스터 토너먼트를 운영하는 것은 확인했지만 구조는 공개돼 있지 않습니다. <b>일반형 추정</b>입니다."},
+ {id:"pub_hyper", grp:"pub", n:"홀덤펍 하이퍼형", tag:"5분 레벨", stack:2000000, bb:200,
+  min:5, hph:10, seats:9, noAnte:true, buyin:30000, rebuyPrice:30000, rebuyStack:3000000,
+  d:"5분마다 블라인드가 오릅니다. 두세 바퀴 돌면 이미 푸시·폴드 구간입니다.",
+  note:"일반형 — 국내 홀덤펍 데일리가 '5~8분마다 블라인드 상승'으로 알려진 점을 반영한 설정입니다."},
+ {id:"pub_deep", grp:"pub", n:"홀덤펍 프리즈아웃 딥스택형", tag:"리바이 없음", stack:3000000, bb:200,
+  min:15, hph:30, seats:9, buyin:50000, rebuyPrice:0, rebuyStack:0,
+  d:"리바이 없이 한 번에 끝내는 구조. 레벨이 길어 초반부터 신중하게 갈 수 있습니다.",
+  note:"일반형 — 프리즈아웃으로 도는 매장을 위한 통상 설정입니다."},
+
+ /* ---------- 해외 · 대형 시리즈 (전부 프리즈아웃 기준) ---------- */
+ {id:"apt_a", grp:"series", n:"APT 인천 메인이벤트형 (Day 1A)", tag:"국내 최대 시리즈", stack:100000, bb:200,
+  min:60, hph:30, seats:9, buyin:1000000, rebuyPrice:0, rebuyStack:0,
+  d:"국내에서 열리는 가장 큰 시리즈(파라다이스시티). 딥스택이지만 WSOP보다는 확실히 빠릅니다.",
+  note:"확인된 사실: 시작 스택 100,000 · Day 1A는 60분 레벨 10개. 시작 블라인드와 사다리는 표준 근사."},
+ {id:"apt_d", grp:"series", n:"APT 가속 플라이트형 (Day 1C·D)", tag:"같은 스택, 절반 시간", stack:100000, bb:200,
+  min:30, hph:15, seats:9, buyin:1000000, rebuyPrice:0, rebuyStack:0,
+  d:"스택은 메인과 같은데 레벨이 절반입니다. 늦게 참가하는 플라이트일수록 압박이 두 배로 빨리 옵니다.",
+  note:"확인된 사실: 시작 스택 100,000 · Day 1C·D는 30분 레벨 6개 후 45분 레벨 4개. 블라인드 사다리는 표준 근사."},
+ {id:"apt_ss", grp:"series", n:"APT 슈퍼스타 챌린지형", tag:"딥스택 40분", stack:250000, bb:400,
+  min:40, hph:20, seats:9, buyin:2000000, rebuyPrice:0, rebuyStack:0,
+  d:"스택은 두껍고 레벨은 짧습니다. 초반 딥스택 플레이와 중반 압박이 한 대회에 다 나옵니다.",
+  note:"확인된 사실: 시작 스택 250,000 · 40분 레벨. 시작 블라인드와 사다리는 표준 근사."},
+ {id:"wsop", grp:"series", n:"WSOP 메인이벤트형", tag:"슬로우 딥스택", stack:60000, bb:200,
+  min:120, hph:60, seats:9, buyin:13000000, rebuyPrice:0, rebuyStack:0,
+  d:"세계에서 가장 느린 구조. 300BB로 시작하니 초반에 서두를 이유가 없습니다.",
+  note:"확인된 사실: 시작 스택 60,000 · 100/200에 BB앤티 200(=300BB) · 전 레벨 120분. 3레벨 이후 사다리는 표준 근사."},
+ {id:"triton", grp:"series", n:"트리톤 슈퍼하이롤러형", tag:"BB앤티 · 슛클락", stack:200000, bb:1000,
+  min:60, hph:30, seats:8, ladder:TRITON_LAD, buyin:130000000, rebuyPrice:0, rebuyStack:0,
+  d:"최상위 프로들의 구조. 앤티가 BB와 같아서 첫 레벨부터 팟이 크고 액션이 많습니다.",
+  note:"확인된 사실: 블라인드 사다리는 공식 구조표 그대로(500/1000 시작, 앤티 = BB). 시작 스택은 확인하지 못해 200BB로 잡았습니다."},
+ {id:"turbo", grp:"series", n:"온라인 터보형", tag:"빠름", stack:10000, bb:100,
+  min:5, hph:8, seats:9, buyin:30000, rebuyPrice:30000, rebuyStack:10000,
+  d:"20~30분이면 숏스택입니다. 푸시·폴드 판단이 실력의 거의 전부가 됩니다.",
+  note:"일반형 — 특정 대회가 아니라 흔히 쓰이는 온라인 터보 설정입니다."}
+];
+const TGRP = {pub:"국내 홀덤펍", series:"해외 · 대형 시리즈"};
+
+let TD = null, TDINT = null, TD_SETUP_LEVEL_OPEN = false;
+const tdSave = () => { if(TD){ TD.at = Date.now(); DB.set("td", TD); } };
+const tdLoad = () => DB.get("td", null);
+function tdSetupPack(D){
+  return {
+    _tpl:D._tpl, _count:D._count, _brkEvery:D._brkEvery, _brkMin:D._brkMin,
+    name:D.name, venue:D.venue, buyin:D.buyin, startStack:D.startStack,
+    rebuyPrice:D.rebuyPrice, rebuyStack:D.rebuyStack,
+    payCurve:D.payCurve, payMode:D.payMode, poolPct:D.poolPct, payShow:D.payShow,
+    levels:JSON.parse(JSON.stringify(D.levels||[]))
+  };
+}
+function tdStoreSetup(D){ DB.set("tdsetup", tdSetupPack(D)); }
+function tdRestoreSetup(D){
+  const S = DB.get("tdsetup", null);
+  if(!S) return false;
+  ["_tpl","_count","_brkEvery","_brkMin","name","venue","buyin","startStack",
+   "rebuyPrice","rebuyStack","payCurve","payMode","poolPct","payShow"].forEach(k=>{
+    if(S[k] !== undefined) D[k] = S[k];
+  });
+  if(Array.isArray(S.levels)) D.levels = JSON.parse(JSON.stringify(S.levels));
+  return true;
+}
+const tdCustom = () => DB.get("tdcustom", []);
+function tdSaveCustom(name){
+  const arr = tdCustom();
+  arr.unshift({id:"c"+Date.now(), n:name, buyin:TD.buyin, stack:TD.startStack,
+               rebuyPrice:TD.rebuyPrice, rebuyStack:TD.rebuyStack,
+               payN:TD.payN, pay:TD.pay.slice(), payCurve:TD.payCurve, payMode:TD.payMode,
+               poolPct:TD.poolPct, payShow:TD.payShow,
+               levels:JSON.parse(JSON.stringify(TD.levels))});
+  DB.set("tdcustom", arr.slice(0,20));
+}
+function tdNew(){
+  return {name:"DAILY", venue:"파이널 나인 소사벌점", buyin:10000, startStack:2000000, rebuyPrice:10000, rebuyStack:3000000,
+          entries:9, rebuys:0, players:9, started:false,
+          levels:[], lvl:0, remain:0, endsAt:null, running:false, paused:false,
+          payN:0, pay:[], payManual:false, payCurve:1, payMode:"curve",
+          poolPct:100, showCount:false, payShow:5, at:Date.now()};
+}
+/* ---- 금액·칩 표기: 만 단위로 통일 ---- */
+function manwon(n){
+  const m = (n||0)/10000;
+  const s = m>=100 ? Math.round(m) : m>=10 ? Math.round(m*10)/10 : Math.round(m*100)/100;
+  return s.toLocaleString()+"만원";
+}
+/* 블라인드처럼 정확히 읽어야 하는 값은 축약하지 않고 숫자 그대로 */
+const numk = n => (n||0).toLocaleString();
+function manchip(n){
+  n = n||0;
+  if(n >= 10000){
+    const m = n/10000;
+    return (m>=100 ? Math.round(m) : Math.round(m*10)/10).toLocaleString()+"만";
+  }
+  if(n >= 1000){                      // 5,000 → 5천 (전광판에서 만/천 단위를 섞지 않게)
+    const k = Math.round(n/100)/10;
+    return (k % 1 === 0 ? k : k)+"천";
+  }
+  return Math.round(n).toLocaleString();
+}
+/* ---- 레벨 표 ---- */
+function buildLevels(st, count, brkEvery, brkMin){
+  const out = [];
+  for(let i=1;i<=count;i++){
+    const b = blindsAt(st, i);
+    out.push({sb:b.sb, bb:b.bb, ante: st.noAnte?0:b.bb, min:st.min, brk:false});
+    if(brkEvery>0 && i%brkEvery===0 && i<count) out.push({brk:true, min:brkMin, sb:0, bb:0, ante:0});
+  }
+  return out;
+}
+/* 소수 1자리로 반올림하면 합이 100에서 조금 어긋난다. 잔차는 1위에 몰아준다. */
+function normTo100(arr){
+  const s = arr.reduce((a,b)=>a+b,0);
+  if(s <= 0) return arr;
+  const out = arr.map(x=>Math.round(x/s*1000)/10);
+  const diff = Math.round((100 - out.reduce((a,b)=>a+b,0))*10)/10;
+  if(diff !== 0) out[0] = Math.round((out[0]+diff)*10)/10;
+  return out;
+}
+/* curve: 작을수록 완만(뒷순위도 두둑), 클수록 1위 몰아주기 */
+function payoutPct(spots, curve){
+  const e = curve || 1, w = [];
+  for(let i=1;i<=spots;i++) w.push(1/Math.pow(i, e));
+  return normTo100(w);
+}
+function tdPayForMode(){
+  return TD.payMode === "flat"
+    ? normTo100(new Array(TD.payN).fill(1))
+    : payoutPct(TD.payN, TD.payCurve);
+}
+function tdAutoPay(){
+  if(TD.payManual) return;
+  TD.payN = Math.max(1, Math.ceil((TD.entries||1)*0.15));
+  TD.pay = tdPayForMode();
+}
+/* 모인 돈 전체 */
+const tdGross = () => TD ? TD.entries*TD.buyin + TD.rebuys*TD.rebuyPrice : 0;
+/* 그중 상금으로 나가는 몫. 1,000원 단위로 내림하고 나머지는 하우스가 가진다 */
+const tdPool  = () => {
+  if(!TD) return 0;
+  const p = TD.poolPct === undefined ? 100 : TD.poolPct;
+  return Math.floor(tdGross() * p / 100 / 1000) * 1000;
+};
+const tdHouse = () => tdGross() - tdPool();
+const tdChips = () => TD ? TD.entries*TD.startStack + TD.rebuys*TD.rebuyStack : 0;
+const tdAvg   = () => (TD && TD.players>0) ? Math.round(tdChips()/TD.players) : 0;
+const curLv   = () => TD && TD.levels[TD.lvl] ? TD.levels[TD.lvl] : null;
+function nextPlayLv(from){
+  for(let i=(from===undefined?TD.lvl:from)+1; i<TD.levels.length; i++) if(!TD.levels[i].brk) return TD.levels[i];
+  return null;
+}
+function nextBreakIn(){
+  let n = 0;
+  for(let i=TD.lvl; i<TD.levels.length; i++){ if(TD.levels[i].brk) return {n:n, lv:i}; n++; }
+  return null;
+}
+/* 레지 마감 지점(levels[i].reg) 기준으로 지금 상태를 알려준다 */
+function regInfo(){
+  if(!TD || !TD.levels) return null;
+  const idx = TD.levels.findIndex(l=>l.reg);
+  if(idx < 0) return null;
+  if(TD.lvl > idx) return {state:"done", text:"레지 마감", idx:idx};
+  if(TD.lvl === idx) return {state:"now", text:"지금 레지 마감", idx:idx};
+  let left = 0;
+  for(let i=TD.lvl; i<idx; i++) if(!TD.levels[i].brk) left++;
+  /* 남은 게 이번 레벨 하나면 '끝나면 마감'이 더 정확하다 */
+  return {state:"soon", idx:idx,
+          text: left<=1 ? "이번 레벨 끝나면 레지 마감" : "레지 마감까지 "+left+"레벨"};
+}
+function lvNumber(idx){
+  let n = 0;
+  for(let i=0;i<=idx && i<TD.levels.length;i++) if(!TD.levels[i].brk) n++;
+  return n;
+}
+const won = v => Math.round(v||0).toLocaleString();
+const hms = ms => {
+  const s = Math.max(0, Math.round(ms/1000)), h = Math.floor(s/3600);
+  const m = Math.floor(s%3600/60), sec = s%60;
+  return (h ? h+":"+String(m).padStart(2,"0") : String(m)) + ":" + String(sec).padStart(2,"0");
+};
+/* 다음 브레이크까지 남은 실제 시간(현재 레벨 잔여 + 그 사이 레벨들) */
+function timeToBreak(){
+  if(!TD || !TD.levels.length) return null;
+  const cur = TD.running ? Math.max(0, TD.endsAt - Date.now()) : TD.remain;
+  if(curLv() && curLv().brk) return cur;          // 이미 휴식 중이면 남은 휴식 시간
+  let ms = cur;
+  for(let i=TD.lvl+1; i<TD.levels.length; i++){
+    if(TD.levels[i].brk) return ms;
+    ms += (TD.levels[i].min||0)*60000;
+  }
+  return null;
+}
+/* 레지 마감으로 지정한 레벨이 끝날 때까지의 실제 남은 시간 */
+function timeToReg(){
+  if(!TD || !TD.levels.length) return null;
+  const idx = TD.levels.findIndex(l=>l.reg);
+  if(idx < 0) return null;
+  if(TD.lvl > idx) return 0;
+  let ms = TD.running ? Math.max(0, TD.endsAt - Date.now()) : TD.remain;
+  for(let i=TD.lvl+1; i<=idx; i++) ms += (TD.levels[i].min||0)*60000;
+  return ms;
+}
+const mmss = ms => {
+  const s = Math.max(0, Math.round(ms/1000));
+  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+};
+function beep(times, freq){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    const A = new AC();
+    for(let i=0;i<(times||1);i++){
+      const o = A.createOscillator(), g = A.createGain();
+      o.connect(g); g.connect(A.destination);
+      o.type = "sine"; o.frequency.value = freq || 880;
+      const t = A.currentTime + i*0.34;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.35, t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.30);
+      o.start(t); o.stop(t+0.32);
+    }
+  }catch(e){}
+}
+/* ---- 시계 제어 ---- */
+function tdStart(){
+  if(!TD.levels.length) return;
+  if(TD.remain <= 0) TD.remain = (curLv().min||1)*60000;
+  TD.endsAt = Date.now() + TD.remain;
+  TD.running = true; TD.paused = false; tdSave(); tdLoop();
+}
+function tdPause(){
+  if(TD.running){ TD.remain = Math.max(0, TD.endsAt - Date.now()); TD.running = false; TD.paused = true; TD.endsAt = null; tdSave(); }
+  paintClock();
+}
+function tdGoto(i, keepRunning){
+  TD.lvl = Math.max(0, Math.min(TD.levels.length-1, i));
+  TD.remain = (curLv().min||1)*60000;
+  if(TD.running || keepRunning){ TD.endsAt = Date.now() + TD.remain; TD.running = true; TD.paused = false; }
+  else TD.endsAt = null;
+  tdSave(); renderTour();
+}
+function tdAdjust(ms){
+  TD.remain = Math.max(0, (TD.running ? TD.endsAt - Date.now() : TD.remain) + ms);
+  if(TD.running) TD.endsAt = Date.now() + TD.remain;
+  tdSave(); paintClock();
+}
+function tdLoop(){
+  if(TDINT) clearInterval(TDINT);
+  TDINT = setInterval(()=>{
+    if(!TD || !TD.running) return;
+    const left = TD.endsAt - Date.now();
+    if(left <= 0){
+      beep(3, 1046);
+      if(TD.lvl < TD.levels.length-1) tdGoto(TD.lvl+1, true);
+      else { TD.running = false; TD.paused = false; TD.remain = 0; tdSave(); renderTour(); }
+      return;
+    }
+    if(left <= 60000 && left > 59000) beep(1, 660);
+    TD.remain = left;
+    paintClock();
+  }, 250);
+}
+function paintClock(){
+  const t = document.getElementById("td-time");
+  if(!t || !TD) return;
+  const left = TD.running ? Math.max(0, TD.endsAt - Date.now()) : TD.remain;
+  t.textContent = mmss(left);
+  t.classList.toggle("hot", left <= 60000);
+  const tbEl = document.getElementById("td-tobreak");
+  if(tbEl){ const tb = timeToBreak(); tbEl.textContent = (tb===null ? "없음" : hms(tb)); }
+  const trEl = document.getElementById("td-toreg");
+  if(trEl){ const tr = timeToReg(); trEl.textContent = (tr===null ? "미설정" : tr<=0 ? "마감 완료" : hms(tr)); }
+  const pb = document.getElementById("td-prog");
+  if(pb){ const total = (curLv().min||1)*60000;
+    pb.style.width = Math.max(0, Math.min(100, (1-left/total)*100)) + "%"; }
+  const b = document.getElementById("td-run");
+  if(b) b.textContent = TD.running ? "일시정지" : (TD.paused ? "계속" : "시작");
+  const pauseEl = document.getElementById("td-pause");
+  if(pauseEl) pauseEl.classList.toggle("on", !!TD.paused);
+}
+
+/* 휴대폰에서는 전체화면과 함께 가로 방향을 요청한다. 미지원 브라우저는 CSS 가로 배치만 사용한다. */
+async function tdToggleFullscreen(){
+  const el = document.getElementById("td-screen");
+  if(!el) return;
+  if(document.fullscreenElement){
+    try{ if(window.screen && screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+    if(document.exitFullscreen) await document.exitFullscreen();
+    return;
+  }
+  if(!el.requestFullscreen) return;
+  await el.requestFullscreen();
+  try{
+    const phoneSize = window.innerWidth<=960 || window.innerHeight<=600;
+    if(phoneSize && window.screen && screen.orientation && screen.orientation.lock)
+      await screen.orientation.lock("landscape");
+  }catch(e){}
+}
+
+/* ---- 화면 ---- */
+function renderTour(){
+  const v = document.getElementById("v-tour");
+  if(!v) return;                       // 화면이 없으면(테스트 등) 계산만 하고 넘어간다
+  if(!TD) TD = tdLoad();
+  if(TD && TD.started === undefined) TD.started = TD.levels.length > 0;   // 예전 저장본 호환
+  if(TD && TD.paused === undefined) TD.paused = false;
+  if(TD && TD.payMode === undefined) TD.payMode = "curve";
+  if(TD && (TD.venue==="파이널 나인" || TD.venue==="파이널나인")){
+    TD.venue = "파이널 나인 소사벌점"; tdSave();
+  }
+  /* 기존 몬스터 저장본도 1~6레벨은 보존하고, 그 아래만 같은 패턴으로 한 번 정리한다. */
+  if(TD && TD._tpl==="f9_monster" && TD.levels.length && !TD.monsterPattern6V1){
+    const mst = TSTRUCT.filter(s=>s.id==="f9_monster")[0];
+    let playNo = 0;
+    TD.levels.forEach(l=>{
+      if(l.brk) return;
+      playNo++;
+      if(playNo>6){ const b=blindsAt(mst,playNo); l.sb=b.sb; l.bb=b.bb; l.ante=b.bb; }
+    });
+    TD.monsterPattern6V1 = true; tdSave();
+  }
+  if(!TD || !TD.levels.length || !TD.started) return renderTDSetup(v);
+  renderTDClock(v);
+}
+const lvBad = l => !l.brk && (l.bb<=0 || l.sb>l.bb || l.min<=0);
+
+function renderTDSetup(v){
+  if(!TD){ TD = tdNew(); tdRestoreSetup(TD); }
+  const D = TD;
+  if(!D.levels.length) tdRestoreSetup(D);
+  if(!D._tpl || !TSTRUCT.some(s=>s.id===D._tpl)) D._tpl = "f9_daily";
+  if(!D._count) D._count = 20;
+  if(D._brkEvery === undefined) D._brkEvery = 4;
+  if(!D._brkMin) D._brkMin = 10;
+  if(!D.venue || D.venue==="파이널 나인") D.venue = "파이널 나인 소사벌점";
+  if(!D.name) D.name = D._tpl==="f9_daily" ? "DAILY"
+                       : D._tpl==="f9_monster" ? "MONSTER"
+                       : D._tpl==="f9_main" ? "WEEKLY TOURNAMENT" : "TOURNAMENT";
+  D.entries = 9; D.players = 9;
+  const st = TSTRUCT.filter(s=>s.id===D._tpl)[0];
+  if(!D.levels.length){
+    D.levels = buildLevels(st, D._count, D._brkEvery, D._brkMin);
+    D.lvl = 0; D.remain = (D.levels[0].min||1)*60000;
+  }
+  const man = n => Math.round((n||0)/10000*100)/100;
+
+  let h = '<div class="card"><h2>5 · 토너먼트 운영 (클락 · 전광판)</h2>'+
+    '<p>국내 홀덤펍·해외 토너먼트 기본 구조를 고른 뒤 <b>매장명·대회명·BUY-IN·REBUY-IN·스택·레벨표</b>를 미리 정하고 대회를 여세요.</p>'+
+
+    '<div class="step"><span class="num">1</span> 기본 구조 선택 <span class="sub">선택 후 아래 값을 자유롭게 수정할 수 있습니다</span></div>'+
+    Object.keys(TGRP).map(g=>
+      '<div style="margin:0 0 9px"><div class="small dim" style="margin-bottom:5px">'+esc(TGRP[g])+'</div>'+
+      '<div class="bg" style="display:flex">'+
+        TSTRUCT.filter(s=>s.grp===g).map(s=>'<button class="tplb '+(D._tpl===s.id?"on":"")+'" data-id="'+s.id+'">'+
+          esc(s.n.replace("형",""))+'</button>').join("")+
+      '</div></div>').join("")+
+    '<div class="tv" style="margin:4px 0 12px">'+st.note+'</div>'+
+
+    '<div class="step"><span class="num">2</span> 대회 기본 정보 <span class="sub">설정 저장 버튼으로 현재 값을 보관합니다</span></div>'+
+    '<div class="grid g3">'+
+      '<div><label>매장명 (큰 제목)</label><input id="td-venue" value="'+esc(D.venue)+'"></div>'+
+      '<div><label>대회명 (작은 제목)</label><input id="td-name" value="'+esc(D.name)+'"></div>'+
+      '<div><label>BUY-IN (만원)</label><input id="td-buyin" type="number" step="0.5" value="'+man(D.buyin)+'"></div>'+
+      '<div><label>STARTING STACK (만)</label><input id="td-stack" type="number" step="10" value="'+man(D.startStack)+'"></div>'+
+      '<div><label>REBUY-IN (만원)</label><input id="td-rbprice" type="number" step="0.5" value="'+man(D.rebuyPrice)+'"></div>'+
+      '<div><label>REBUY STACK (만)</label><input id="td-rbstack" type="number" step="10" value="'+man(D.rebuyStack)+'"></div>'+
+    '</div>'+
+    '<div class="notice"><b>STARTING PLAYERS 9명</b>으로 시작합니다. 파이널 나인 로고는 항상 고정됩니다.</div>'+
+    '<div class="step"><span class="num">3</span> 레벨표 설정 <span class="sub">기본은 닫힘 상태입니다</span>'+
+      '<button class="btn sec sm" id="td-lv-toggle" type="button" aria-expanded="'+TD_SETUP_LEVEL_OPEN+'" style="margin-left:auto">'+
+        (TD_SETUP_LEVEL_OPEN?'레벨표 닫기':'레벨표 열기')+'</button></div>'+
+    '<div id="td-setup-levels" style="display:'+(TD_SETUP_LEVEL_OPEN?'block':'none')+'">'+tdBadBanner()+tdLevelTable(true)+'</div>'+
+    '<div class="row" style="margin-top:16px;justify-content:space-between;width:100%"><div style="flex:0 0 auto">'+
+      '<button class="btn sec" id="td-savesetup" style="font-size:15px;padding:12px 22px">설정 저장</button></div>'+
+      '<div style="flex:0 0 auto;margin-left:auto"><button class="btn" id="td-quick" style="font-size:16px;padding:13px 26px">대회 시작</button></div></div>'+
+    '</div>';
+  v.innerHTML = h;
+
+  const num = id => +document.getElementById(id).value || 0;
+  const grab = () => {
+    D.name = document.getElementById("td-name").value;
+    D.venue = document.getElementById("td-venue").value;
+    D.buyin = num("td-buyin")*10000;   D.startStack = num("td-stack")*10000;
+    D.rebuyPrice = num("td-rbprice")*10000; D.rebuyStack = num("td-rbstack")*10000;
+    D.entries = 9; D.players = 9;
+  };
+  const applyTpl = (t) => {                 // 템플릿 하나로 전부 채운다
+    D._tpl = t.id;
+    D.venue = "파이널 나인 소사벌점";
+    if(/^f9_/.test(t.id)){
+      D.name = t.id==="f9_daily" ? "DAILY"
+             : t.id==="f9_monster" ? "MONSTER" : "WEEKLY TOURNAMENT";
+    } else { D.name = t.n.replace("형",""); }
+    D.buyin = t.buyin || D.buyin;
+    D.startStack = t.stack;
+    D.rebuyPrice = (t.rebuyPrice !== undefined) ? t.rebuyPrice : (t.buyin||0);
+    D.rebuyStack = (t.rebuyStack !== undefined) ? t.rebuyStack : t.stack;
+    D.entries = 9; D.players = 9; D.rebuys = 0;
+    D.levels = buildLevels(t, D._count, D._brkEvery, D._brkMin);
+    D.lvl = 0; D.remain = (D.levels[0].min||1)*60000; D.running = false; D.paused = false; D.endsAt = null;
+  };
+  v.querySelectorAll(".tplb").forEach(b=>b.onclick=()=>{
+    grab(); applyTpl(TSTRUCT.filter(s=>s.id===b.dataset.id)[0]); tdSave(); renderTDSetup(v);
+  });
+  ["td-venue","td-name","td-buyin","td-stack","td-rbprice","td-rbstack"].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.oninput = grab;
+  });
+  document.getElementById("td-lv-toggle").onclick = e=>{
+    TD_SETUP_LEVEL_OPEN = !TD_SETUP_LEVEL_OPEN;
+    const box = document.getElementById("td-setup-levels");
+    box.style.display = TD_SETUP_LEVEL_OPEN ? "block" : "none";
+    e.currentTarget.textContent = TD_SETUP_LEVEL_OPEN ? "레벨표 닫기" : "레벨표 열기";
+    e.currentTarget.setAttribute("aria-expanded", String(TD_SETUP_LEVEL_OPEN));
+  };
+  bindLevelTable(v);
+  document.getElementById("td-savesetup").onclick = ()=>{
+    grab();
+    if(!D.levels.length){
+      const t = TSTRUCT.filter(s=>s.id===D._tpl)[0];
+      D.levels = buildLevels(t, D._count, D._brkEvery, D._brkMin);
+    }
+    tdStoreSetup(D); tdSave(); toast("현재 대회 설정을 저장했습니다");
+  };
+  document.getElementById("td-quick").onclick = ()=>{
+    grab();
+    if(!D.levels.length){
+      const t = TSTRUCT.filter(s=>s.id===D._tpl)[0];
+      D.levels = buildLevels(t, D._count, D._brkEvery, D._brkMin);
+    }
+    if(!D.name) D.name = "TOURNAMENT";
+    D.players = D.entries; D.rebuys = 0; D.payManual = false; D.started = true;
+    tdAutoPay();
+    D.lvl = 0; D.remain = (D.levels[0].min||1)*60000; D.running = false; D.paused = false; D.endsAt = null;
+    tdSave(); renderTour();
+  };
+}
+/* 표를 접어둬도 잘못된 값은 보이게 — 경고 배너는 접기 바깥에 따로 그린다 */
+function tdBadBanner(){
+  const bad = TD.levels.filter(lvBad).length;
+  return bad ? '<div class="blk warn" style="margin:10px 0 0"><div class="t">확인 필요</div>'+
+    '<div>'+bad+'개 레벨의 값이 이상합니다. SB가 BB보다 크거나 BB·시간이 0입니다. '+
+    '레벨 표를 열어 주황색 줄을 확인하세요.</div></div>' : '';
+}
+function tdLevelTable(editable){
+  const regIdx = TD.levels.findIndex(l=>l.reg);
+  let h = editable ? '<div class="lvregbox"><label for="td-reglevel">레지 마감</label>'+
+    '<select id="td-reglevel"><option value="">미설정</option>'+TD.levels.map((l,i)=>
+      '<option value="'+(i+1)+'" '+(i===regIdx?'selected':'')+'>'+(i+1)+(l.brk?' · BREAK':'')+'</option>').join("")+
+    '</select><span>레벨까지</span></div>' : '';
+  h += '<div class="scrollx" style="margin-top:10px"><table id="td-lv"><tr><th>#</th><th>SB</th><th>BB</th><th>ANTE</th><th>분</th><th>− / +</th></tr>';
+  TD.levels.forEach((l,i)=>{
+    h += '<tr class="'+(l.brk?"lvbrk":(lvBad(l)?"lvbad":""))+'">'+
+      '<td class="lvdrag" draggable="true" data-row="'+i+'" title="드래그해서 순서 변경"><b>↕ '+(i+1)+'</b>'+
+        (l.brk?'<span style="display:block;color:var(--warn);font-size:9px">BREAK</span>':'')+'</td>'+
+      (l.brk ? '<td colspan="3" class="dim">휴식</td>'
+             : '<td><input class="lvin" data-i="'+i+'" data-f="sb" type="number" value="'+l.sb+'" style="width:82px"></td>'+
+               '<td><input class="lvin" data-i="'+i+'" data-f="bb" type="number" value="'+l.bb+'" style="width:82px"></td>'+
+               '<td><input class="lvin" data-i="'+i+'" data-f="ante" type="number" value="'+l.ante+'" style="width:82px"></td>')+
+      '<td><input class="lvin" data-i="'+i+'" data-f="min" type="number" value="'+l.min+'" style="width:62px"></td>'+
+      '<td>'+(editable?'<button class="btn sec sm lvdel" data-i="'+i+'" title="이 행 삭제">−</button> '+
+        '<button class="btn sec sm lvaddrow" data-i="'+i+'" title="같은 종류 행 추가">+</button>':'')+'</td></tr>';
+  });
+  h += '</table></div>';
+  return h;
+}
+function bindLevelTable(v){
+  v.querySelectorAll(".lvin").forEach(inp=>inp.onchange=()=>{
+    const i = +inp.dataset.i;
+    TD.levels[i][inp.dataset.f] = +inp.value || 0;
+    if(i === TD.lvl && inp.dataset.f === "min" && !TD.running) TD.remain = (TD.levels[i].min||1)*60000;
+    tdSave(); renderTour();
+  });
+  const regSel = document.getElementById("td-reglevel");
+  if(regSel) regSel.onchange = ()=>{
+    TD.levels.forEach(l=>{ delete l.reg; });
+    const n = +regSel.value;
+    if(n>=1 && n<=TD.levels.length) TD.levels[n-1].reg = true;
+    tdSave(); renderTour(); };
+  v.querySelectorAll(".lvdel").forEach(b=>b.onclick=()=>{
+    if(TD.levels.length<=1){ toast("최소 1개는 있어야 합니다"); return; }
+    const i = +b.dataset.i, wasCurrent = i===TD.lvl;
+    TD.levels.splice(i,1);
+    if(i < TD.lvl) TD.lvl--;
+    if(TD.lvl >= TD.levels.length) TD.lvl = TD.levels.length-1;
+    if(wasCurrent && !TD.running) TD.remain = (curLv().min||1)*60000;
+    tdSave(); renderTour(); });
+  v.querySelectorAll(".lvaddrow").forEach(b=>b.onclick=()=>{
+    const i = +b.dataset.i, src = TD.levels[i];
+    const row = src.brk
+      ? {brk:true, min:src.min||10, sb:0,bb:0,ante:0}
+      : {brk:false, min:src.min||20, sb:niceChip(src.sb*1.4),
+         bb:niceChip(src.bb*1.4), ante:src.ante?niceChip(src.ante*1.4):0};
+    TD.levels.splice(i+1,0,row);
+    if(i < TD.lvl) TD.lvl++;
+    tdSave(); renderTour(); });
+  let dragFrom = null;
+  v.querySelectorAll(".lvdrag").forEach(cell=>{
+    cell.ondragstart = e=>{
+      dragFrom = +cell.dataset.row;
+      if(e.dataTransfer){ e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragFrom)); }
+      if(cell.parentElement) cell.parentElement.classList.add("lvdragging");
+    };
+    cell.ondragover = e=>{
+      e.preventDefault();
+      if(e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      if(cell.parentElement) cell.parentElement.classList.add("lvdragover");
+    };
+    cell.ondragleave = ()=>{ if(cell.parentElement) cell.parentElement.classList.remove("lvdragover"); };
+    cell.ondrop = e=>{
+      e.preventDefault();
+      const to = +cell.dataset.row;
+      const from = dragFrom===null && e.dataTransfer ? +e.dataTransfer.getData("text/plain") : dragFrom;
+      if(Number.isInteger(from) && from>=0 && from<TD.levels.length && to>=0 && to<TD.levels.length && from!==to){
+        const current = curLv(), moved = TD.levels.splice(from,1)[0];
+        TD.levels.splice(to,0,moved);
+        TD.lvl = Math.max(0, TD.levels.indexOf(current));
+        tdSave(); renderTour();
+      }
+    };
+    cell.ondragend = ()=>{
+      dragFrom = null;
+      v.querySelectorAll("#td-lv tr").forEach(r=>{ r.classList.remove("lvdragging"); r.classList.remove("lvdragover"); });
+    };
+  });
+}
+
+function renderTDClock(v){
+  const l = curLv(), nx = nextPlayLv(), nb = nextBreakIn();
+  const pool = tdPool(), left = TD.running ? Math.max(0, TD.endsAt-Date.now()) : TD.remain;
+
+  /* ===== 전광판 — 손님에게 보여주는 것만 ===== */
+  const tb = timeToBreak(), tr = timeToReg(), prizeOpen = tr!==null && tr<=0;
+  const logo = LOGO_DEFAULT;
+  const venue = TD.venue || "", title = TD.name || "토너먼트";
+  let h = '<div id="td-screen" class="tdwrap">'+
+
+    '<div class="bhead">'+
+      '<div class="blogo">'+(logo ? '<img src="'+logo+'" alt="">' : '')+'</div>'+
+      '<div class="btitle">'+
+        (venue ? '<div class="bname">'+esc(venue)+'</div>' : '')+
+        '<div class="'+(venue?"bsub":"bname")+'">'+esc(title)+'</div>'+
+      '</div>'+
+      '<div class="bmini">'+
+        '<div class="mi reg"><span class="mk">레지 마감까지</span><span class="mv" id="td-toreg">'+
+          (tr===null ? '미설정' : tr<=0 ? '마감 완료' : hms(tr))+'</span></div>'+
+        '<div class="mi"><span class="mk">다음 휴식까지</span><span class="mv" id="td-tobreak">'+
+          (tb===null ? '없음' : hms(tb))+'</span></div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="bmid">'+
+      '<div class="bclock">'+
+        '<div id="td-time" class="'+(left<=60000?"hot":"")+'">'+mmss(left)+'</div>'+
+        '<div class="tdbar"><i id="td-prog" style="width:0%"></i></div>'+
+      '</div>'+
+      '<div class="blower">'+
+        (prizeOpen
+          ? '<div class="bprize">'+
+              '<div class="ptot"><span class="k">Total prize</span><span class="v">'+won(pool)+'원</span></div>'+
+              '<ol class="plist">'+TD.pay.slice(0, TD.payShow||5).map((p,i)=>
+                '<li><span class="r">'+(i+1)+'위</span><b>'+won(Math.floor(pool*p/100))+'원</b></li>').join("")+
+              '</ol></div>'
+          : '<div class="bprize locked"><span>PRIZE</span><b>레지 마감 후 공개</b></div>')+
+        '<div class="bblindside">'+
+        '<div class="bblind">'+
+          '<div class="lvrow'+(l.brk?" brkc":"")+'">'+(l.brk ? 'BREAK TIME' : '레벨 '+lvNumber(TD.lvl))+'</div>'+
+          (l.brk
+            ? (nx ? '<div class="brow"><span class="k">NEXT BLINDS</span><span class="v3">'+
+                    numk(nx.sb)+' / '+numk(nx.bb)+'</span></div>' : '')
+            : '<div class="brow"><span class="k">BLINDS</span><span class="v blindvals">'+
+                '<span class="sb">'+numk(l.sb)+'</span><i class="slash">/</i><span class="bb">'+numk(l.bb)+'</span></span></div>'+
+              '<div class="brow"><span class="k">ANTE</span><span class="v antevals">'+
+                '<span class="av">'+(l.ante ? numk(l.ante) : '&nbsp;')+'</span></span></div>'+
+              (nx ? '<div class="brow"><span class="k">NEXT BLINDS</span><span class="v3">'+
+                    numk(nx.sb)+' / '+numk(nx.bb)+(nx.ante?' · ANTE '+numk(nx.ante):'')+'</span></div>' : ''))+
+        '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="bstats compactstats'+(l.brk?' breakstats':'')+'">'+
+      '<div><span class="k">AVERAGE STACK</span><span class="v">'+
+        (tdAvg()?tdAvg().toLocaleString():'—')+'<u>CHIPS</u></span></div>'+
+      '<div><span class="k">PLAYERS <span class="dim2">REMAIN / ENTRIES</span></span><span class="v">'+
+        TD.players+' <u>/</u> '+TD.entries+'</span></div>'+
+      '<div><span class="k">REBUY-IN</span><span class="v">'+TD.rebuys+'<u>TIMES</u></span></div>'+
+    '</div>'+
+
+    (venue ? '<div class="bfoot">'+esc(venue)+' 토너먼트</div>' : '')+
+    '<div id="td-pause" class="tdpause'+(TD.paused?' on':'')+'" aria-live="polite"><b>일시정지</b></div>'+
+    '</div>';
+
+  /* ===== 아래부터는 운영용 ===== */
+  h += '<div class="card tdops"><h3>진행</h3>'+
+    '<div class="row">'+
+      '<div style="flex:0 0 auto"><button class="btn" id="td-run">'+(TD.running?"일시정지":(TD.paused?"계속":"시작"))+'</button></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-prev">◀ 이전 레벨</button></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-next">다음 레벨 ▶</button></div>'+
+      '<div class="tdsep"></div>'+
+      '<div style="flex:0 0 auto"><span class="tdglab">시간</span></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec tdmin" id="td-m1">−1분</button></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec tdmin" id="td-p1">+1분</button></div>'+
+      '<div class="tdsep"></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-full">전체화면</button></div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-end">토너 종료 · 다음 대회 설정</button></div>'+
+      '<div class="tdreghint">레지 마감은 아래 <b>별도 레지 마감 선택칸</b>에서 지정</div>'+
+    '</div></div>';
+
+  h += '<div class="card tdcounts"><h3>인원 · 리바이 <span class="small dim">— 손님 화면에는 안 나옵니다</span></h3>'+
+    '<div class="hudline">'+
+      '<div><span class="k">참가</span>'+
+        '<input class="cntin" data-f="entries" type="number" min="0" value="'+TD.entries+'"><span class="u">명</span>'+
+        '<button class="btn sm" data-act="e+">+1</button><button class="btn sec sm" data-act="e-">−1</button></div>'+
+      '<div><span class="k">남은 인원</span>'+
+        '<input class="cntin" data-f="players" type="number" min="0" value="'+TD.players+'"><span class="u">명</span>'+
+        '<button class="btn sec sm" data-act="p+">+1</button><button class="btn sec sm" data-act="p-">−1</button></div>'+
+      '<div><span class="k">리바이</span>'+
+        '<input class="cntin" data-f="rebuys" type="number" min="0" value="'+TD.rebuys+'"><span class="u">회</span>'+
+        '<button class="btn sm" data-act="r+">+1</button><button class="btn sec sm" data-act="r-">−1</button></div>'+
+    '</div>'+
+    '<div class="hudline" style="margin-top:9px">'+
+      '<div><span class="k">평균 스택</span><b>'+manchip(tdAvg())+'</b></div>'+
+      '<div><span class="k">총 칩</span><b>'+manchip(tdChips())+'</b></div>'+
+      '<div><span class="k">모인 돈</span><b>'+manwon(tdGross())+'</b></div>'+
+      '<div><span class="k">상금 ('+(TD.poolPct===undefined?100:TD.poolPct)+'%)</span><b style="color:var(--ac)">'+manwon(pool)+'</b></div>'+
+      '<div><span class="k">하우스 몫</span><b>'+manwon(tdHouse())+'</b></div>'+
+    '</div>'+
+    '<details class="tdhelp"><summary>입력 방법 · 단축키 보기</summary><div class="small">'+
+      '숫자는 칸에 직접 입력하거나 ± 버튼으로 바꿀 수 있습니다. 참가·리바이는 총 상금과 총 칩에 자동 반영됩니다.<br>'+ 
+      '<b>스페이스</b> 시작·정지 · <b>← →</b> 레벨 이동 · <b>F</b> 전체화면 · '+
+      '<b>B</b> BUY-IN +1 · <b>E</b> ELIMINATE −1 · <b>R</b> REBUY-IN +1</div></details></div>';
+
+  /* ===== 상금 배분 — 우리가 정한다 ===== */
+  const sum = Math.round(TD.pay.reduce((a,b)=>a+b,0)*10)/10;
+  const pctOf = TD.entries ? Math.round(TD.payN/TD.entries*100) : 0;
+  h += '<div class="card tdpayout"><h3>상금 배분 <span class="small dim">— 몇 명까지, 몇 %씩</span></h3>'+
+    '<div class="step" style="margin-top:2px"><span class="num">1</span> 얼마를 상금으로 돌릴까요</div>'+
+    '<div class="poolcalc">'+
+      '<span>모인 돈 <b>'+manwon(tdGross())+'</b></span>'+
+      '<span class="op">×</span>'+
+      '<span><input id="td-poolpct" type="number" min="0" max="100" step="1" value="'+
+        (TD.poolPct===undefined?100:TD.poolPct)+'"> %</span>'+
+      '<span class="op">=</span>'+
+      '<span class="res">상금 <b>'+manwon(pool)+'</b></span>'+
+      '<span class="hs">하우스 '+manwon(tdHouse())+'</span>'+
+    '</div>'+
+    '<div class="bg" id="td-poolq" style="display:flex;margin-top:8px">'+
+      [100,90,85,80,70].map(x=>'<button data-p="'+x+'" class="'+
+        ((TD.poolPct===undefined?100:TD.poolPct)===x?"on":"")+'">'+x+'%</button>').join("")+
+    '</div>'+
+    '<div class="small dim" style="margin-top:5px">상금은 1,000원 단위로 내림하고 나머지는 하우스 몫으로 넘깁니다. '+
+      '전광판에는 <b>상금만</b> 나옵니다.</div>'+
+
+    '<div class="step"><span class="num">2</span> 몇 명까지 줄까요</div>'+
+    '<div class="row">'+
+      '<div style="flex:0 0 130px"><label>지급 인원</label>'+
+        '<input id="td-payn" type="number" min="1" value="'+TD.payN+'"></div>'+
+      '<div style="flex:1 1 auto"><label>참가 인원 기준으로 빠르게</label><div class="bg" id="td-payq" style="display:flex">'+
+        [10,15,20,25].map(x=>'<button data-p="'+x+'">상위 '+x+'%</button>').join("")+
+      '</div></div>'+
+    '</div>'+
+    '<div class="small dim" style="margin-top:5px">지금 참가 '+TD.entries+'명 중 '+TD.payN+'명 지급'+
+      (TD.entries?' (상위 '+pctOf+'%)':'')+'</div>'+
+
+    '<div class="step"><span class="num">3</span> 어떤 비율로 나눌까요</div>'+
+    '<div class="bg" id="td-curve" style="display:flex">'+
+      [[0.7,"완만 (뒷순위도 두둑)"],[1.0,"보통"],[1.4,"가파름 (1위 몰아주기)"]].map(c=>
+        '<button data-c="'+c[0]+'" class="'+(TD.payMode!=="flat" && Math.abs((TD.payCurve||1)-c[0])<0.01?"on":"")+'">'+c[1]+'</button>').join("")+
+      '<button id="td-payflat" class="'+(TD.payMode==="flat"?"on":"")+'">균등 분배</button>'+
+      '<span style="display:inline-flex;align-items:center;gap:6px;margin-left:6px">'+
+        '<span class="small dim">직접</span>'+
+        '<input id="td-curvein" type="number" step="0.1" min="0.2" max="3" value="'+
+          (TD.payCurve===undefined?1:TD.payCurve)+'" style="width:74px">'+
+      '</span>'+
+    '</div>'+
+    '<div class="small dim" style="margin-top:5px">버튼을 누르면 아래 표가 다시 계산됩니다. 그 뒤에 칸을 직접 고쳐도 됩니다.</div>'+
+
+    '<div class="row" style="margin-top:10px">'+
+      '<div style="flex:0 0 auto"><label>전광판에 표시할 순위 수</label>'+
+        '<input id="td-payshow" type="number" min="1" max="60" value="'+(TD.payShow||5)+'"></div>'+
+    '</div>'+
+    '<div class="step"><span class="num">4</span> 순위별 확인 · 직접 수정</div>'+
+    '<div class="scrollx"><table class="tstack paytbl"><tr><th>순위</th><th>비율</th><th>금액</th></tr>'+
+    TD.pay.map((p,i)=>'<tr><td>'+(i+1)+'위</td>'+
+      '<td data-l="비율"><input class="payin" data-i="'+i+'" type="number" step="0.1" min="0" value="'+p+'"> %</td>'+
+      '<td data-l="금액">'+manwon(pool*p/100)+'</td></tr>').join("")+
+    '</table></div>'+
+    '<div class="row" style="margin-top:9px">'+
+      '<div style="flex:0 0 auto" class="'+(Math.abs(sum-100)>0.5?"":"dim")+'">'+
+        '합계 <b style="color:'+(Math.abs(sum-100)>0.5?"var(--warn)":"var(--good)")+'">'+sum+'%</b></div>'+
+      (Math.abs(sum-100)>0.5 ? '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-pay100">100%로 맞추기</button></div>' : '')+
+    '</div>'+
+    (Math.abs(sum-100)>0.5 ? '<div class="notice">합계가 100%가 아니면 전광판 금액이 총 상금과 어긋납니다.</div>' : '')+
+    '</div>';
+
+  h += '<div class="card tdlevels"><h3>레벨 표</h3>'+
+    '<div class="small muted">진행 중에도 고칠 수 있습니다. 현재 레벨은 초록색으로 표시됩니다. '+
+      '<b>레지</b> 칸을 누르면 그 지점이 <b>레지 마감</b>으로 지정되고 전광판에 남은 레벨이 표시됩니다(한 곳만).</div>'+
+    tdBadBanner()+
+    '<div class="row" style="margin-top:9px">'+
+      '<div style="flex:0 0 auto"><button class="btn sec" id="td-lvtoggle2">'+
+        (TD._lvOpen ? '▲ 레벨 표 닫기' : '▼ 레벨 표 열기 (전체 '+TD.levels.length+'행)')+'</button></div>'+
+    '</div>'+
+    (TD._lvOpen ? tdLevelTable(true) : '')+
+    '</div>';
+
+  v.innerHTML = h;
+
+  document.getElementById("td-lvtoggle2").onclick = ()=>{ TD._lvOpen = !TD._lvOpen; tdSave(); renderTour(); };
+  document.getElementById("td-run").onclick = ()=>{ TD.running ? tdPause() : tdStart(); paintClock(); };
+  document.getElementById("td-prev").onclick = ()=>tdGoto(TD.lvl-1);
+  document.getElementById("td-next").onclick = ()=>tdGoto(TD.lvl+1);
+  document.getElementById("td-m1").onclick = ()=>tdAdjust(-60000);
+  document.getElementById("td-p1").onclick = ()=>tdAdjust(60000);
+  document.getElementById("td-full").onclick = ()=>tdToggleFullscreen();
+  v.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{ tdCount(b.dataset.act); });
+  v.querySelectorAll(".cntin").forEach(inp=>inp.onchange=()=>{
+    TD[inp.dataset.f] = Math.max(0, Math.round(+inp.value||0));
+    tdAutoPay(); tdSave(); renderTour(); });
+
+  /* 상금 배분 */
+  document.getElementById("td-payshow").onchange = (e)=>{
+    TD.payShow = Math.max(1, Math.min(60, +e.target.value||5)); tdSave(); renderTour(); };
+  document.getElementById("td-poolpct").onchange = (e)=>{
+    TD.poolPct = Math.max(0, Math.min(100, +e.target.value||0)); tdSave(); renderTour(); };
+  v.querySelectorAll("#td-poolq button").forEach(b=>b.onclick=()=>{
+    TD.poolPct = +b.dataset.p; tdSave(); renderTour(); });
+  document.getElementById("td-payn").onchange = (e)=>{
+    TD.payManual = true; TD.payN = Math.max(1, +e.target.value||1);
+    TD.pay = tdPayForMode(); tdSave(); renderTour(); };
+  v.querySelectorAll("#td-payq button").forEach(b=>b.onclick=()=>{
+    TD.payManual = true;
+    TD.payN = Math.max(1, Math.round((TD.entries||1) * (+b.dataset.p)/100));
+    TD.pay = tdPayForMode(); tdSave(); renderTour(); });
+  v.querySelectorAll("#td-curve button[data-c]").forEach(b=>b.onclick=()=>{
+    TD.payMode = "curve"; TD.payCurve = +b.dataset.c;
+    TD.pay = payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour(); });
+  document.getElementById("td-curvein").onchange = (e)=>{
+    TD.payMode = "curve";
+    TD.payCurve = Math.max(0.2, Math.min(3, +e.target.value||1));
+    TD.pay = payoutPct(TD.payN, TD.payCurve); tdSave(); renderTour(); };
+  document.getElementById("td-payflat").onclick = ()=>{
+    TD.payMode = "flat"; TD.pay = tdPayForMode(); tdSave(); renderTour(); };
+  v.querySelectorAll(".payin").forEach(inp=>inp.onchange=()=>{
+    TD.payManual = true; TD.payMode = "custom";
+    TD.pay[+inp.dataset.i] = Math.max(0, +inp.value||0); tdSave(); renderTour(); });
+  const p100 = document.getElementById("td-pay100");
+  if(p100) p100.onclick = ()=>{ TD.pay = normTo100(TD.pay); tdSave(); renderTour(); };
+
+  document.getElementById("td-end").onclick = ()=>{
+    if(confirm("현재 게임을 종료하고 다음 토너먼트 설정 화면을 띄울까요?")){
+      if(TDINT) clearInterval(TDINT); TDINT = null;
+      TD.lvl=0; TD.remain=TD.levels.length ? (TD.levels[0].min||1)*60000 : 0;
+      TD.running=false; TD.paused=false; TD.endsAt=null;
+      TD.entries=9; TD.players=9; TD.rebuys=0; TD.payN=0; TD.pay=[]; TD.payManual=false;
+      TD.started=false; TD_SETUP_LEVEL_OPEN=false; tdSave(); renderTour();
+    }
+  };
+  bindLevelTable(v);
+  const rows = v.querySelectorAll("#td-lv tr");
+  if(rows[TD.lvl+1]) rows[TD.lvl+1].classList.add("lvcur");
+  if(TD.running) tdLoop();
+  paintClock();
+}
+
+/* 인원·리바이 증감 — 참가가 늘면 상금권 인원도 따라 늘어난다 */
+function tdCount(act){
+  if(act==="e+"){ TD.entries++; TD.players++; }
+  else if(act==="e-"){ if(TD.entries>0){ TD.entries--; TD.players=Math.max(0,TD.players-1); } }
+  else if(act==="p+"){ TD.players++; }
+  else if(act==="p-"){ TD.players = Math.max(0, TD.players-1); }
+  else if(act==="r+"){ TD.rebuys++; }
+  else if(act==="r-"){ if(TD.rebuys>0) TD.rebuys--; }
+  tdAutoPay(); tdSave(); renderTour();
+}
+/* 단축키 — 토너먼트 화면일 때만 */
+document.addEventListener("keydown", e=>{
+  const onTour = document.getElementById("v-tour") && document.getElementById("v-tour").classList.contains("on");
+  if(!onTour || !TD || !TD.levels.length) return;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||""))) return;
+  const k = (e.key||"").toLowerCase();
+  if(e.code === "Space"){ e.preventDefault(); TD.running ? tdPause() : tdStart(); paintClock(); }
+  else if(e.code === "ArrowRight") tdGoto(TD.lvl+1);
+  else if(e.code === "ArrowLeft")  tdGoto(TD.lvl-1);
+  else if(k === "f") tdToggleFullscreen();
+  else if(k === "b") tdCount("e+");
+  else if(k === "e") tdCount("p-");
+  else if(k === "r") tdCount("r+");
+});
+
+/* ---- 라우팅 & 초기화 ---- */
+function go(v){
+  /* 토너먼트는 전광판이라 폭을 넓게, 나머지는 읽기 좋은 폭으로 */
+  const wrap = document.querySelector(".wrap");
+  if(wrap) wrap.style.maxWidth = (v==="tour" ? "1600px" : "960px");
+  document.querySelectorAll(".view").forEach(e=>e.classList.remove("on"));
+  document.getElementById("v-"+v).classList.add("on");
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  if(v==="home") renderHome();
+  if(v==="quiz") renderQuiz();
+  if(v==="stats") renderStats();
+  if(v==="drill") renderDrill();
+  if(v==="tour") renderTour();
+  window.scrollTo(0,0);
+}
+function saveSetup(){
+  const s = {};
+  ["s-gt","s-seats","s-stack","s-bl","s-ante","s-br","s-goal"].forEach(id=>s[id]=document.getElementById(id).value);
+  DB.set("setup", s); bankrollAdvice(); toast("세팅을 저장했습니다");
+}
+function loadSetup(){
+  const s = DB.get("setup", null); if(!s) return;
+  Object.keys(s).forEach(id=>{ const e=document.getElementById(id); if(e) e.value = s[id]; });
+}
+function fillDemo(){
+  document.getElementById("s-seats").value = "6";
+  HI.pos="BTN"; HI.vils=[{pos:"BB", vt:"station"}]; HI.agg=0; HI.pf="open_call";
+  HI.c = {h0:cid("A","s"), h1:cid("Q","s"), f0:cid("K","s"), f1:cid("7","h"), f2:cid("2","d"),
+          t0:cid("4","c"), r0:null};
+  HI.target = "r0";
+  HI.acts = [{v:"check",vs:0,m:"check",ms:0},{v:"bet",vs:4,m:"call",ms:0},{v:"check",vs:0,m:"check",ms:0}];
+  buildHandInputs();
+  toast("예시를 채웠습니다 — 분석하기를 눌러보세요");
+}
+function clearHand(){
+  HI.c = {h0:null,h1:null,f0:null,f1:null,f2:null,t0:null,r0:null};
+  HI.target = "h0";
+  HI.acts = [{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0}];
+  buildHandInputs();
+  document.getElementById("h-out").innerHTML = "";
+}
+window.addEventListener("DOMContentLoaded", function(){
+  const vv = document.getElementById("app-ver");
+  if(vv){ vv.textContent = "v"+APP_VER; vv.title = APP_VER_NOTE; }
+  loadSetup();
+  buildHandInputs();
+  bankrollAdvice();
+  renderHome();
+  document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.v));
+  document.getElementById("s-seats").onchange = buildHandInputs;
+  document.getElementById("s-save").onclick = saveSetup;
+  ["s-br","s-bl","s-gt"].forEach(id=>document.getElementById(id).onchange = bankrollAdvice);
+  document.getElementById("h-run").onclick = runAnalysis;
+  document.getElementById("h-demo").onclick = fillDemo;
+  document.getElementById("h-clear").onclick = clearHand;
+  document.getElementById("s-stack").onchange = renderActs;
+  document.getElementById("ex-json").onclick = function(){
+    const d = {profile:DB.get("profile",null), hands:DB.get("hands",[]), setup:DB.get("setup",null),
+               drills:DB.get("drills",[]), drillcfg:DB.get("drillcfg",null),
+               td:DB.get("td",null), tdcustom:DB.get("tdcustom",[]), logo:DB.get("logo",""), v:4};
+    const b = new Blob([JSON.stringify(d,null,2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "홀덤분석_백업_"+new Date().toISOString().slice(0,10)+".json";
+    a.click();
+  };
+  document.getElementById("im-json").onclick = ()=>document.getElementById("im-file").click();
+  document.getElementById("im-file").onchange = function(e){
+    const f = e.target.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = function(){
+      try{
+        const d = JSON.parse(rd.result);
+        if(d.profile) DB.set("profile", d.profile);
+        if(d.hands) DB.set("hands", d.hands);
+        if(d.setup) DB.set("setup", d.setup);
+        if(d.drills) DB.set("drills", d.drills);
+        if(d.drillcfg) DB.set("drillcfg", d.drillcfg);
+        if(d.td) DB.set("td", d.td);
+        if(d.tdcustom) DB.set("tdcustom", d.tdcustom);
+        if(d.logo) DB.set("logo", d.logo);
+        TD = null;
+        loadSetup(); renderHome(); toast("불러왔습니다");
+      }catch(err){ toast("파일을 읽지 못했습니다"); }
+    };
+    rd.readAsText(f);
+  };
+  document.getElementById("rs-all").onclick = function(){
+    if(confirm("성향 진단·핸드 기록·세팅을 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?")){
+      DB.del("profile"); DB.del("hands"); DB.del("setup"); DB.del("drills"); DB.del("drillcfg");
+      DR = null; renderHome(); renderStats(); toast("초기화했습니다");
+    }
+  };
+});
+
+</script>
+</body>
+</html>

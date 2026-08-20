@@ -1305,10 +1305,15 @@ group('저장소 · 백업');
     'data 가 비어 있으면 예전 형식으로 보고 최상위 키를 읽는다');
   ok(hbRestore({ v: 5, data: {} }) === 0, '빈 백업은 아무것도 덮어쓰지 않는다');
 
-  // 초기화 범위가 모든 키를 빠짐없이, 겹치지 않게 나누는지
+  // 초기화 범위가 모든 키를 빠짐없이, 겹치지 않게 나누는지.
+  // theme·tab 은 «어떻게 보이나»일 뿐 기록이 아니라서 초기화 대상이 아니고,
+  // accounts·curacct 를 지우면 계정 체계 자체가 무너지니 둘 다 뺀다.
+  const NOT_DATA = ['theme', 'tab', 'accounts', 'curacct'];
   const covered = new Set([...LEARN_KEYS, ...TOUR_KEYS, ...(app.STAT_KEYS || [])]);
-  const uncovered = [...used].filter((k) => !covered.has(k) && !['theme', 'accounts', 'curacct'].includes(k));
-  ok(uncovered.length === 0, '초기화 범위가 모든 키를 덮는다(테마·계정 목록 제외)', '안 덮인 키: ' + uncovered.join(', '));
+  const uncovered = [...used].filter((k) => !covered.has(k) && !NOT_DATA.includes(k));
+  ok(uncovered.length === 0, '초기화 범위가 모든 키를 덮는다(화면 설정·계정 목록 제외)', '안 덮인 키: ' + uncovered.join(', '));
+  ok(NOT_DATA.every((k) => !covered.has(k)), '화면 설정과 계정 목록은 초기화 대상에 안 들어간다',
+    NOT_DATA.filter((k) => covered.has(k)).join(', '));
   const overlap = LEARN_KEYS.filter((k) => TOUR_KEYS.includes(k));
   ok(overlap.length === 0, '학습/대회 초기화 범위가 겹치지 않는다', overlap.join(', '));
   ok(LEARN_KEYS.includes('quizans') && LEARN_KEYS.includes('drillaxis'),

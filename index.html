@@ -1095,6 +1095,19 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
     <h3 style="margin-top:16px">탑 플레이어 렌즈에 대해</h3>
     <p class="muted">실존 선수의 발언이나 생각을 지어내지 않습니다. 널리 알려진 <b>플레이 스타일 유형</b>을 재구성해
     보여주는 것이며, 특정 인물의 실제 사고를 옮긴 것이 아닙니다.</p>
+    <h3 style="margin-top:16px">단축키</h3>
+    <p class="muted">탭에 적힌 번호가 그대로 단축키입니다 — <b>0</b> 홈 · <b>1</b> 성향 진단 · <b>2</b> 핸드 분석 ·
+    <b>3</b> 리크·기록 · <b>4</b> 드릴 · <b>5</b> 전적 · <b>6</b> 토너먼트.
+    입력 칸에 글자를 치는 중에는 동작하지 않습니다.</p>
+    <p class="muted">토너먼트 화면에서는 <b>스페이스</b> 시작·정지 · <b>← →</b> 레벨 이동 · <b>F</b> 전체화면 ·
+    <b>B</b> 참가 +1 · <b>E</b> 탈락 −1 · <b>R</b> 리바이 +1.
+    앱을 닫았다 열면 <b>마지막에 보던 탭</b>으로 돌아옵니다.</p>
+
+    <h3 style="margin-top:16px">계정</h3>
+    <p class="muted">헤더 오른쪽 칩에서 선수 계정을 만들고 바꿉니다. 성향 진단 · 핸드 · 드릴 · 전적이 계정마다
+    따로 쌓이고, 대회 설정과 전광판은 매장 것이라 이 기기에 하나로 둡니다.
+    PIN 은 <b>보안이 아니라</b> 실수 방지용입니다 — 브라우저 안에 그대로 저장되니 진짜 비밀번호를 쓰지 마세요.</p>
+
     <h3 style="margin-top:16px">데이터</h3>
     <p class="muted">모든 기록은 이 브라우저 안에만 저장됩니다(localStorage). 서버로 보내지 않습니다.
     브라우저 데이터를 지우면 함께 사라지니 아래에서 백업하세요.</p>
@@ -5855,7 +5868,9 @@ const todayISO = () => {
 };
 
 /* ---- 라우팅 & 초기화 ---- */
+const VIEWS = ["home","quiz","hand","stats","drill","rec","tour","help"];
 function go(v){
+  if(VIEWS.indexOf(v) < 0) v = "home";
   /* 토너먼트는 전광판이라 폭을 넓게, 나머지는 읽기 좋은 폭으로 */
   const wrap = document.querySelector(".wrap");
   if(wrap) wrap.style.maxWidth = (v==="tour" ? "1600px" : "960px");
@@ -5868,8 +5883,29 @@ function go(v){
   if(v==="drill") renderDrill();
   if(v==="rec") renderRec();
   if(v==="tour") renderTour();
+  /* 다음에 열 때 여기서 이어서 — 매장에서 하루에도 몇 번씩 새로고침한다 */
+  DB.set("tab", v);
   window.scrollTo(0,0);
 }
+const curView = () => {
+  const on = document.querySelector(".view.on");
+  return on ? on.id.replace(/^v-/, "") : "home";
+};
+/* 숫자 키로 탭 이동.
+   탭에 적힌 번호가 그대로 단축키다 — 화면에 1 이라고 써 놓고 2 를 누르게 하면 안 된다.
+   홈은 번호가 없으니 0. 입력 칸에 타이핑 중이거나 계정 창이 떠 있으면 건드리지 않는다. */
+const TABKEY = {"0":"home", "1":"quiz", "2":"hand", "3":"stats", "4":"drill", "5":"rec", "6":"tour"};
+document.addEventListener("keydown", function(e){
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "")) return;
+  if(e.target.isContentEditable) return;
+  const m = document.getElementById("acct-m");
+  if(m && !m.hidden) return;
+  const v = TABKEY[e.key];
+  if(!v) return;
+  e.preventDefault();
+  go(v);
+});
 function saveSetup(){
   const s = {};
   ["s-gt","s-seats","s-stack","s-bl","s-ante","s-br","s-goal"].forEach(id=>s[id]=document.getElementById(id).value);
@@ -5926,6 +5962,8 @@ window.addEventListener("DOMContentLoaded", function(){
   bankrollAdvice();
   renderHome();
   renderAcctChip();
+  /* 마지막에 보던 탭에서 이어서 연다 */
+  go(DB.get("tab", "home"));
   document.getElementById("acct-b").onclick = openAcct;
   document.getElementById("acct-m").querySelectorAll("[data-mclose]")
     .forEach(e=>e.onclick = closeAcct);

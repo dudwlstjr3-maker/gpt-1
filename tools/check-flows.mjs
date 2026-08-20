@@ -679,6 +679,63 @@ group('선수 계정');
   await page.evaluate(() => DB.del('hands'));
 }
 
+/* ─────────── 탭 이동 · 단축키 ─────────── */
+group('탭 이동');
+{
+  const onTab = () => page.evaluate(() => curView());
+
+  // 탭에 적힌 번호가 그대로 단축키여야 한다
+  const printed = await page.evaluate(() =>
+    [...document.querySelectorAll('#nav button')].map((b) => {
+      const i = b.querySelector('i');
+      return { v: b.dataset.v, num: i ? (i.textContent.match(/\d+/) || [null])[0] : null };
+    }));
+  let mismatch = null;
+  for (const t of printed) {
+    if (!t.num) continue;
+    await page.click('body');
+    await page.keyboard.press(t.num);
+    await page.waitForTimeout(180);
+    const got = await onTab();
+    if (got !== t.v) { mismatch = `${t.num} 를 눌렀더니 ${t.v} 가 아니라 ${got}`; break; }
+  }
+  ok(!mismatch, '탭에 적힌 번호를 누르면 그 탭이 열린다', mismatch);
+
+  await page.keyboard.press('0');
+  await page.waitForTimeout(180);
+  ok(await onTab() === 'home', '0 은 홈', await onTab());
+
+  // 입력 칸에서는 숫자가 탭을 옮기지 않아야 한다 — 금액을 치다가 화면이 튀면 못 쓴다
+  await tab('rec');
+  await page.fill('#rc-place', '');
+  await page.click('#rc-place');
+  await page.keyboard.type('3');
+  await page.waitForTimeout(200);
+  ok(await onTab() === 'rec', '입력 칸에 숫자를 쳐도 탭이 안 바뀐다', await onTab());
+  ok(await page.inputValue('#rc-place') === '3', '친 숫자는 칸에 그대로 들어간다',
+    await page.inputValue('#rc-place'));
+
+  // 계정 창이 떠 있을 때도 뒤 탭이 안 바뀌어야 한다
+  await page.click('#acct-b');
+  await page.waitForTimeout(200);
+  await page.keyboard.press('4');
+  await page.waitForTimeout(200);
+  ok(await onTab() === 'rec', '계정 창이 열려 있으면 숫자 키가 안 먹는다', await onTab());
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  // 마지막에 보던 탭에서 이어서 열린다
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+  ok(await onTab() === 'rec', '새로고침하면 마지막에 보던 탭이 열린다', await onTab());
+
+  // 없는 탭 이름이 저장돼 있어도 홈으로 떨어진다
+  await page.evaluate(() => DB.set('tab', '없는탭'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+  ok(await onTab() === 'home', '저장된 탭 이름이 이상하면 홈으로 연다', await onTab());
+}
+
 /* ─────────── 테마 ─────────── */
 group('테마');
 {

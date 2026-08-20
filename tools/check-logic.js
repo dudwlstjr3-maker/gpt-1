@@ -740,13 +740,43 @@ group('상금 사다리');
   ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
   ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
 
+  // 상금 사다리 키가 블라인드 사다리(ladder)와 겹치면 blindsAt 이 오작동한다
+  for (const t of TSTRUCT) {
+    if (t.prizeLadder) ok(!t.ladder || Array.isArray(t.ladder),
+      `${t.n}: 상금 사다리가 블라인드 사다리 자리를 침범하지 않는다`);
+  }
+
+  // 세는 기준 — 엔트리만 셀 수도 있다
+  ctx.__APP.TD.ladderFree = 0; ctx.__APP.TD.ladderEvery = 3; ctx.__APP.TD.ladderAmt = 10000;
+  ctx.__APP.TD.entries = 12; ctx.__APP.TD.rebuys = 6;
+  ctx.__APP.TD.ladderBasis = 'all';
+  ok(tdUnits() === 18, '합산 기준: 엔트리 12 + 리바이 6 = 18개', String(tdUnits()));
+  okNear(tdPool(), 60000, '3개당 1만원 · 18개 → 6만원');
+  ctx.__APP.TD.ladderBasis = 'entry';
+  ok(tdUnits() === 12, '엔트리만 기준: 12개', String(tdUnits()));
+  okNear(tdPool(), 40000, '3개당 1만원 · 12개 → 4만원');
+  ctx.__APP.TD.ladderBasis = 'all';
+  ctx.__APP.TD.ladderFree = LADDER_DEF.free;
+  ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
+  ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
+
+  // 데일리 프리셋 — 3개당 1만원, 면제 없음
+  const dy = TSTRUCT.find((t) => t.id === 'f9_daily');
+  ok(!!dy && !!dy.prizeLadder, '데일리에도 상금 사다리가 붙어 있다');
+  if (dy && dy.prizeLadder) {
+    ok(dy.prizeLadder.every === 3 && dy.prizeLadder.amt === 10000, '데일리는 3개당 1만원',
+      JSON.stringify(dy.prizeLadder));
+    ok(dy.prizeLadder.free === 0, '데일리는 면제 개수가 없다', String(dy.prizeLadder.free));
+    ok(/엔트리만/.test(dy.note), 'note 에 «엔트리만» 으로 바꾸는 법을 적어 뒀다');
+  }
+
   // 프리셋
   const lg = TSTRUCT.find((t) => t.id === 'f9_league');
   ok(!!lg, '몬스터 리그 프리셋이 있다');
   if (lg) {
     ok(/리그/.test(lg.n), '이름에 리그가 들어간다', lg.n);
-    ok(lg.ladder && lg.ladder.free === 8 && lg.ladder.every === 7 && lg.ladder.amt === 100000,
-      '프리셋에 사다리 값이 담겨 있다', JSON.stringify(lg.ladder));
+    ok(lg.prizeLadder && lg.prizeLadder.free === 8 && lg.prizeLadder.every === 7 && lg.prizeLadder.amt === 100000,
+      '프리셋에 상금 사다리 값이 담겨 있다', JSON.stringify(lg.prizeLadder));
     ok(lg.grp === 'pub', '국내 홀덤펍 묶음에 들어간다');
     ok(/확인:/.test(lg.note) && /추정/.test(lg.note), 'note 에 확인·추정 구분이 있다');
     ok(lg.buyin === 30000, '바이인은 몬스터와 같은 3만원', String(lg.buyin));

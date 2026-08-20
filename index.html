@@ -504,6 +504,8 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .ladset{display:flex;flex-wrap:wrap;gap:9px;align-items:center;font-size:13px}
 .ladset label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--tx2);font-weight:600}
 .ladset input{width:66px;padding:5px 7px;font-size:13px;text-align:right}
+.ladlab{font-size:13px;font-weight:600;color:var(--tx2)}
+.ladset .bg button{padding:5px 11px;font-size:12.5px}
 .ladnow{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin-top:10px;padding-top:9px;
   border-top:1px solid var(--line);font-size:13px}
 .ladnow .k{color:var(--tx2)}
@@ -3676,8 +3678,12 @@ const TSTRUCT = [
  {id:"f9_daily", grp:"pub", n:"파이널나인 데일리형", tag:"데일리 · 리바이", stack:2000000, bb:200,
   min:6, hph:12, seats:9, noAnte:true, buyin:10000, rebuyPrice:10000, rebuyStack:3000000,
   d:"매일 도는 기본 게임. 100/200에 200만 스택으로 시작하고, 레벨이 짧아 블라인드가 빠르게 따라붙습니다.",
-  note:"확인: 바이인 1만원 · 시작 스택 200만 · 리바이 1만원에 300만 (리바이가 시작보다 50% 많음) · 1레벨 100/200. "+
-       "레벨 시간과 블라인드 사다리는 아직 확인 못 해 통상값으로 넣었으니 매장 표로 덮어쓰세요."},
+  prizeLadder:{free:0, every:3, amt:10000, basis:"all"},
+  note:"확인: 바이인 1만원 · 시작 스택 200만 · 리바이 1만원에 300만 (리바이가 시작보다 50% 많음) · 1레벨 100/200 · "+
+       "상금은 3개당 1만원. "+
+       "«3개»를 엔트리만 세는지 리바이까지 세는지는 확인 못 해 몬스터와 같게 «엔트리+리바이»로 뒀습니다 — "+
+       "엔트리만 센다면 상금 사다리에서 «엔트리만»으로 바꾸세요. "+
+       "레벨 시간과 블라인드 사다리는 아직 확인 못 해 통상값입니다."},
  {id:"f9_monster", grp:"pub", n:"파이널나인 몬스터형", tag:"몬스터 · 딥스택", stack:5000000, bb:200,
   pattern6:[[100,200],[150,300],[200,400],[250,500],[300,600],[400,800]], patternScale:5,
   min:8, hph:16, seats:9, buyin:30000, rebuyPrice:30000, rebuyStack:7500000,
@@ -3689,7 +3695,7 @@ const TSTRUCT = [
  {id:"f9_league", grp:"pub", n:"파이널나인 몬스터 리그형", tag:"리그 · 사다리 상금", stack:5000000, bb:200,
   pattern6:[[100,200],[150,300],[200,400],[250,500],[300,600],[400,800]], patternScale:5,
   min:8, hph:16, seats:9, buyin:30000, rebuyPrice:30000, rebuyStack:7500000,
-  ladder:{free:8, every:7, amt:100000},
+  prizeLadder:{free:8, every:7, amt:100000, basis:"all"},
   d:"몬스터와 같은 구조인데 상금을 모인 돈 비율이 아니라 «개수 사다리»로 정합니다. 엔트리와 리바이를 합쳐 7개마다 10만원씩 올라갑니다.",
   note:"확인: 상금은 엔트리+리바이 합계 7개당 10만원, 8개 이하이면 0원 (매장 규칙). "+
        "구조(스택·블라인드·레벨 시간)는 몬스터형과 같은 추정값입니다."},
@@ -3744,6 +3750,7 @@ function tdSetupPack(D){
     rebuyPrice:D.rebuyPrice, rebuyStack:D.rebuyStack,
     payCurve:D.payCurve, payMode:D.payMode, poolPct:D.poolPct, payShow:D.payShow,
     ladderOn:D.ladderOn, ladderFree:D.ladderFree, ladderEvery:D.ladderEvery, ladderAmt:D.ladderAmt,
+    ladderBasis:D.ladderBasis,
     levels:JSON.parse(JSON.stringify(D.levels||[]))
   };
 }
@@ -3753,7 +3760,7 @@ function tdRestoreSetup(D){
   if(!S) return false;
   ["_tpl","_count","_brkEvery","_brkMin","name","venue","buyin","startStack",
    "rebuyPrice","rebuyStack","payCurve","payMode","poolPct","payShow",
-   "ladderOn","ladderFree","ladderEvery","ladderAmt"].forEach(k=>{
+   "ladderOn","ladderFree","ladderEvery","ladderAmt","ladderBasis"].forEach(k=>{
     if(S[k] !== undefined) D[k] = S[k];
   });
   if(Array.isArray(S.levels)) D.levels = JSON.parse(JSON.stringify(S.levels));
@@ -3766,7 +3773,8 @@ function tdSaveCustom(name){
                rebuyPrice:TD.rebuyPrice, rebuyStack:TD.rebuyStack,
                payN:TD.payN, pay:TD.pay.slice(), payCurve:TD.payCurve, payMode:TD.payMode,
                poolPct:TD.poolPct, payShow:TD.payShow,
-               ladderOn:TD.ladderOn, ladderFree:TD.ladderFree, ladderEvery:TD.ladderEvery, ladderAmt:TD.ladderAmt,
+               ladderOn:TD.ladderOn, ladderFree:TD.ladderFree, ladderEvery:TD.ladderEvery,
+               ladderAmt:TD.ladderAmt, ladderBasis:TD.ladderBasis,
                levels:JSON.parse(JSON.stringify(TD.levels))});
   DB.set("tdcustom", arr.slice(0,20));
 }
@@ -3805,7 +3813,7 @@ function tdProfileApply(P){
   TD = tdNew();
   ["_tpl","_count","_brkEvery","_brkMin","name","venue","buyin","startStack",
    "rebuyPrice","rebuyStack","payCurve","payMode","poolPct","payShow","payN",
-   "ladderOn","ladderFree","ladderEvery","ladderAmt"].forEach(k=>{
+   "ladderOn","ladderFree","ladderEvery","ladderAmt","ladderBasis"].forEach(k=>{
     if(P[k] !== undefined) TD[k] = P[k];
   });
   TD.levels = Array.isArray(P.levels) ? JSON.parse(JSON.stringify(P.levels)) : [];
@@ -3883,7 +3891,8 @@ function tdNew(){
           levels:[], lvl:0, remain:0, endsAt:null, running:false, paused:false,
           payN:0, pay:[], payManual:false, payCurve:1, payMode:"curve",
           poolPct:100, showCount:false, payShow:5,
-          ladderOn:false, ladderFree:LADDER_DEF.free, ladderEvery:LADDER_DEF.every, ladderAmt:LADDER_DEF.amt,
+          ladderOn:false, ladderFree:LADDER_DEF.free, ladderEvery:LADDER_DEF.every,
+          ladderAmt:LADDER_DEF.amt, ladderBasis:LADDER_DEF.basis,
           at:Date.now()};
 }
 /* ---- 금액·칩 표기: 만 단위로 통일 ---- */
@@ -3999,18 +4008,27 @@ const tdPool  = () => {
    면제 개수 이하이면 0원 — 판이 안 서면 사다리를 적용하지 않는다는 뜻이다.
    이 방식을 켜면 바이인·리바이로 거둔 돈은 상금 계산에 들어가지 않고,
    매장이 사다리대로 정한 금액만 상금이 된다.                                */
-const LADDER_DEF = {free:8, every:7, amt:100000};
+const LADDER_DEF = {free:8, every:7, amt:100000, basis:"all"};
+const LADDER_BASIS = [
+  {id:"all",   n:"엔트리+리바이", d:"들어온 개수를 전부 셉니다."},
+  {id:"entry", n:"엔트리만",      d:"리바이는 세지 않고 참가 인원만 셉니다."}
+];
 function tdLadder(){
   const g = (k, d) => (TD && TD[k] !== undefined && TD[k] !== null) ? +TD[k] : d;
+  const bs = (TD && TD.ladderBasis === "entry") ? "entry" : "all";
   return {
     on:    !!(TD && TD.ladderOn),
     free:  Math.max(0, g("ladderFree",  LADDER_DEF.free)),
     every: Math.max(1, g("ladderEvery", LADDER_DEF.every)),
-    amt:   Math.max(0, g("ladderAmt",   LADDER_DEF.amt))
+    amt:   Math.max(0, g("ladderAmt",   LADDER_DEF.amt)),
+    basis: bs
   };
 }
-/* 엔트리 + 리바이 합계 — 사다리는 이 개수로 센다 */
-const tdUnits = () => TD ? (TD.entries||0) + (TD.rebuys||0) : 0;
+/* 사다리가 세는 개수. 매장마다 리바이를 세기도 하고 안 세기도 한다. */
+const tdUnits = () => {
+  if(!TD) return 0;
+  return tdLadder().basis === "entry" ? (TD.entries||0) : (TD.entries||0) + (TD.rebuys||0);
+};
 function tdLadderPrize(units){
   const L = tdLadder();
   if(units <= L.free) return 0;
@@ -4035,16 +4053,25 @@ function tdLadderCard(pool){
   const nextUp = bands.filter(b=>b.from > units)[0];
   return '<div class="ladbox">'+
     '<div class="ladset">'+
-      '<label>엔트리+리바이 <input id="td-lad-free" type="number" min="0" step="1" value="'+L.free+'"> 개까지는 0원</label>'+
+      '<span class="ladlab">무엇을 세나</span>'+
+      '<div class="bg" id="td-lad-basis" style="display:flex">'+
+        LADDER_BASIS.map(x=>'<button data-b="'+x.id+'" class="'+(L.basis===x.id?"on":"")+'">'+esc(x.n)+'</button>').join("")+
+      '</div>'+
+    '</div>'+
+    '<div class="ladset" style="margin-top:8px">'+
+      '<label><input id="td-lad-free" type="number" min="0" step="1" value="'+L.free+'"> 개까지는 0원</label>'+
       '<label><input id="td-lad-every" type="number" min="1" step="1" value="'+L.every+'"> 개마다</label>'+
       '<label><input id="td-lad-amt" type="number" min="0" step="1" value="'+(L.amt/10000)+'"> 만원</label>'+
     '</div>'+
     '<div class="ladnow">'+
-      '<span class="k">지금 엔트리 '+(TD.entries||0)+' + 리바이 '+(TD.rebuys||0)+' = <b>'+units+'개</b></span>'+
+      '<span class="k">지금 '+(L.basis==="entry"
+          ? '엔트리 '+(TD.entries||0)
+          : '엔트리 '+(TD.entries||0)+' + 리바이 '+(TD.rebuys||0))+
+        ' = <b>'+units+'개</b></span>'+
       '<span class="v">상금 <b>'+manwon(pool)+'</b></span>'+
       (nextUp ? '<span class="nx">'+(nextUp.from - units)+'개 더 들어오면 '+manwon(nextUp.amt)+'</span>' : '')+
     '</div>'+
-    '<div class="scrollx"><table class="ladtbl"><tr><th>엔트리+리바이</th><th>상금</th></tr>'+
+    '<div class="scrollx"><table class="ladtbl"><tr><th>'+esc(LADDER_BASIS.filter(x=>x.id===L.basis)[0].n)+'</th><th>상금</th></tr>'+
       bands.map(b=>{
         const here = units >= b.from && units <= b.to;
         return '<tr'+(here?' class="on"':'')+'><td>'+b.from+(b.from===b.to?'':'~'+b.to+(b.last?'+':''))+'개'+
@@ -4054,7 +4081,8 @@ function tdLadderCard(pool){
     '</table></div>'+
     '<div class="notice">이 방식을 켜면 <b>바이인·리바이로 거둔 돈은 상금 계산에 안 들어갑니다.</b> '+
       '매장이 사다리대로 정한 금액만 상금이 됩니다(지금 모인 돈은 '+manwon(tdGross())+'). '+
-      '개수가 '+L.free+'개 이하이면 사다리를 적용하지 않아 0원입니다.</div>'+
+      (L.free>0 ? '개수가 '+L.free+'개 이하이면 사다리를 적용하지 않아 0원입니다. ' : '')+
+      esc(LADDER_BASIS.filter(x=>x.id===L.basis)[0].d)+'</div>'+
   '</div>';
 }
 
@@ -4606,8 +4634,10 @@ function renderTDSetup(v){
     D.rebuyStack = (t.rebuyStack !== undefined) ? t.rebuyStack : t.stack;
     D.entries = 9; D.players = 9; D.rebuys = 0;
     /* 사다리 상금을 쓰는 구조면 그 값까지 같이 채운다 */
-    D.ladderOn = !!t.ladder;
-    if(t.ladder){ D.ladderFree = t.ladder.free; D.ladderEvery = t.ladder.every; D.ladderAmt = t.ladder.amt; }
+    /* t.ladder 는 «블라인드» 사다리라 이름이 겹치면 안 된다 — 상금 쪽은 prizeLadder */
+    D.ladderOn = !!t.prizeLadder;
+    if(t.prizeLadder){ D.ladderFree = t.prizeLadder.free; D.ladderEvery = t.prizeLadder.every;
+                       D.ladderAmt = t.prizeLadder.amt; D.ladderBasis = t.prizeLadder.basis || "all"; }
     D.levels = buildLevels(t, D._count, D._brkEvery, D._brkMin);
     D.lvl = 0; D.remain = (D.levels[0].min||1)*60000; D.running = false; D.paused = false; D.endsAt = null;
   };
@@ -5040,6 +5070,8 @@ function renderTDClock(v){
   ladBind("td-lad-free",  "ladderFree",  0);
   ladBind("td-lad-every", "ladderEvery", 1);
   ladBind("td-lad-amt",   "ladderAmt",   0, 10000);
+  v.querySelectorAll("#td-lad-basis button").forEach(b=>b.onclick=()=>{
+    TD.ladderBasis = b.dataset.b; tdSave(); renderTour(); });
   document.getElementById("td-payn").onchange = (e)=>{
     TD.payManual = true; TD.payN = Math.max(1, +e.target.value||1);
     TD.pay = tdPayForMode(); tdSave(); renderTour(); };

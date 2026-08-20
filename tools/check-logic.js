@@ -679,6 +679,81 @@ group('권장 스타일');
   DB.set('hstyle', 'tight');
 }
 
+/* ───────────────── 상금 사다리 (몬스터 리그) ───────────────── */
+group('상금 사다리');
+{
+  const { tdNew, tdLadderPrize, tdLadderBands, tdUnits, tdPool, tdGross, tdLadder, TSTRUCT, LADDER_DEF } = app;
+  ok(LADDER_DEF.free === 8 && LADDER_DEF.every === 7 && LADDER_DEF.amt === 100000,
+    '기본값 — 8개까지 0원, 7개마다 10만원',
+    JSON.stringify(LADDER_DEF));
+
+  ctx.__APP.TD = Object.assign(tdNew(), { ladderOn: true, entries: 9, rebuys: 0 });
+
+  // 엔트리 + 리바이 «합계» 로 센다
+  ok(tdUnits() === 9, '엔트리 9 + 리바이 0 = 9개', String(tdUnits()));
+  ctx.__APP.TD.rebuys = 12;
+  ok(tdUnits() === 21, '엔트리 9 + 리바이 12 = 21개', String(tdUnits()));
+
+  // 사다리 값
+  const cases = [[0, 0], [1, 0], [7, 0], [8, 0], [9, 1], [13, 1], [14, 2], [20, 2], [21, 3], [27, 3], [28, 4], [70, 10]];
+  for (const [u, mul] of cases)
+    okNear(tdLadderPrize(u), mul * 100000, `${u}개 → ${mul * 10}만원`);
+
+  // 8개 이하는 사다리를 아예 적용하지 않는다
+  ok(tdLadderPrize(8) === 0 && tdLadderPrize(9) === 100000,
+    '8개까지 0원, 9개부터 10만원');
+
+  // 사다리를 켜면 모인 돈 비율은 안 본다
+  ctx.__APP.TD.entries = 9; ctx.__APP.TD.rebuys = 12;   // 21개
+  const gross = tdGross();
+  ok(gross > 0, `모인 돈이 있다 (${gross}원)`);
+  okNear(tdPool(), 300000, '사다리 켜짐: 21개 → 상금 30만원 (모인 돈과 무관)');
+  ctx.__APP.TD.poolPct = 50;
+  okNear(tdPool(), 300000, '사다리 켜짐: 비율을 바꿔도 상금은 그대로');
+  ctx.__APP.TD.ladderOn = false;
+  okNear(tdPool(), Math.floor(gross * 0.5 / 1000) * 1000, '사다리 끄면 다시 비율로 계산한다');
+  ctx.__APP.TD.ladderOn = true; ctx.__APP.TD.poolPct = 100;
+
+  // 구간표
+  const bands = tdLadderBands(30);
+  ok(bands[0].from === 0 && bands[0].to === 8 && bands[0].amt === 0, '첫 구간은 0~8개 0원',
+    JSON.stringify(bands[0]));
+  ok(bands[1].from === 9 && bands[1].to === 13 && bands[1].amt === 100000, '다음 구간은 9~13개 10만원',
+    JSON.stringify(bands[1]));
+  let mono = true;
+  for (let i = 1; i < bands.length; i++) {
+    if (bands[i].amt < bands[i - 1].amt) mono = false;
+    if (bands[i].from !== bands[i - 1].to + 1) mono = false;   // 빈틈 없이 이어져야 한다
+  }
+  ok(mono, '구간이 빈틈 없이 이어지고 금액이 줄지 않는다',
+    bands.map((b) => `${b.from}~${b.to}:${b.amt / 10000}만`).join(' '));
+  ok(bands[bands.length - 1].last === true, '마지막 구간에 표시가 있다');
+
+  // 숫자를 바꾸면 따라간다
+  ctx.__APP.TD.ladderFree = 0; ctx.__APP.TD.ladderEvery = 10; ctx.__APP.TD.ladderAmt = 50000;
+  okNear(tdLadderPrize(10), 50000, '설정을 바꾸면 사다리도 바뀐다 (10개마다 5만원)');
+  okNear(tdLadderPrize(25), 100000, '25개 → 2묶음 → 10만원');
+  ok(tdLadder().every >= 1, '묶음 크기는 1 미만이 될 수 없다');
+  ctx.__APP.TD.ladderEvery = 0;
+  ok(tdLadder().every === 1, '0 을 넣어도 1 로 막는다');
+  ctx.__APP.TD.ladderFree = LADDER_DEF.free;
+  ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
+  ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
+
+  // 프리셋
+  const lg = TSTRUCT.find((t) => t.id === 'f9_league');
+  ok(!!lg, '몬스터 리그 프리셋이 있다');
+  if (lg) {
+    ok(/리그/.test(lg.n), '이름에 리그가 들어간다', lg.n);
+    ok(lg.ladder && lg.ladder.free === 8 && lg.ladder.every === 7 && lg.ladder.amt === 100000,
+      '프리셋에 사다리 값이 담겨 있다', JSON.stringify(lg.ladder));
+    ok(lg.grp === 'pub', '국내 홀덤펍 묶음에 들어간다');
+    ok(/확인:/.test(lg.note) && /추정/.test(lg.note), 'note 에 확인·추정 구분이 있다');
+    ok(lg.buyin === 30000, '바이인은 몬스터와 같은 3만원', String(lg.buyin));
+  }
+  ctx.__APP.TD = null;
+}
+
 /* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
 group('대회 프로필');
 {

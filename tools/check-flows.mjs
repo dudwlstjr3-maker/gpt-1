@@ -101,6 +101,74 @@ group('대회 프로필');
   ok((await txt('.tdsched')).includes('아직 저장한 대회가 없습니다'), '삭제하면 빈 상태로 돌아간다');
 }
 
+/* ─────────── 몬스터 리그 상금 사다리 ─────────── */
+group('상금 사다리');
+{
+  await tab('tour');
+  // 리그 프리셋을 누르면 사다리가 켜진다
+  const lg = page.locator('.tplb').filter({ hasText: '몬스터 리그' });
+  ok(await lg.count() === 1, '몬스터 리그 버튼이 있다');
+  await lg.click();
+  await page.waitForTimeout(350);
+  ok((await page.inputValue('#td-buyin')) === '3', '리그 프리셋이 바이인 3만원을 채운다',
+    await page.inputValue('#td-buyin'));
+
+  await page.click('#td-quick');
+  await page.waitForTimeout(600);
+  ok(await page.locator('.ladbox').count() === 1, '상금 사다리 카드가 뜬다');
+  const on = await page.locator('#td-poolmode button.on').innerText();
+  ok(/사다리/.test(on), '상금 방식이 사다리로 켜져 있다', on);
+
+  // 9명 시작 → 9개 → 10만원
+  let lad = await txt('.ladbox');
+  ok(/9개/.test(lad), '엔트리+리바이 합계가 표시된다', lad.replace(/\n/g, ' | ').slice(0, 140));
+  ok(/10만원/.test(lad), '9개면 상금 10만원', lad.replace(/\n/g, ' | ').slice(0, 200));
+
+  // 구간표
+  ok(await page.locator('.ladtbl tr.on').count() === 1, '지금 구간이 표에서 강조된다');
+  const band = await txt('.ladtbl tr.on');
+  ok(/9~13/.test(band), '지금 구간은 9~13개', band.replace(/\n/g, ' '));
+
+  // 리바이를 늘리면 사다리가 올라간다
+  for (let i = 0; i < 5; i++) { await page.click('.tdcounts [data-act="r+"]'); await page.waitForTimeout(120); }
+  await page.waitForTimeout(300);
+  lad = await txt('.ladbox');
+  ok(/14개/.test(lad), '리바이 5개를 더하면 14개', lad.replace(/\n/g, ' | ').slice(0, 140));
+  ok(/20만원/.test(lad), '14개면 상금 20만원', lad.replace(/\n/g, ' | ').slice(0, 200));
+
+  // 운영 카드 상금도 따라간다 (전광판 총 상금은 레지 마감 전까지 가려져 있다)
+  const ops = await txt('.tdcounts');
+  ok(/20만원/.test(ops), '운영 카드 상금이 사다리를 따른다', ops.replace(/\n/g, ' | '));
+  ok(/사다리 14개/.test(ops), '상금 라벨이 비율이 아니라 사다리라고 알려준다', ops.replace(/\n/g, ' | '));
+  ok(/레지 마감 후 공개|PRIZE/.test(await txt('#td-screen')), '전광판은 레지 마감 전까지 상금을 가린다');
+
+  // 설정을 바꾸면 반영된다
+  await page.fill('#td-lad-amt', '5'); await page.dispatchEvent('#td-lad-amt', 'change');
+  await page.waitForTimeout(320);
+  ok(/10만원/.test(await txt('.ladbox')), '한 묶음을 5만원으로 바꾸면 14개는 10만원',
+    (await txt('.ladbox')).replace(/\n/g, ' | ').slice(0, 200));
+  await page.fill('#td-lad-amt', '10'); await page.dispatchEvent('#td-lad-amt', 'change');
+  await page.waitForTimeout(300);
+
+  // 비율 방식으로 되돌릴 수 있다
+  await page.locator('#td-poolmode button').filter({ hasText: '모인 돈' }).click();
+  await page.waitForTimeout(350);
+  ok(await page.locator('.ladbox').count() === 0, '비율 방식으로 바꾸면 사다리 카드가 사라진다');
+  ok(await page.locator('#td-poolpct').count() === 1, '비율 입력이 돌아온다');
+  await page.locator('#td-poolmode button').filter({ hasText: '사다리' }).click();
+  await page.waitForTimeout(300);
+
+  // 새로고침해도 유지
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+  ok(await page.locator('.ladbox').count() === 1, '새로고침해도 사다리 설정이 남는다');
+
+  // 다음 검사를 위해 설정 화면으로 되돌린다
+  await page.evaluate(() => localStorage.removeItem('hb.td'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+}
+
 /* ─────────── 전광판 테마 · 광고 슬라이드 ─────────── */
 group('전광판 꾸미기');
 {

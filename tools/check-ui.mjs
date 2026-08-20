@@ -98,10 +98,36 @@ async function scanOverflow(page, where, vw) {
   for (const e of res.els) add(where, `요소가 화면 밖: <${e.tag}${e.id ? '#' + e.id : ''}${e.cls ? '.' + e.cls.split(' ')[0] : ''}> left=${e.left} right=${e.right} (뷰포트 ${vw})`);
 }
 
-async function scanContrast(page, where) {
+/* 자기 상자보다 내용이 넓은 요소 — 화면 밖으로 안 나가도 그 자리에서 잘리거나 옆을 침범한다.
+   가운데 정렬이면 왼쪽으로도 넘쳐서 화면 기준 검사에는 안 걸린다. */
+async function scanClipped(page, where, root) {
+  checks++;
+  const hits = await page.evaluate((root) => {
+    const scope = root ? document.querySelector(root) : document.body;
+    if (!scope) return [];
+    const out = [];
+    for (const el of scope.querySelectorAll('*')) {
+      if (!el.offsetParent) continue;
+      const cs = getComputedStyle(el);
+      if (/auto|scroll|hidden/.test(cs.overflowX)) continue;   // 스스로 감당하는 컨테이너는 제외
+      const over = el.scrollWidth - el.clientWidth;
+      if (over <= 1 || el.clientWidth === 0) continue;
+      const txt = (el.textContent || '').trim().slice(0, 40);
+      if (!txt) continue;
+      out.push({ tag: el.tagName.toLowerCase(), cls: (el.className || '').toString().slice(0, 30),
+        id: el.id || '', over, w: el.clientWidth, txt });
+    }
+    return out.slice(0, 8);
+  }, root);
+  for (const h of hits)
+    add(where, `내용이 상자보다 ${h.over}px 넓어 잘립니다: <${h.tag}${h.id ? '#' + h.id : ''}` +
+      `${h.cls ? '.' + h.cls.split(' ')[0] : ''}> 상자 ${h.w}px · "${h.txt}"`);
+}
+
+async function scanContrast(page, where, root) {
   checks++;
   // 작은 글씨의 대비비가 4.5:1 미만이면 가독성 문제로 본다 (WCAG AA)
-  const low = await page.evaluate(() => {
+  const low = await page.evaluate((root) => {
     const lum = (c) => {
       const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -133,7 +159,9 @@ async function scanContrast(page, where) {
     };
     const out = [];
     const seen = new Set();
-    for (const el of document.querySelectorAll('body *')) {
+    const scope = root ? document.querySelector(root) : document.body;
+    if (!scope) return [];
+    for (const el of scope.querySelectorAll('*')) {
       if (!el.offsetParent) continue;
       const txt = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue.trim()).join('');
       if (!txt) continue;
@@ -153,7 +181,7 @@ async function scanContrast(page, where) {
       }
     }
     return out.slice(0, 12);
-  });
+  }, root);
   for (const l of low) add(where, `대비 ${l.ratio}:1 < ${l.need}:1 · ${l.size}px ${l.color} · "${l.txt}" (.${l.cls.split(' ')[0]})`);
 }
 
@@ -190,6 +218,7 @@ for (const vp of WIDTHS) {
 
     await scanText(page, where);
     await scanOverflow(page, where, vp.w);
+    await scanClipped(page, where);
 
     // 레이아웃은 테마와 무관하니 대비만 라이트·다크 양쪽으로 본다
     if (vp.w === 1440) {
@@ -209,6 +238,86 @@ for (const vp of WIDTHS) {
   await page.close();
 }
 
+/* ── 전광판: 테마 6종 × (진행 중 · 휴식 중) ──
+   TV 에 걸리는 화면이라 멀리서 읽힌다. 어느 테마에서도 대비가 무너지면 안 된다.
+   전광판은 앱 테마와 무관하게 자기 색을 쓰므로 따로 돌린다. */
+const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
+{
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 160)));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)); });
+  await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
+
+  // 광고 슬라이드를 켜 둔 상태로 검사한다 (아래띠도 전광판의 일부다)
+  await page.evaluate(() => {
+    localStorage.setItem('hb.tdslides', JSON.stringify([
+      { id: 's1', title: '다음 대회 — 금요일 몬스터', body: '매주 금요일 19:30 · 바이인 3만원 · 500만 스택' },
+      { id: 's2', title: '매장 공지', body: '주차는 건물 뒤편 공영주차장을 이용해 주세요' },
+    ]));
+    localStorage.setItem('hb.adcfg', JSON.stringify({ on: true, sec: 60, bigOnBreak: true }));
+  });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.click('nav button[data-v="tour"]');
+  await page.waitForTimeout(300);
+  await page.click('#td-quick');                       // 대회를 열어 전광판을 띄운다
+  await page.waitForTimeout(500);
+
+  checks++;
+  if (await page.locator('#td-screen').count() === 0) {
+    add('전광판', '대회를 시작했는데 전광판이 렌더되지 않습니다');
+  } else {
+    checks++;
+    if (await page.locator('#td-ad .adslide').count() === 0) add('전광판', '광고 띠가 렌더되지 않습니다');
+
+    for (const bt of BTHEMES) {
+      await page.evaluate((t) => {
+        localStorage.setItem('hb.btheme', JSON.stringify(t));
+        document.getElementById('td-screen').setAttribute('data-btheme', t);
+      }, bt);
+      await page.waitForTimeout(250);
+
+      await scanContrast(page, `전광판 · ${bt}`, '#td-screen');
+      await scanText(page, `전광판 · ${bt}`);
+      await scanClipped(page, `전광판 · ${bt}`, '#td-screen');
+
+      // 전광판이 가로로 넘치면 TV 에서 잘린다
+      checks++;
+      const spill = await page.evaluate(() => {
+        const el = document.getElementById('td-screen');
+        return el ? el.scrollWidth - el.clientWidth : 0;
+      });
+      if (spill > 1) add(`전광판 · ${bt}`, `전광판이 가로로 ${spill}px 넘칩니다`);
+
+      if (SHOTS) await page.locator('#td-screen').screenshot({ path: path.join(SHOT_DIR, `board-${bt}.png`) });
+    }
+
+    // 휴식 중 화면 — 광고가 크게 뜨고 레이아웃이 바뀐다
+    await page.evaluate(() => {
+      const td = JSON.parse(localStorage.getItem('hb.td'));
+      const i = td.levels.findIndex((l) => l.brk);
+      if (i >= 0) { td.lvl = i; td.remain = (td.levels[i].min || 1) * 60000; localStorage.setItem('hb.td', JSON.stringify(td)); }
+      return i;
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.click('nav button[data-v="tour"]');
+    await page.waitForTimeout(450);
+    checks++;
+    if (await page.locator('#td-screen .lvrow.brkc').count() === 0) {
+      add('전광판 · 휴식', '휴식 레벨인데 휴식 표시가 없습니다');
+    }
+    checks++;
+    if (await page.locator('#td-ad.big').count() === 0) add('전광판 · 휴식', '휴식 중 광고가 크게 뜨지 않습니다');
+    await scanContrast(page, '전광판 · 휴식', '#td-screen');
+    await scanText(page, '전광판 · 휴식');
+    await scanClipped(page, '전광판 · 휴식', '#td-screen');
+    if (SHOTS) await page.locator('#td-screen').screenshot({ path: path.join(SHOT_DIR, 'board-break.png') });
+  }
+
+  if (errs.length) [...new Set(errs)].forEach((e) => add('전광판', '콘솔 ' + e));
+  await page.close();
+}
+
 await browser.close();
 server.close();
 
@@ -219,4 +328,5 @@ if (problems.length) {
   console.log('');
   process.exit(1);
 }
-console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 (${TABS.length}탭 × ${WIDTHS.length}폭)\n`);
+console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식)\n`);

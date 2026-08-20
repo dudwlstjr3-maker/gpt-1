@@ -101,6 +101,62 @@ group('대회 프로필');
   ok((await txt('.tdsched')).includes('아직 저장한 대회가 없습니다'), '삭제하면 빈 상태로 돌아간다');
 }
 
+/* ─────────── 전광판 테마 · 광고 슬라이드 ─────────── */
+group('전광판 꾸미기');
+{
+  await tab('tour');
+  ok(await page.locator('.tdboard').count() === 1, '전광판 꾸미기 카드가 있다');
+  ok(await page.locator('.thcard').count() === 6, '테마 6종이 나온다', `${await page.locator('.thcard').count()}종`);
+  ok((await txt('.tdboard')).includes('아직 슬라이드가 없습니다'), '처음엔 슬라이드가 없다');
+
+  // 슬라이드 두 장 추가하고 문구를 넣는다
+  await page.click('#td-ad-add'); await page.waitForTimeout(280);
+  await page.click('#td-ad-add'); await page.waitForTimeout(280);
+  ok(await page.locator('.adrow').count() === 2, '슬라이드 2장이 생긴다');
+  await page.locator('.adrow').nth(0).locator('.adtitle').fill('다음 대회 — 금요일 몬스터');
+  await page.locator('.adrow').nth(0).locator('.adbody').fill('매주 금요일 19:30');
+  await page.locator('.adrow').nth(1).locator('.adtitle').fill('매장 공지');
+  await page.waitForTimeout(250);
+
+  // 대회를 열어 전광판에 실제로 뜨는지
+  await page.click('#td-quick');
+  await page.waitForTimeout(600);
+  ok(await page.locator('#td-screen').count() === 1, '대회를 시작하면 전광판이 뜬다');
+  ok(await page.locator('#td-ad .adslide').count() >= 1, '전광판에 광고 띠가 뜬다');
+  const ad = await txt('#td-ad');
+  ok(ad.includes('금요일 몬스터'), '첫 슬라이드 내용이 나온다', ad.replace(/\n/g, ' | '));
+
+  // 전광판에는 운영 정보가 나가면 안 된다
+  const board = await txt('#td-screen');
+  ok(!/매출|하우스|모인 돈|바이인 합계/.test(board), '전광판에 매출·하우스 몫이 나가지 않는다');
+
+  // 테마 전환
+  const before = await page.getAttribute('#td-screen', 'data-btheme');
+  await page.click('.thcard[data-bt="bright"]');
+  await page.waitForTimeout(250);
+  ok(await page.getAttribute('#td-screen', 'data-btheme') === 'bright', `테마를 누르면 전광판만 바뀐다 (${before} → bright)`);
+  ok(await page.getAttribute('html', 'data-theme') === 'dark', '전광판 테마는 앱 테마를 건드리지 않는다');
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+  ok(await page.getAttribute('#td-screen', 'data-btheme') === 'bright', '새로고침해도 전광판 테마가 유지된다');
+
+  // 광고 끄기
+  await page.click('#td-ad-on button[data-on="0"]');
+  await page.waitForTimeout(350);
+  ok(await page.locator('#td-ad').count() === 0, '끄면 광고 띠가 사라진다');
+  await page.click('#td-ad-on button[data-on="1"]');
+  await page.waitForTimeout(350);
+  ok(await page.locator('#td-ad').count() === 1, '다시 켜면 나타난다');
+
+  // 순서 바꾸기 · 삭제
+  await page.locator('.adrow').nth(1).locator('[data-act="up"]').click();
+  await page.waitForTimeout(300);
+  ok((await page.locator('.adrow').nth(0).locator('.adtitle').inputValue()) === '매장 공지', '↑ 로 순서가 바뀐다');
+  await page.locator('.adrow').nth(0).locator('[data-act="del"]').click();
+  await page.waitForTimeout(300);
+  ok(await page.locator('.adrow').count() === 1, '삭제하면 한 장이 남는다');
+}
+
 /* ─────────── 핸드 분석 ─────────── */
 group('핸드 분석');
 {

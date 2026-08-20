@@ -74,15 +74,53 @@
   --ring:0 0 0 3px rgba(18,168,124,.26);
 }
 
-/* ── 전광판 색 (테마와 무관 · 아래 .tdwrap[data-btheme] 로 갈아끼운다) ── */
+/* ── 전광판 색 (앱 테마와 무관 · .tdwrap[data-btheme] 로 갈아끼운다) ── */
 :root{
   --b-bg:#07090d; --b-panel:#0e1218; --b-panel2:#0a0d12; --b-line:#1b2230;
-  --b-tx:#ffffff; --b-tx2:#c3d1e0; --b-tx3:#8b9cb0; --b-tx4:#6a7b8f;
+  --b-tx:#ffffff; --b-tx2:#c3d1e0; --b-tx3:#8b9cb0; --b-tx4:#7b8ca1;
   --b-ac:#4fd1a5; --b-ac2:#8cc4f2; --b-warn:#ffc061; --b-warn-bg:#2a2113;
   --b-prize-bd:#23405c;
   /* 멀리서 읽는 숫자 — 폭이 고정된 글꼴 우선 */
   --font-num:'Pretendard Variable',Pretendard,system-ui,'Segoe UI',Arial,sans-serif;
 }
+
+/* ── 전광판 테마 프리셋 ──
+   TV 에 걸리는 화면이라 매장 분위기·조명에 따라 고를 수 있게 한다.
+   글자색은 어느 테마에서도 바탕 대비 7:1 이상이 되게 잡았다(멀리서 읽는 화면). */
+.tdwrap[data-btheme="black"]{                       /* 순검정 — OLED·고대비 */
+  --b-bg:#000000; --b-panel:#0b0b0b; --b-panel2:#070707; --b-line:#232323;
+  --b-tx:#ffffff; --b-tx2:#d4d4d4; --b-tx3:#9a9a9a; --b-tx4:#8a8a8a;
+  --b-ac:#4fd1a5; --b-ac2:#8cc4f2; --b-warn:#ffc061; --b-warn-bg:#2a2113;
+  --b-prize-bd:#333333;
+}
+.tdwrap[data-btheme="felt"]{                        /* 딥 그린 — 테이블 펠트 */
+  --b-bg:#06120e; --b-panel:#0c1f18; --b-panel2:#081712; --b-line:#1d3a30;
+  --b-tx:#ffffff; --b-tx2:#c6ddd4; --b-tx3:#8faea3; --b-tx4:#7fa094;
+  --b-ac:#6fe0b6; --b-ac2:#8fd0f0; --b-warn:#ffc978; --b-warn-bg:#2a2415;
+  --b-prize-bd:#2b5546;
+}
+.tdwrap[data-btheme="wine"]{                        /* 버건디 — 하이롤러 */
+  --b-bg:#0d0709; --b-panel:#1a0d11; --b-panel2:#12080b; --b-line:#3a1c24;
+  --b-tx:#ffffff; --b-tx2:#e3cbd2; --b-tx3:#b596a0; --b-tx4:#a88a97;
+  --b-ac:#e8b978; --b-ac2:#e79aae; --b-warn:#ffc061; --b-warn-bg:#2e1c14;
+  --b-prize-bd:#5c2b38;
+}
+.tdwrap[data-btheme="steel"]{                       /* 차가운 블루그레이 */
+  --b-bg:#080c12; --b-panel:#101822; --b-panel2:#0b1219; --b-line:#22303f;
+  --b-tx:#ffffff; --b-tx2:#c8d6e6; --b-tx3:#93a5b9; --b-tx4:#8497ac;
+  --b-ac:#63d3ff; --b-ac2:#9bb8ff; --b-warn:#ffc061; --b-warn-bg:#2a2113;
+  --b-prize-bd:#2b4a68;
+}
+.tdwrap[data-btheme="bright"]{                      /* 밝은 홀 — 조명이 센 매장 */
+  --b-bg:#f2f4f8; --b-panel:#ffffff; --b-panel2:#eef2f7; --b-line:#d3dbe6;
+  --b-tx:#0d1219; --b-tx2:#33404f; --b-tx3:#46566a; --b-tx4:#5f6e80;
+  --b-ac:#07734f; --b-ac2:#0f5fa8; --b-warn:#8a5800; --b-warn-bg:#f7ecd7;
+  --b-prize-bd:#b6cbe0;
+}
+.tdwrap[data-btheme="bright"] .tdreg.now{color:#ffffff}
+.tdwrap[data-btheme="bright"] .tdpause{background:rgba(240,244,248,.45)}
+.tdwrap[data-btheme="bright"] .tdpause b{background:rgba(255,255,255,.9);color:#0d1219;
+  border-color:rgba(13,18,25,.45);box-shadow:0 10px 36px rgba(23,38,59,.20)}
 
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--tx);
@@ -319,6 +357,12 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   text-align:center;padding-bottom:8px;margin-bottom:8px;border-bottom:0;
   white-space:nowrap}
 .lvrow.brkc{color:var(--b-warn);font-size:clamp(84px,12vw,168px);font-weight:900;line-height:.9;letter-spacing:.04em}
+/* BREAK TIME 은 뷰포트 기준으로만 키우면 담긴 상자보다 넓어져 TV 에서 잘린다(v3.1까지의 결함).
+   상자 폭을 기준으로 한 번 더 눌러 어떤 해상도에서도 안에 들어오게 한다. */
+@supports (font-size:1cqi){
+  .bblindside{container-type:inline-size}
+  .lvrow.brkc{font-size:min(11.5cqi, clamp(84px,12vw,168px))}
+}
 .brow{display:grid;grid-template-columns:clamp(90px,12vw,170px) clamp(210px,34vw,520px);
   justify-content:center;gap:0 clamp(12px,1.6vw,26px);align-items:center;text-align:center}
 .bblind .k{font-size:clamp(13px,1.5vw,22px);color:var(--b-tx3);justify-self:center;text-align:center;letter-spacing:1px}
@@ -382,6 +426,9 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .tdwrap:fullscreen .blogo img{width:min(100%,clamp(170px,18vh,260px));height:auto;max-height:none}
 .tdwrap:fullscreen .lvrow{font-size:clamp(20px,4.4vh,50px)}
 .tdwrap:fullscreen .lvrow.brkc{font-size:clamp(96px,18vh,200px)}
+@supports (font-size:1cqi){
+  .tdwrap:fullscreen .lvrow.brkc{font-size:min(11.5cqi, clamp(96px,18vh,200px))}
+}
 .tdwrap:fullscreen .bblind .v{font-size:clamp(30px,8vh,96px)}
 .tdwrap:fullscreen .bblind .v3{font-size:clamp(15px,3vh,34px)}
 .tdwrap:fullscreen .bstats .v{font-size:clamp(18px,4vh,44px)}
@@ -452,6 +499,62 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
+/* --- 전광판 광고 띠 (손님 화면) --- */
+.badbar{position:relative;margin:clamp(10px,1.4vw,18px) clamp(10px,1.6vw,22px) 0;
+  height:clamp(56px,7vw,96px);border-radius:12px;overflow:hidden;
+  background:var(--b-panel);border:1px solid var(--b-line)}
+.badbar.big{height:clamp(120px,17vw,240px)}
+.adslide{position:absolute;inset:0;display:flex;align-items:center;gap:clamp(10px,1.4vw,20px);
+  padding:clamp(7px,1vw,14px) clamp(12px,1.6vw,22px);text-align:left;
+  opacity:0;transition:opacity .6s ease}
+.adslide.on{opacity:1}
+.adimg{flex:0 0 auto;height:100%;display:flex;align-items:center}
+.adimg img{max-height:100%;max-width:clamp(90px,16vw,260px);object-fit:contain;border-radius:7px}
+.adtxt{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.adtxt b{font-size:clamp(15px,2.1vw,34px);font-weight:800;color:var(--b-tx);line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adtxt span{font-size:clamp(11px,1.35vw,21px);color:var(--b-tx2);line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badbar.big .adtxt b{font-size:clamp(22px,3.4vw,56px)}
+.badbar.big .adtxt span{font-size:clamp(13px,1.9vw,30px)}
+.badbar.big .adimg img{max-width:clamp(120px,24vw,420px)}
+.tdwrap:fullscreen .badbar{height:clamp(48px,9vh,110px)}
+.tdwrap:fullscreen .badbar.big{height:clamp(110px,26vh,300px)}
+@media(orientation:landscape) and (max-height:600px){
+  .tdwrap:fullscreen .badbar{height:clamp(34px,8vh,58px);margin-top:5px;border-radius:8px}
+  .tdwrap:fullscreen .badbar.big{height:clamp(56px,18vh,110px)}
+}
+@media(prefers-reduced-motion:reduce){ .adslide{transition:none} }
+
+/* --- 전광판 꾸미기 카드 (운영 화면) --- */
+.tdboard{width:min(100%,780px);margin:0 auto 7px}
+.thgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.thcard{text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:10px;
+  padding:9px 10px;cursor:pointer;font-family:inherit;color:var(--tx);
+  transition:border-color .15s,background .15s}
+.thcard:hover{border-color:var(--ac)}
+.thcard.on{border-color:var(--ac);background:var(--ac-bg);box-shadow:var(--ring)}
+.thcard b{display:block;font-size:13px;margin-top:6px}
+.thcard .thd{display:block;font-size:11.5px;color:var(--tx3);line-height:1.4;margin-top:1px}
+.thsw{display:flex;height:20px;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.thsw i{flex:1}
+.thsw .s1{background:var(--b-bg)}.thsw .s2{background:var(--b-panel)}.thsw .s3{background:var(--b-ac)}
+.adlist{margin-top:9px}
+.adrow{display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:10px;padding:9px 10px;margin:0 0 7px;flex-wrap:wrap}
+.adthumb{position:relative;flex:0 0 auto;width:96px;height:54px;border-radius:7px;
+  background:var(--b-panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;padding:4px}
+.adthumb img{max-width:100%;max-height:100%;object-fit:contain}
+.adx{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);
+  background:var(--card);color:var(--tx2);cursor:pointer;font-size:13px;line-height:1;padding:0;font-family:inherit}
+.adx:hover{border-color:var(--bad);color:var(--bad-tx)}
+.adfields{flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:5px}
+.adfields input{font-size:13px;padding:6px 9px}
+.adfields .adtitle{font-weight:700}
+.adact{flex:0 0 auto;display:flex;gap:4px}
+.adact button{padding:5px 9px;font-size:11.5px;border-radius:6px}
+@media(max-width:560px){ .adact{width:100%;justify-content:flex-end} }
+
 /* --- 내 대회 · 주간 일정표 --- */
 .tdsched{width:min(100%,780px);margin:0 auto 7px}
 .wkgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:10px}
@@ -530,6 +633,9 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   .tdwrap:fullscreen .bblind{height:clamp(120px,31vh,190px);padding:5px 12px;border-radius:8px}
   .tdwrap:fullscreen .lvrow{font-size:clamp(16px,5vh,24px);padding-bottom:2px;margin-bottom:2px}
   .tdwrap:fullscreen .lvrow.brkc{font-size:clamp(68px,18vh,96px)}
+  @supports (font-size:1cqi){
+    .tdwrap:fullscreen .lvrow.brkc{font-size:min(11.5cqi, clamp(68px,18vh,96px))}
+  }
   .tdwrap:fullscreen .bblind .k{font-size:clamp(9px,2.7vh,13px)}
   .tdwrap:fullscreen .bblind .v{font-size:clamp(25px,7.5vh,38px)}
   .tdwrap:fullscreen .bblind .v3{font-size:clamp(11px,3.4vh,17px)}
@@ -3052,6 +3158,54 @@ function tdWeek(){
   return wk.map(list => list.sort((a,b)=> tdMinOfDay(a.time) - tdMinOfDay(b.time) || a.n.localeCompare(b.n)));
 }
 
+/* ============================================================
+   전광판 테마 · 광고 슬라이드
+   테마는 매장 분위기·조명에 맞춰 고르고, 슬라이드는 전광판 아래띠에서 돌아간다.
+   이미지는 딸린 파일을 만들지 않으려고 data URI 로 넣는다 — 그래서 용량을 제한한다.
+   hb.btheme  = "night" | "black" | "felt" | "wine" | "steel" | "bright"
+   hb.tdslides= [{id, title, body, img, sec}]
+   hb.adcfg   = {on, sec, bigOnBreak}
+   ============================================================ */
+const BTHEMES = [
+  {id:"night",  n:"딥 네이비",  d:"기본값 — 어두운 홀에 무난합니다"},
+  {id:"black",  n:"순검정",     d:"OLED TV 에서 가장 또렷합니다"},
+  {id:"felt",   n:"딥 그린",    d:"테이블 펠트와 같은 계열"},
+  {id:"wine",   n:"버건디",     d:"금색 강조 — 하이롤러·메인이벤트"},
+  {id:"steel",  n:"블루그레이", d:"차가운 톤"},
+  {id:"bright", n:"밝은 홀",    d:"조명이 센 매장 — 흰 바탕에 검은 글씨"}
+];
+const AD_MAX_SLIDES   = 8;
+const AD_MAX_IMG      = 200 * 1024;    // 슬라이드 한 장당 이미지 상한
+const AD_SEC_MIN = 3, AD_SEC_MAX = 120;
+
+const btheme = () => { const t = DB.get("btheme","night"); return BTHEMES.some(x=>x.id===t) ? t : "night"; };
+const tdSlides = () => { const a = DB.get("tdslides", []); return Array.isArray(a) ? a : []; };
+const tdSlidesSet = a => DB.set("tdslides", a.slice(0, AD_MAX_SLIDES));
+function adCfg(){
+  const c = DB.get("adcfg", null) || {};
+  return {
+    on: c.on !== false,
+    sec: Math.min(AD_SEC_MAX, Math.max(AD_SEC_MIN, +c.sec || 8)),
+    bigOnBreak: c.bigOnBreak !== false
+  };
+}
+const adCfgSet = c => DB.set("adcfg", c);
+/* 실제로 띄울 슬라이드만 — 제목·본문·이미지가 모두 비면 뺀다 */
+const adLive = () => tdSlides().filter(s => (s.title||"").trim() || (s.body||"").trim() || s.img);
+
+/* localStorage 를 얼마나 쓰고 있는지 — data URI 를 넣는 앱이라 운영자가 알아야 한다 */
+function hbUsedBytes(){
+  let n = 0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf("hb.")===0) n += k.length + (localStorage.getItem(k)||"").length;
+    }
+  }catch(e){}
+  return n * 2;                        // UTF-16 이라 문자당 2바이트로 잡는다
+}
+const kb = n => n >= 1024*1024 ? (Math.round(n/1024/1024*10)/10)+"MB" : Math.round(n/1024)+"KB";
+
 function tdNew(){
   return {name:"DAILY", venue:"파이널 나인 소사벌점", buyin:10000, startStack:2000000, rebuyPrice:10000, rebuyStack:3000000,
           entries:9, rebuys:0, players:9, started:false,
@@ -3348,6 +3502,137 @@ function renderTour(){
 }
 const lvBad = l => !l.brk && (l.bb<=0 || l.sb>l.bb || l.min<=0);
 
+/* ---- 전광판 꾸미기 카드 (테마 · 광고 슬라이드) ----
+   설정 화면과 진행 화면 양쪽에 같은 카드를 쓴다. */
+function tdBoardCard(){
+  const cfg = adCfg(), slides = tdSlides(), cur = btheme(), used = hbUsedBytes();
+
+  let h = '<div class="card tdboard"><h3>전광판 꾸미기 '+
+    '<span class="small dim">— 손님에게 보이는 화면입니다</span></h3>'+
+
+    '<div class="step"><span class="num">1</span> 색 테마</div>'+
+    '<div class="thgrid">'+ BTHEMES.map(t=>
+      '<button type="button" class="thcard'+(t.id===cur?' on':'')+'" data-bt="'+t.id+'">'+
+        '<span class="thsw" data-btheme="'+t.id+'"><i class="s1"></i><i class="s2"></i><i class="s3"></i></span>'+
+        '<b>'+esc(t.n)+'</b><span class="thd">'+esc(t.d)+'</span>'+
+      '</button>').join("") + '</div>'+
+
+    '<div class="step"><span class="num">2</span> 광고 · 공지 슬라이드 '+
+      '<span class="sub">전광판 아래띠에서 돌아갑니다</span></div>'+
+    '<div class="row" style="align-items:center;gap:10px">'+
+      '<div style="flex:0 0 auto"><label>표시</label>'+
+        '<div class="bg" id="td-ad-on" style="display:flex">'+
+          '<button data-on="1" class="'+(cfg.on?"on":"")+'">켜기</button>'+
+          '<button data-on="0" class="'+(cfg.on?"":"on")+'">끄기</button>'+
+        '</div></div>'+
+      '<div style="flex:0 0 auto"><label>넘기는 간격 (초)</label>'+
+        '<input id="td-ad-sec" type="number" min="'+AD_SEC_MIN+'" max="'+AD_SEC_MAX+'" value="'+cfg.sec+'" style="width:90px"></div>'+
+      '<div style="flex:0 0 auto"><label>휴식 중</label>'+
+        '<div class="bg" id="td-ad-big" style="display:flex">'+
+          '<button data-big="1" class="'+(cfg.bigOnBreak?"on":"")+'">크게</button>'+
+          '<button data-big="0" class="'+(cfg.bigOnBreak?"":"on")+'">그대로</button>'+
+        '</div></div>'+
+    '</div>';
+
+  h += slides.length
+    ? '<div class="adlist">'+ slides.map((s,i)=>
+        '<div class="adrow" data-i="'+i+'">'+
+          '<div class="adthumb">'+(s.img
+            ? '<img src="'+esc(s.img)+'" alt=""><button class="adx" type="button" data-act="img-del" title="이미지 지우기">×</button>'
+            : '<button class="btn sec sm" type="button" data-act="img-add">이미지</button>')+'</div>'+
+          '<div class="adfields">'+
+            '<input class="adtitle" data-act="title" placeholder="제목 (예: 다음 대회 안내)" value="'+esc(s.title||"")+'">'+
+            '<input class="adbody" data-act="body" placeholder="한 줄 설명 (예: 매주 금요일 19:30 몬스터)" value="'+esc(s.body||"")+'">'+
+          '</div>'+
+          '<div class="adact">'+
+            '<button class="btn sec sm" type="button" data-act="up" title="위로"'+(i===0?" disabled":"")+'>↑</button>'+
+            '<button class="btn sec sm" type="button" data-act="down" title="아래로"'+(i===slides.length-1?" disabled":"")+'>↓</button>'+
+            '<button class="btn sec sm" type="button" data-act="del" title="삭제">삭제</button>'+
+          '</div>'+
+        '</div>').join("") +'</div>'
+    : '<div class="empty" style="padding:16px 10px">아직 슬라이드가 없습니다. '+
+      '<span class="small">아래 「슬라이드 추가」로 매장 공지나 다음 대회 안내를 올리세요.</span></div>';
+
+  h += '<div class="row" style="margin-top:9px">'+
+      '<div style="flex:0 0 auto"><button class="btn sec" type="button" id="td-ad-add"'+
+        (slides.length>=AD_MAX_SLIDES?" disabled":"")+'>슬라이드 추가</button></div>'+
+      '<div class="tdreghint">'+slides.length+' / '+AD_MAX_SLIDES+'장 · 저장 공간 '+kb(used)+' 사용 중</div>'+
+    '</div>'+
+    '<input type="file" id="td-ad-file" accept="image/*" style="display:none">'+
+    '<div class="notice">이미지는 파일로 빠지지 않고 이 HTML 밖의 브라우저 저장소에 담깁니다(한 장 '+
+      Math.round(AD_MAX_IMG/1024)+'KB 이하). 백업에 함께 들어갑니다. '+
+      '<b>인원·리바이·매출 같은 운영 정보는 전광판에 나가지 않습니다.</b></div>'+
+    '</div>';
+  return h;
+}
+
+/* 전광판 꾸미기 카드의 버튼·입력을 연결한다 */
+function bindBoardCard(v){
+  const box = v.querySelector(".tdboard");
+  if(!box) return;
+
+  box.querySelectorAll(".thcard").forEach(b=>b.onclick = ()=>{
+    DB.set("btheme", b.dataset.bt);
+    const sc = document.getElementById("td-screen");
+    if(sc) sc.setAttribute("data-btheme", b.dataset.bt);   // 전광판만 즉시 갈아끼운다
+    box.querySelectorAll(".thcard").forEach(x=>x.classList.toggle("on", x===b));
+  });
+
+  const cfgUpd = patch => { adCfgSet(Object.assign(adCfg(), patch)); renderTour(); };
+  box.querySelectorAll("#td-ad-on button").forEach(b=>b.onclick = ()=>cfgUpd({on: b.dataset.on==="1"}));
+  box.querySelectorAll("#td-ad-big button").forEach(b=>b.onclick = ()=>cfgUpd({bigOnBreak: b.dataset.big==="1"}));
+  const secEl = box.querySelector("#td-ad-sec");
+  if(secEl) secEl.onchange = ()=>cfgUpd({sec: Math.min(AD_SEC_MAX, Math.max(AD_SEC_MIN, +secEl.value||8))});
+
+  const add = box.querySelector("#td-ad-add");
+  if(add) add.onclick = ()=>{
+    const arr = tdSlides();
+    if(arr.length >= AD_MAX_SLIDES){ toast("슬라이드는 "+AD_MAX_SLIDES+"장까지입니다"); return; }
+    arr.push({id:"s"+Date.now(), title:"", body:"", img:"", sec:0});
+    tdSlidesSet(arr); renderTour();
+  };
+
+  /* 이미지 고르기는 어느 줄에서 눌렀는지 기억해 뒀다가 처리한다 */
+  const file = box.querySelector("#td-ad-file");
+  let pickFor = -1;
+  if(file) file.onchange = e=>{
+    const f = e.target.files && e.target.files[0];
+    file.value = "";
+    if(!f || pickFor < 0) return;
+    if(!/^image\//.test(f.type)){ toast("이미지 파일만 올릴 수 있습니다"); return; }
+    if(f.size > AD_MAX_IMG){ toast("이미지가 큽니다 — "+Math.round(AD_MAX_IMG/1024)+"KB 이하로 줄여주세요"); return; }
+    const i = pickFor, rd = new FileReader();
+    rd.onload = ()=>{
+      const arr = tdSlides();
+      if(!arr[i]) return;
+      arr[i].img = String(rd.result);
+      try{ tdSlidesSet(arr); }catch(err){ toast("저장 공간이 부족합니다 — 이미지를 줄이거나 슬라이드를 지워주세요"); return; }
+      renderTour();
+    };
+    rd.onerror = ()=>toast("이미지를 읽지 못했습니다");
+    rd.readAsDataURL(f);
+  };
+
+  box.querySelectorAll(".adrow").forEach(row=>{
+    const i = +row.dataset.i;
+    const save = fn => { const arr = tdSlides(); if(arr[i]){ fn(arr[i], arr); tdSlidesSet(arr); } };
+    row.querySelectorAll("[data-act]").forEach(el=>{
+      const act = el.dataset.act;
+      if(act==="title" || act==="body"){
+        el.oninput = ()=>save(s=>{ s[act] = el.value; });     // 다시 그리지 않는다 — 커서가 튄다
+        return;
+      }
+      el.onclick = ()=>{
+        if(act==="img-add"){ pickFor = i; file.click(); return; }
+        if(act==="img-del"){ save(s=>{ s.img = ""; }); renderTour(); return; }
+        if(act==="del"){ const arr = tdSlides(); arr.splice(i,1); tdSlidesSet(arr); TDADI = 0; renderTour(); return; }
+        if(act==="up" && i>0){ const arr = tdSlides(); [arr[i-1],arr[i]] = [arr[i],arr[i-1]]; tdSlidesSet(arr); renderTour(); return; }
+        if(act==="down"){ const arr = tdSlides(); if(i<arr.length-1){ [arr[i+1],arr[i]] = [arr[i],arr[i+1]]; tdSlidesSet(arr); renderTour(); } }
+      };
+    });
+  });
+}
+
 /* ---- 내 대회 · 주간 일정표 카드 ---- */
 function tdScheduleCard(){
   const list = tdProfiles(), wk = tdWeek(), today = new Date().getDay();
@@ -3557,7 +3842,9 @@ function renderTDSetup(v){
       '<button class="btn sec" id="td-savesetup" style="font-size:15px;padding:12px 22px">설정 저장</button></div>'+
       '<div style="flex:0 0 auto;margin-left:auto"><button class="btn" id="td-quick" style="font-size:16px;padding:13px 26px">대회 시작</button></div></div>'+
     '</div>';
+  h += tdBoardCard();
   v.innerHTML = h;
+  bindBoardCard(v);
 
   const num = id => +document.getElementById(id).value || 0;
   const grab = () => {
@@ -3737,6 +4024,48 @@ function bindLevelTable(v){
   });
 }
 
+/* ---- 전광판 광고 띠 ----
+   손님이 보는 화면이라 운영 정보(인원·매출)는 절대 넣지 않는다. 매장이 적어 넣은 것만 돈다.
+   휴식 중에는 시계가 할 일이 없으니 크게 띄울 수 있다. */
+let TDADINT = null, TDADI = 0;
+function adSlideHTML(s){
+  return (s.img ? '<div class="adimg"><img src="'+esc(s.img)+'" alt=""></div>' : '')+
+    '<div class="adtxt">'+
+      (s.title ? '<b>'+esc(s.title)+'</b>' : '')+
+      (s.body  ? '<span>'+esc(s.body)+'</span>' : '')+
+    '</div>';
+}
+function tdAdBarHTML(isBreak){
+  const cfg = adCfg(), live = adLive();
+  if(!cfg.on || !live.length) return "";
+  if(TDADI >= live.length) TDADI = 0;
+  const big = isBreak && cfg.bigOnBreak;
+  return '<div class="badbar'+(big?' big':'')+'" id="td-ad" aria-hidden="true">'+
+    '<div class="adslide on">'+adSlideHTML(live[TDADI])+'</div></div>';
+}
+/* 슬라이드를 돌린다. 대회가 멈춰 있어도 돌아야 해서 클락 루프와 따로 둔다. */
+function startAdRotation(){
+  if(TDADINT){ clearInterval(TDADINT); TDADINT = null; }
+  const cfg = adCfg(), live = adLive();
+  if(!cfg.on || live.length < 2) return;
+  TDADINT = setInterval(()=>{
+    const bar = document.getElementById("td-ad");
+    if(!bar){ clearInterval(TDADINT); TDADINT = null; return; }
+    const cur = adLive();
+    if(cur.length < 2) return;
+    TDADI = (TDADI + 1) % cur.length;
+    const old = bar.querySelector(".adslide");
+    const nx = document.createElement("div");
+    nx.className = "adslide";
+    nx.innerHTML = adSlideHTML(cur[TDADI]);
+    bar.appendChild(nx);
+    requestAnimationFrame(()=>{
+      nx.classList.add("on");
+      if(old){ old.classList.remove("on"); setTimeout(()=>old.remove(), 700); }
+    });
+  }, cfg.sec * 1000);
+}
+
 function renderTDClock(v){
   const l = curLv(), nx = nextPlayLv(), nb = nextBreakIn();
   const pool = tdPool(), left = TD.running ? Math.max(0, TD.endsAt-Date.now()) : TD.remain;
@@ -3745,7 +4074,7 @@ function renderTDClock(v){
   const tb = timeToBreak(), tr = timeToReg(), prizeOpen = tr!==null && tr<=0;
   const logo = DB.get("logo","");
   const venue = TD.venue || "", title = TD.name || "토너먼트";
-  let h = '<div id="td-screen" class="tdwrap">'+
+  let h = '<div id="td-screen" class="tdwrap" data-btheme="'+btheme()+'">'+
 
     '<div class="bhead'+(logo?'':' nologo')+'">'+
       (logo ? '<div class="blogo"><img src="'+esc(logo)+'" alt=""></div>' : '')+
@@ -3799,6 +4128,7 @@ function renderTDClock(v){
       '<div><span class="k">REBUY-IN</span><span class="v">'+TD.rebuys+'<u>TIMES</u></span></div>'+
     '</div>'+
 
+    tdAdBarHTML(!!l.brk)+
     (venue ? '<div class="bfoot">'+esc(venue)+' 토너먼트</div>' : '')+
     '<div id="td-pause" class="tdpause'+(TD.paused?' on':'')+'" aria-live="polite"><b>일시정지</b></div>'+
     '</div>';
@@ -3918,7 +4248,12 @@ function renderTDClock(v){
     (TD._lvOpen ? tdLevelTable(true) : '')+
     '</div>';
 
+  /* 대회 중에도 테마·광고를 바꿀 수 있어야 한다 */
+  h += tdBoardCard();
+
   v.innerHTML = h;
+  startAdRotation();
+  bindBoardCard(v);
 
   document.getElementById("td-lvtoggle2").onclick = ()=>{ TD._lvOpen = !TD._lvOpen; tdSave(); renderTour(); };
   document.getElementById("td-run").onclick = ()=>{ TD.running ? tdPause() : tdStart(); paintClock(); };
@@ -3927,7 +4262,9 @@ function renderTDClock(v){
   document.getElementById("td-m1").onclick = ()=>tdAdjust(-60000);
   document.getElementById("td-p1").onclick = ()=>tdAdjust(60000);
   document.getElementById("td-full").onclick = ()=>tdToggleFullscreen();
-  v.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{ tdCount(b.dataset.act); });
+  /* 인원·리바이 카드 안쪽만 잡는다. 화면 전체를 훑으면 다른 카드의 [data-act] 까지
+     같은 핸들러로 덮어써 버린다(전광판 꾸미기 카드의 버튼이 실제로 그렇게 죽었다). */
+  v.querySelectorAll(".tdcounts [data-act]").forEach(b=>b.onclick=()=>{ tdCount(b.dataset.act); });
   v.querySelectorAll(".cntin").forEach(inp=>inp.onchange=()=>{
     TD[inp.dataset.f] = Math.max(0, Math.round(+inp.value||0));
     tdAutoPay(); tdSave(); renderTour(); });

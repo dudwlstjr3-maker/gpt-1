@@ -106,15 +106,30 @@ async function scanContrast(page, where) {
       const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
-    const parse = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    // Chromium 은 color-mix() 를 `color(srgb 0.93 0.95 0.97 / 0.88)` 로 돌려준다 (0~1 스케일).
+    // rgb()/rgba() 는 0~255. 둘 다 [r,g,b,a] 0~255 로 맞춘다.
+    const parse = (s) => {
+      if (!s) return null;
+      const nums = (s.match(/-?[\d.]+(?:e-?\d+)?/g) || []).map(Number);
+      if (nums.length < 3) return null;
+      const unit = /^color\(/i.test(s.trim()) ? 255 : 1;    // color() 은 0~1 이라 255 를 곱한다
+      const a = nums.length >= 4 ? nums[3] : 1;
+      return [nums[0] * unit, nums[1] * unit, nums[2] * unit, a];
+    };
+    // 반투명 배경은 뒤 배경 위에 실제로 합성해야 진짜 색이 나온다
+    const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
     const bgOf = (el) => {
+      const stack = [];
       let e = el;
       while (e && e !== document.documentElement) {
-        const c = getComputedStyle(e).backgroundColor;
-        if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return parse(c);
+        const c = parse(getComputedStyle(e).backgroundColor);
+        if (c && c[3] > 0) { stack.push(c); if (c[3] >= 0.999) break; }
         e = e.parentElement;
       }
-      return parse(getComputedStyle(document.body).backgroundColor || 'rgb(255,255,255)');
+      const root = parse(getComputedStyle(document.documentElement).backgroundColor);
+      let base = (root && root[3] >= 0.999) ? root.slice(0, 3) : [255, 255, 255];
+      for (let i = stack.length - 1; i >= 0; i--) base = over(stack[i], base);
+      return base;
     };
     const out = [];
     const seen = new Set();
@@ -123,8 +138,9 @@ async function scanContrast(page, where) {
       const txt = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue.trim()).join('');
       if (!txt) continue;
       const cs = getComputedStyle(el);
-      const fg = parse(cs.color), bg = bgOf(el);
-      if (fg.length < 3 || bg.length < 3) continue;
+      const fgp = parse(cs.color), bg = bgOf(el);
+      if (!fgp || !bg) continue;
+      const fg = fgp[3] >= 0.999 ? fgp.slice(0, 3) : over(fgp, bg);
       const L1 = lum(fg), L2 = lum(bg);
       const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
       const size = parseFloat(cs.fontSize), bold = +cs.fontWeight >= 700;
@@ -174,9 +190,19 @@ for (const vp of WIDTHS) {
 
     await scanText(page, where);
     await scanOverflow(page, where, vp.w);
-    if (vp.w === 1440) await scanContrast(page, where);
 
-    if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${vp.w}-${tab.v}.png`), fullPage: vp.w === 1440 });
+    // 레이아웃은 테마와 무관하니 대비만 라이트·다크 양쪽으로 본다
+    if (vp.w === 1440) {
+      for (const th of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), th);
+        await page.waitForTimeout(400);   // CSS 트랜지션이 끝나야 최종 색이 읽힌다
+        await scanContrast(page, `${where} · ${th === 'light' ? '밝게' : '어둡게'}`);
+        if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${th}-${tab.v}.png`), fullPage: true });
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    } else if (SHOTS) {
+      await page.screenshot({ path: path.join(SHOT_DIR, `${vp.w}-${tab.v}.png`) });
+    }
   }
 
   if (consoleErrs.length) [...new Set(consoleErrs)].forEach((e) => add(`${vp.n} ${vp.w}px`, '콘솔 ' + e));

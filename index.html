@@ -4003,6 +4003,14 @@ function tdPayWarn(pool){
   if(!TD || !TD.pay || !TD.pay.length) return "";
   const msg = [];
   const flat = TD.payMode === "flat";
+  /* 1만원 단위로 나눌 칸이 지급 인원보다 적으면 뒷순위가 0원이 된다 */
+  const slots = Math.floor(pool / PAY_UNIT_WON);
+  if(slots > 0 && slots < TD.pay.length)
+    msg.push('총 상금 <b>'+manwon(pool)+'</b>을 1만원 단위로 나누면 <b>'+slots+'칸</b>뿐인데 '+
+      '지급 인원이 <b>'+TD.pay.length+'명</b>입니다. 뒤 '+(TD.pay.length-slots)+'명은 0원이 됩니다 — '+
+      '지급 인원을 '+slots+'명 이하로 줄이세요.');
+  if(slots <= 0)
+    msg.push('총 상금이 1만원도 안 됩니다. 개수가 더 들어와야 상금이 잡힙니다.');
   if(!flat){
     const floored = payoutFloored(TD.payN, TD.payCurve);
     if(floored > 0) msg.push('지급 인원 <b>'+TD.payN+'명</b>에 이 곡선은 너무 가팔라 <b>뒤 '+floored+'명</b>이 최소 몫(0.1%)까지 눌렸습니다. '+
@@ -4027,12 +4035,50 @@ function tdAutoPay(){
 /* 모인 돈 전체 */
 const tdGross = () => TD ? TD.entries*TD.buyin + TD.rebuys*TD.rebuyPrice : 0;
 /* 그중 상금으로 나가는 몫. 1,000원 단위로 내림하고 나머지는 하우스가 가진다 */
+/* 실제로 지급하는 단위. 펍에서 1,000원 단위로 거슬러 주기 곤란하다. */
+const PAY_UNIT_WON = 10000;
 const tdPool  = () => {
   if(!TD) return 0;
   if(TD.ladderOn) return tdLadderPrize(tdUnits());       // 사다리를 쓰면 모인 돈 비율은 안 본다
   const p = TD.poolPct === undefined ? 100 : TD.poolPct;
-  return Math.floor(tdGross() * p / 100 / 1000) * 1000;
+  return Math.floor(tdGross() * p / 100 / PAY_UNIT_WON) * PAY_UNIT_WON;
 };
+
+/* 순위별 «실제 지급액». 퍼센트를 그대로 곱하면 133,200원 같은 금액이 나와 지급이 곤란하므로
+   1만원 칸으로 나눠 준다. 내림으로 잡고 남은 칸은 소수부가 큰 순위부터 하나씩 얹어
+   합계가 총 상금과 정확히 맞는다. 지급 순위는 최소 한 칸씩 받는다(0원 방지). */
+function tdPayAmounts(){
+  const pool = tdPool(), pct = (TD && TD.pay) ? TD.pay : [];
+  const n = pct.length;
+  if(!n || pool <= 0) return new Array(n).fill(0);
+  const slots = Math.floor(pool / PAY_UNIT_WON);
+  if(slots <= 0) return new Array(n).fill(0);
+  if(slots < n){
+    /* 칸이 인원보다 적다 — 위 순위부터 한 칸씩만 주고 나머지는 0.
+       이 상태는 tdPayWarn 이 «지급 인원을 줄이라»고 경고한다. */
+    return pct.map((_,i)=> i < slots ? PAY_UNIT_WON : 0);
+  }
+  const raw  = pct.map(x => pool * x / 100 / PAY_UNIT_WON);
+  const base = raw.map(x => Math.max(1, Math.floor(x)));          // 모든 지급 순위에 최소 한 칸
+  let left = slots - base.reduce((a,b)=>a+b, 0);
+  if(left < 0){
+    /* 최소 한 칸씩 주느라 넘쳤다 — 여유 있는 순위에서 위에서부터 회수한다 */
+    const donors = base.map((v,i)=>({i, room:v-1})).filter(x=>x.room>0).sort((a,b)=>b.room-a.room || a.i-b.i);
+    for(let k=0; left<0 && donors.length; k=(k+1)%donors.length){
+      const d = donors[k];
+      if(d.room <= 0) continue;
+      base[d.i]--; d.room--; left++;
+    }
+  } else if(left > 0){
+    /* 남은 칸은 «아직 못 받은 몫» 이 큰 순위부터. 최소 한 칸으로 올려 준 순위는
+       이미 제 몫보다 더 받았으므로 (raw-base 가 음수) 자연히 뒤로 밀린다. */
+    const order = raw.map((x,i)=>({i, f:x-base[i]})).sort((a,b)=> b.f-a.f || a.i-b.i);
+    for(let k=0; k<left; k++) base[order[k % n].i]++;
+  }
+  /* 아래 순위가 위 순위보다 많이 받는 일은 없어야 한다 */
+  for(let i=1;i<n;i++) if(base[i] > base[i-1]) base[i] = base[i-1];
+  return base.map(x => x * PAY_UNIT_WON);
+}
 
 /* ---- 상금 사다리 (몬스터 리그) ----
    엔트리와 리바이를 «합쳐» 정해진 개수마다 정해진 금액을 상금으로 내려주는 방식.
@@ -4885,8 +4931,8 @@ function renderTDClock(v){
         (prizeOpen
           ? '<div class="bprize">'+
               '<div class="ptot"><span class="k">Total prize</span><span class="v">'+won(pool)+'원</span></div>'+
-              '<ol class="plist">'+TD.pay.slice(0, TD.payShow||5).map((p,i)=>
-                '<li><span class="r">'+(i+1)+'위</span><b>'+won(Math.floor(pool*p/100))+'원</b></li>').join("")+
+              '<ol class="plist">'+tdPayAmounts().slice(0, TD.payShow||5).map((amt,i)=>
+                '<li><span class="r">'+(i+1)+'위</span><b>'+won(amt)+'원</b></li>').join("")+
               '</ol></div>'
           : '<div class="bprize locked"><span>PRIZE</span><b>레지 마감 후 공개</b></div>')+
         '<div class="bblindside">'+
@@ -5017,11 +5063,13 @@ function renderTDClock(v){
         '<input id="td-payshow" type="number" min="1" max="60" value="'+(TD.payShow||5)+'"></div>'+
     '</div>'+
     '<div class="step"><span class="num">4</span> 순위별 확인 · 직접 수정</div>'+
-    '<div class="scrollx"><table class="tstack paytbl"><tr><th>순위</th><th>비율</th><th>금액</th></tr>'+
-    TD.pay.map((p,i)=>'<tr><td>'+(i+1)+'위</td>'+
+    '<div class="scrollx"><table class="tstack paytbl"><tr><th>순위</th><th>비율</th><th>실제 지급</th></tr>'+
+    (function(){ const amts = tdPayAmounts(); return TD.pay.map((p,i)=>'<tr'+(amts[i]<=0?' class="rdim"':'')+'><td>'+(i+1)+'위</td>'+
       '<td data-l="비율"><input class="payin" data-i="'+i+'" type="number" step="0.1" min="0" value="'+p+'"> %</td>'+
-      '<td data-l="금액">'+manwon(pool*p/100)+'</td></tr>').join("")+
+      '<td data-l="실제 지급"><b>'+manwon(amts[i])+'</b></td></tr>').join(""); })()+
     '</table></div>'+
+    '<div class="small dim" style="margin-top:5px">지급액은 <b>1만원 단위</b>로 맞추고 남는 칸은 위 순위부터 얹습니다 — '+
+      '합계는 총 상금 '+manwon(pool)+'과 정확히 같습니다.</div>'+
     '<div class="row" style="margin-top:9px">'+
       '<div style="flex:0 0 auto" class="'+(Math.abs(sum-100)>0.5?"":"dim")+'">'+
         '합계 <b style="color:'+(Math.abs(sum-100)>0.5?"var(--warn)":"var(--good)")+'">'+sum+'%</b></div>'+

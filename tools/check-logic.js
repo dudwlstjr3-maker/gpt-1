@@ -711,7 +711,8 @@ group('상금 사다리');
   ctx.__APP.TD.poolPct = 50;
   okNear(tdPool(), 300000, '사다리 켜짐: 비율을 바꿔도 상금은 그대로');
   ctx.__APP.TD.ladderOn = false;
-  okNear(tdPool(), Math.floor(gross * 0.5 / 1000) * 1000, '사다리 끄면 다시 비율로 계산한다');
+  okNear(tdPool(), Math.floor(gross * 0.5 / 10000) * 10000,
+    '사다리 끄면 다시 비율로 계산한다 (1만원 단위 내림)');
   ctx.__APP.TD.ladderOn = true; ctx.__APP.TD.poolPct = 100;
 
   // 구간표
@@ -784,6 +785,57 @@ group('상금 사다리');
     ok(/확인:/.test(lg.note) && /추정/.test(lg.note), 'note 에 확인·추정 구분이 있다');
     ok(lg.buyin === 30000, '바이인은 몬스터와 같은 3만원', String(lg.buyin));
   }
+  ctx.__APP.TD = null;
+}
+
+/* ───────────────── 순위별 실제 지급액 (1만원 단위) ───────────────── */
+group('실제 지급액');
+{
+  const { tdNew, tdPool, tdPayAmounts, payoutPct, PAY_UNIT_WON } = app;
+  ok(PAY_UNIT_WON === 10000, '지급 단위는 1만원', String(PAY_UNIT_WON));
+
+  ctx.__APP.TD = Object.assign(tdNew(), {
+    ladderOn: true, ladderFree: 8, ladderEvery: 7, ladderAmt: 100000, entries: 9, rebuys: 8,
+  });
+  okNear(tdPool(), 200000, '17개 → 총 상금 20만원');
+
+  let bad = null;
+  for (const n of [1, 2, 3, 5, 9, 15, 27]) {
+    for (const c of [0.7, 1, 1.4, 3]) {
+      ctx.__APP.TD.payN = n;
+      ctx.__APP.TD.pay = payoutPct(n, c);
+      const a = tdPayAmounts();
+      const tag = `${n}명/곡선${c}`;
+      if (a.length !== n) { bad = `${tag}: 인원 수 불일치`; break; }
+      if (a.some((x) => x % PAY_UNIT_WON !== 0)) { bad = `${tag}: 1만원 단위가 아님 — ${a.join(',')}`; break; }
+      const sum = a.reduce((x, y) => x + y, 0);
+      const slots = Math.floor(tdPool() / PAY_UNIT_WON);
+      if (sum !== tdPool()) { bad = `${tag}: 합계 ${sum} ≠ 총 상금 ${tdPool()}`; break; }
+      for (let i = 1; i < n; i++) if (a[i] > a[i - 1]) { bad = `${tag}: ${i + 1}위가 ${i}위보다 많다`; break; }
+      if (bad) break;
+      if (slots >= n && a.some((x) => x <= 0)) { bad = `${tag}: 0원인 순위가 있다 — ${a.join(',')}`; break; }
+    }
+    if (bad) break;
+  }
+  ok(!bad, '모든 인원·곡선에서 1만원 단위·합계 일치·내림차순·0원 없음', bad);
+
+  // 칸이 인원보다 적으면 위에서부터만 준다 (그리고 경고가 뜬다)
+  ctx.__APP.TD.ladderAmt = 10000; ctx.__APP.TD.ladderEvery = 7; ctx.__APP.TD.ladderFree = 8;
+  ctx.__APP.TD.entries = 9; ctx.__APP.TD.rebuys = 0;          // 9개 → 1묶음 → 1만원
+  okNear(tdPool(), 10000, '9개 · 7개당 1만원 → 총 상금 1만원');
+  ctx.__APP.TD.payN = 3; ctx.__APP.TD.pay = payoutPct(3, 1);
+  const few = tdPayAmounts();
+  okNear(few.reduce((a, b) => a + b, 0), 10000, '칸이 모자라도 합계는 총 상금과 같다');
+  ok(few[0] === 10000 && few[1] === 0, '칸이 모자라면 위 순위부터 준다', few.join(','));
+  const warn = app.tdPayWarn(tdPool());
+  ok(/지급 인원을/.test(warn), '칸이 모자라면 지급 인원을 줄이라고 경고한다', warn.slice(0, 120));
+
+  // 비율 방식에서도 총 상금이 1만원 단위로 내려간다
+  ctx.__APP.TD.ladderOn = false;
+  ctx.__APP.TD.entries = 9; ctx.__APP.TD.rebuys = 4;
+  ctx.__APP.TD.buyin = 30000; ctx.__APP.TD.rebuyPrice = 30000; ctx.__APP.TD.poolPct = 85;
+  ok(tdPool() % PAY_UNIT_WON === 0, `비율 방식 총 상금도 1만원 단위 (${tdPool()}원)`);
+  ok(tdPool() <= 13 * 30000 * 0.85, '총 상금이 모인 돈 × 비율을 넘지 않는다');
   ctx.__APP.TD = null;
 }
 

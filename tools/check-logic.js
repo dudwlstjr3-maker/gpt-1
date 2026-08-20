@@ -442,10 +442,10 @@ group('드릴');
   }
 }
 
-/* ───────────────── 저장소 ───────────────── */
-group('저장소');
+/* ───────────────── 저장소 · 백업 ───────────────── */
+group('저장소 · 백업');
 {
-  const { DB } = app;
+  const { DB, hbDump, hbRestore, LEARN_KEYS, TOUR_KEYS } = app;
   ok(!!DB, 'DB 래퍼 존재');
   if (DB) {
     DB.set('__t', { a: 1 });
@@ -454,6 +454,51 @@ group('저장소');
     DB.del('__t');
     ok(DB.get('__t', 'gone') === 'gone', 'del 후 기본값 반환');
   }
+
+  // 백업이 실제로 쓰이는 키를 전부 담는지 — 소스에서 DB.set(...) 키를 긁어 대조한다.
+  // v3.1 까지 quizans·drillaxis 가 백업에서 빠져 있었고, 그래서 이 검사를 둔다.
+  const src = require('fs').readFileSync(FILE, 'utf8');
+  const used = new Set();
+  for (const m of src.matchAll(/DB\.set\(\s*"([a-zA-Z0-9_]+)"/g)) used.add(m[1]);
+  ok(used.size >= 12, `DB.set 으로 쓰는 키를 찾았다 (${used.size}개)`);
+
+  ctx.localStorage.clear();
+  for (const k of used) DB.set(k, { probe: k });
+  const dump = hbDump();
+  const missing = [...used].filter((k) => !(k in dump));
+  ok(missing.length === 0, '백업이 모든 저장 키를 담는다', '빠진 키: ' + missing.join(', '));
+
+  // 왕복
+  ctx.localStorage.clear();
+  const n = hbRestore({ v: 5, at: 1, app: '4.0', data: dump });
+  ok(n === Object.keys(dump).length, `복원 개수 일치 (${n})`);
+  const back = hbDump();
+  ok(JSON.stringify(back) === JSON.stringify(dump), '내보내기 → 불러오기 왕복이 같다');
+
+  // 예전 형식(v4 이하: 최상위에 키가 흩어져 있음)도 받아야 한다
+  ctx.localStorage.clear();
+  const n4 = hbRestore({ profile: { x: 1 }, hands: [1, 2], logo: 'data:,', v: 4 });
+  ok(n4 === 3, `v4 형식 3개 복원 (실제 ${n4})`);
+  ok(DB.get('profile', null) && DB.get('profile', {}).x === 1, 'v4 형식에서 profile 복원');
+  ok(DB.get('v', 'none') === 'none', 'v4 의 버전 필드는 키로 저장하지 않는다');
+
+  // 엉뚱한 입력에 죽지 않는다
+  ok(hbRestore(null) === 0, 'null 을 넣어도 0 을 돌려준다');
+  ok(hbRestore('문자열') === 0, '문자열을 넣어도 0');
+  ctx.localStorage.clear();
+  ok(hbRestore({ data: null, profile: { x: 1 }, v: 5 }) === 1,
+    'data 가 비어 있으면 예전 형식으로 보고 최상위 키를 읽는다');
+  ok(hbRestore({ v: 5, data: {} }) === 0, '빈 백업은 아무것도 덮어쓰지 않는다');
+
+  // 초기화 범위가 모든 키를 빠짐없이, 겹치지 않게 나누는지
+  const covered = new Set([...LEARN_KEYS, ...TOUR_KEYS]);
+  const uncovered = [...used].filter((k) => !covered.has(k) && k !== 'theme');
+  ok(uncovered.length === 0, '초기화 두 갈래가 모든 키를 덮는다(테마 제외)', '안 덮인 키: ' + uncovered.join(', '));
+  const overlap = LEARN_KEYS.filter((k) => TOUR_KEYS.includes(k));
+  ok(overlap.length === 0, '학습/대회 초기화 범위가 겹치지 않는다', overlap.join(', '));
+  ok(LEARN_KEYS.includes('quizans') && LEARN_KEYS.includes('drillaxis'),
+    '학습 초기화가 답한 문항·드릴 성향까지 지운다');
+  ctx.localStorage.clear();
 }
 
 /* ───────────────── 결과 ───────────────── */

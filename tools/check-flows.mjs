@@ -134,14 +134,14 @@ group('상금 사다리');
   ok(/9~13/.test(band), '지금 구간은 9~13개', band.replace(/\n/g, ' '));
 
   // 리바이를 늘리면 사다리가 올라간다
-  for (let i = 0; i < 5; i++) { await page.click('.tdcounts [data-act="r+"]'); await page.waitForTimeout(120); }
+  for (let i = 0; i < 5; i++) { await page.click('#td-ops [data-act="r+"]'); await page.waitForTimeout(120); }
   await page.waitForTimeout(300);
   lad = await txt('.ladbox');
   ok(/14개/.test(lad), '리바이 5개를 더하면 14개', lad.replace(/\n/g, ' | ').slice(0, 140));
   ok(/20만원/.test(lad), '14개면 상금 20만원', lad.replace(/\n/g, ' | ').slice(0, 200));
 
   // 운영 카드 상금도 따라간다 (전광판 총 상금은 레지 마감 전까지 가려져 있다)
-  const ops = await txt('.tdcounts');
+  const ops = await txt('#td-ops');
   ok(/20만원/.test(ops), '운영 카드 상금이 사다리를 따른다', ops.replace(/\n/g, ' | '));
   ok(/사다리 14개/.test(ops), '상금 라벨이 비율이 아니라 사다리라고 알려준다', ops.replace(/\n/g, ' | '));
   ok(/레지 마감 후 공개|PRIZE/.test(await txt('#td-screen')), '전광판은 레지 마감 전까지 상금을 가린다');
@@ -169,6 +169,64 @@ group('상금 사다리');
 
   // 다음 검사를 위해 설정 화면으로 되돌린다
   await page.evaluate(() => localStorage.removeItem('hb.td'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+}
+
+/* ─────────── 내 스택 ─────────── */
+group('내 스택');
+{
+  await tab('tour');
+  await page.click('#td-quick');
+  await page.waitForTimeout(600);
+
+  ok(await page.locator('.tdmystack').count() === 1, '내 스택 카드가 있다');
+  ok(/내 칩을 넣으면/.test(await txt('.tdmystack')), '칩을 안 넣었으면 안내만 나온다',
+    (await txt('.tdmystack')).replace(/\n/g, ' | ').slice(0, 120));
+  ok(/어림/.test(await txt('.tdmystack')), '구간 지침이 어림이라고 적혀 있다');
+
+  const lv = await page.evaluate(() => { const l = curLv(); return { sb: l.sb, bb: l.bb, ante: l.ante }; });
+
+  // 10BB 를 넣으면 푸시·폴드 구간이 나와야 한다
+  await page.fill('#td-my', String(lv.bb * 10));
+  await page.dispatchEvent('#td-my', 'change');
+  await page.waitForTimeout(400);
+  let box = await txt('.tdmystack');
+  ok(/\b10 BB\b/.test(box), '넣은 칩이 BB 수로 환산된다', box.replace(/\n/g, ' | ').slice(0, 160));
+  ok(/숏 구간/.test(box), '10BB 는 숏 구간', box.replace(/\n/g, ' | ').slice(0, 200));
+
+  // 4BB → 위기
+  await page.fill('#td-my', String(lv.bb * 4));
+  await page.dispatchEvent('#td-my', 'change');
+  await page.waitForTimeout(400);
+  box = await txt('.tdmystack');
+  ok(/위기 구간/.test(box), '4BB 는 위기 구간', box.replace(/\n/g, ' | ').slice(0, 200));
+
+  // 평균으로
+  await page.click('#td-my-avg');
+  await page.waitForTimeout(400);
+  const avg = await page.evaluate(() => tdAvg());
+  ok(await page.inputValue('#td-my') === String(avg), '«평균으로» 를 누르면 평균 스택이 들어간다',
+    `${await page.inputValue('#td-my')} vs ${avg}`);
+  ok(/100%/.test(await txt('.tdmystack')), '평균과 같으면 평균 대비 100%',
+    (await txt('.tdmystack')).replace(/\n/g, ' | ').slice(0, 160));
+
+  // 새로고침해도 남는다 — 4시간짜리 대회 도중에 날아가면 안 된다
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+  ok(await page.inputValue('#td-my') === String(avg), '새로고침해도 내 칩이 남는다',
+    await page.inputValue('#td-my'));
+
+  // 인원 칸이 내 칩 칸에 휘말리지 않는지 (같은 .cntin 핸들러를 쓴다)
+  await page.fill('#td-ops input[data-f="entries"]', '12');
+  await page.dispatchEvent('#td-ops input[data-f="entries"]', 'change');
+  await page.waitForTimeout(400);
+  ok(await page.evaluate(() => TD.entries) === 12, '참가 인원은 그대로 참가 인원에 들어간다',
+    String(await page.evaluate(() => TD.entries)));
+  ok(await page.evaluate(() => TD.myChips) === avg, '내 칩이 인원 입력에 덮이지 않는다',
+    String(await page.evaluate(() => TD.myChips)));
+
+  await page.evaluate(() => { localStorage.removeItem('hb.td'); });
   await page.reload({ waitUntil: 'networkidle' });
   await tab('tour');
 }

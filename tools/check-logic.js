@@ -183,6 +183,46 @@ group('analyze 통합');
   }
 }
 
+/* ───────────────── 내 스택 구간 ───────────────── */
+group('내 스택');
+{
+  const { stackRead, stackBand, STACKBANDS } = app;
+  const lv = { sb: 500, bb: 1000, ante: 1000 };   // 한 바퀴 비용 2500
+
+  {
+    const S = stackRead(20000, lv, 40000);
+    okNear(S.bb, 20, 'BB 수 = 칩 / BB');
+    okNear(S.m, 8, 'M = 칩 / (SB+BB+앤티)');
+    ok(S.avgPct === 50, '평균 대비 %', String(S.avgPct));
+  }
+
+  // 구간 경계 — 위/아래가 확실히 갈려야 한다
+  ok(stackBand(4.9).n === '위기' && stackBand(5).n === '푸시·폴드', '5BB 에서 위기 → 푸시·폴드로 넘어간다',
+    `${stackBand(4.9).n} / ${stackBand(5).n}`);
+  ok(stackBand(9.9).n === '푸시·폴드' && stackBand(10).n === '숏', '10BB 에서 숏으로', `${stackBand(9.9).n} / ${stackBand(10).n}`);
+  ok(stackBand(19.9).n === '숏' && stackBand(20).n === '표준', '20BB 에서 표준으로', `${stackBand(19.9).n} / ${stackBand(20).n}`);
+  ok(stackBand(39.9).n === '표준' && stackBand(40).n === '딥', '40BB 에서 딥으로', `${stackBand(39.9).n} / ${stackBand(40).n}`);
+  ok(stackBand(0).n === '위기', '0BB 는 위기');
+  ok(stackBand(1e9).n === '딥', '아주 깊어도 구간이 나온다');
+  ok(STACKBANDS.every((b) => b.n && b.d), '구간마다 이름과 지침이 있다');
+
+  // 0 으로 나누지 않는다 — 블라인드가 없는 순간(휴식·설정 전)에도 화면이 살아 있어야 한다
+  {
+    const S = stackRead(20000, null, 0);
+    ok(S.bb === null && S.m === null && S.band === null && S.avgPct === null,
+      '레벨이 없으면 숫자 대신 빈 값을 낸다', JSON.stringify(S));
+  }
+  ok(stackRead(20000, { sb: 0, bb: 0, ante: 0 }, 0).bb === null, 'BB 가 0 이면 BB 수를 안 만든다');
+  ok(stackRead(20000, { sb: 500, bb: 1000, ante: 0 }, 0).avgPct === null, '평균이 0 이면 대비 %도 없다');
+
+  // 이상한 입력
+  ok(stackRead(-5000, lv, 40000).chips === 0, '음수 칩은 0 으로');
+  ok(stackRead('abc', lv, 40000).chips === 0, '숫자가 아니면 0 으로');
+  ok(stackRead(undefined, lv, 40000).bb === 0, '칩을 안 넣으면 0BB');
+  ok(stackRead(0, lv, 40000).band.n === '위기', '0칩은 위기 구간');
+  okNear(stackRead(2500, { sb: 500, bb: 1000, ante: 0 }, 0).m, 2500 / 1500, '앤티가 없으면 한 바퀴는 SB+BB');
+}
+
 /* ───────────────── 토너먼트 ───────────────── */
 group('토너먼트');
 {

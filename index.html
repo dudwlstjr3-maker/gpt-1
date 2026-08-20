@@ -1144,14 +1144,177 @@ const POS6 = ["UTG","HJ","CO","BTN","SB","BB"];
 const POS9 = ["UTG","UTG+1","MP","MP+1","HJ","CO","BTN","SB","BB"];
 const POS2 = ["BTN(SB)","BB"];
 function posList(seats){ return seats==9?POS9:seats==2?POS2:POS6; }
+const isSB = p => p==="SB" || p==="BTN(SB)";
+
+/* 액션 순서. 프리플랍은 UTG부터(블라인드가 마지막), 포스트플랍은 SB부터(버튼이 마지막).
+   헤즈업은 예외다 — 버튼이 스몰블라인드를 내고 프리플랍에 먼저 치지만 포스트플랍엔 마지막에 친다.
+   (v4.0까지 이 예외가 빠져 있어 헤즈업 포지션 판정이 반대로 나왔다.) */
+function actOrder(seats, street){
+  const L = posList(seats);
+  if(seats == 2) return street===0 ? ["BTN(SB)","BB"] : ["BB","BTN(SB)"];
+  if(street === 0) return L.slice();
+  return L.filter(p=>isSB(p)).concat(L.filter(p=>p==="BB"), L.filter(p=>!isSB(p) && p!=="BB"));
+}
+/* 포스트플랍에 상대보다 나중에 치면 내가 포지션이다 */
 function ipVs(seats, me, vil){
-  const L = posList(seats), a = L.indexOf(me), b = L.indexOf(vil);
-  const ord = p => { const i=L.indexOf(p); return p==="SB"||p==="BTN(SB)" ? -2 : p==="BB" ? -1 : i; };
-  // 포스트플랍 순서: SB, BB가 가장 먼저 액션 → BTN이 마지막
-  const post = p => p==="SB"||p==="BTN(SB)" ? 0 : p==="BB" ? 1 : L.indexOf(p)+2;
-  return post(me) > post(vil);
+  const o = actOrder(seats, 1);
+  return o.indexOf(me) > o.indexOf(vil);
 }
 const OPEN_PCT = {"UTG":15,"UTG+1":16,"MP":18,"MP+1":20,"HJ":21,"CO":27,"BTN":44,"SB":38,"BB":100,"BTN(SB)":75};
+
+/* ============================================================
+   PART 1b. 액션 순서 엔진
+
+   핸드는 "누가 무엇을 했는지"를 순서대로 담은 배열 하나로만 저장한다.
+   자리·스트리트·팟·콜할 금액은 전부 포커 규칙에서 되계산한다.
+   시퀀스에 자리를 같이 적어 두면 인원이나 내 자리를 바꿨을 때 어긋나므로 적지 않는다.
+
+   금액 단위는 전부 BB. seq = [{a:"fold|check|call|bet|raise", to:이번 스트리트 맞춘 총액}]
+   ============================================================ */
+const STREETN = ["프리플랍","플랍","턴","리버"];
+const ACTN = {fold:"폴드", check:"체크", call:"콜", bet:"벳", raise:"레이즈"};
+const BOARD_NEED = [0,3,4,5];
+const r1 = x => Math.round((+x||0)*10)/10;      // 화면에 쓰는 값은 0.1BB 단위
+const eqAmt = (a,b) => Math.abs(a-b) < 1e-9;    // 팟 계산은 정확한 값으로, 비교만 허용오차로
+
+/** 시퀀스를 처음부터 되돌려 지금 상태를 만든다.
+ *  @param cfg {seats, ante, stack, hero}  ante·stack 은 BB 단위
+ *  @param seq [{a,to}]
+ *  @param boardLen 지금까지 깔린 보드 장수 (스트리트를 넘길 수 있는지 판단)   */
+function handState(cfg, seq){
+  const seats = +cfg.seats || 6, L = posList(seats);
+  const stack = Math.max(0.1, +cfg.stack || 100);
+  const ante = Math.max(0, +cfg.ante || 0);
+  const boardLen = Math.max(0, +cfg.boardLen || 0);
+
+  const S = {
+    seats, hero: cfg.hero, street: 0, pot: 0, betTo: 0, minRaise: 1,
+    inv: {}, cm: {}, folded: {}, allin: {}, acted: {},
+    lastActor: null, lastAgg: null, aggBy: [null,null,null,null],
+    log: [[],[],[],[]], over: false, ended: null, err: null, applied: 0
+  };
+  L.forEach(p=>{ S.inv[p]=0; S.cm[p]=0; });
+
+  const live = () => L.filter(p=>!S.folded[p]);
+  const canAct = () => live().filter(p=>!S.allin[p]);
+  const left = p => stack - S.inv[p];
+
+  /* 앤티 → 블라인드. 앤티는 세션 세팅의 "BB 단위" 값을 인원수만큼 받는 것으로 본다. */
+  if(ante > 0) L.forEach(p=>{ const x=Math.min(ante,left(p)); S.inv[p]+=x; S.pot+=x; });
+  const sbPos = seats==2 ? "BTN(SB)" : "SB";
+  const post = (p, amt) => {
+    const a = Math.min(amt, left(p));
+    S.inv[p]+=a; S.cm[p]+=a; S.pot+=a;
+    if(left(p) <= 1e-9) S.allin[p]=true;
+  };
+  post(sbPos, 0.5); post("BB", 1);
+  S.betTo = 1; S.minRaise = 1;      // 프리플랍 기준선은 BB, 최소 레이즈 폭도 1BB
+
+  /* 이번 스트리트가 끝났는지 — 남은 사람이 모두 한 번씩 쳤고 투입액이 같으면 끝 */
+  function streetDone(){
+    const a = canAct();
+    if(live().length <= 1) return true;
+    if(a.length === 0) return true;
+    return a.every(p => S.acted[p] && eqAmt(S.cm[p], S.betTo));
+  }
+  function nextTurn(){
+    if(live().length <= 1) return null;
+    const ord = actOrder(seats, S.street).filter(p=>!S.folded[p] && !S.allin[p]);
+    if(!ord.length) return null;
+    const full = actOrder(seats, S.street);
+    let start = 0;
+    if(S.lastActor){ const i = full.indexOf(S.lastActor); if(i>=0) start = i+1; }
+    for(let k=0;k<full.length;k++){
+      const p = full[(start+k) % full.length];
+      if(S.folded[p] || S.allin[p]) continue;
+      if(!S.acted[p] || S.cm[p] < S.betTo - 1e-9) return p;
+    }
+    return null;
+  }
+  function openStreetN(){
+    S.street++;
+    S.acted = {}; S.lastActor = null; S.lastAgg = null;
+    L.forEach(p=>{ S.cm[p]=0; });
+    S.betTo = 0; S.minRaise = 1;
+  }
+
+  /* 시퀀스를 하나씩 적용한다. 규칙에 안 맞는 항목이 나오면 거기서 멈춘다. */
+  for(const step of (seq||[])){
+    if(S.over) break;
+    if(streetDone()){
+      if(live().length <= 1) break;
+      if(S.street >= 3) break;
+      if(boardLen < BOARD_NEED[S.street+1]) break;   // 보드가 아직 안 깔렸으면 더 못 간다
+      openStreetN();
+    }
+    const p = nextTurn();
+    if(!p) break;
+    const toCall = Math.max(0, Math.min(S.betTo - S.cm[p], left(p)));
+    const a = step.a;
+
+    if(a === "fold"){
+      S.folded[p] = true;
+    } else if(a === "check"){
+      if(toCall > 0) { S.err = "체크할 수 없는 자리입니다"; break; }
+    } else if(a === "call"){
+      if(toCall <= 0) { S.err = "콜할 금액이 없습니다"; break; }
+      S.cm[p]+=toCall; S.inv[p]+=toCall; S.pot+=toCall;
+      if(left(p) <= 1e-9) S.allin[p]=true;
+    } else if(a === "bet" || a === "raise"){
+      const cap = S.cm[p] + left(p);                           // 올인까지
+      const to = Math.min(r1(step.to), cap);
+      if(to <= S.betTo + 1e-9 && to < cap - 1e-9) { S.err = "직전 금액보다 커야 합니다"; break; }
+      const add = to - S.cm[p];
+      S.cm[p]=to; S.inv[p]+=add; S.pot+=add;
+      S.minRaise = Math.max(1, to - S.betTo);
+      S.betTo = to; S.lastAgg = p; S.aggBy[S.street] = p;
+      if(left(p) <= 1e-9) S.allin[p]=true;
+    } else { S.err = "모르는 액션입니다: " + a; break; }
+
+    S.acted[p] = true; S.lastActor = p;
+    S.log[S.street].push({pos:p, a:a, to:r1(S.cm[p]), toCall:r1(toCall), hero:p===cfg.hero});
+    S.applied++;
+    if(live().length <= 1){ S.over = true; S.ended = "fold"; }
+  }
+
+  /* 지금 상태 */
+  S.live = live();
+  S.done = streetDone();
+  if(!S.over && S.done && S.street >= 3) { S.over = true; S.ended = "showdown"; }
+  S.needBoard = (!S.over && S.done && S.street < 3) ? BOARD_NEED[S.street+1] : 0;
+  S.waitingBoard = S.needBoard > 0 && boardLen < S.needBoard;
+  /* 스트리트가 끝났고 보드도 깔려 있으면 다음 스트리트를 열어 다음 차례를 보여준다 */
+  if(!S.over && S.done && !S.waitingBoard && S.street < 3){
+    openStreetN();
+    S.done = false;
+    S.needBoard = 0;
+  }
+  S.toAct = (S.over || S.waitingBoard || S.done) ? null : nextTurn();
+  S.toCall = S.toAct ? r1(Math.max(0, Math.min(S.betTo - S.cm[S.toAct], left(S.toAct)))) : 0;
+  S.leftOf = p => r1(left(p));
+  S.stack = stack;
+  /* 앤티가 붙으면 팟이 0.1BB 로 딱 떨어지지 않는다. 표시는 0.01BB 까지 남기고,
+     계산에는 반올림 안 한 potRaw 를 쓴다. */
+  S.potRaw = S.pot; S.pot = Math.round(S.pot*100)/100;
+  S.minRaiseTo = S.toAct ? r1(Math.min(S.betTo + S.minRaise, S.cm[S.toAct] + left(S.toAct))) : 0;
+  S.allinTo = S.toAct ? r1(S.cm[S.toAct] + left(S.toAct)) : 0;
+  return S;
+}
+
+/** 지금 차례인 사람이 고를 수 있는 액션 */
+function legalActs(S){
+  if(!S.toAct) return [];
+  const out = [];
+  if(S.toCall > 0){
+    out.push({a:"fold", n:"폴드"});
+    out.push({a:"call", n:"콜 "+nfmt(S.toCall)+"BB", amt:S.toCall});
+    if(S.allinTo > S.betTo) out.push({a:"raise", n:"레이즈"});
+  } else {
+    out.push({a:"check", n:"체크"});
+    if(S.allinTo > S.betTo) out.push({a:"bet", n:"벳"});
+  }
+  return out;
+}
 
 /* ============================================================
    PART 2. 저장소 · 성향 진단(모듈 A)

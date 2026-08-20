@@ -240,6 +240,142 @@ group('토너먼트');
   ok(typeof manwon === 'function' && typeof manchip === 'function', '만원/만칩 표시 함수 존재');
 }
 
+/* ───────────────── 액션 순서 엔진 ───────────────── */
+group('액션 순서');
+{
+  const { actOrder, ipVs, handState, legalActs, posList } = app;
+
+  // 순서: 프리플랍은 UTG부터, 포스트플랍은 SB부터
+  ok(actOrder(6, 0).join(',') === 'UTG,HJ,CO,BTN,SB,BB', '6맥스 프리플랍은 UTG부터', actOrder(6, 0).join(','));
+  ok(actOrder(6, 1).join(',') === 'SB,BB,UTG,HJ,CO,BTN', '6맥스 포스트플랍은 SB부터 · BTN 마지막', actOrder(6, 1).join(','));
+  ok(actOrder(9, 1)[0] === 'SB' && actOrder(9, 1).slice(-1)[0] === 'BTN', '9맥스도 SB 먼저 · BTN 마지막');
+  // 헤즈업: 버튼이 프리플랍 먼저, 포스트플랍 마지막
+  ok(actOrder(2, 0).join(',') === 'BTN(SB),BB', '헤즈업 프리플랍은 버튼부터', actOrder(2, 0).join(','));
+  ok(actOrder(2, 1).join(',') === 'BB,BTN(SB)', '헤즈업 포스트플랍은 BB부터', actOrder(2, 1).join(','));
+  ok(ipVs(2, 'BTN(SB)', 'BB') === true, '헤즈업에서 버튼이 포지션을 가진다 (v4.0까지 반대였다)');
+  ok(ipVs(2, 'BB', 'BTN(SB)') === false, '헤즈업에서 BB 는 포지션이 없다');
+  ok(ipVs(6, 'BTN', 'BB') === true, '6맥스 BTN vs BB → BTN 이 포지션');
+  ok(ipVs(6, 'SB', 'BTN') === false, '6맥스 SB vs BTN → SB 가 포지션 없음');
+  ok(ipVs(6, 'BB', 'SB') === true, '6맥스 BB vs SB → BB 가 포지션');
+
+  const cfg = (o) => Object.assign({ seats: 6, ante: 0, stack: 100, hero: 'BTN', boardLen: 0 }, o);
+
+  // 블라인드와 첫 차례
+  {
+    const S = handState(cfg(), []);
+    okNear(S.pot, 1.5, '블라인드만 있으면 팟 1.5BB');
+    ok(S.toAct === 'UTG', '첫 차례는 UTG', S.toAct);
+    okNear(S.toCall, 1, 'UTG 가 콜할 금액은 1BB');
+    okNear(S.cm.SB, 0.5, 'SB 가 0.5 냈다');
+    okNear(S.cm.BB, 1, 'BB 가 1 냈다');
+    const la = legalActs(S).map((x) => x.a).join(',');
+    ok(la === 'fold,call,raise', '벳을 맞은 자리는 폴드·콜·레이즈', la);
+  }
+  // 앤티
+  {
+    const S = handState(cfg({ ante: 0.125 }), []);
+    okNear(S.pot, 1.5 + 6 * 0.125, '앤티가 인원수만큼 팟에 들어간다');
+  }
+  // 폴드가 돌면 차례가 넘어간다
+  {
+    const S = handState(cfg(), [{ a: 'fold' }, { a: 'fold' }]);
+    ok(S.toAct === 'CO', 'UTG·HJ 폴드 후 차례는 CO', S.toAct);
+    ok(S.folded.UTG && S.folded.HJ, '폴드가 기록된다');
+    okNear(S.pot, 1.5, '폴드는 팟을 늘리지 않는다');
+  }
+  // 오픈 → 폴드 → BB 콜 → 플랍
+  {
+    const seq = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' },
+      { a: 'raise', to: 2.5 }, { a: 'fold' }, { a: 'call' }];
+    const S = handState(cfg(), seq);
+    okNear(S.pot, 2.5 + 2.5 + 0.5, 'BTN 2.5 오픈 · BB 콜 · SB 폴드 → 팟 5.5BB');
+    ok(S.live.join(',') === 'BTN,BB', '남은 사람은 BTN·BB', S.live.join(','));
+    ok(S.waitingBoard === true, '플랍 카드를 기다린다');
+    ok(S.needBoard === 3, '필요한 보드 장수 3', String(S.needBoard));
+    ok(S.toAct === null, '보드가 없으면 다음 차례가 없다');
+    const S2 = handState(cfg({ boardLen: 3 }), seq);
+    ok(S2.street === 1, '보드를 깔면 플랍으로 넘어간다', String(S2.street));
+    ok(S2.toAct === 'BB', '플랍 첫 차례는 BB (포지션 없는 쪽)', S2.toAct);
+    okNear(S2.toCall, 0, '플랍 첫 액션은 콜할 금액 0');
+    ok(legalActs(S2).map((x) => x.a).join(',') === 'check,bet', '벳이 없으면 체크·벳만');
+  }
+  // BB 옵션 — 다 콜해도 BB 는 한 번 더 친다
+  {
+    const seq = [{ a: 'call' }, { a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'call' }];
+    const S = handState(cfg({ hero: 'BB' }), seq);
+    ok(S.toAct === 'BB', '모두 콜해도 BB 에게 옵션이 온다', S.toAct);
+    okNear(S.toCall, 0, 'BB 는 이미 맞춰 놨으니 콜할 금액 0');
+    ok(legalActs(S).map((x) => x.a).join(',') === 'check,bet', 'BB 옵션은 체크 또는 레이즈(벳)');
+  }
+  // 3벳 · 최소 레이즈
+  {
+    const seq = [{ a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }];
+    const S = handState(cfg(), seq);
+    ok(S.toAct === 'BTN', '오픈 뒤 차례는 BTN', S.toAct);
+    okNear(S.betTo, 2.5, '맞춰야 할 금액 2.5');
+    okNear(S.minRaiseTo, 2.5 + 1.5, '최소 레이즈는 직전 레이즈 폭만큼 더');
+    const S3 = handState(cfg(), seq.concat([{ a: 'raise', to: 8 }]));
+    ok(S3.toAct === 'SB', '3벳 뒤 차례는 SB', S3.toAct);
+    okNear(S3.pot, 2.5 + 8 + 0.5 + 1, '3벳 팟');
+    const S4 = handState(cfg(), seq.concat([{ a: 'raise', to: 8 }, { a: 'fold' }, { a: 'fold' }]));
+    ok(S4.toAct === 'CO', '3벳에 블라인드가 접으면 오픈한 사람 차례', S4.toAct);
+    okNear(S4.toCall, 8 - 2.5, '오픈한 사람이 콜할 금액은 차액');
+  }
+  // 체크가 돌면 스트리트가 넘어간다
+  {
+    const pre = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'fold' }, { a: 'call' }];
+    const S = handState(cfg({ boardLen: 4 }), pre.concat([{ a: 'check' }, { a: 'check' }]));
+    ok(S.street === 2, '플랍에서 둘 다 체크하면 턴으로', String(S.street));
+    ok(S.toAct === 'BB', '턴 첫 차례도 BB', S.toAct);
+  }
+  // 체크-레이즈
+  {
+    const pre = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'fold' }, { a: 'call' }];
+    const S = handState(cfg({ boardLen: 3 }), pre.concat([{ a: 'check' }, { a: 'bet', to: 3 }, { a: 'raise', to: 10 }]));
+    ok(S.toAct === 'BTN', '체크-레이즈를 맞은 쪽이 다시 친다', S.toAct);
+    okNear(S.toCall, 7, '체크-레이즈에 콜할 금액은 차액 7');
+    okNear(S.pot, 5.5 + 3 + 10, '체크-레이즈 팟');
+  }
+  // 한 명만 남으면 핸드 종료
+  {
+    const S = handState(cfg(), [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'fold' }, { a: 'fold' }]);
+    ok(S.over === true, '한 명만 남으면 끝난다');
+    ok(S.ended === 'fold', '끝난 이유는 폴드', String(S.ended));
+    ok(S.toAct === null, '끝났으면 차례가 없다');
+  }
+  // 올인 상한
+  {
+    const S = handState(cfg({ stack: 12 }), [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 99 }]);
+    okNear(S.cm.BTN, 12, '스택보다 크게 넣을 수 없다');
+    ok(S.allin.BTN === true, '스택을 다 넣으면 올인으로 표시된다');
+  }
+  // 규칙에 안 맞는 시퀀스는 거기서 멈추고 앞부분만 반영한다
+  {
+    const S = handState(cfg(), [{ a: 'check' }]);
+    ok(S.applied === 0, '벳을 맞은 자리에서 체크는 적용되지 않는다', String(S.applied));
+    ok(!!S.err, '무엇이 잘못됐는지 알려준다', String(S.err));
+  }
+  // 모든 인원 수에서 죽지 않는다
+  for (const seats of [2, 6, 9]) {
+    let bad = null;
+    try {
+      const seq = [];
+      for (let i = 0; i < 40; i++) {
+        const S = handState(cfg({ seats, hero: posList(seats)[0], boardLen: 5 }), seq);
+        if (S.err) { bad = `${seats}인: ${S.err}`; break; }
+        if (S.over || !S.toAct) break;
+        const la = legalActs(S);
+        if (!la.length) { bad = `${seats}인: 고를 액션이 없다`; break; }
+        const pick = la.find((x) => x.a === 'call') || la.find((x) => x.a === 'check') || la[0];
+        seq.push(pick.a === 'bet' || pick.a === 'raise' ? { a: pick.a, to: S.minRaiseTo } : { a: pick.a });
+      }
+      const F = handState(cfg({ seats, hero: posList(seats)[0], boardLen: 5 }), seq);
+      if (!F.over) bad = `${seats}인: 끝까지 진행되지 않았다 (스트리트 ${F.street})`;
+    } catch (e) { bad = `${seats}인: ` + e.message; }
+    ok(!bad, `${seats}인 테이블을 끝까지 진행할 수 있다`, bad);
+  }
+}
+
 /* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
 group('대회 프로필');
 {

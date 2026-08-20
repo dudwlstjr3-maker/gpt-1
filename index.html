@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>홀덤 핸드 분석 — 성향 기반 복기 도구</title>
+<!-- 파비콘도 파일로 빼지 않고 안에 넣는다 (단일 HTML 유지) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1219'/%3E%3Cpath d='M16 6l7 10-7 10-7-10z' fill='%234fd1a5'/%3E%3C/svg%3E">
 <style>
 *{box-sizing:border-box}
 
@@ -275,6 +277,9 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   align-items:center;background:var(--b-panel);border-bottom:1px solid var(--b-line);
   padding:clamp(8px,1.1vw,16px) clamp(10px,1.4vw,20px);
   min-height:clamp(96px,12vw,176px)}
+/* 로고를 안 올렸으면 왼쪽 칸을 없애고 제목이 그 폭을 쓴다 */
+.bhead.nologo{grid-template-columns:1fr clamp(150px,18%,260px)}
+.bhead.nologo .btitle{padding-left:clamp(4px,1vw,14px);text-align:left}
 .blogo{display:flex;align-items:center;justify-content:flex-start;min-height:0;height:100%;overflow:visible;
   padding:4px 0;box-sizing:border-box}
 .blogo img{display:block;width:min(100%,clamp(150px,17vw,240px));max-width:100%;height:auto;max-height:none;
@@ -444,6 +449,15 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
+/* 전광판 로고 고르기 */
+.logobox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 2px;
+  padding:11px 12px;background:var(--bg2);border:1px solid var(--line);border-radius:10px}
+.lgprev{flex:0 0 auto;width:132px;height:62px;border-radius:8px;background:var(--b-panel);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center;padding:6px}
+.lgprev img{max-width:100%;max-height:100%;object-fit:contain}
+/* 미리보기 바탕은 전광판과 같은 어두운 색이라 글자도 전광판 색을 쓴다 */
+.lgnone{font-size:12.5px;color:var(--b-tx3)}
+.lgctl{flex:1 1 220px;min-width:0}
 .lvdrag{cursor:grab;user-select:none}.lvdrag:active{cursor:grabbing}
 #td-lv tr.lvdragging{opacity:.42}#td-lv tr.lvdragover td{border-top:2px solid var(--ac)}
 @media(max-width:640px){
@@ -722,7 +736,9 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
 <script>
 "use strict";
 /* 이 파일의 버전. 수정할 때마다 올리고 버전\ 폴더에 복사본을 남긴다. */
-const LOGO_DEFAULT = "finalnine-logo.png";
+/* 전광판 로고는 매장이 직접 올린다. 딸린 파일을 만들지 않으려고 data URI 로 localStorage 에 넣는다.
+   비어 있으면 전광판은 로고 칸 없이 제목만 크게 쓴다. 외부 파일명을 하드코딩하지 않는다. */
+const LOGO_MAX_BYTES = 400 * 1024;
 const APP_VER = "3.1";
 const APP_VER_NOTE = "드릴 정리 · 팟 계산 수정";
 /* ============================================================
@@ -2984,11 +3000,54 @@ function normTo100(arr){
   if(diff !== 0) out[0] = Math.round((out[0]+diff)*10)/10;
   return out;
 }
-/* curve: 작을수록 완만(뒷순위도 두둑), 클수록 1위 몰아주기 */
+/* curve: 작을수록 완만(뒷순위도 두둑), 클수록 1위 몰아주기
+
+   지급 인원으로 지정한 사람은 반드시 0보다 큰 상금을 받아야 한다.
+   1/i^e 를 그대로 정규화하면 인원이 많고 곡선이 가파를 때 뒷순위가 반올림에서 0% 로 깔려
+   「45위까지 지급」이라 써놓고 36~45위는 0원이 되는 모순이 생겼다(v3.1까지의 결함).
+   그래서 (1) 0.1% 를 최소 몫으로 먼저 떼어두고 (2) 남은 몫만 곡선대로 나누며
+   (3) 0.1% 단위 정수로 계산해 반올림 오차가 생기지 않게 한다.                      */
+const PAY_UNIT = 1000;   // 100% 를 0.1% 단위로
+const PAY_MIN  = 1;      // 지급 순위의 최소 몫 = 0.1%
 function payoutPct(spots, curve){
+  const n = Math.max(1, Math.round(spots));
+  if(n * PAY_MIN > PAY_UNIT) return new Array(n).fill(Math.round(PAY_UNIT/n)/10);
   const e = curve || 1, w = [];
-  for(let i=1;i<=spots;i++) w.push(1/Math.pow(i, e));
-  return normTo100(w);
+  for(let i=1;i<=n;i++) w.push(1/Math.pow(i, e));
+  const s = w.reduce((a,b)=>a+b,0);
+
+  const rest = PAY_UNIT - n*PAY_MIN;          // 최소 몫을 뗀 나머지를 곡선대로 나눈다
+  const raw  = w.map(x=>x/s*rest);
+  const base = raw.map(x=>Math.floor(x));
+  const left = rest - base.reduce((a,b)=>a+b,0);
+  /* 버림하고 남은 칸은 소수부가 큰 순서대로 하나씩 준다.
+     w 가 내림차순이라 같은 몫이면 상위 순위가 먼저 받고, 결과도 내림차순을 유지한다. */
+  const order = raw.map((x,i)=>({i:i, f:x-Math.floor(x)})).sort((a,b)=> b.f-a.f || a.i-b.i);
+  for(let k=0;k<left;k++) base[order[k].i]++;
+
+  return base.map(x=>(x+PAY_MIN)/10);
+}
+/* 지금 설정이 뒷순위를 최소 몫까지 눌렀는지 — 운영자에게 알려줄 때 쓴다 */
+function payoutFloored(spots, curve){
+  const p = payoutPct(spots, curve);
+  return p.filter(x=>x <= PAY_MIN/10).length;
+}
+/* 상금 배분이 운영상 말이 되는지 점검한다.
+   min-cash(꼴찌 상금)가 바이인보다 적으면 「상금권인데 본전도 못 찾는」 자리가 된다. */
+function tdPayWarn(pool){
+  if(!TD || !TD.pay || !TD.pay.length) return "";
+  const msg = [];
+  const flat = TD.payMode === "flat";
+  if(!flat){
+    const floored = payoutFloored(TD.payN, TD.payCurve);
+    if(floored > 0) msg.push('지급 인원 <b>'+TD.payN+'명</b>에 이 곡선은 너무 가팔라 <b>뒤 '+floored+'명</b>이 최소 몫(0.1%)까지 눌렸습니다. '+
+      '곡선을 완만하게 하거나 지급 인원을 줄이세요.');
+  }
+  const last = TD.pay[TD.pay.length-1];
+  const minCash = pool * last / 100;
+  if(TD.buyin > 0 && minCash < TD.buyin) msg.push('꼴찌 상금 <b>'+manwon(minCash)+'</b>이 바이인 <b>'+manwon(TD.buyin)+'</b>보다 적습니다. '+
+    '상금권인데 본전이 안 되는 자리라 보통은 지급 인원을 줄입니다.');
+  return msg.length ? '<div class="notice" style="border-left-color:var(--warn);color:var(--warn-tx)">'+msg.join('<br>')+'</div>' : '';
 }
 function tdPayForMode(){
   return TD.payMode === "flat"
@@ -3232,8 +3291,24 @@ function renderTDSetup(v){
       '<div><label>REBUY-IN (만원)</label><input id="td-rbprice" type="number" step="0.5" value="'+man(D.rebuyPrice)+'"></div>'+
       '<div><label>REBUY STACK (만)</label><input id="td-rbstack" type="number" step="10" value="'+man(D.rebuyStack)+'"></div>'+
     '</div>'+
-    '<div class="notice"><b>STARTING PLAYERS 9명</b>으로 시작합니다. 파이널 나인 로고는 항상 고정됩니다.</div>'+
-    '<div class="step"><span class="num">3</span> 레벨표 설정 <span class="sub">기본은 닫힘 상태입니다</span>'+
+    '<div class="notice"><b>STARTING PLAYERS 9명</b>으로 시작합니다.</div>'+
+
+    '<div class="step"><span class="num">3</span> 전광판 로고 <span class="sub">안 올려도 됩니다 — 없으면 매장명이 그 자리를 씁니다</span></div>'+
+    '<div class="logobox">'+
+      '<div class="lgprev">'+(DB.get("logo","")
+        ? '<img src="'+esc(DB.get("logo",""))+'" alt="현재 로고">'
+        : '<span class="lgnone">로고 없음</span>')+'</div>'+
+      '<div class="lgctl">'+
+        '<div class="row" style="gap:6px">'+
+          '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-logo-pick" type="button">이미지 고르기</button></div>'+
+          (DB.get("logo","") ? '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-logo-del" type="button">지우기</button></div>' : '')+
+        '</div>'+
+        '<div class="small dim" style="margin-top:5px">PNG · JPG · SVG · '+Math.round(LOGO_MAX_BYTES/1024)+'KB 이하. '+
+          '이 브라우저에 저장되고 백업에도 함께 담깁니다.</div>'+
+      '</div>'+
+      '<input type="file" id="td-logo-file" accept="image/*" style="display:none">'+
+    '</div>'+
+    '<div class="step"><span class="num">4</span> 레벨표 설정 <span class="sub">기본은 닫힘 상태입니다</span>'+
       '<button class="btn sec sm" id="td-lv-toggle" type="button" aria-expanded="'+TD_SETUP_LEVEL_OPEN+'" style="margin-left:auto">'+
         (TD_SETUP_LEVEL_OPEN?'레벨표 닫기':'레벨표 열기')+'</button></div>'+
     '<div id="td-setup-levels" style="display:'+(TD_SETUP_LEVEL_OPEN?'block':'none')+'">'+tdBadBanner()+tdLevelTable(true)+'</div>'+
@@ -3279,6 +3354,35 @@ function renderTDSetup(v){
     e.currentTarget.textContent = TD_SETUP_LEVEL_OPEN ? "레벨표 닫기" : "레벨표 열기";
     e.currentTarget.setAttribute("aria-expanded", String(TD_SETUP_LEVEL_OPEN));
   };
+  /* ---- 전광판 로고 ----
+     외부 파일을 만들지 않으려고 data URI 로 읽어 localStorage 에 넣는다. */
+  const lgPick = document.getElementById("td-logo-pick");
+  const lgFile = document.getElementById("td-logo-file");
+  if(lgPick && lgFile){
+    lgPick.onclick = ()=>lgFile.click();
+    lgFile.onchange = e=>{
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      if(!/^image\//.test(f.type)){ toast("이미지 파일만 올릴 수 있습니다"); lgFile.value=""; return; }
+      if(f.size > LOGO_MAX_BYTES){
+        toast("로고가 너무 큽니다 — "+Math.round(LOGO_MAX_BYTES/1024)+"KB 이하로 줄여주세요");
+        lgFile.value=""; return;
+      }
+      const rd = new FileReader();
+      rd.onload = ()=>{
+        try{
+          DB.set("logo", String(rd.result));
+          toast("전광판 로고를 저장했습니다");
+          renderTDSetup(v);
+        }catch(err){ toast("저장 공간이 부족합니다 — 더 작은 이미지를 써주세요"); }
+      };
+      rd.onerror = ()=>toast("이미지를 읽지 못했습니다");
+      rd.readAsDataURL(f);
+    };
+  }
+  const lgDel = document.getElementById("td-logo-del");
+  if(lgDel) lgDel.onclick = ()=>{ DB.del("logo"); toast("로고를 지웠습니다"); renderTDSetup(v); };
+
   bindLevelTable(v);
   document.getElementById("td-savesetup").onclick = ()=>{
     grab();
@@ -3397,12 +3501,12 @@ function renderTDClock(v){
 
   /* ===== 전광판 — 손님에게 보여주는 것만 ===== */
   const tb = timeToBreak(), tr = timeToReg(), prizeOpen = tr!==null && tr<=0;
-  const logo = LOGO_DEFAULT;
+  const logo = DB.get("logo","");
   const venue = TD.venue || "", title = TD.name || "토너먼트";
   let h = '<div id="td-screen" class="tdwrap">'+
 
-    '<div class="bhead">'+
-      '<div class="blogo">'+(logo ? '<img src="'+logo+'" alt="">' : '')+'</div>'+
+    '<div class="bhead'+(logo?'':' nologo')+'">'+
+      (logo ? '<div class="blogo"><img src="'+esc(logo)+'" alt=""></div>' : '')+
       '<div class="btitle">'+
         (venue ? '<div class="bname">'+esc(venue)+'</div>' : '')+
         '<div class="'+(venue?"bsub":"bname")+'">'+esc(title)+'</div>'+
@@ -3558,6 +3662,7 @@ function renderTDClock(v){
       (Math.abs(sum-100)>0.5 ? '<div style="flex:0 0 auto"><button class="btn sec sm" id="td-pay100">100%로 맞추기</button></div>' : '')+
     '</div>'+
     (Math.abs(sum-100)>0.5 ? '<div class="notice">합계가 100%가 아니면 전광판 금액이 총 상금과 어긋납니다.</div>' : '')+
+    tdPayWarn(pool)+
     '</div>';
 
   h += '<div class="card tdlevels"><h3>레벨 표</h3>'+

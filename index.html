@@ -1569,11 +1569,94 @@ function legalActs(S){
 /* ============================================================
    PART 2. 저장소 · 성향 진단(모듈 A)
    ============================================================ */
+/* ============================================================
+   PART 0. 저장소 · 선수 계정
+
+   서버가 없는 단일 HTML이라 «진짜 로그인»은 만들 수 없다.
+   대신 이 기기 안에 선수 계정을 여러 개 두고 전환한다 —
+   계정마다 성향 진단·핸드 기록·드릴·전적이 따로 쌓인다.
+   대회 설정·전광판·테마는 매장 것이라 계정과 상관없이 기기 하나에 공용으로 둔다.
+
+   PIN 은 브라우저 저장소에 그대로 들어가므로 «보안»이 아니다.
+   옆 사람이 실수로 남의 기록을 건드리지 않게 하는 잠금일 뿐이고, 화면에도 그렇게 적어 둔다.
+   ============================================================ */
+/* 계정별로 갈리는 키. 여기 없는 키는 기기 공용이다. */
+const ACCT_KEYS = ["profile","quizans","drillaxis","hands","setup","drills","drillcfg","hstyle","stats"];
+const acctKey = k => ACCT_KEYS.indexOf(k) >= 0 ? ("u" + curAcctId() + "." + k) : k;
+
 const DB = {
-  get(k,d){ try{ const v=localStorage.getItem("hb."+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
-  set(k,v){ try{ localStorage.setItem("hb."+k, JSON.stringify(v)); }catch(e){} },
-  del(k){ try{ localStorage.removeItem("hb."+k); }catch(e){} }
+  get(k,d){ try{ const v=localStorage.getItem("hb."+acctKey(k)); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("hb."+acctKey(k), JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem("hb."+acctKey(k)); }catch(e){} },
+  /* 계정 구분 없이 날것으로 — 이사·백업에만 쓴다 */
+  rawGet(k,d){ try{ const v=localStorage.getItem("hb."+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  rawSet(k,v){ try{ localStorage.setItem("hb."+k, JSON.stringify(v)); }catch(e){} }
 };
+
+/* ---- 계정 ---- */
+const acctList = () => { const a = DB.rawGet("accounts", []); return Array.isArray(a) ? a : []; };
+const acctSetList = a => DB.rawSet("accounts", a.slice(0, 40));
+function curAcctId(){
+  const list = acctList();
+  if(!list.length) return "0";
+  const cur = DB.rawGet("curacct", null);
+  return list.some(x=>x.id===cur) ? cur : list[0].id;
+}
+const curAcct = () => acctList().filter(x=>x.id===curAcctId())[0] || null;
+
+/* 계정 체계 이전 — 예전에 쓰던 기록을 첫 계정으로 옮긴다 (한 번만) */
+function acctMigrate(){
+  if(acctList().length) return;
+  const id = "u" + Date.now().toString(36);
+  let moved = 0;
+  try{
+    ACCT_KEYS.forEach(k=>{
+      const v = localStorage.getItem("hb."+k);
+      if(v !== null){ localStorage.setItem("hb.u"+id+"."+k, v); localStorage.removeItem("hb."+k); moved++; }
+    });
+  }catch(e){}
+  acctSetList([{id:id, n: moved ? "내 기록" : "선수 1", pin:"", at:Date.now()}]);
+  DB.rawSet("curacct", id);
+}
+function acctAdd(name){
+  const list = acctList();
+  if(list.length >= 40) return null;
+  const id = "u" + Date.now().toString(36) + Math.floor(Math.random()*100);
+  list.push({id:id, n:(name||"").trim() || ("선수 "+(list.length+1)), pin:"", at:Date.now()});
+  acctSetList(list);
+  return id;
+}
+function acctSwitch(id){
+  if(!acctList().some(x=>x.id===id)) return false;
+  DB.rawSet("curacct", id);
+  return true;
+}
+function acctRename(id, name){
+  const list = acctList(), a = list.filter(x=>x.id===id)[0];
+  if(!a) return false;
+  a.n = (name||"").trim() || a.n;
+  acctSetList(list);
+  return true;
+}
+function acctSetPin(id, pin){
+  const list = acctList(), a = list.filter(x=>x.id===id)[0];
+  if(!a) return false;
+  a.pin = /^\d{4}$/.test(pin||"") ? pin : "";
+  acctSetList(list);
+  return true;
+}
+/* 계정 하나를 지우면 그 계정 기록도 함께 지운다. 마지막 하나는 못 지운다. */
+function acctDelete(id){
+  const list = acctList();
+  if(list.length <= 1) return false;
+  if(!list.some(x=>x.id===id)) return false;
+  try{ ACCT_KEYS.forEach(k=>localStorage.removeItem("hb.u"+id+"."+k)); }catch(e){}
+  acctSetList(list.filter(x=>x.id!==id));
+  if(curAcctId() === id) DB.rawSet("curacct", acctList()[0].id);
+  return true;
+}
+/* 다른 코드가 DB 를 읽기 전에 계정 체계를 세워 둔다 */
+acctMigrate();
 function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("on"); setTimeout(()=>t.classList.remove("on"),1600); }
 const esc = s => String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 
@@ -1759,6 +1842,9 @@ function hbRestore(d){
 /* 초기화 범위를 두 갈래로 나눈다 — 학습 데이터와 매장 운영 데이터는 성격이 다르다 */
 const LEARN_KEYS = ["profile","quizans","drillaxis","hands","setup","drills","drillcfg","hstyle"];
 const TOUR_KEYS  = ["td","tdsetup","tdcustom","tdprofiles","tdslides","adcfg","logo","btheme"];
+/* 전적은 따로 둔다 — 학습 기록을 지운다고 우승 횟수까지 날리면 곤란하다.
+   전적 초기화는 계정 화면에서 따로 한다. */
+const STAT_KEYS  = ["stats"];
 
 /* 드릴에서 모은 성향 근거. 문항 하나보다 가볍게 반영한다(가중치 0.35). */
 const DRILL_W = 0.35;

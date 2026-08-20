@@ -788,6 +788,72 @@ group('상금 사다리');
   ctx.__APP.TD = null;
 }
 
+/* ───────────────── 선수 계정 ───────────────── */
+group('선수 계정');
+{
+  const { DB, acctList, acctAdd, acctSwitch, acctRename, acctDelete, acctSetPin,
+    curAcct, curAcctId, acctMigrate, ACCT_KEYS } = app;
+
+  ctx.localStorage.clear();
+  acctMigrate();
+  ok(acctList().length === 1, '처음 열면 계정 하나가 생긴다', String(acctList().length));
+  ok(!!curAcct(), '현재 계정이 잡힌다');
+
+  // 예전 기록이 있으면 첫 계정으로 옮겨진다
+  ctx.localStorage.clear();
+  ctx.localStorage.setItem('hb.hands', JSON.stringify([{ a: 1 }]));
+  ctx.localStorage.setItem('hb.profile', JSON.stringify({ n: 9 }));
+  ctx.localStorage.setItem('hb.td', JSON.stringify({ name: '대회' }));
+  acctMigrate();
+  ok(JSON.stringify(DB.get('hands', null)) === '[{"a":1}]', '예전 핸드 기록이 계정으로 옮겨진다');
+  ok(DB.get('profile', {}).n === 9, '예전 진단도 옮겨진다');
+  ok(ctx.localStorage.getItem('hb.hands') === null, '옛 자리에는 남지 않는다');
+  ok(JSON.stringify(DB.get('td', null)) === '{"name":"대회"}', '대회 설정은 기기 공용이라 그대로 있다');
+  ok(curAcct().n === '내 기록', '기록이 있던 계정 이름', curAcct().n);
+
+  // 계정마다 기록이 갈린다
+  const a1 = curAcctId();
+  const a2 = acctAdd('선수 B');
+  ok(!!a2 && a2 !== a1, '계정을 더 만들 수 있다');
+  ok(acctList().length === 2, '계정 2개');
+  ok(acctSwitch(a2), '계정을 바꾼다');
+  ok(curAcctId() === a2, '바꾼 계정이 현재 계정');
+  ok(DB.get('hands', null) === null, '새 계정은 기록이 비어 있다');
+  DB.set('hands', [{ b: 2 }]);
+  ok(acctSwitch(a1) && JSON.stringify(DB.get('hands', null)) === '[{"a":1}]',
+    '되돌아오면 원래 계정 기록이 그대로다');
+  ok(acctSwitch(a2) && JSON.stringify(DB.get('hands', null)) === '[{"b":2}]',
+    '다시 가면 그 계정 기록이 나온다');
+
+  // 대회 설정은 어느 계정에서도 같다
+  acctSwitch(a1); DB.set('td', { x: 1 });
+  acctSwitch(a2);
+  ok(JSON.stringify(DB.get('td', null)) === '{"x":1}', '대회 설정은 계정과 무관하게 공용');
+
+  // 이름 바꾸기 · PIN
+  ok(acctRename(a2, '선수 C') && acctList().filter((x) => x.id === a2)[0].n === '선수 C', '이름을 바꾼다');
+  ok(acctRename(a2, '   ') && acctList().filter((x) => x.id === a2)[0].n === '선수 C', '빈 이름은 무시한다');
+  ok(acctSetPin(a2, '1234') && acctList().filter((x) => x.id === a2)[0].pin === '1234', 'PIN 을 건다');
+  ok(acctSetPin(a2, '12') && acctList().filter((x) => x.id === a2)[0].pin === '', '4자리가 아니면 안 걸린다');
+  ok(acctSetPin(a2, 'abcd') && acctList().filter((x) => x.id === a2)[0].pin === '', '숫자가 아니면 안 걸린다');
+
+  // 삭제
+  acctSwitch(a2);
+  ok(acctDelete(a2), '계정을 지운다');
+  ok(acctList().length === 1 && curAcctId() === a1, '지우면 남은 계정으로 옮겨간다');
+  ok(ctx.localStorage.getItem('hb.u' + a2 + '.hands') === null, '지운 계정의 기록도 함께 지워진다');
+  ok(!acctDelete(a1), '마지막 하나는 못 지운다');
+  ok(acctList().length === 1, '마지막 계정은 남아 있다');
+
+  // 계정별로 갈리는 키가 학습 데이터를 덮는지
+  for (const k of ['profile', 'quizans', 'drillaxis', 'hands', 'drills', 'stats'])
+    ok(ACCT_KEYS.indexOf(k) >= 0, `${k} 는 계정별로 갈린다`);
+  for (const k of ['td', 'tdprofiles', 'logo', 'btheme', 'theme'])
+    ok(ACCT_KEYS.indexOf(k) < 0, `${k} 는 기기 공용이다`);
+  ctx.localStorage.clear();
+  acctMigrate();
+}
+
 /* ───────────────── 순위별 실제 지급액 (1만원 단위) ───────────────── */
 group('실제 지급액');
 {
@@ -1062,10 +1128,15 @@ group('저장소 · 백업');
   ok(used.size >= 12, `DB.set 으로 쓰는 키를 찾았다 (${used.size}개)`);
 
   ctx.localStorage.clear();
+  app.acctMigrate();                                   // 계정 체계를 세우고
   for (const k of used) DB.set(k, { probe: k });
   const dump = hbDump();
-  const missing = [...used].filter((k) => !(k in dump));
-  ok(missing.length === 0, '백업이 모든 저장 키를 담는다', '빠진 키: ' + missing.join(', '));
+  // 계정별 키는 hb.u<id>.<key> 로 들어간다 — 접두사가 붙어도 담겼으면 통과
+  const has = (k) => (k in dump) || Object.keys(dump).some((d) => d.endsWith('.' + k));
+  const missing = [...used].filter((k) => !has(k));
+  ok(missing.length === 0, '백업이 모든 저장 키를 담는다(계정 접두사 포함)', '빠진 키: ' + missing.join(', '));
+  ok(Object.keys(dump).some((k) => /^u[a-z0-9]+\./.test(k)),
+    '계정별 키가 접두사와 함께 담긴다', Object.keys(dump).slice(0, 4).join(', '));
 
   // 왕복
   ctx.localStorage.clear();
@@ -1082,6 +1153,15 @@ group('저장소 · 백업');
   ok(DB.get('v', 'none') === 'none', 'v4 의 버전 필드는 키로 저장하지 않는다');
 
   // 엉뚱한 입력에 죽지 않는다
+  // 계정 접두사가 없는 예전 백업은 «지금 계정» 으로 들어와야 한다
+  ctx.localStorage.clear();
+  app.acctMigrate();
+  hbRestore({ v: 4, hands: [{ old: 1 }] });
+  ok(JSON.stringify(DB.get('hands', null)) === '[{"old":1}]',
+    '접두사 없는 예전 백업은 지금 계정으로 들어온다', JSON.stringify(DB.get('hands', null)));
+  ok(ctx.localStorage.getItem('hb.hands') === null,
+    '예전 백업을 넣어도 계정 밖에 남지 않는다');
+
   ok(hbRestore(null) === 0, 'null 을 넣어도 0 을 돌려준다');
   ok(hbRestore('문자열') === 0, '문자열을 넣어도 0');
   ctx.localStorage.clear();
@@ -1090,9 +1170,9 @@ group('저장소 · 백업');
   ok(hbRestore({ v: 5, data: {} }) === 0, '빈 백업은 아무것도 덮어쓰지 않는다');
 
   // 초기화 범위가 모든 키를 빠짐없이, 겹치지 않게 나누는지
-  const covered = new Set([...LEARN_KEYS, ...TOUR_KEYS]);
-  const uncovered = [...used].filter((k) => !covered.has(k) && k !== 'theme');
-  ok(uncovered.length === 0, '초기화 두 갈래가 모든 키를 덮는다(테마 제외)', '안 덮인 키: ' + uncovered.join(', '));
+  const covered = new Set([...LEARN_KEYS, ...TOUR_KEYS, ...(app.STAT_KEYS || [])]);
+  const uncovered = [...used].filter((k) => !covered.has(k) && !['theme', 'accounts', 'curacct'].includes(k));
+  ok(uncovered.length === 0, '초기화 범위가 모든 키를 덮는다(테마·계정 목록 제외)', '안 덮인 키: ' + uncovered.join(', '));
   const overlap = LEARN_KEYS.filter((k) => TOUR_KEYS.includes(k));
   ok(overlap.length === 0, '학습/대회 초기화 범위가 겹치지 않는다', overlap.join(', '));
   ok(LEARN_KEYS.includes('quizans') && LEARN_KEYS.includes('drillaxis'),

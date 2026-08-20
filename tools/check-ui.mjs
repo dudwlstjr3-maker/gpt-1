@@ -149,18 +149,43 @@ async function scanContrast(page, where, root) {
     };
     // 반투명 배경은 뒤 배경 위에 실제로 합성해야 진짜 색이 나온다
     const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3]));
+    // 그라데이션은 backgroundColor 가 투명으로 나온다. 색 정지점을 모두 뽑아
+    // «가장 불리한 정지점» 으로 검사한다 — 버튼 배경이 대개 그라데이션이라 이게 없으면 검사가 눈을 감는다.
+    const gradStops = (el) => {
+      const bi = getComputedStyle(el).backgroundImage || '';
+      if (!/gradient/i.test(bi)) return [];
+      const out = [];
+      const re = /(?:rgba?|color)\([^)]*\)/gi;
+      let m;
+      while ((m = re.exec(bi)) !== null) { const c = parse(m[0]); if (c) out.push(c); }
+      return out;
+    };
     const bgOf = (el) => {
       const stack = [];
       let e = el;
       while (e && e !== document.documentElement) {
-        const c = parse(getComputedStyle(e).backgroundColor);
+        const cs = getComputedStyle(e);
+        const c = parse(cs.backgroundColor);
         if (c && c[3] > 0) { stack.push(c); if (c[3] >= 0.999) break; }
+        if (/gradient/i.test(cs.backgroundImage || '')) break;   // 그라데이션은 따로 본다
         e = e.parentElement;
       }
       const root = parse(getComputedStyle(document.documentElement).backgroundColor);
       let base = (root && root[3] >= 0.999) ? root.slice(0, 3) : [255, 255, 255];
       for (let i = stack.length - 1; i >= 0; i--) base = over(stack[i], base);
       return base;
+    };
+    /* 이 요소 뒤에 실제로 깔리는 색 후보들 — 그라데이션이면 정지점마다 하나씩 */
+    const bgCandidates = (el) => {
+      const under = bgOf(el);
+      const out = [];
+      for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+        const st = gradStops(e);
+        if (st.length) { st.forEach((c) => out.push(c[3] >= 0.999 ? c.slice(0, 3) : over(c, under))); break; }
+        const c = parse(getComputedStyle(e).backgroundColor);
+        if (c && c[3] >= 0.999) break;
+      }
+      return out.length ? out : [under];
     };
     const out = [];
     const seen = new Set();
@@ -171,11 +196,16 @@ async function scanContrast(page, where, root) {
       const txt = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue.trim()).join('');
       if (!txt) continue;
       const cs = getComputedStyle(el);
-      const fgp = parse(cs.color), bg = bgOf(el);
-      if (!fgp || !bg) continue;
-      const fg = fgp[3] >= 0.999 ? fgp.slice(0, 3) : over(fgp, bg);
-      const L1 = lum(fg), L2 = lum(bg);
-      const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+      const fgp = parse(cs.color);
+      if (!fgp) continue;
+      const cands = bgCandidates(el);
+      let ratio = Infinity, bg = cands[0];
+      for (const c of cands) {
+        const fg = fgp[3] >= 0.999 ? fgp.slice(0, 3) : over(fgp, c);
+        const L1 = lum(fg), L2 = lum(c);
+        const r = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+        if (r < ratio) { ratio = r; bg = c; }        // 가장 불리한 정지점 기준
+      }
       const size = parseFloat(cs.fontSize), bold = +cs.fontWeight >= 700;
       const need = (size >= 24 || (size >= 18.66 && bold)) ? 3 : 4.5;
       if (ratio < need) {

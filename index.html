@@ -499,6 +499,47 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
+/* --- 세션 세팅: 평소엔 접어 두고 한 줄로 요약 --- */
+.sessd{background:none;border:0;padding:0;margin:0}
+.sesssum{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;cursor:pointer;
+  font-size:13px;color:var(--tx2);list-style:none;padding:2px 0}
+.sesssum::-webkit-details-marker{display:none}
+.sesssum b{font-size:14.5px;color:var(--tx)}
+.sesssum span{color:var(--tx3);font-variant-numeric:tabular-nums}
+.sesssum i{margin-left:auto;font-style:normal;font-size:12.5px;color:var(--ac-tx);font-weight:700}
+.sessd[open] .sesssum i::after{content:" 닫기"}
+.sessd[open] .sesssum i{font-size:0}
+.sessd[open] .sesssum i::after{font-size:12.5px}
+.sesssum:hover i{text-decoration:underline}
+
+/* --- 핸드 입력: 테이블과 액션을 나란히 --- */
+/* 액션할 때 테이블이 화면에서 사라지면 위아래로 스크롤하게 된다. 옆에 붙여 둔다. */
+.playgrid{display:grid;grid-template-columns:minmax(290px,340px) minmax(0,1fr);
+  gap:16px;align-items:start;margin-top:12px}
+.pgleft{position:sticky;top:64px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:12px;padding:12px 13px}
+.pgh{font-size:12px;font-weight:800;color:var(--tx3);letter-spacing:1px;margin-bottom:6px}
+.pgleft .seatmap{margin:0 auto}
+.pgright{min-width:0}
+@media(max-width:900px){
+  /* 좁은 화면에서는 테이블 바로 아래에 액션이 오게 쌓는다 — 둘이 한 화면에 들어온다 */
+  .playgrid{grid-template-columns:1fr;gap:12px}
+  .pgleft{position:static}
+  .pgleft .seatmap{max-width:300px;height:168px}
+}
+.holedone{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--bg2);
+  border:1px solid var(--line);border-radius:11px;padding:9px 12px;margin:2px 0 0}
+.holedone .hl{font-size:12.5px;font-weight:700;color:var(--tx2);margin-right:2px}
+.holedone .btn{margin-left:auto}
+.pickbox{border:1px solid var(--vx-bd);background:var(--vx-bg);border-radius:11px;padding:12px 13px}
+.pkh{display:flex;align-items:baseline;gap:8px;font-size:14px;font-weight:700;color:var(--vx);margin-bottom:9px}
+.pkh span{font-size:12.5px;font-weight:400;color:var(--tx3)}
+.pickbox .slotrow{margin:0 0 10px}
+.pickbox .deck{margin:0}
+.stb{background:none;border:0;padding:0;cursor:pointer;display:inline-flex;gap:2px;
+  border-radius:5px;font-family:inherit}
+.stb:hover{outline:2px solid var(--ac);outline-offset:2px}
+
 /* --- 테이블 세팅 · 액션 순서 --- */
 .seat u{display:block;text-decoration:none;font-size:9.5px;font-weight:800;color:var(--warn-tx);margin-top:1px}
 .seat.me u{color:var(--on-ac);opacity:.85}
@@ -833,9 +874,10 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
 
 <!-- ================= 핸드 분석 ================= -->
 <section class="view" id="v-hand">
-  <div class="card">
-    <h2>세션 세팅</h2>
-    <p class="muted small">한 번 저장하면 다음부터 자동으로 불러옵니다.</p>
+  <div class="card tight">
+    <details class="sessd" id="sess-d">
+    <summary class="sesssum"><b>세션 세팅</b><span id="sess-line"></span><i>고치기</i></summary>
+    <p class="muted small" style="margin-top:10px">한 번 저장하면 다음부터 자동으로 불러옵니다.</p>
     <div class="grid g3" style="margin-top:10px">
       <div><label>게임 타입</label><select id="s-gt">
         <option value="cash">캐시 게임</option><option value="mtt">토너먼트(MTT)</option>
@@ -854,22 +896,23 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
       <div style="flex:0 0 auto"><button class="btn sec sm" id="s-save">세팅 저장</button></div>
     </div>
     <div id="br-advice"></div>
+    </details>
   </div>
 
   <div class="card">
     <h2>핸드 입력</h2>
 
-    <div class="step"><span class="num">1</span> 테이블 세팅 <span class="sub">자리를 눌러 내 자리를 정하세요</span></div>
-    <div class="seatmap" id="seat-map"></div>
-    <div class="sub" id="seat-hint" style="margin:8px 0 0;font-size:12.5px;color:var(--tx3);line-height:1.6"></div>
-    <div id="vt-chips" style="margin-top:12px"></div>
+    <div id="stage-hole"></div>
 
-    <div class="step"><span class="num">2</span> 카드 고르기 <span class="sub">아래 덱에서 탭하세요 · 이미 놓은 카드를 탭하면 지워집니다</span></div>
-    <div class="slotrow" id="slots"></div>
-    <div class="deck" id="deck"></div>
-
-    <div class="step"><span class="num">3</span> 액션을 순서대로 <span class="sub">차례는 앱이 계산합니다 · 단위는 BB</span></div>
-    <div id="acts2"></div>
+    <div class="playgrid">
+      <div class="pgleft">
+        <div class="pgh">테이블</div>
+        <div class="seatmap" id="seat-map"></div>
+        <div class="sub" id="seat-hint" style="margin:8px 0 0;font-size:12.5px;color:var(--tx3);line-height:1.6"></div>
+        <div id="vt-chips" style="margin-top:10px"></div>
+      </div>
+      <div class="pgright" id="acts2"></div>
+    </div>
 
     <div class="row" style="margin-top:16px">
       <div style="flex:0 0 auto"><button class="btn" id="h-run">분석하기</button></div>
@@ -2220,12 +2263,6 @@ function boardCards(){
   if(b.length===4 && HI.c.r0!=null) b.push(HI.c.r0);
   return b;
 }
-function nextTarget(from){
-  const i0 = SLOTS.indexOf(from)+1;
-  for(let i=i0;i<SLOTS.length;i++) if(slotOn(SLOTS[i]) && HI.c[SLOTS[i]]==null) return SLOTS[i];
-  for(let i=0;i<SLOTS.length;i++)  if(slotOn(SLOTS[i]) && HI.c[SLOTS[i]]==null) return SLOTS[i];
-  return from;
-}
 
 /* ---- 1. 테이블 세팅 ----
    자리를 누르면 내 자리가 되고, 나머지는 이 핸드에 앉아 있는 상대다.
@@ -2272,9 +2309,15 @@ function renderSeats(){
   });
 
   const hint = document.getElementById("seat-hint");
-  hint.innerHTML = '내 자리 <b>'+esc(HI.pos)+'</b> — 다른 자리를 누르면 바뀝니다. '+
-    '블라인드·앤티·스택은 위 <b>세션 세팅</b>을 따릅니다 (SB 0.5 / BB 1'+
+  hint.innerHTML = '내 자리 <b>'+esc(HI.pos)+'</b> — 다른 자리를 누르면 바뀝니다.<br>'+
+    '인원·스택·블라인드는 <a href="#" id="open-sess">세션 세팅</a>에서 (SB 0.5 / BB 1'+
     (cfg.ante>0 ? ' / 앤티 '+nfmt(cfg.ante)+'×'+cfg.seats : '')+'BB).';
+  const os = hint.querySelector("#open-sess");
+  if(os) os.onclick = e=>{
+    e.preventDefault();
+    const d = document.getElementById("sess-d");
+    if(d){ d.open = true; d.scrollIntoView({block:"nearest", behavior:"smooth"}); }
+  };
 }
 
 /* ---- 2. 상대 성향 — 아직 핸드에 남아 있는 사람만 보여준다 ---- */
@@ -2302,53 +2345,104 @@ function renderVT(){
   });
 }
 
-/* ---- 3. 카드: 슬롯 + 덱 ---- */
+/* ---- 3. 카드 고르기 ----
+   덱을 화면 위에 늘 띄워 두지 않는다. 지금 넣어야 할 카드가 있을 때
+   그 자리에서 열린다 — 내 카드 2장 → (액션) → 플랍 → (액션) → 턴 → 리버. */
+const boardSlotsFor = need => SLOTS.slice(2, 2+need);
 
-function renderSlots(){
-  if(!slotOn(HI.target) || HI.c[HI.target]!=null) HI.target = nextTarget(HI.target);
-  let h = "";
-  SLOTG.forEach(g=>{
-    h += '<div class="slotgrp"><div class="gl">'+g.k+
-         (g.k==="플랍"?' <span class="dim">(비우면 프리플랍만)</span>':'')+'</div><div class="gc">';
-    g.s.forEach(k=>{
-      const c = HI.c[k], on = slotOn(k);
-      const cls = "slot" + (c!=null ? " filled "+SU[st(c)] : "") + (HI.target===k?" tgt":"") + (on?"":" off");
-      h += '<button class="'+cls+'" data-k="'+k+'"'+(on?"":" disabled")+'>'+
-           (c!=null ? R[rk(c)]+SUCH[SU[st(c)]] : "+")+'</button>';
-    });
-    h += '</div></div>';
-  });
-  const sl = document.getElementById("slots");
-  sl.innerHTML = h;
-  sl.querySelectorAll(".slot").forEach(b=>b.onclick=()=>{
-    const k = b.dataset.k;
-    if(HI.c[k]!=null){ HI.c[k]=null; if(k==="f0"||k==="f1"||k==="f2"){ HI.c.t0=null; HI.c.r0=null; }
-                       if(k==="t0") HI.c.r0=null; }
-    HI.target = k;
-    renderSlots(); renderDeck(); renderActs();
-  });
+/** 지금 넣어야 할 카드가 있으면 무엇인지 알려준다 */
+function pendingPick(){
+  if(HI.c.h0==null || HI.c.h1==null) return {kind:"hole", slots:["h0","h1"], label:"내 카드"};
+  const S = curState();
+  if(S.waitingBoard){
+    const slots = boardSlotsFor(S.needBoard);
+    if(slots.some(k=>HI.c[k]==null))
+      return {kind:"board", slots:slots, label:STREETN[S.street+1], street:S.street+1};
+  }
+  return null;
 }
-function renderDeck(){
+/* 고를 자리가 바뀌면 커서도 따라간다 */
+function syncTarget(){
+  const p = pendingPick();
+  if(!p){ HI.target = null; return null; }
+  if(p.slots.indexOf(HI.target) < 0 || HI.c[HI.target] != null)
+    HI.target = p.slots.find(k=>HI.c[k]==null) || p.slots[0];
+  return p;
+}
+/* 스트리트 st 까지의 액션만 남기고 그 뒤는 버린다 (보드를 고치면 그 뒤 액션이 무의미해진다) */
+function trimSeqToStreet(st){
+  const S = curState();
+  let n = 0;
+  for(let k=0;k<=st && k<4;k++) n += S.log[k].length;
+  HI.seq = HI.seq.slice(0, n);
+}
+/* 보드 카드를 지우면 뒤 카드와 뒤 액션도 함께 정리한다 */
+function clearFrom(k){
+  if(k==="f0"||k==="f1"||k==="f2"){ HI.c.f0=HI.c.f1=HI.c.f2=null; HI.c.t0=null; HI.c.r0=null; trimSeqToStreet(0); }
+  else if(k==="t0"){ HI.c.t0=null; HI.c.r0=null; trimSeqToStreet(1); }
+  else if(k==="r0"){ HI.c.r0=null; trimSeqToStreet(2); }
+  else HI.c[k]=null;
+}
+
+function slotsHTML(label, keys){
+  return '<div class="slotgrp"><div class="gl">'+esc(label)+'</div><div class="gc">'+
+    keys.map(k=>{
+      const c = HI.c[k];
+      const cls = "slot" + (c!=null ? " filled "+SU[st(c)] : "") + (HI.target===k?" tgt":"");
+      return '<button class="'+cls+'" data-slot="'+k+'">'+
+        (c!=null ? R[rk(c)]+SUCH[SU[st(c)]] : "+")+'</button>';
+    }).join("") + '</div></div>';
+}
+function deckHTML(){
   const used = usedCards();
-  let h = "";
+  let h = '<div class="deck">';
   for(let s=0;s<4;s++){
     h += '<div class="dr">';
     for(let r=12;r>=0;r--){
       const c = r*4+s, u = used.indexOf(c)>=0;
-      h += '<button class="dc '+SU[s]+(u?" used":"")+'" data-c="'+c+'"'+(u?" disabled":"")+'>'+
+      h += '<button class="dc '+SU[s]+(u?" used":"")+'" data-card="'+c+'"'+(u?" disabled":"")+'>'+
            R[r]+'<small>'+SUCH[SU[s]]+'</small></button>';
     }
     h += '</div>';
   }
-  const dk = document.getElementById("deck");
-  dk.innerHTML = h;
-  dk.querySelectorAll(".dc").forEach(b=>b.onclick=()=>{
-    HI.c[HI.target] = +b.dataset.c;
-    HI.target = nextTarget(HI.target);
-    renderSlots(); renderDeck(); renderActs();
+  return h + '</div>';
+}
+/** 카드 고르는 묶음 하나 (슬롯 + 덱) */
+function pickerHTML(p){
+  return '<div class="slotrow">'+ slotsHTML(p.label, p.slots) +'</div>' + deckHTML();
+}
+function bindPicker(root){
+  root.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{
+    const k = b.dataset.slot;
+    if(HI.c[k]!=null) clearFrom(k);
+    HI.target = k;
+    buildHandInputs();
+  });
+  root.querySelectorAll("[data-card]").forEach(b=>b.onclick=()=>{
+    if(!HI.target) return;
+    HI.c[HI.target] = +b.dataset.card;
+    const p = pendingPick();
+    HI.target = p ? (p.slots.find(k=>HI.c[k]==null) || null) : null;
+    buildHandInputs();
   });
 }
 
+/* ---- 1. 내 카드 2장 — 다 고르면 한 줄로 접힌다 ---- */
+function renderHole(){
+  const el = document.getElementById("stage-hole");
+  const p = pendingPick();
+  if(p && p.kind === "hole"){
+    el.innerHTML = '<div class="step"><span class="num">1</span> 내 카드 2장'+
+      '<span class="sub">덱에서 탭하세요</span></div>' + pickerHTML(p);
+    bindPicker(el);
+    return;
+  }
+  el.innerHTML = '<div class="holedone">'+
+    '<span class="hl">내 카드</span>'+ cardHTML(HI.c.h0)+cardHTML(HI.c.h1)+
+    '<button class="btn sec sm" id="hole-edit">바꾸기</button></div>';
+  const e = el.querySelector("#hole-edit");
+  if(e) e.onclick = ()=>{ HI.c.h0=null; HI.c.h1=null; HI.target="h0"; buildHandInputs(); };
+}
 /* ---- 4. 액션: 상황에 맞는 버튼만 노출 ---- */
 /* ---- 4. 액션을 순서대로 ----
    차례·팟·콜할 금액은 전부 규칙에서 계산한다. 사용자는 "무엇을 했는지"만 고른다. */
@@ -2393,7 +2487,8 @@ function renderActs(){
     const potIn = log.length ? log[0].potBefore : S.potRaw;
     h += '<div class="seqst'+(st===S.street?" now":"")+'">'+
       '<span class="stn">'+STREETN[st]+'</span>'+
-      (st>0 ? '<span class="stb">'+board.slice(0, BOARD_NEED[st]).map(c=>cardHTML(c,true)).join("")+'</span>' : '')+
+      (st>0 ? '<button class="stb" data-redo="'+st+'" title="'+esc(STREETN[st])+' 카드를 다시 깔기">'+
+              board.slice(0, BOARD_NEED[st]).map(c=>cardHTML(c,true)).join("")+'</button>' : '')+
       '<span class="stp">팟 '+nfmt(Math.round(potIn*100)/100)+'BB</span></div>';
     h += log.length
       ? '<div class="seqrow">'+ log.map(e=>
@@ -2414,9 +2509,15 @@ function renderActs(){
       (S.ended==="fold" ? '한 명만 남아 끝났습니다.' : '리버까지 액션이 끝났습니다.')+
       ' 아래 <b>분석하기</b>를 누르세요.</div>';
   } else if(S.waitingBoard){
-    const need = S.needBoard, have = board.length;
-    h += '<div class="blk vx"><div class="t">'+esc(STREETN[S.street+1])+' 카드를 넣어주세요</div>'+
-      '위 덱에서 <b>'+(need-have)+'장</b>을 더 고르면 '+esc(STREETN[S.street+1])+' 액션이 열립니다.</div>';
+    if(HI.c.h0==null || HI.c.h1==null){
+      h += '<div class="blk warn"><div class="t">내 카드 먼저</div>'+
+        '위에서 <b>내 카드 2장</b>을 고르면 '+esc(STREETN[S.street+1])+' 카드를 넣을 수 있습니다.</div>';
+    } else {
+      const slots = boardSlotsFor(S.needBoard);
+      h += '<div class="pickbox"><div class="pkh">'+esc(STREETN[S.street+1])+' 카드를 넣어주세요'+
+        '<span>'+(S.needBoard - board.length)+'장 남음</span></div>'+
+        pickerHTML({slots:slots, label:STREETN[S.street+1]})+'</div>';
+    }
   } else if(S.toAct){
     const me = S.toAct === HI.pos;
     const legal = legalActs(S), sizes = sizeOptions(S);
@@ -2450,6 +2551,12 @@ function renderActs(){
     '<div class="tdreghint">'+HI.seq.length+'개 입력됨</div></div>';
 
   el.innerHTML = h;
+  bindPicker(el);
+  el.querySelectorAll("[data-redo]").forEach(b=>b.onclick=()=>{
+    const st = +b.dataset.redo;
+    clearFrom(st===1 ? "f0" : st===2 ? "t0" : "r0");
+    buildHandInputs();
+  });
 
   el.querySelectorAll("[data-do]").forEach(b=>b.onclick=()=>{
     const a = b.dataset.do;
@@ -2471,7 +2578,19 @@ function renderActs(){
   if(c) c.onclick = ()=>{ HI.seq = []; buildHandInputs(); };
 }
 
-function buildHandInputs(){ renderSeats(); renderVT(); renderSlots(); renderDeck(); renderActs(); }
+/* 접힌 세션 세팅 줄에 지금 값을 요약해 둔다 — 펴지 않아도 무엇으로 계산 중인지 보이게 */
+function renderSessLine(){
+  const el = document.getElementById("sess-line");
+  if(!el) return;
+  const g = id => document.getElementById(id);
+  const gt = {cash:"캐시", mtt:"토너먼트", sng:"SNG"}[g("s-gt").value] || g("s-gt").value;
+  const seats = {2:"헤즈업", 6:"6맥스", 9:"9맥스"}[+g("s-seats").value] || g("s-seats").value+"인";
+  const ante = +g("s-ante").value || 0;
+  el.textContent = [gt, seats, (+g("s-stack").value||100)+"BB",
+                    g("s-bl").value, ante>0 ? "앤티 "+nfmt(ante)+"BB" : null]
+                   .filter(Boolean).join(" · ");
+}
+function buildHandInputs(){ syncTarget(); renderSessLine(); renderHole(); renderSeats(); renderVT(); renderActs(); }
 
 function readHandInput(){
   if(HI.c.h0==null || HI.c.h1==null) return {err:"내 홀카드 2장을 골라주세요."};
@@ -4754,7 +4873,10 @@ window.addEventListener("DOMContentLoaded", function(){
   bankrollAdvice();
   renderHome();
   document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.v));
-  document.getElementById("s-seats").onchange = buildHandInputs;
+  ["s-seats","s-stack","s-ante","s-bl","s-gt"].forEach(id=>{
+    const e = document.getElementById(id);
+    if(e) e.addEventListener("change", buildHandInputs);
+  });
   document.getElementById("s-save").onclick = saveSetup;
   ["s-br","s-bl","s-gt"].forEach(id=>document.getElementById(id).onchange = bankrollAdvice);
   document.getElementById("h-run").onclick = runAnalysis;

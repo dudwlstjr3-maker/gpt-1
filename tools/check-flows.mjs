@@ -266,17 +266,42 @@ group('액션 순서 입력');
     '액션이 없으면 무엇이 빠졌는지 알려준다', (await txt('#h-out')).slice(0, 120));
 }
 
+/* ─────────── 세션 세팅 접기 ─────────── */
+group('세션 세팅');
+{
+  await tab('hand');
+  ok(!(await page.locator('#s-stack').isVisible()), '세션 세팅은 기본으로 접혀 있다');
+  const line = await txt('#sess-line');
+  ok(/6맥스/.test(line) && /100BB/.test(line), '접힌 줄에 지금 값이 요약된다', line);
+  // 좌석표 안내에서 바로 펼 수 있다
+  await page.click('#open-sess'); await page.waitForTimeout(250);
+  ok(await page.locator('#s-stack').isVisible(), '좌석표 안내를 누르면 세션 세팅이 펴진다');
+  await page.fill('#s-stack', '40'); await page.dispatchEvent('#s-stack', 'change');
+  await page.waitForTimeout(300);
+  ok((await txt('#sess-line')).includes('40BB'), '값을 바꾸면 요약 줄도 따라 바뀐다', await txt('#sess-line'));
+  ok((await txt('.turnbox .turnh')).includes('40BB'), '스택을 바꾸면 액션 패널에도 반영된다',
+    (await txt('.turnbox .turnh')).replace(/\n/g, ' '));
+  await page.fill('#s-stack', '100'); await page.dispatchEvent('#s-stack', 'change');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => { document.getElementById('sess-d').open = false; });
+}
+
 /* ─────────── 헤즈업 포지션 ─────────── */
 group('헤즈업');
 {
   await tab('hand');
   await page.click('#h-clear'); await page.waitForTimeout(200);
+  // 인원은 세션 세팅 안에 있다 — 접혀 있으면 펴고 고른다
+  await page.evaluate(() => { document.getElementById('sess-d').open = true; });
+  await page.waitForTimeout(150);
+  ok(await page.locator('#s-seats').isVisible(), '세션 세팅을 펴면 인원을 고를 수 있다');
   await page.selectOption('#s-seats', '2');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(350);
   const turn = await txt('.turnbox .turnh');
   ok(turn.includes('BTN(SB)'), '헤즈업 프리플랍은 버튼부터', turn.replace(/\n/g, ' '));
   await page.selectOption('#s-seats', '6');
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById('sess-d').open = false; });
 }
 
 /* ─────────── 성향 진단 ─────────── */

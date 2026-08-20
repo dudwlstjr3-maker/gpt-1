@@ -157,22 +157,126 @@ group('전광판 꾸미기');
   ok(await page.locator('.adrow').count() === 1, '삭제하면 한 장이 남는다');
 }
 
-/* ─────────── 핸드 분석 ─────────── */
+/* ─────────── 핸드 분석: 예시 ─────────── */
 group('핸드 분석');
 {
   await tab('hand');
   await page.click('#h-demo');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(300);
+  const seq = await txt('#acts2');
+  ok(/프리플랍/.test(seq) && /레이즈/.test(seq), '예시가 액션 순서로 채워진다', seq.replace(/\n/g, ' | ').slice(0, 160));
   await page.click('#h-run');
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(800);
   const out = await txt('#h-out');
   ok(out.length > 200, '분석 결과가 나온다', `길이 ${out.length}`);
   ok(!/\bundefined\b|\bNaN\b/.test(out), '결과에 undefined/NaN 이 없다',
     (out.match(/.{0,40}(undefined|NaN).{0,40}/) || [])[0]);
   ok(/필요 승률|MDF/.test(out), '필요 승률·MDF 가 표시된다');
   await page.click('#h-clear');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(250);
   ok((await txt('#h-out')).trim().length === 0, '초기화하면 결과가 지워진다');
+  ok((await txt('#acts2')).includes('아직 없음'), '초기화하면 액션도 지워진다');
+}
+
+/* ─────────── 핸드 분석: 액션을 직접 쌓기 ─────────── */
+group('액션 순서 입력');
+{
+  await tab('hand');
+  await page.click('#h-clear');
+  await page.waitForTimeout(250);
+
+  const turn = () => txt('.turnbox .turnh');
+  const doAct = async (label) => {
+    const b = page.locator('.turnb .btn').filter({ hasText: label }).first();
+    await b.click(); await page.waitForTimeout(180);
+  };
+
+  // 블라인드가 서 있고 UTG 차례
+  ok((await turn()).includes('UTG'), '처음 차례는 UTG', (await turn()).replace(/\n/g, ' '));
+  ok((await turn()).includes('1.5BB'), '블라인드만 있으면 팟 1.5BB', (await turn()).replace(/\n/g, ' '));
+
+  // UTG·HJ·CO 폴드 → BTN(나) 차례
+  await doAct('폴드'); await doAct('폴드'); await doAct('폴드');
+  ok((await turn()).includes('BTN'), '세 명이 접으면 BTN 차례', (await turn()).replace(/\n/g, ' '));
+  ok((await turn()).includes('(나)'), '내 차례라고 표시된다');
+
+  // 2.5배 레이즈
+  await doAct('2.5배');
+  ok((await turn()).includes('SB'), '레이즈하면 SB 차례', (await turn()).replace(/\n/g, ' '));
+  await doAct('폴드');
+  ok((await turn()).includes('BB'), 'SB 가 접으면 BB 차례', (await turn()).replace(/\n/g, ' '));
+  ok((await turn()).includes('1.5BB'), 'BB 는 1.5BB 만 더 내면 된다', (await turn()).replace(/\n/g, ' '));
+
+  await doAct('콜');
+  await page.waitForTimeout(220);
+  const log = await txt('#acts2');
+  ok(/UTG\s*폴드/.test(log) && /BTN\(나\)\s*레이즈\s*2\.5/.test(log) && /BB\s*콜/.test(log),
+    '액션 로그가 순서대로 쌓인다', log.replace(/\n/g, ' | ').slice(0, 200));
+  ok(/플랍 카드를 넣어주세요|플랍/.test(log), '프리플랍이 끝나면 플랍 카드를 요청한다');
+
+  // 되돌리기
+  await page.click('#seq-undo'); await page.waitForTimeout(220);
+  ok((await turn()).includes('BB'), '되돌리면 BB 차례로 돌아온다', (await turn()).replace(/\n/g, ' '));
+  await doAct('콜'); await page.waitForTimeout(220);
+
+  // 홀카드 2장 + 플랍 3장
+  const deck = page.locator('.deck .dc:not(.used)');
+  for (let i = 0; i < 5; i++) { await deck.first().click(); await page.waitForTimeout(140); }
+  await page.waitForTimeout(300);
+  const log2 = await txt('#acts2');
+  ok(!/카드를 넣어주세요/.test(log2), '플랍을 깔면 액션이 열린다', log2.replace(/\n/g, ' | ').slice(-140));
+  ok((await turn()).includes('BB'), '플랍 첫 차례는 BB (포지션 없는 쪽)', (await turn()).replace(/\n/g, ' '));
+  ok((await turn()).includes('앞에 벳 없음'), '플랍 첫 액션은 콜할 금액이 없다');
+
+  // 체크 → 내가 ½팟 벳 → BB 콜
+  await doAct('체크');
+  ok((await turn()).includes('BTN'), '체크가 돌면 내 차례', (await turn()).replace(/\n/g, ' '));
+  await doAct('½팟');
+  ok((await turn()).includes('BB'), '내가 치면 BB 차례', (await turn()).replace(/\n/g, ' '));
+  ok(/콜하려면/.test(await turn()), 'BB 는 콜할 금액이 생긴다');
+  await doAct('콜');
+  await page.waitForTimeout(250);
+  ok(/턴 카드를 넣어주세요|턴/.test(await txt('#acts2')), '플랍이 끝나면 턴 카드를 요청한다');
+
+  // 턴: 이번에는 상대가 치고 내가 받는다 — 필요 승률이 나오는 쪽
+  await deck.first().click();
+  await page.waitForTimeout(300);
+  ok((await turn()).includes('BB'), '턴 첫 차례도 BB', (await turn()).replace(/\n/g, ' '));
+  await doAct('⅔팟');
+  ok((await turn()).includes('BTN'), '상대가 치면 내 차례', (await turn()).replace(/\n/g, ' '));
+  ok(/콜하려면/.test(await turn()), '내가 콜할 금액이 표시된다', (await turn()).replace(/\n/g, ' '));
+  await doAct('콜');
+  await page.waitForTimeout(250);
+
+  // 분석
+  await page.click('#h-run');
+  await page.waitForTimeout(900);
+  const out = await txt('#h-out');
+  ok(out.length > 200, '직접 쌓은 핸드도 분석된다', `길이 ${out.length}`);
+  ok(!/\bundefined\b|\bNaN\b/.test(out), '결과에 undefined/NaN 이 없다',
+    (out.match(/.{0,40}(undefined|NaN).{0,40}/) || [])[0]);
+  ok(/필요 승률/.test(out), '상대 벳을 맞은 스트리트에 필요 승률이 나온다');
+  ok(/MDF/.test(out), 'MDF 도 나온다');
+  ok(/플랍/.test(out) && /턴/.test(out), '플랍·턴 두 스트리트가 모두 분석된다');
+
+  // 액션을 지우면 분석이 막힌다
+  await page.click('#seq-clear'); await page.waitForTimeout(250);
+  await page.click('#h-run'); await page.waitForTimeout(400);
+  ok(/액션을 하나 이상/.test(await txt('#h-out')) || (await txt('#h-out')).trim().length < 80,
+    '액션이 없으면 무엇이 빠졌는지 알려준다', (await txt('#h-out')).slice(0, 120));
+}
+
+/* ─────────── 헤즈업 포지션 ─────────── */
+group('헤즈업');
+{
+  await tab('hand');
+  await page.click('#h-clear'); await page.waitForTimeout(200);
+  await page.selectOption('#s-seats', '2');
+  await page.waitForTimeout(300);
+  const turn = await txt('.turnbox .turnh');
+  ok(turn.includes('BTN(SB)'), '헤즈업 프리플랍은 버튼부터', turn.replace(/\n/g, ' '));
+  await page.selectOption('#s-seats', '6');
+  await page.waitForTimeout(250);
 }
 
 /* ─────────── 성향 진단 ─────────── */

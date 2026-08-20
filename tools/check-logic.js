@@ -397,6 +397,7 @@ group('시퀀스 → 분석');
     ok(!inp.err, '어댑터가 입력을 만든다', inp.err);
     if (!inp.err) {
       ok(inp.pf === 'open_call', '내가 오픈하고 상대가 콜 → open_call', inp.pf);
+      okNear(inp.pfPot, 5.5, '프리플랍 종료 팟이 실제 액션에서 나온다');
       ok(inp.pos === 'BTN' && inp.vpos === 'BB', '내 자리·상대 자리', `${inp.pos} vs ${inp.vpos}`);
       ok(inp.vils.length === 1, '상대는 한 명');
       const st = inp.streets[0];
@@ -411,6 +412,18 @@ group('시퀀스 → 분석');
       okNear(st.pot / (st.pot + st.vSize), 5.5 / 8.25, 'MDF = 팟/(팟+벳)');
     }
   }
+  // 오픈 사이즈가 다르면 프리플랍 팟도 달라진다 (프리셋 5.5 에 고정되면 안 된다)
+  {
+    const seq = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 4 }, { a: 'fold' }, { a: 'call' },
+      { a: 'bet', to: 4 }, { a: 'call' }];
+    const inp = seqToInput(cfg({ boardLen: 3 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c']));
+    okNear(inp.pfPot, 8.5, '4BB 오픈이면 프리플랍 팟은 8.5BB');
+    okNear(inp.streets[0].pot, 8.5, '플랍 상대 벳 앞 팟도 8.5BB');
+    const res = analyze(inp);
+    okNear(res.pf.pot, 8.5, 'analyze 결과에도 실제 팟이 실린다');
+    ok(res.pf.fromSeq === true, '시퀀스에서 온 입력이라고 표시된다');
+  }
+
   // 체크-레이즈: 내가 벳하고 상대가 레이즈, 내가 콜 → 차액만 넣는다
   {
     const seq = pre.concat([{ a: 'check' }, { a: 'bet', to: 3 }, { a: 'raise', to: 10 }, { a: 'call' }]);

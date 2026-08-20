@@ -499,6 +499,56 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
+/* --- 테이블 세팅 · 액션 순서 --- */
+.seat u{display:block;text-decoration:none;font-size:9.5px;font-weight:800;color:var(--warn-tx);margin-top:1px}
+.seat.me u{color:var(--on-ac);opacity:.85}
+.seat.out{opacity:.4}
+.seat.out u{color:var(--tx3)}
+.seat.turn{border-color:var(--ac2);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac2) 32%,transparent)}
+@supports not (background:color-mix(in srgb,red 50%,transparent)){.seat.turn{box-shadow:var(--ring)}}
+.seat.ai{border-color:var(--bad)}
+.vtgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:7px}
+.vtcell{display:flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:9px;padding:6px 9px;margin:0}
+.vtcell .vtp{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--warn-tx);min-width:34px}
+.vtcell select{padding:5px 7px;font-size:12.5px;border-radius:7px}
+
+.seqlog{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin:0 0 11px}
+.seqst{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:9px 0 5px;font-size:12.5px}
+.seqst:first-child{margin-top:0}
+.seqst .stn{font-weight:800;color:var(--tx2);letter-spacing:.3px}
+.seqst.now .stn{color:var(--ac-tx)}
+.seqst .stp{margin-left:auto;color:var(--tx3);font-variant-numeric:tabular-nums}
+.seqrow{display:flex;flex-wrap:wrap;gap:5px}
+.sq{display:inline-flex;align-items:baseline;gap:5px;background:var(--card);border:1px solid var(--line);
+  border-radius:7px;padding:3px 9px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.sq i{font-style:normal;font-size:11px;font-weight:800;color:var(--tx3)}
+.sq.me{border-color:var(--ac);background:var(--ac-bg)}
+.sq.me i{color:var(--ac-tx)}
+.sq.f{opacity:.55}
+.sqe{font-size:12px;color:var(--tx3)}
+
+.turnbox{border:1px solid var(--ac2-bd);background:var(--ac2-bg);border-radius:11px;padding:12px 13px}
+.turnbox.me{border-color:var(--ac-bd);background:var(--ac-bg)}
+.turnh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:9px;font-size:14.5px}
+.turnh b{font-size:16px;color:var(--ac2-tx)}
+.turnbox.me .turnh b{color:var(--ac-tx)}
+.turnh .tsub{font-size:12.5px;color:var(--tx2);font-variant-numeric:tabular-nums}
+.turnb{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.turnb .btn{padding:8px 14px;font-size:13.5px}
+.turnb .btn.sz{padding:7px 11px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.turnb .btn.sz u{text-decoration:none;font-weight:800;color:var(--ac-tx)}
+.turnb .tsep{flex:0 0 auto;width:1px;align-self:stretch;background:var(--line2);margin:0 4px;min-height:26px}
+.turnb .tlab{font-size:12px;font-weight:700;color:var(--tx3);letter-spacing:.5px}
+.turnb .tin{display:inline-flex;gap:5px;align-items:center}
+.turnb .tin input{width:120px;padding:7px 9px;font-size:13px}
+.turnb .tin .btn{padding:7px 12px;font-size:12.5px}
+@media(max-width:640px){
+  .turnb .tsep{display:none}
+  .turnb .tin{width:100%}
+  .turnb .tin input{flex:1 1 auto;width:auto}
+}
+
 /* --- 전광판 광고 띠 (손님 화면) --- */
 .badbar{position:relative;margin:clamp(10px,1.4vw,18px) clamp(10px,1.6vw,22px) 0;
   height:clamp(56px,7vw,96px);border-radius:12px;overflow:hidden;
@@ -809,22 +859,16 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
   <div class="card">
     <h2>핸드 입력</h2>
 
-    <div class="step"><span class="num">1</span> 자리 고르기</div>
-    <div class="sub" id="seat-hint" style="margin:-4px 0 4px;font-size:12px;color:var(--tx3)"></div>
+    <div class="step"><span class="num">1</span> 테이블 세팅 <span class="sub">자리를 눌러 내 자리를 정하세요</span></div>
     <div class="seatmap" id="seat-map"></div>
+    <div class="sub" id="seat-hint" style="margin:8px 0 0;font-size:12.5px;color:var(--tx3);line-height:1.6"></div>
+    <div id="vt-chips" style="margin-top:12px"></div>
 
-    <div class="step"><span class="num">2</span> 상대는 어떤 사람인가요 <span class="sub">모르면 그대로 두세요</span></div>
-    <div class="bg" id="vt-chips" style="display:flex"></div>
-    <div class="small dim" id="vt-desc" style="margin-top:6px"></div>
-
-    <div class="step"><span class="num">3</span> 프리플랍은 어떻게 됐나요</div>
-    <div class="bg" id="pf-chips" style="display:flex"></div>
-
-    <div class="step"><span class="num">4</span> 카드 고르기 <span class="sub">아래 덱에서 탭하세요 · 이미 놓은 카드를 탭하면 지워집니다</span></div>
+    <div class="step"><span class="num">2</span> 카드 고르기 <span class="sub">아래 덱에서 탭하세요 · 이미 놓은 카드를 탭하면 지워집니다</span></div>
     <div class="slotrow" id="slots"></div>
     <div class="deck" id="deck"></div>
 
-    <div class="step"><span class="num">5</span> 액션 넣기 <span class="sub">단위는 BB</span></div>
+    <div class="step"><span class="num">3</span> 액션을 순서대로 <span class="sub">차례는 앱이 계산합니다 · 단위는 BB</span></div>
     <div id="acts2"></div>
 
     <div class="row" style="margin-top:16px">
@@ -1367,8 +1411,12 @@ function seqToInput(cfg, seq, cards){
   const lastAgg = [3,2,1,0].map(k=>S.aggBy[k]).filter(p=>p && p!==hero)[0];
   const vpos = lastAgg && vils.indexOf(lastAgg)>=0 ? lastAgg : vils[vils.length-1];
 
+  /* 프리플랍이 끝났을 때(= 플랍이 시작될 때) 실제 팟. 프리셋 값 대신 이걸 보여준다. */
+  const pfPot = (S.log[1] && S.log[1].length) ? S.log[1][0].potBefore
+              : (S.street >= 1 ? S.potRaw : null);
+
   return {
-    seats: +cfg.seats, gt: cfg.gt, stack: cfg.stack,
+    seats: +cfg.seats, gt: cfg.gt, stack: cfg.stack, pfPot: pfPot,
     pos: hero, vpos: vpos, pf: streets.length ? pfScenarioOf(S, hero) : "pf_only",
     vt: cfg.seatVT[vpos] || "unknown",
     vils: vils.map(p=>({pos:p, vt:cfg.seatVT[p] || "unknown"})),
@@ -1808,6 +1856,8 @@ function analyze(inp){
   res.pf.heroClasses = scen.hR(inp.pos);
   const pfEq = equityVsRanges(hole, [], vilR);
   res.pf.eq = pfEq.eq; res.pf.eqInfo = pfEq;
+  res.pf.pot = (inp.pfPot != null) ? inp.pfPot : (scen.pot + (nV-1)*scen.vInv);
+  res.pf.fromSeq = !!inp.streets;
 
   /* ---------- 포스트플랍 ---------- */
   /* 참가자가 늘면 프리플랍에 들어온 돈도 그만큼 늘어난다 */
@@ -2148,10 +2198,13 @@ const SLOTG = [
   {k:"턴",     s:["t0"]},
   {k:"리버",   s:["r0"]}
 ];
+/* 핸드 입력 상태.
+   액션은 순서대로 쌓은 배열 하나(seq)뿐이다 — 누가 칠 차례인지, 팟이 얼마인지,
+   콜하려면 얼마를 더 내야 하는지는 전부 handState() 가 규칙에서 계산한다. */
 const HI = {
-  pos:"BTN", vils:[{pos:"BB", vt:"unknown"}], agg:0, mode:"vil", pf:"open_call", target:"h0",
+  pos:"BTN", seatVT:{}, target:"h0",
   c:{h0:null,h1:null,f0:null,f1:null,f2:null,t0:null,r0:null},
-  acts:[{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0}]
+  seq:[]
 };
 const flopDone = () => HI.c.f0!=null && HI.c.f1!=null && HI.c.f2!=null;
 function slotOn(k){
@@ -2174,93 +2227,83 @@ function nextTarget(from){
   return from;
 }
 
-/* ---- 1. 자리: 테이블 그림에서 탭. 탭할 때마다 빈자리 → 나 → 상대 → 빈자리 ---- */
-const vilIdx = p => HI.vils.findIndex(v=>v.pos===p);
+/* ---- 1. 테이블 세팅 ----
+   자리를 누르면 내 자리가 되고, 나머지는 이 핸드에 앉아 있는 상대다.
+   누가 빠지는지는 따로 고르지 않는다 — 액션에서 폴드하면 그때 빠진다. */
+function curCfg(){
+  const g = id => document.getElementById(id);
+  return {
+    seats: +g("s-seats").value || 6,
+    stack: +g("s-stack").value || 100,
+    ante:  +g("s-ante").value  || 0,
+    gt:    g("s-gt").value,
+    hero:  HI.pos,
+    seatVT: HI.seatVT,
+    boardLen: boardCards().length
+  };
+}
+const curState = () => handState(curCfg(), HI.seq);
+
 function renderSeats(){
-  const seats = +document.getElementById("s-seats").value;
-  const L = posList(seats);
-  HI.vils = HI.vils.filter(v=>L.indexOf(v.pos)>=0 && v.pos!==HI.pos);
-  if(L.indexOf(HI.pos)<0) HI.pos = L[Math.max(0, L.length-3)];
-  if(!HI.vils.length){
-    const cand = L.filter(p=>p!==HI.pos);
-    HI.vils = [{pos:(cand.indexOf("BB")>=0?"BB":cand[cand.length-1]), vt:"unknown"}];
-  }
-  if(HI.agg >= HI.vils.length) HI.agg = 0;
+  const cfg = curCfg(), L = posList(cfg.seats);
+  if(L.indexOf(HI.pos) < 0) HI.pos = L[Math.max(0, L.length-3)];
+  const S = handState(cfg, HI.seq);
   const btn = L.indexOf("BTN")>=0 ? L.indexOf("BTN") : L.length-2;
-  let h = '<div class="felt"><span>'+seats+'인 테이블</span></div>';
+
+  let h = '<div class="felt"><span>'+cfg.seats+'인 · 팟 '+nfmt(S.pot)+'BB</span></div>';
   L.forEach((p,i)=>{
     const ang = (90 + (i-btn)*(360/L.length)) * Math.PI/180;
     const x = 50 + 44*Math.cos(ang), y = 50 + 42*Math.sin(ang);
-    const vi = vilIdx(p);
-    const cls = p===HI.pos ? "me" : vi>=0 ? "vil" : "";
-    h += '<button class="seat '+cls+'" style="left:'+x.toFixed(1)+'%;top:'+y.toFixed(1)+'%" data-p="'+p+'">'+
-         '<b>'+(p===HI.pos?"나":vi>=0?"상대":"&nbsp;")+'</b>'+p+'</button>';
+    const me = p===HI.pos;
+    const cls = [me?"me":"", S.folded[p]?"out":"", S.toAct===p?"turn":"", S.allin[p]?"ai":""].filter(Boolean).join(" ");
+    const put = S.cm[p] > 0 ? nfmt(r1(S.cm[p])) : "";
+    h += '<button class="seat '+cls+'" style="left:'+x.toFixed(1)+'%;top:'+y.toFixed(1)+'%" '+
+         'data-p="'+p+'" title="'+esc(p)+(me?" — 내 자리":"")+'">'+
+         '<b>'+(me?"나":S.folded[p]?"폴드":S.allin[p]?"올인":"&nbsp;")+'</b>'+esc(p)+
+         (put?'<u>'+put+'</u>':'')+'</button>';
   });
   const map = document.getElementById("seat-map");
   map.innerHTML = h;
   map.querySelectorAll(".seat").forEach(b=>b.onclick=()=>{
-    const p = b.dataset.p, vi = vilIdx(p);
-    if(HI.mode === "me"){                       // 내 자리 지정
-      if(vi >= 0) HI.vils.splice(vi,1);
-      HI.pos = p;
-      if(!HI.vils.length){ toast("상대가 최소 한 명은 있어야 합니다"); HI.vils=[{pos:L.filter(q=>q!==p)[0], vt:"unknown"}]; }
-    } else {                                    // 상대 추가 / 제거
-      if(p === HI.pos){ toast("여긴 내 자리입니다 — 위에서 '내 자리' 모드로 바꾸세요"); return; }
-      if(vi >= 0){
-        if(HI.vils.length === 1){ toast("상대가 최소 한 명은 있어야 합니다"); return; }
-        HI.vils.splice(vi,1);
-      } else {
-        HI.vils.push({pos:p, vt:"unknown"});
-        HI.vils.sort((a,b2)=>L.indexOf(a.pos)-L.indexOf(b2.pos));
-      }
-    }
-    if(HI.agg >= HI.vils.length) HI.agg = 0;
-    renderSeats(); renderVT(); renderActs();
+    if(b.dataset.p === HI.pos) return;
+    if(HI.seq.length && !confirm("내 자리를 바꾸면 지금까지 넣은 액션이 지워집니다. 계속할까요?")) return;
+    HI.pos = b.dataset.p; HI.seq = [];
+    buildHandInputs();
   });
-  document.getElementById("seat-hint").innerHTML =
-    '<span class="bg" style="display:inline-flex;margin-right:8px">'+
-      '<button data-m="me"  class="'+(HI.mode==="me" ?"on":"")+'">내 자리</button>'+
-      '<button data-m="vil" class="'+(HI.mode!=="me"?"on":"")+'">상대 추가·제거</button>'+
-    '</span>'+
-    '나 <b>'+esc(HI.pos)+'</b> · 상대 <b>'+HI.vils.length+'명</b> ('+HI.vils.map(v=>esc(v.pos)).join(", ")+')';
-  document.getElementById("seat-hint").querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{
-    HI.mode = b.dataset.m; renderSeats(); });
+
+  const hint = document.getElementById("seat-hint");
+  hint.innerHTML = '내 자리 <b>'+esc(HI.pos)+'</b> — 다른 자리를 누르면 바뀝니다. '+
+    '블라인드·앤티·스택은 위 <b>세션 세팅</b>을 따릅니다 (SB 0.5 / BB 1'+
+    (cfg.ante>0 ? ' / 앤티 '+nfmt(cfg.ante)+'×'+cfg.seats : '')+'BB).';
 }
 
-/* ---- 2. 상대별 성향 ---- */
+/* ---- 2. 상대 성향 — 아직 핸드에 남아 있는 사람만 보여준다 ---- */
 function renderVT(){
+  const cfg = curCfg(), S = handState(cfg, HI.seq);
   const el = document.getElementById("vt-chips");
-  el.style.display = "block";
-  el.innerHTML = HI.vils.map((v,i)=>
-    '<div class="arow" style="margin-bottom:7px">'+
-      '<span class="al" style="flex:0 0 46px;font-weight:700;color:var(--warn)">'+esc(v.pos)+'</span>'+
-      '<select data-i="'+i+'" class="vt-sel" style="max-width:250px">'+
-        Object.keys(VTYPE).map(k=>'<option value="'+k+'"'+(v.vt===k?" selected":"")+'>'+VTYPE[k].n+'</option>').join("")+
-      '</select>'+
-      (HI.vils.length>1 ? '<button class="btn '+(HI.agg===i?"":"sec")+' sm" data-agg="'+i+'">'+
-        (HI.agg===i?"★ 액션한 상대":"이 사람이 액션")+'</button>' : '')+
-    '</div>').join("");
-  el.querySelectorAll(".vt-sel").forEach(s=>s.onchange=()=>{
-    HI.vils[+s.dataset.i].vt = s.value; renderVT(); });
-  el.querySelectorAll("[data-agg]").forEach(b=>b.onclick=()=>{ HI.agg = +b.dataset.agg; renderVT(); });
-  const cur = VTYPE[HI.vils[HI.agg] ? HI.vils[HI.agg].vt : "unknown"];
-  document.getElementById("vt-desc").innerHTML =
-    (HI.vils.length>1
-      ? '상대 '+HI.vils.length+'명. <b>5번의 액션 입력</b>은 ★ 표시된 <b>'+esc(HI.vils[HI.agg].pos)+
-        '</b> 기준이고, 나머지는 <b>따라 들어온 콜러</b>로 계산합니다. 멀티웨이라 같은 핸드도 승률이 크게 떨어집니다.'
-      : esc(cur.d)) +
-    (cur.id==="unknown" ? "" :
-     ' <span class="dim">— 레인지 폭 ×'+cur.w.toFixed(2)+' · 벳 해석 ×'+cur.keep.toFixed(2)+' · 폴드 빈도 ×'+cur.fold.toFixed(2)+'</span>');
-}
+  const live = S.live.filter(p=>p!==HI.pos);
+  if(!live.length){ el.innerHTML = '<div class="notice">상대가 모두 접었습니다.</div>'; return; }
 
-/* ---- 3. 프리플랍 진행 ---- */
-function renderPF(){
-  const el = document.getElementById("pf-chips");
-  el.innerHTML = PFS.map(s=>'<button data-id="'+s.id+'" class="'+(HI.pf===s.id?"on":"")+'">'+s.t+'</button>').join("");
-  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ HI.pf=b.dataset.id; renderPF(); renderActs(); });
+  el.innerHTML = '<div class="vtgrid">'+ live.map(p=>{
+    const cur = HI.seatVT[p] || "unknown";
+    return '<label class="vtcell"><span class="vtp">'+esc(p)+'</span>'+
+      '<select data-p="'+esc(p)+'">'+
+        Object.keys(VTYPE).map(k=>'<option value="'+k+'"'+(cur===k?" selected":"")+'>'+esc(VTYPE[k].n)+'</option>').join("")+
+      '</select></label>';
+  }).join("") +'</div>'+
+  '<div class="small dim" style="margin-top:6px">'+
+    (live.length>1
+      ? '상대 <b>'+live.length+'명</b>. 멀티웨이는 같은 핸드라도 승률이 크게 떨어집니다. '+
+        '가장 마지막에 올린 사람을 기준 상대로 보고, 나머지는 따라 들어온 콜러로 계산합니다.'
+      : esc(VTYPE[HI.seatVT[live[0]] || "unknown"].d)) + '</div>';
+
+  el.querySelectorAll("select").forEach(s=>s.onchange=()=>{
+    HI.seatVT[s.dataset.p] = s.value; renderVT();
+  });
 }
 
 /* ---- 3. 카드: 슬롯 + 덱 ---- */
+
 function renderSlots(){
   if(!slotOn(HI.target) || HI.c[HI.target]!=null) HI.target = nextTarget(HI.target);
   let h = "";
@@ -2307,125 +2350,136 @@ function renderDeck(){
 }
 
 /* ---- 4. 액션: 상황에 맞는 버튼만 노출 ---- */
-function heroInvBefore(i){
-  const sc = PFS.filter(s=>s.id===HI.pf)[0] || PFS[0];
-  let inv = sc.hInv;
-  for(let k=0;k<i;k++){
-    const a = HI.acts[k], facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
-    if(facing){ if(a.m==="call") inv += +a.vs; else if(a.m==="raise") inv += +a.ms; }
-    else if((a.m==="bet"||a.m==="raise") && +a.ms>0) inv += +a.ms;
+/* ---- 4. 액션을 순서대로 ----
+   차례·팟·콜할 금액은 전부 규칙에서 계산한다. 사용자는 "무엇을 했는지"만 고른다. */
+
+/* 지금 자리에서 흔히 쓰는 벳·레이즈 금액. to = 이번 스트리트에 맞춘 총액 */
+function sizeOptions(S){
+  const out = [], seen = {};
+  const add = (to, n) => {
+    to = r1(to);
+    if(to < S.minRaiseTo - 1e-9 || to > S.allinTo + 1e-9) return;
+    if(seen[to]) return;
+    seen[to] = 1; out.push({to:Math.min(to, S.allinTo), n:n});
+  };
+  if(S.toCall > 0){
+    // 레이즈는 직전 금액의 배수로 생각한다
+    [2.5, 3, 4].forEach(m=>add(S.betTo*m, m+"배"));
+    // 팟 레이즈 — 콜하고 나서 팟만큼 더
+    add(S.betTo + (S.pot + S.toCall), "팟");
+  } else {
+    [[1/3,"⅓팟"],[1/2,"½팟"],[2/3,"⅔팟"],[1,"팟"]].forEach(f=>add(S.pot*f[0], f[1]));
   }
-  return inv;
+  if(S.allinTo > S.betTo + 1e-9 && !seen[r1(S.allinTo)]) out.push({to:S.allinTo, n:"올인"});
+  return out;
 }
-function potBefore(i){
-  const sc = PFS.filter(s=>s.id===HI.pf)[0] || PFS[0];
-  let pot = sc.pot;
-  for(let k=0;k<i;k++){
-    const a = HI.acts[k], facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
-    if(facing){ pot += +a.vs; if(a.m==="call") pot += +a.vs; else if(a.m==="raise") pot += (+a.ms)*2; }
-    else if((a.m==="bet"||a.m==="raise") && +a.ms>0) pot += (+a.ms)*2;
-  }
-  return pot;
+
+function seqPush(a, to){
+  HI.seq.push(to===undefined ? {a:a} : {a:a, to:to});
+  buildHandInputs();
 }
+
 function renderActs(){
-  const bd = boardCards(), el = document.getElementById("acts2");
-  if(bd.length < 3){
-    el.innerHTML = '<div class="notice">플랍 3장을 넣으면 여기에 스트리트별 액션 입력이 열립니다. '+
-      '플랍 없이 <b>분석하기</b>를 누르면 프리플랍 판단만 보여드립니다.</div>';
-    return;
-  }
-  const stack = +document.getElementById("s-stack").value || 100;
-  const NM = ["플랍","턴","리버"];
+  const cfg = curCfg(), S = handState(cfg, HI.seq), el = document.getElementById("acts2");
+  const board = boardCards();
   let h = "";
-  for(let i=0;i<3;i++){
-    if(bd.length < 3+i) break;
-    const a = HI.acts[i], pot = potBefore(i);
-    const facing = (a.v==="bet"||a.v==="raise") && +a.vs>0;
-    const eff = Math.max(0, stack - heroInvBefore(i));
-    h += '<div class="acard"><div class="ah">'+NM[i]+' '+
-      bd.slice(0,3+i).map(c=>cardHTML(c,true)).join("")+
-      '<span class="pt">팟 '+nfmt(pot)+'BB · 내 잔여 '+nfmt(eff)+'BB</span></div>';
 
-    h += '<div class="arow"><span class="al">상대</span><div class="bg" data-i="'+i+'" data-k="v">'+
-      [["check","체크 / 액션 없음"],["bet","벳"],["raise","내 벳에 레이즈"]].map(o=>
-        '<button data-a="'+o[0]+'" class="'+(a.v===o[0]?"on":"")+'">'+o[1]+'</button>').join("")+'</div></div>';
-    if(a.v!=="check")
-      h += sizeRow(i,"vs",+a.vs, pot, eff, "상대가 넣은 금액");
-
-    const opts = facing ? [["call","콜"],["raise","레이즈"],["fold","폴드"]]
-                        : [["check","체크"],["bet","벳"]];
-    if(facing && (a.m==="check"||a.m==="bet")) a.m = "call";
-    if(!facing && (a.m==="call"||a.m==="fold"||a.m==="raise")) a.m = "check";
-    h += '<div class="arow"><span class="al">나</span><div class="bg" data-i="'+i+'" data-k="m">'+
-      opts.map(o=>'<button data-a="'+o[0]+'" class="'+(a.m===o[0]?"on"+(o[0]==="fold"?" neg":""):"")+'">'+o[1]+'</button>').join("")+
-      '</div></div>';
-    if(a.m==="bet"||a.m==="raise")
-      h += sizeRow(i,"ms",+a.ms, facing? pot + (+a.vs) : pot, eff, a.m==="raise"?"레이즈해서 총 얼마까지":"내가 넣은 금액");
-    h += '</div>';
-    if(a.m==="fold") break;
+  /* ── 지금까지의 액션 ── */
+  h += '<div class="seqlog">';
+  for(let st=0; st<4; st++){
+    const log = S.log[st];
+    if(!log.length && st > S.street) break;
+    if(!log.length && st > 0 && st !== S.street) continue;
+    const potIn = log.length ? log[0].potBefore : S.potRaw;
+    h += '<div class="seqst'+(st===S.street?" now":"")+'">'+
+      '<span class="stn">'+STREETN[st]+'</span>'+
+      (st>0 ? '<span class="stb">'+board.slice(0, BOARD_NEED[st]).map(c=>cardHTML(c,true)).join("")+'</span>' : '')+
+      '<span class="stp">팟 '+nfmt(Math.round(potIn*100)/100)+'BB</span></div>';
+    h += log.length
+      ? '<div class="seqrow">'+ log.map(e=>
+          '<span class="sq'+(e.hero?" me":"")+(e.a==="fold"?" f":"")+'">'+
+            '<i>'+esc(e.pos)+(e.hero?"(나)":"")+'</i>'+esc(ACTN[e.a])+
+            ((e.a==="bet"||e.a==="raise") ? ' '+nfmt(e.to) : e.a==="call" ? ' '+nfmt(e.toCall) : '')+
+          '</span>').join("") +'</div>'
+      : '<div class="seqrow"><span class="sqe">아직 없음</span></div>';
   }
-  el.innerHTML = h;
-  el.querySelectorAll(".bg[data-k]").forEach(g=>g.querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    const i=+g.dataset.i, k=g.dataset.k, a=b.dataset.a, A=HI.acts[i], p=potBefore(i);
-    A[k] = a;
-    // 액션을 고르면 흔한 사이즈를 미리 채운다 (금액을 넣기 전에도 다음 선택지가 바로 맞게 뜨도록)
-    if(k==="v"){
-      if(a==="check") A.vs = 0;
-      else if(!(+A.vs>0)) A.vs = Math.round(p*0.5*10)/10;
-    } else {
-      if(a==="bet"   && !(+A.ms>0)) A.ms = Math.round(p*0.5*10)/10;
-      else if(a==="raise" && !(+A.ms>0)) A.ms = Math.round((+A.vs||p*0.5)*3*10)/10;
-      else if(a==="check"||a==="call"||a==="fold") A.ms = 0;
+  h += '</div>';
+
+  /* ── 다음에 할 일 ── */
+  if(S.err){
+    h += '<div class="blk warn"><div class="t">액션 순서 오류</div>'+esc(S.err)+
+      ' — <b>되돌리기</b>로 한 칸 물러나세요.</div>';
+  } else if(S.over){
+    h += '<div class="blk hi"><div class="t">핸드 종료</div>'+
+      (S.ended==="fold" ? '한 명만 남아 끝났습니다.' : '리버까지 액션이 끝났습니다.')+
+      ' 아래 <b>분석하기</b>를 누르세요.</div>';
+  } else if(S.waitingBoard){
+    const need = S.needBoard, have = board.length;
+    h += '<div class="blk vx"><div class="t">'+esc(STREETN[S.street+1])+' 카드를 넣어주세요</div>'+
+      '위 덱에서 <b>'+(need-have)+'장</b>을 더 고르면 '+esc(STREETN[S.street+1])+' 액션이 열립니다.</div>';
+  } else if(S.toAct){
+    const me = S.toAct === HI.pos;
+    const legal = legalActs(S), sizes = sizeOptions(S);
+    h += '<div class="turnbox'+(me?" me":"")+'">'+
+      '<div class="turnh"><b>'+esc(S.toAct)+(me?" (나)":"")+'</b> 차례'+
+        '<span class="tsub">팟 '+nfmt(S.pot)+'BB'+
+          (S.toCall>0 ? ' · 콜하려면 '+nfmt(S.toCall)+'BB' : ' · 앞에 벳 없음')+
+          ' · 남은 스택 '+nfmt(S.leftOf(S.toAct))+'BB</span></div>'+
+      '<div class="turnb">';
+    legal.filter(o=>o.a!=="bet" && o.a!=="raise").forEach(o=>{
+      h += '<button class="btn'+(o.a==="fold"?" sec":"")+'" data-do="'+o.a+'">'+esc(o.n)+'</button>';
+    });
+    const agg = legal.find(o=>o.a==="bet"||o.a==="raise");
+    if(agg && sizes.length){
+      h += '<span class="tsep"></span><span class="tlab">'+esc(ACTN[agg.a])+'</span>';
+      sizes.forEach(z=>{
+        h += '<button class="btn sec sz" data-do="'+agg.a+'" data-to="'+z.to+'">'+
+          esc(z.n)+' <u>'+nfmt(z.to)+'</u></button>';
+      });
+      h += '<span class="tin"><input type="number" step="0.1" min="'+S.minRaiseTo+'" max="'+S.allinTo+'" '+
+        'id="act-amt" placeholder="'+nfmt(S.minRaiseTo)+'~'+nfmt(S.allinTo)+'">'+
+        '<button class="btn sec" data-do="'+agg.a+'" data-manual="1">넣기</button></span>';
     }
-    renderActs();
-  }));
-  el.querySelectorAll("[data-sz]").forEach(b=>b.onclick=()=>{
-    const [i,k,val] = b.dataset.sz.split("|");
-    HI.acts[+i][k] = Math.round((+val)*10)/10; renderActs();
+    h += '</div></div>';
+  }
+
+  /* ── 되돌리기 ── */
+  h += '<div class="row" style="margin-top:10px">'+
+    '<div style="flex:0 0 auto"><button class="btn sec sm" id="seq-undo"'+(HI.seq.length?"":" disabled")+'>← 되돌리기</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec sm" id="seq-clear"'+(HI.seq.length?"":" disabled")+'>액션 전부 지우기</button></div>'+
+    '<div class="tdreghint">'+HI.seq.length+'개 입력됨</div></div>';
+
+  el.innerHTML = h;
+
+  el.querySelectorAll("[data-do]").forEach(b=>b.onclick=()=>{
+    const a = b.dataset.do;
+    if(a==="bet"||a==="raise"){
+      let to;
+      if(b.dataset.manual){
+        const inp = document.getElementById("act-amt");
+        to = +inp.value;
+        if(!(to > 0)){ toast("금액을 넣어주세요"); inp.focus(); return; }
+        if(to < S.minRaiseTo - 1e-9){ toast("최소 "+nfmt(S.minRaiseTo)+"BB 이상이어야 합니다"); inp.focus(); return; }
+        if(to > S.allinTo + 1e-9) to = S.allinTo;
+      } else to = +b.dataset.to;
+      seqPush(a, to);
+    } else seqPush(a);
   });
-  el.querySelectorAll("[data-szin]").forEach(inp=>inp.oninput=()=>{
-    const [i,k] = inp.dataset.szin.split("|");
-    HI.acts[+i][k] = +inp.value || 0;
-    inp.parentNode.parentNode.querySelectorAll("[data-sz]").forEach(x=>x.classList.remove("on"));
-  });
+  const u = document.getElementById("seq-undo");
+  if(u) u.onclick = ()=>{ HI.seq.pop(); buildHandInputs(); };
+  const c = document.getElementById("seq-clear");
+  if(c) c.onclick = ()=>{ HI.seq = []; buildHandInputs(); };
 }
-function sizeRow(i, key, cur, base, eff, label){
-  const chips = [["1/3",base/3],["1/2",base/2],["2/3",base*2/3],["팟",base],["올인",eff]];
-  return '<div class="arow"><span class="al">'+(key==="vs"?"금액":"금액")+'</span><div class="bg">'+
-    chips.map(c=>'<button data-sz="'+i+'|'+key+'|'+c[1]+'" class="'+
-      (Math.abs(cur-Math.round(c[1]*10)/10)<0.05 && cur>0 ?"on":"")+'">'+c[0]+'</button>').join("")+
-    '</div><input class="szin" data-szin="'+i+'|'+key+'" type="number" step="0.5" min="0" value="'+
-    (cur||"")+'" placeholder="BB"><span class="small dim">'+esc(label)+'</span></div>';
-}
-function buildHandInputs(){ renderSeats(); renderVT(); renderPF(); renderSlots(); renderDeck(); renderActs(); }
+
+function buildHandInputs(){ renderSeats(); renderVT(); renderSlots(); renderDeck(); renderActs(); }
+
 function readHandInput(){
   if(HI.c.h0==null || HI.c.h1==null) return {err:"내 홀카드 2장을 골라주세요."};
-  if(!HI.pos || !HI.vils.length) return {err:"내 자리와 상대 자리를 모두 골라주세요."};
-  const hole = [HI.c.h0, HI.c.h1];
+  const board = boardCards();
   const nf = [HI.c.f0,HI.c.f1,HI.c.f2].filter(c=>c!=null).length;
   if(nf>0 && nf<3) return {err:"플랍은 3장 모두 넣거나 전부 비워주세요."};
-  const flop = nf===3 ? [HI.c.f0,HI.c.f1,HI.c.f2] : [];
-  const turn = (flop.length===3 && HI.c.t0!=null) ? [HI.c.t0] : [];
-  const river = (turn.length===1 && HI.c.r0!=null) ? [HI.c.r0] : [];
-  for(let i=0;i<3;i++){
-    const a = HI.acts[i];
-    if(flop.length && (3+i)<=flop.concat(turn,river).length){
-      if(a.v!=="check" && !(+a.vs>0)) return {err:["플랍","턴","리버"][i]+"에서 상대 액션이 '"+
-        (a.v==="bet"?"벳":"레이즈")+"'인데 금액이 비어 있습니다."};
-      if((a.m==="bet"||a.m==="raise") && !(+a.ms>0)) return {err:["플랍","턴","리버"][i]+"에서 내 "+
-        (a.m==="bet"?"벳":"레이즈")+" 금액이 비어 있습니다."};
-    }
-  }
-  return {
-    seats:+document.getElementById("s-seats").value,
-    gt:document.getElementById("s-gt").value,
-    stack:+document.getElementById("s-stack").value || 100,
-    pos:HI.pos, vpos:HI.vils[HI.agg].pos, pf:HI.pf, vt:HI.vils[HI.agg].vt,
-    vils:HI.vils.map(v=>({pos:v.pos, vt:v.vt})), agg:HI.agg,
-    hole:hole, flop:flop, turn:turn, river:river,
-    board:flop.concat(turn,river),
-    acts:HI.acts.map(a=>({v:a.v, vs:a.vs, m:a.m, ms:a.ms}))
-  };
+  if(!HI.seq.length) return {err:"액션을 하나 이상 넣어주세요 — 프리플랍부터 순서대로 고르면 됩니다."};
+  return seqToInput(curCfg(), HI.seq, {hole:[HI.c.h0, HI.c.h1], board:board});
 }
 function gridHTML(classes, hero){
   const inR = {}; classes.forEach(c=>inR[c]=1);
@@ -2581,8 +2635,12 @@ function renderAnalysis(res, inp){
   if(!res.pfOnly){
     const rw = res.pf.vilClasses.reduce((a,c)=>a+combosOf(c),0)/TOTCOMBO*100;
     h += '<div class="blk"><div class="t">프리플랍 승률 · 상대 레인지</div><div>'+
-      '이 시나리오("'+esc(res.scen.t)+'")에서 상대 레인지 상대 승률은 <b>'+pct(res.pf.eq)+'</b>입니다. '+
-      '팟은 '+nfmt(res.scen.pot)+'BB에서 시작합니다.</div>'+
+      (res.pf.fromSeq
+        ? '넣으신 액션을 <b>"'+esc(res.scen.t)+'"</b>로 읽고 상대 레인지를 잡았습니다. '
+        : '이 시나리오("'+esc(res.scen.t)+'")에서 ')+
+      '상대 레인지 상대 승률은 <b>'+pct(res.pf.eq)+'</b>입니다. '+
+      '포스트플랍은 팟 <b>'+nfmt(Math.round((res.pf.pot||0)*100)/100)+'BB</b>에서 시작합니다'+
+      (res.pf.fromSeq ? ' (실제 액션에서 계산한 값입니다).' : '.')+'</div>'+
       '<div style="margin-top:5px">'+(res.nV>1
         ? '상대 <b>'+res.nV+'명</b>: '+res.vils.map((v,k)=>esc(v.pos)+' <span class="dim">'+esc(v.vt.n)+'</span>'+
             (k===res.aggI?' <span class="pill w">액션 기준</span>':'')).join(", ")+
@@ -4650,19 +4708,28 @@ function loadSetup(){
   Object.keys(s).forEach(id=>{ const e=document.getElementById(id); if(e) e.value = s[id]; });
 }
 function fillDemo(){
+  /* BTN 에서 AQs 로 오픈 → BB 가 콜 → K72 플랍에서 체크가 돌고, 턴에 BB 가 4BB 벳, 내가 콜 */
   document.getElementById("s-seats").value = "6";
-  HI.pos="BTN"; HI.vils=[{pos:"BB", vt:"station"}]; HI.agg=0; HI.pf="open_call";
+  HI.pos = "BTN";
+  HI.seatVT = {BB:"station"};
   HI.c = {h0:cid("A","s"), h1:cid("Q","s"), f0:cid("K","s"), f1:cid("7","h"), f2:cid("2","d"),
           t0:cid("4","c"), r0:null};
   HI.target = "r0";
-  HI.acts = [{v:"check",vs:0,m:"check",ms:0},{v:"bet",vs:4,m:"call",ms:0},{v:"check",vs:0,m:"check",ms:0}];
+  HI.seq = [
+    {a:"fold"}, {a:"fold"}, {a:"fold"},        // UTG · HJ · CO
+    {a:"raise", to:2.5},                        // BTN(나) 오픈
+    {a:"fold"},                                 // SB
+    {a:"call"},                                 // BB 콜
+    {a:"check"}, {a:"check"},                   // 플랍 체크-체크
+    {a:"bet", to:4}, {a:"call"}                 // 턴: BB 벳 4 · 나 콜
+  ];
   buildHandInputs();
   toast("예시를 채웠습니다 — 분석하기를 눌러보세요");
 }
 function clearHand(){
   HI.c = {h0:null,h1:null,f0:null,f1:null,f2:null,t0:null,r0:null};
   HI.target = "h0";
-  HI.acts = [{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0},{v:"check",vs:0,m:"check",ms:0}];
+  HI.seq = [];
   buildHandInputs();
   document.getElementById("h-out").innerHTML = "";
 }

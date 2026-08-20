@@ -3,9 +3,9 @@
 이 앱은 단일 HTML이라 테스트 러너가 따로 없다. 수정 후에는 **반드시 두 층 다** 돌린다.
 
 ```
-node tools/check-logic.js          # 1층 — 로직   (466건)
+node tools/check-logic.js          # 1층 — 로직   (467건)
 node tools/check-ui.mjs            # 2층 — 화면   (150회)
-node tools/check-flows.mjs         # 3층 — 조작   (119건)
+node tools/check-flows.mjs         # 3층 — 조작   (121건)
 node tools/check-ui.mjs --shots    # 화면 + 스크린샷(tools/_shots/)
 ```
 

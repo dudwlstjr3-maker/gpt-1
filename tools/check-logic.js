@@ -746,16 +746,19 @@ group('상금 사다리');
       `${t.n}: 상금 사다리가 블라인드 사다리 자리를 침범하지 않는다`);
   }
 
-  // 세는 기준 — 엔트리만 셀 수도 있다
+  // 데일리 셈법 — 언제나 엔트리 + 리바이 합계
   ctx.__APP.TD.ladderFree = 0; ctx.__APP.TD.ladderEvery = 3; ctx.__APP.TD.ladderAmt = 10000;
   ctx.__APP.TD.entries = 12; ctx.__APP.TD.rebuys = 6;
-  ctx.__APP.TD.ladderBasis = 'all';
-  ok(tdUnits() === 18, '합산 기준: 엔트리 12 + 리바이 6 = 18개', String(tdUnits()));
+  ok(tdUnits() === 18, '엔트리 12 + 리바이 6 = 18개', String(tdUnits()));
   okNear(tdPool(), 60000, '3개당 1만원 · 18개 → 6만원');
-  ctx.__APP.TD.ladderBasis = 'entry';
-  ok(tdUnits() === 12, '엔트리만 기준: 12개', String(tdUnits()));
+  ctx.__APP.TD.rebuys = 0;
+  ok(tdUnits() === 12, '리바이가 줄면 개수도 준다', String(tdUnits()));
   okNear(tdPool(), 40000, '3개당 1만원 · 12개 → 4만원');
-  ctx.__APP.TD.ladderBasis = 'all';
+  // 리바이를 빼고 세는 길은 아예 없어야 한다 (매장 규칙이 항상 합산이다)
+  ctx.__APP.TD.ladderBasis = 'entry';
+  ctx.__APP.TD.rebuys = 6;
+  ok(tdUnits() === 18, '엉뚱한 설정이 남아 있어도 합산으로만 센다', String(tdUnits()));
+  delete ctx.__APP.TD.ladderBasis;
   ctx.__APP.TD.ladderFree = LADDER_DEF.free;
   ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
   ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
@@ -767,7 +770,7 @@ group('상금 사다리');
     ok(dy.prizeLadder.every === 3 && dy.prizeLadder.amt === 10000, '데일리는 3개당 1만원',
       JSON.stringify(dy.prizeLadder));
     ok(dy.prizeLadder.free === 0, '데일리는 면제 개수가 없다', String(dy.prizeLadder.free));
-    ok(/엔트리만/.test(dy.note), 'note 에 «엔트리만» 으로 바꾸는 법을 적어 뒀다');
+    ok(/엔트리\+리바이 합계/.test(dy.note), 'note 에 합산해서 센다고 적혀 있다', dy.note.slice(0, 90));
   }
 
   // 프리셋

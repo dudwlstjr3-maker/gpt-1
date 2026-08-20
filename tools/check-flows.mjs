@@ -119,6 +119,10 @@ group('상금 사다리');
   const on = await page.locator('#td-poolmode button.on').innerText();
   ok(/사다리/.test(on), '상금 방식이 사다리로 켜져 있다', on);
 
+  // 세는 기준을 고르는 옵션은 없다 — 언제나 합산
+  ok(await page.locator('#td-lad-basis').count() === 0, '«엔트리만» 선택지는 없다 (항상 합산)');
+  ok(/엔트리\+리바이/.test(await txt('.ladbox')), '합산해서 센다고 화면에 쓰여 있다');
+
   // 9명 시작 → 9개 → 10만원
   let lad = await txt('.ladbox');
   ok(/9개/.test(lad), '엔트리+리바이 합계가 표시된다', lad.replace(/\n/g, ' | ').slice(0, 140));

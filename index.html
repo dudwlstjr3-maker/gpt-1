@@ -529,6 +529,9 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .ladset label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--tx2);font-weight:600}
 .ladset input{width:66px;padding:5px 7px;font-size:13px;text-align:right}
 .ladlab{font-size:13px;font-weight:600;color:var(--tx2)}
+/* 버튼 안의 «기본» 표식 */
+.bg button u{text-decoration:none;font-size:10px;font-weight:800;opacity:.7;margin-left:4px;
+  border:1px solid currentColor;border-radius:4px;padding:0 3px;vertical-align:1px}
 .ladset .bg button{padding:5px 11px;font-size:12.5px}
 .ladnow{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin-top:10px;padding-top:9px;
   border-top:1px solid var(--line);font-size:13px}
@@ -3719,8 +3722,10 @@ const TSTRUCT = [
  {id:"f9_monster", grp:"pub", n:"파이널나인 몬스터형", tag:"몬스터 · 딥스택", stack:5000000, bb:200,
   pattern6:[[100,200],[150,300],[200,400],[250,500],[300,600],[400,800]], patternScale:5,
   min:8, hph:16, seats:9, buyin:30000, rebuyPrice:30000, rebuyStack:7500000,
+  prizeLadder:{free:8, every:7, amt:100000},
   d:"데일리보다 바이인이 크고 스택도 깊습니다(500만). 앤티가 붙어 팟이 커지고 레벨도 길어 플레이할 여지가 있습니다.",
-  note:"확인: 바이인 3만원 · 앤티 있음 · 1레벨 100/200. 앤티는 BB와 같은 금액으로 1레벨부터 넣어뒀으니, "+
+  note:"확인: 바이인 3만원 · 앤티 있음 · 1레벨 100/200 · 상금은 엔트리+리바이 합계 7개당 10만원(8개까지 0원). "+
+       "앤티는 BB와 같은 금액으로 1레벨부터 넣어뒀으니, "+
        "매장이 특정 레벨부터 받는다면 레벨 표에서 앞 레벨의 앤티를 0으로 지우세요. "+
        "1~6레벨의 블라인드 흐름을 기준으로 아래 레벨도 같은 6단계 패턴으로 이어집니다. "+
        "시작 스택·리바이·레벨 시간은 아직 확인 못 한 추정값입니다."},
@@ -5013,10 +5018,22 @@ function renderTDClock(v){
   const pctOf = TD.entries ? Math.round(TD.payN/TD.entries*100) : 0;
   h += '<div class="card tdpayout"><h3>상금 배분 <span class="small dim">— 몇 명까지, 몇 %씩</span></h3>'+
     '<div class="step" style="margin-top:2px"><span class="num">1</span> 얼마를 상금으로 돌릴까요</div>'+
-    '<div class="bg" id="td-poolmode" style="display:flex;margin-bottom:9px">'+
-      '<button data-m="pct" class="'+(TD.ladderOn?"":"on")+'">모인 돈의 %</button>'+
-      '<button data-m="ladder" class="'+(TD.ladderOn?"on":"")+'">사다리 (개수당 정액)</button>'+
-    '</div>'+
+    (function(){
+      const L = tdLadder();
+      const tpl = TSTRUCT.filter(x=>x.id===TD._tpl)[0];
+      const def = tpl && tpl.prizeLadder ? "ladder" : "pct";
+      const tag = s => s + (def===s ? ' <u>기본</u>' : '');
+      return '<div class="bg" id="td-poolmode" style="display:flex;margin-bottom:9px">'+
+        '<button data-m="pct" class="'+(TD.ladderOn?"":"on")+'">'+tag('모인 돈의 %')+'</button>'+
+        '<button data-m="ladder" class="'+(TD.ladderOn?"on":"")+'">'+
+          tag('사다리 — '+L.every+'개당 '+manwon(L.amt))+'</button>'+
+      '</div>'+
+      (def==="ladder" && !TD.ladderOn
+        ? '<div class="notice" style="margin-bottom:9px">이 대회의 기본은 <b>사다리</b>입니다 '+
+          '('+L.every+'개당 '+manwon(L.amt)+(L.free>0?' · '+L.free+'개까지 0원':'')+'). '+
+          '되돌리려면 위에서 사다리를 누르세요.</div>'
+        : '');
+    })()+
     (TD.ladderOn ? tdLadderCard(pool) :
       '<div class="poolcalc">'+
         '<span>모인 돈 <b>'+manwon(tdGross())+'</b></span>'+
@@ -5029,7 +5046,8 @@ function renderTDClock(v){
       '</div>'+
       '<div class="bg" id="td-poolq" style="display:flex;margin-top:8px">'+
         [100,90,85,80,70].map(x=>'<button data-p="'+x+'" class="'+
-          ((TD.poolPct===undefined?100:TD.poolPct)===x?"on":"")+'">'+x+'%</button>').join("")+
+          ((TD.poolPct===undefined?100:TD.poolPct)===x?"on":"")+'">'+x+'%'+
+          (x===100?' <u>기본</u>':'')+'</button>').join("")+
       '</div>'+
       '<div class="small dim" style="margin-top:5px">상금은 1,000원 단위로 내림하고 나머지는 하우스 몫으로 넘깁니다. '+
         '전광판에는 <b>상금만</b> 나옵니다.</div>')+

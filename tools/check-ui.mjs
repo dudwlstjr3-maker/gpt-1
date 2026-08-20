@@ -371,12 +371,17 @@ for (const vp of WIDTHS) {
     recAdd({ at: Date.parse('2026-04-03T12:00'), name: '이름이 아주아주 긴 대회 이름입니다', place: 0, field: 0, buyins: 1, spent: 10000, prize: 0 });
     // 등급이 매겨질 만큼의 드릴 표본
     DB.set('drills', [{ at: Date.now(), n: 60, ok: 39, loss: 22, passive: 9, aggro: 4 }]);
-    // 연습 누적 카드가 그려지도록 핸드도 (저장 코드가 만드는 모양 그대로)
-    DB.set('hands', [{
-      at: Date.now(), cls: 'AQs', pos: 'BTN', vpos: 'BB', pf: 'open', vt: '스테이션',
-      hole: ['As', 'Qs'], board: ['Ks', '7h', '2d'],
-      streets: [{ n: '플랍', rec: '벳', my: '체크', eq: 0.55, evLoss: 0.4, tags: ['소극적'] }]
-    }]);
+    // 연습 누적 카드와 핸드 기록 표가 그려지도록 핸드도 (저장 코드가 만드는 모양 그대로)
+    const hand = (cls, pos, vpos, tag, loss) => ({
+      at: Date.now(), cls, pos, vpos, pf: 'open', vt: '스테이션',
+      hole: [0, 12], board: [24, 33, 40],
+      streets: [{ n: '플랍', rec: '벳', my: 'check', eq: 0.55, evLoss: loss, tags: [tag] }]
+    });
+    DB.set('hands', [
+      hand('AQs', 'BTN', 'BB', '소극적', 0.4),
+      hand('72o', 'SB', 'BB', '과공격', 1.2),
+      hand('QQ', 'UTG', 'CO', '사이즈', 0.8),
+    ]);
     go('rec');
   });
   await page.waitForTimeout(300);
@@ -406,6 +411,25 @@ for (const vp of WIDTHS) {
       await page.waitForTimeout(400);
       await scanContrast(page, `${where} · ${th === 'light' ? '밝게' : '어둡게'}`);
       if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${th}-rec-full.png`), fullPage: true });
+    }
+  }
+
+  // 핸드 기록 — 찾기 줄이 붙은 표
+  await page.evaluate(() => go('stats'));
+  await page.waitForTimeout(250);
+  const sw = `${vp.n} ${vp.w}px · 리크·기록(기록 있음)`;
+  checks++;
+  if (await page.locator('#hf-tbl tr').count() !== 4) add(sw, `핸드 표가 머리글 + 3줄이 아닙니다 (${await page.locator('#hf-tbl tr').count()})`);
+  checks++;
+  if (await page.locator('#hf-q').count() !== 1) add(sw, '찾기 칸이 없습니다');
+  await scanText(page, sw);
+  await scanOverflow(page, sw, vp.w);
+  await scanClipped(page, sw);
+  if (vp.w === 1440) {
+    for (const th of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), th);
+      await page.waitForTimeout(400);
+      await scanContrast(page, `${sw} · ${th === 'light' ? '밝게' : '어둡게'}`);
     }
   }
 

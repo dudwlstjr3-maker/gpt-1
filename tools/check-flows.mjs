@@ -504,6 +504,77 @@ group('실전 드릴');
   }
 }
 
+/* ─────────── 핸드 기록 찾기 ─────────── */
+group('핸드 찾기');
+{
+  await page.evaluate(() => {
+    const hand = (cls, pos, vpos, tag, loss) => ({
+      at: Date.now(), cls, pos, vpos, pf: 'open', vt: '스테이션',
+      hole: [], board: [24, 33, 40],
+      streets: [{ n: '플랍', rec: '벳', my: 'check', eq: 0.55, evLoss: loss, tags: [tag] }],
+    });
+    DB.set('hands', [
+      hand('AQs', 'BTN', 'BB', '소극적', 0.4),
+      hand('72o', 'SB', 'BB', '과공격', 1.2),
+      hand('QQ', 'UTG', 'CO', '사이즈', 0.8),
+    ]);
+  });
+  await tab('stats');
+  const bodyRows = () => page.locator('#hf-tbl tr').count();
+
+  ok(await bodyRows() === 4, '머리글 + 핸드 3줄', String(await bodyRows()));
+
+  // 검색어
+  await page.fill('#hf-q', 'QQ');
+  await page.waitForTimeout(250);
+  ok(await bodyRows() === 2, '검색어를 넣으면 한 줄만 남는다', String(await bodyRows()));
+  ok(/UTG vs CO/.test(await txt('#hf-tbl')), '남은 줄이 찾던 핸드다', (await txt('#hf-tbl')).replace(/\n/g, ' | '));
+  ok(/3개 중 1개/.test(await txt('#v-stats')), '몇 개 중 몇 개인지 알려준다',
+    (await txt('#v-stats')).slice(0, 200).replace(/\n/g, ' | '));
+
+  // 두 글자 이상 이어서 칠 수 있어야 한다 — 다시 그릴 때 포커스가 날아가면 못 친다
+  await page.fill('#hf-q', '');
+  await page.click('#hf-q');
+  await page.keyboard.type('BTN');
+  await page.waitForTimeout(250);
+  ok(await page.inputValue('#hf-q') === 'BTN', '검색어를 이어서 칠 수 있다 (포커스 유지)',
+    await page.inputValue('#hf-q'));
+  ok(await bodyRows() === 2, 'BTN 핸드 하나만 남는다', String(await bodyRows()));
+
+  // 조건 지우기
+  await page.click('#hf-clear');
+  await page.waitForTimeout(250);
+  ok(await bodyRows() === 4, '조건을 지우면 전부 돌아온다', String(await bodyRows()));
+  ok(await page.inputValue('#hf-q') === '', '검색 칸도 비워진다');
+
+  // 포지션 · 리크 고르기
+  await page.selectOption('#hf-pos', 'SB');
+  await page.waitForTimeout(250);
+  ok(await bodyRows() === 2 && /SB vs BB/.test(await txt('#hf-tbl')), '포지션으로 거른다',
+    (await txt('#hf-tbl')).replace(/\n/g, ' | '));
+  await page.click('#hf-clear');
+  await page.waitForTimeout(200);
+  await page.selectOption('#hf-tag', '사이즈');
+  await page.waitForTimeout(250);
+  ok(await bodyRows() === 2 && /UTG vs CO/.test(await txt('#hf-tbl')), '리크로 거른다',
+    (await txt('#hf-tbl')).replace(/\n/g, ' | '));
+  await page.click('#hf-clear');
+  await page.waitForTimeout(200);
+
+  // 정렬 뒤에 지워도 «그 줄»이 지워져야 한다 (순번으로 지우면 엉뚱한 핸드가 사라진다)
+  await page.selectOption('#hf-sort', 'loss');
+  await page.waitForTimeout(250);
+  ok(/1\.2 BB/.test(await txt('#hf-tbl tr:nth-child(2)')), '손실 큰 순이면 72o(1.2BB) 가 맨 위',
+    (await txt('#hf-tbl tr:nth-child(2)')).replace(/\n/g, ' | '));
+  await page.click('#hf-tbl tr:nth-child(2) [data-del]');
+  await page.waitForTimeout(300);
+  const left = await page.evaluate(() => DB.get('hands', []).map((x) => x.cls).join(','));
+  ok(left === 'AQs,QQ', '정렬 뒤에 지워도 누른 줄(72o)이 지워진다', left);
+
+  await page.evaluate(() => DB.del('hands'));
+  await tab('home');
+}
+
 /* ─────────── 홈: 오늘 대회 ─────────── */
 group('오늘 대회');
 {

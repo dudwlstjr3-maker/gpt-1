@@ -1142,6 +1142,67 @@ group('드릴');
   }
 }
 
+/* ───────────────── 핸드 기록 찾기 ───────────────── */
+group('핸드 찾기');
+{
+  const { handFilter, handFilterNew, handLoss } = app;
+  const mk = (cls, pos, vpos, vt, tags, loss) => ({
+    at: 1, cls, pos, vpos, vt, pf: 'open', hole: [], board: [],
+    streets: [{ n: '플랍', rec: '벳', my: 'check', eq: 0.5, evLoss: loss, tags }]
+  });
+  const H = [
+    mk('AKs', 'BTN', 'BB', '스테이션', ['소극적'], 0.9),        // 0
+    mk('72o', 'SB', 'BB', '어그레시브', ['과공격'], 0.2),        // 1
+    mk('QQ', 'BTN', 'CO', '스테이션', ['사이즈'], 1.4),          // 2
+    mk('J9s', 'UTG', 'BB', '타이트', [], 0.0),                   // 3
+  ];
+
+  ok(handFilter(H, handFilterNew()).length === 4, '조건이 없으면 전부 나온다');
+  ok(handFilter(H, handFilterNew()).map((r) => r.i).join(',') === '0,1,2,3', '원래 자리를 그대로 들고 있다');
+  ok(handFilter([], handFilterNew()).length === 0, '기록이 없으면 빈 목록');
+  ok(handFilter(null, null).length === 0, '아무것도 안 넘겨도 안 터진다');
+
+  // 포지션
+  {
+    const r = handFilter(H, Object.assign(handFilterNew(), { pos: 'BTN' }));
+    ok(r.length === 2 && r.map((x) => x.i).join(',') === '0,2', 'BTN 만 걸러진다', r.map((x) => x.i).join(','));
+  }
+  // 리크 태그
+  {
+    const r = handFilter(H, Object.assign(handFilterNew(), { tag: '사이즈' }));
+    ok(r.length === 1 && r[0].i === 2, '리크 태그로 걸러진다', JSON.stringify(r.map((x) => x.i)));
+  }
+  // 검색어 — 핸드 이름 · 상대 유형 · 리크가 다 걸린다
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: 'QQ' })).length === 1, '핸드 이름으로 찾는다');
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: '스테이션' })).length === 2, '상대 유형으로 찾는다');
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: '과공격' })).length === 1, '리크 이름으로 찾는다');
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: 'btn' })).length === 2, '대소문자를 가리지 않는다');
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: '  BTN  ' })).length === 2, '앞뒤 공백은 무시한다');
+  ok(handFilter(H, Object.assign(handFilterNew(), { q: '없는말' })).length === 0, '없는 말이면 빈 목록');
+
+  // 조건을 겹쳐 쓴다
+  {
+    const r = handFilter(H, Object.assign(handFilterNew(), { pos: 'BTN', tag: '소극적' }));
+    ok(r.length === 1 && r[0].i === 0, '포지션과 리크를 같이 걸 수 있다', JSON.stringify(r.map((x) => x.i)));
+  }
+
+  // 정렬 — 그래도 원래 자리는 안 바뀐다 (삭제가 엉뚱한 핸드를 지우면 안 된다)
+  {
+    const r = handFilter(H, Object.assign(handFilterNew(), { sort: 'loss' }));
+    ok(r.map((x) => x.i).join(',') === '2,0,1,3', '손실 큰 순으로 줄 선다', r.map((x) => x.i).join(','));
+    ok(r[0].x.cls === 'QQ', '맨 위가 제일 많이 잃은 핸드', r[0].x.cls);
+    // 이게 이 기능의 핵심 함정이다: 정렬·필터 뒤의 순번으로 지우면 다른 핸드가 사라진다
+    ok(r[0].i === 2 && H[r[0].i] === r[0].x, '정렬해도 i 가 원래 배열의 그 핸드를 가리킨다');
+  }
+  {
+    const r = handFilter(H, Object.assign(handFilterNew(), { pos: 'BTN', sort: 'loss' }));
+    ok(r.every((x) => H[x.i] === x.x), '걸러낸 뒤에도 i 가 전부 제자리를 가리킨다');
+  }
+
+  okNear(handLoss(H[2]), 1.4, '핸드 손실은 스트리트 손실의 합');
+  okNear(handLoss({}), 0, '스트리트가 없어도 0 을 낸다');
+}
+
 /* ───────────────── 전적 ───────────────── */
 group('전적');
 {

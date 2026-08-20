@@ -3411,19 +3411,90 @@ function renderStats(){
     (leaks.length?' · 가장 큰 구멍은 <b>'+esc(leaks[0].k)+'</b>입니다. 여기 하나만 고쳐도 손실의 '+
       Math.round(leaks[0].ev/Math.max(totLoss,0.01)*100)+'%가 사라집니다.':'')+'</p></div>';
 
-  h += '<div class="card"><h2>핸드 기록</h2><div class="scrollx"><table class="tstack">'+
-    '<tr><th>핸드</th><th>보드</th><th>상황</th><th>스트리트별</th><th>손실</th><th></th></tr>'+
-    hands.slice(0,60).map((x,i)=>{
-      const loss = x.streets.reduce((a,s)=>a+(s.evLoss||0),0);
-      return '<tr><td>'+x.hole.map(c=>cardHTML(c,true)).join("")+
-        ' <span class="dim" style="font-size:11px;font-weight:400">'+new Date(x.at).toLocaleDateString()+'</span></td>'+
-      '<td data-l="보드">'+(x.board.length?x.board.map(c=>cardHTML(c,true)).join(""):'<span class="dim small">-</span>')+'</td>'+
-      '<td data-l="상황" class="small">'+esc(x.pos)+' vs '+esc(x.vpos)+(x.vt?' · '+esc(x.vt):'')+'</td>'+
-      '<td data-l="내 액션 → 권장" class="small">'+x.streets.map(s=>s.n+": "+actName(s.my)+" → "+esc(s.rec)).join("<br>")+'</td>'+
-      '<td data-l="EV 손실" class="small" style="color:'+(loss>0.5?"var(--bad)":"var(--tx2)")+'">'+nfmt(loss,2)+' BB</td>'+
-      '<td><button class="btn sec sm" onclick="delHand('+i+')">삭제</button></td></tr>';
-    }).join("")+'</table></div></div>';
+  /* ---- 찾기 ----
+     핸드가 쌓이면 «그때 그 스팟»을 눈으로 훑어 찾을 수 없다.
+     걸러낸 뒤에도 삭제가 엉뚱한 줄을 지우지 않도록 원래 자리(i)를 들고 다닌다. */
+  const posList = [...new Set(hands.map(x=>x.pos).filter(Boolean))];
+  const tagList = [...new Set([].concat.apply([], hands.map(x=>
+    [].concat.apply([], (x.streets||[]).map(s=>s.tags||[])))))];
+  const rows = handFilter(hands, HFILT);
+
+  h += '<div class="card"><h2>핸드 기록 <span class="small dim">— ' +
+    (rows.length === hands.length ? hands.length + '개' : hands.length + '개 중 ' + rows.length + '개') +
+    '</span></h2>' +
+    '<div class="row" style="margin-bottom:12px">' +
+    '<div style="flex:2 1 180px"><label for="hf-q">찾기</label>' +
+      '<input id="hf-q" placeholder="핸드 · 포지션 · 리크 · 상대 유형" value="'+esc(HFILT.q)+'"></div>' +
+    '<div style="flex:1 1 110px"><label for="hf-pos">내 포지션</label><select id="hf-pos">' +
+      '<option value="">전체</option>' +
+      posList.map(p=>'<option'+(HFILT.pos===p?' selected':'')+'>'+esc(p)+'</option>').join("") +
+      '</select></div>' +
+    '<div style="flex:1 1 130px"><label for="hf-tag">리크</label><select id="hf-tag">' +
+      '<option value="">전체</option>' +
+      tagList.map(t=>'<option'+(HFILT.tag===t?' selected':'')+'>'+esc(t)+'</option>').join("") +
+      '</select></div>' +
+    '<div style="flex:1 1 110px"><label for="hf-sort">정렬</label><select id="hf-sort">' +
+      '<option value="recent"'+(HFILT.sort==="recent"?' selected':'')+'>최근 순</option>' +
+      '<option value="loss"'+(HFILT.sort==="loss"?' selected':'')+'>손실 큰 순</option>' +
+      '</select></div>' +
+    '<div style="flex:0 0 auto"><button class="btn sec sm" id="hf-clear">조건 지우기</button></div>' +
+    '</div>';
+
+  h += rows.length
+    ? '<div class="scrollx"><table class="tstack" id="hf-tbl">'+
+      '<tr><th>핸드</th><th>보드</th><th>상황</th><th>스트리트별</th><th>손실</th><th></th></tr>'+
+      rows.slice(0,60).map(function(r){
+        const x = r.x, loss = handLoss(x);
+        return '<tr><td>'+x.hole.map(c=>cardHTML(c,true)).join("")+
+          ' <span class="dim" style="font-size:11px;font-weight:400">'+new Date(x.at).toLocaleDateString()+'</span></td>'+
+        '<td data-l="보드">'+(x.board.length?x.board.map(c=>cardHTML(c,true)).join(""):'<span class="dim small">-</span>')+'</td>'+
+        '<td data-l="상황" class="small">'+esc(x.pos)+' vs '+esc(x.vpos)+(x.vt?' · '+esc(x.vt):'')+'</td>'+
+        '<td data-l="내 액션 → 권장" class="small">'+(x.streets||[]).map(s=>s.n+": "+actName(s.my)+" → "+esc(s.rec)).join("<br>")+'</td>'+
+        '<td data-l="EV 손실" class="small" style="color:'+(loss>0.5?"var(--bad)":"var(--tx2)")+'">'+nfmt(loss,2)+' BB</td>'+
+        '<td><button class="btn sec sm" data-del="'+r.i+'">삭제</button></td></tr>';
+      }).join("")+'</table></div>'+
+      (rows.length > 60 ? '<p class="small dim" style="margin:9px 0 0">'+rows.length+'개 중 앞 60개만 보여줍니다 — 조건을 좁혀보세요.</p>' : '')
+    : '<div class="empty">조건에 맞는 핸드가 없습니다.</div>';
+  h += '</div>';
+
   v.innerHTML = h;
+
+  const bind = (id, key) => {
+    const e = document.getElementById(id);
+    if(!e) return;
+    e.oninput = function(){ HFILT[key] = e.value; renderStats(); refocus(id); };
+    e.onchange = function(){ HFILT[key] = e.value; renderStats(); refocus(id); };
+  };
+  /* 다시 그리면 포커스가 날아가서 두 글자째부터 못 친다 — 커서 자리까지 되돌린다 */
+  const refocus = id => {
+    const e = document.getElementById(id);
+    if(!e) return;
+    e.focus();
+    if(e.setSelectionRange && e.type === "text"){ const n = e.value.length; e.setSelectionRange(n, n); }
+  };
+  bind("hf-q", "q"); bind("hf-pos", "pos"); bind("hf-tag", "tag"); bind("hf-sort", "sort");
+  const cl = document.getElementById("hf-clear");
+  if(cl) cl.onclick = function(){ HFILT = handFilterNew(); renderStats(); };
+  v.querySelectorAll("[data-del]").forEach(b => b.onclick = ()=>delHand(Number(b.dataset.del)));
+}
+const handLoss = x => (x.streets||[]).reduce((a,s)=>a+(s.evLoss||0), 0);
+const handFilterNew = () => ({q:"", pos:"", tag:"", sort:"recent"});
+let HFILT = handFilterNew();
+/* 원래 자리를 들고 다니는 게 핵심이다 — 걸러낸 목록의 순번으로 지우면 엉뚱한 핸드가 사라진다 */
+function handFilter(hands, F){
+  F = F || handFilterNew();
+  const q = String(F.q || "").trim().toLowerCase();
+  let out = (hands || []).map((x, i) => ({x:x, i:i}));
+  if(F.pos) out = out.filter(r => r.x.pos === F.pos);
+  if(F.tag) out = out.filter(r => (r.x.streets||[]).some(s => (s.tags||[]).indexOf(F.tag) >= 0));
+  if(q) out = out.filter(function(r){
+    const x = r.x;
+    const bits = [x.cls, x.pos, x.vpos, x.vt, x.pf]
+      .concat((x.streets||[]).map(s => [s.n, s.rec, s.my].concat(s.tags||[]).join(" ")));
+    return bits.join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  if(F.sort === "loss") out = out.slice().sort((a,b)=>handLoss(b.x) - handLoss(a.x));
+  return out;
 }
 function delHand(i){ const a = DB.get("hands",[]); a.splice(i,1); DB.set("hands",a); renderStats(); renderHome(); }
 

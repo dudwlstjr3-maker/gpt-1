@@ -30,7 +30,7 @@
   --good:#4fd1a5;
   /* 강조 (글자로 쓰는 색) — 라이트에서 따로 어두워진다 */
   --ac-tx:#5eddb1; --ac2-tx:#8cc9ff; --warn-tx:#ffc978; --bad-tx:#ff9a9a; --good-tx:#5eddb1;
-  --vx:#c0aeff;
+  --vx:#c0aeff; --on-vx:#140f26;
   /* 은은한 강조 배경 */
   --ac-bg:#14271f;  --ac-bd:#2f5a48;
   --ac2-bg:#132234; --ac2-bd:#2c4d6e;
@@ -63,7 +63,7 @@
   --bad:#c22d2d;  --on-bad:#ffffff;
   --good:#0a7f5c;
   --ac-tx:#076f50; --ac2-tx:#0f5fa8; --warn-tx:#7a4e00; --bad-tx:#b32222; --good-tx:#076f50;
-  --vx:#5b41b8;
+  --vx:#5b41b8; --on-vx:#ffffff;
   --ac-bg:#e6f6f0;  --ac-bd:#a9dfcb;
   --ac2-bg:#e8f2fd; --ac2-bd:#b0d2f2;
   --warn-bg:#fdf3e0; --warn-bd:#eccf9a;
@@ -145,12 +145,31 @@ header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 8
 @supports not (background:color-mix(in srgb,red 50%,transparent)){header{background:var(--bg)}}
 .hd{max-width:960px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .logo{font-weight:800;font-size:15.5px;letter-spacing:-.02em;white-space:nowrap}
+.hdr-r{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:7px}
 /* 밝게 / 어둡게 전환 */
-.thbtn{margin-left:auto;flex:0 0 auto;background:var(--bg2);border:1px solid var(--line);
+.thbtn{flex:0 0 auto;background:var(--bg2);border:1px solid var(--line);
   color:var(--tx2);width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:15px;
   line-height:1;display:inline-flex;align-items:center;justify-content:center;
   transition:border-color .15s,color .15s,background .15s}
 .thbtn:hover{border-color:var(--ac);color:var(--tx);background:var(--card)}
+/* 지금 누구로 쓰고 있는지 — 항상 헤더에 보여야 남의 계정에 기록이 쌓이지 않는다 */
+.acbtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;max-width:190px;
+  background:var(--bg2);border:1px solid var(--line);color:var(--tx);height:34px;
+  padding:0 11px 0 5px;border-radius:9px;cursor:pointer;font-family:inherit;
+  font-size:13px;font-weight:700;letter-spacing:-.01em;
+  transition:border-color .15s,background .15s}
+.acbtn:hover{border-color:var(--ac);background:var(--card)}
+.acbtn>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 아바타는 24px 이라 그라디언트가 보이지도 않는데 아래쪽 색이 대비를 깎는다.
+   면으로 쓰는 토큰은 짝이 되는 --on-* 글자색이 AA 를 넘도록 잡혀 있으니 그대로 단색으로 쓴다. */
+.acav{flex:0 0 auto;width:24px;height:24px;border-radius:7px;font-style:normal;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+  background:var(--ac);color:var(--on-ac)}
+.acav.n1{background:var(--ac2);color:var(--on-ac2)}
+.acav.n2{background:var(--warn);color:var(--on-warn)}
+.acav.n3{background:var(--vx);color:var(--on-vx)}
+.acav.n4{background:var(--bad);color:var(--on-bad)}
+.acav.big{width:34px;height:34px;border-radius:9px;font-size:15px}
 .logo span{color:var(--ac-tx)}
 nav{display:flex;gap:4px;flex-wrap:wrap}
 nav button{background:none;border:0;color:var(--tx2);padding:7px 12px;border-radius:8px;
@@ -330,6 +349,45 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   color:var(--on-ac);padding:9px 20px;border-radius:22px;font-weight:700;font-size:13px;z-index:99;
   opacity:0;pointer-events:none;transition:opacity .25s}
 .toast.on{opacity:1}
+
+/* --- 겹쳐 뜨는 창 (계정 등) --- */
+.modal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal[hidden]{display:none}
+.modalbg{position:absolute;inset:0;background:rgba(3,6,10,.62);backdrop-filter:blur(3px)}
+.modalbx{position:relative;width:100%;max-width:560px;max-height:calc(100vh - 36px);
+  display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line2);
+  border-radius:16px;box-shadow:var(--sh2)}
+.modalhd{flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:15px 16px 12px;border-bottom:1px solid var(--line)}
+.modalhd h2{margin:0;font-size:16px}
+.modalhd .mx{margin-left:auto;flex:0 0 auto;background:var(--bg2);border:1px solid var(--line);
+  color:var(--tx2);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;
+  font-family:inherit;line-height:1}
+.modalhd .mx:hover{border-color:var(--line2);color:var(--tx)}
+.modalbd{flex:1 1 auto;overflow-y:auto;padding:15px 16px 17px}
+/* 계정 한 줄 */
+.acrow{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:11px;padding:10px 12px;margin:0 0 8px}
+.acrow.cur{border-color:var(--ac-bd);background:var(--ac-bg)}
+.acrow .acnm{flex:1 1 auto;min-width:0}
+.acrow .acnm b{display:block;font-size:14px;letter-spacing:-.01em;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.acrow .acnm i{display:block;font-style:normal;font-size:12px;color:var(--tx3);margin-top:2px}
+.acrow .acbs{flex:0 0 auto;display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.acnow{flex:0 0 auto;font-size:11px;font-weight:800;letter-spacing:.02em;border-radius:20px;
+  padding:2px 9px;background:var(--ac);color:var(--on-ac)}
+.acpin{display:flex;gap:6px;align-items:center;margin:-3px 0 9px;padding:9px 12px;
+  background:var(--card2);border:1px solid var(--line);border-radius:11px}
+.acpin input{width:92px;flex:0 0 auto;text-align:center;letter-spacing:.35em;font-weight:700}
+.acnote{margin:12px 0 0;padding:11px 13px;border-radius:11px;
+  background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--tx2);
+  font-size:12.5px;line-height:1.65}
+.acnote b{color:var(--warn-tx)}
+@media (max-width:520px){
+  .acrow{flex-wrap:wrap}
+  .acrow .acnm{flex:1 1 100%}
+  .acrow .acbs{width:100%;justify-content:flex-start}
+}
 
 /* --- 토너먼트 전광판 --- */
 .tv{font-size:12.5px;color:var(--tx3);border-left:2px solid var(--line2);padding-left:10px}
@@ -932,7 +990,12 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
     <button data-v="tour"><i>5 · </i>토너먼트</button>
     <button data-v="help">도움말</button>
   </nav>
-  <button class="thbtn" id="theme-t" title="밝게 / 어둡게" aria-label="밝게 / 어둡게 전환"></button>
+  <div class="hdr-r">
+    <button class="acbtn" id="acct-b" title="선수 계정 — 누구 기록으로 쌓을지" aria-haspopup="dialog">
+      <i class="acav" id="acct-av"></i><span id="acct-nm">계정</span>
+    </button>
+    <button class="thbtn" id="theme-t" title="밝게 / 어둡게" aria-label="밝게 / 어둡게 전환"></button>
+  </div>
 </div></header>
 
 <div class="wrap">
@@ -1047,6 +1110,19 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
 </section>
 
 </div>
+
+<!-- ================= 선수 계정 ================= -->
+<div class="modal" id="acct-m" role="dialog" aria-modal="true" aria-labelledby="acct-mt" hidden>
+  <div class="modalbg" data-mclose="1"></div>
+  <div class="modalbx">
+    <div class="modalhd">
+      <h2 id="acct-mt">선수 계정</h2>
+      <button class="mx" data-mclose="1" aria-label="닫기">✕</button>
+    </div>
+    <div class="modalbd" id="acct-body"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -5299,6 +5375,161 @@ document.addEventListener("keydown", e=>{
   else if(k === "r") tdCount("r+");
 });
 
+/* ============================================================
+   PART 9. 선수 계정 화면
+   헤더에 «지금 누구인지»를 항상 띄운다. 이걸 안 보이게 두면
+   남의 계정에 내 드릴 기록이 쌓이고 나중에 되돌릴 방법이 없다.
+   ============================================================ */
+/* 전환하지 않고 다른 계정의 기록을 들여다볼 때만 쓴다 */
+const acctPeek = (id, k, d) => DB.rawGet("u" + id + "." + k, d);
+const acctAvClass = i => ["", "n1", "n2", "n3", "n4"][i % 5];
+const acctInitial = n => (String(n || "?").trim()[0] || "?").toUpperCase();
+
+/* 계정 한 줄에 붙는 요약 — 이 계정에 뭐가 들었는지 보고 고를 수 있게 */
+function acctSummary(id){
+  const hands = acctPeek(id, "hands", []);
+  const drills = acctPeek(id, "drills", []);
+  const prof = acctPeek(id, "profile", null);
+  const bits = [];
+  bits.push("핸드 " + (Array.isArray(hands) ? hands.length : 0));
+  bits.push("드릴 " + (Array.isArray(drills) ? drills.length : 0) + "세션");
+  bits.push(prof ? "진단 완료" : "진단 전");
+  return bits.join(" · ");
+}
+
+/* PIN 을 물어보는 중인 계정. 한 번에 하나만 */
+let ACPIN = null;
+
+function renderAcctChip(){
+  const list = acctList(), id = curAcctId();
+  const i = Math.max(0, list.map(x=>x.id).indexOf(id));
+  const a = list[i] || {n:"선수"};
+  const av = document.getElementById("acct-av");
+  const nm = document.getElementById("acct-nm");
+  if(av){ av.className = "acav " + acctAvClass(i); av.textContent = acctInitial(a.n); }
+  if(nm) nm.textContent = a.n;
+}
+
+function renderAcct(){
+  const box = document.getElementById("acct-body");
+  if(!box) return;
+  const list = acctList(), cur = curAcctId();
+  let h = '<p class="small muted" style="margin-bottom:12px">' +
+    '기록을 사람별로 나눠 쌓습니다. <b>성향 진단 · 핸드 · 드릴 · 전적</b>이 계정마다 따로 갑니다.<br>' +
+    '<span class="dim">대회 설정 · 전광판 · 광고는 매장 것이라 계정과 상관없이 이 기기에 하나로 둡니다.</span></p>';
+
+  list.forEach((a, i) => {
+    const me = a.id === cur;
+    h += '<div class="acrow' + (me ? ' cur' : '') + '">' +
+      '<i class="acav big ' + acctAvClass(i) + '">' + esc(acctInitial(a.n)) + '</i>' +
+      '<div class="acnm"><b>' + esc(a.n) + (a.pin ? ' <span class="dim" title="PIN 잠금">🔒</span>' : '') + '</b>' +
+      '<i>' + acctSummary(a.id) + '</i></div>' +
+      (me ? '<span class="acnow">지금</span>' : '') +
+      '<div class="acbs">' +
+      (me ? '' : '<button class="btn sec sm" data-ac="go" data-id="' + a.id + '">전환</button>') +
+      '<button class="btn sec sm" data-ac="nm" data-id="' + a.id + '">이름</button>' +
+      '<button class="btn sec sm" data-ac="pin" data-id="' + a.id + '">' + (a.pin ? "PIN 해제" : "PIN") + '</button>' +
+      (list.length > 1 ? '<button class="btn sec sm" data-ac="del" data-id="' + a.id + '">삭제</button>' : '') +
+      '</div></div>';
+    if(ACPIN === a.id){
+      h += '<div class="acpin"><span class="small muted">PIN 4자리</span>' +
+        '<input id="ac-pin-in" type="password" inputmode="numeric" maxlength="4" autocomplete="off">' +
+        '<button class="btn sm" data-ac="pinok" data-id="' + a.id + '">확인</button>' +
+        '<button class="btn sec sm" data-ac="pinno">취소</button></div>';
+    }
+  });
+
+  h += '<hr><div class="row"><div><label for="ac-new">새 계정 이름</label>' +
+    '<input id="ac-new" maxlength="16" placeholder="예: 김대표"></div>' +
+    '<div style="flex:0 0 auto"><button class="btn" data-ac="add">계정 만들기</button></div></div>';
+
+  h += '<div class="acnote"><b>PIN 은 보안이 아닙니다.</b> 이 앱은 서버가 없어서 PIN 이 브라우저 안에 ' +
+    '그대로 저장됩니다 — 마음먹으면 볼 수 있습니다. 옆 사람이 <b>실수로</b> 남의 기록을 건드리지 않게 하는 ' +
+    '잠금일 뿐이니, 진짜 비밀번호를 재사용하지 마세요.<br>' +
+    '기록은 이 브라우저에만 남습니다. 다른 기기로 옮기려면 <b>도움말 → 데이터 내보내기</b>를 쓰세요.</div>';
+
+  box.innerHTML = h;
+
+  box.querySelectorAll("[data-ac]").forEach(b => b.onclick = () => acctAction(b.dataset.ac, b.dataset.id));
+  const pi = document.getElementById("ac-pin-in");
+  if(pi){ pi.focus(); pi.onkeydown = e => { if(e.key === "Enter") acctAction("pinok", ACPIN); }; }
+  const nw = document.getElementById("ac-new");
+  if(nw) nw.onkeydown = e => { if(e.key === "Enter") acctAction("add"); };
+}
+
+function acctAction(what, id){
+  const a = acctList().filter(x => x.id === id)[0];
+  if(what === "go"){
+    if(a && a.pin){ ACPIN = id; renderAcct(); return; }
+    acctApply(id);
+  } else if(what === "pinok"){
+    const v = (document.getElementById("ac-pin-in") || {}).value || "";
+    if(a && v === a.pin){ ACPIN = null; acctApply(id); }
+    else toast("PIN 이 다릅니다");
+  } else if(what === "pinno"){
+    ACPIN = null; renderAcct();
+  } else if(what === "nm"){
+    const v = prompt("이름을 바꿉니다", a ? a.n : "");
+    if(v !== null && acctRename(id, v)){ renderAcct(); renderAcctChip(); toast("이름을 바꿨습니다"); }
+  } else if(what === "pin"){
+    if(a && a.pin){
+      if(confirm("PIN 잠금을 풉니다. 계속할까요?")){ acctSetPin(id, ""); renderAcct(); toast("PIN 을 껐습니다"); }
+      return;
+    }
+    const v = prompt("숫자 4자리를 정하세요.\n(보안이 아니라 실수 방지용입니다 — 진짜 비밀번호를 쓰지 마세요)", "");
+    if(v === null) return;
+    if(!/^\d{4}$/.test(v.trim())){ toast("숫자 4자리만 됩니다"); return; }
+    acctSetPin(id, v.trim()); renderAcct(); toast("PIN 을 걸었습니다");
+  } else if(what === "del"){
+    if(!a) return;
+    if(!confirm('"' + a.n + '" 계정과 그 계정의 성향 진단·핸드·드릴·전적을 모두 지웁니다.\n\n되돌릴 수 없습니다. 계속할까요?')) return;
+    const wasCur = id === curAcctId();
+    if(acctDelete(id)){
+      if(wasCur) acctReload();
+      renderAcct(); renderAcctChip(); toast("계정을 지웠습니다");
+    }
+  } else if(what === "add"){
+    const el = document.getElementById("ac-new");
+    const nid = acctAdd(el ? el.value : "");
+    if(!nid){ toast("계정은 40개까지입니다"); return; }
+    if(el) el.value = "";
+    acctApply(nid);
+    toast("새 계정으로 전환했습니다");
+  }
+}
+
+/* 계정을 바꾸면 화면에 남아 있던 앞 사람 숫자를 전부 새로 그린다.
+   헤더 칩을 맨 먼저 고쳐야 «지금 누구인지»가 어긋나지 않는다 —
+   기록 하나가 깨져서 어느 화면이 그리다 멈추더라도 저장소와 헤더는 같은 사람을 가리켜야 한다. */
+function acctReload(){
+  DR = null; QZ = null;
+  renderAcctChip();
+  const broke = [];
+  [["세팅", loadSetup], ["뱅크롤", bankrollAdvice], ["핸드 입력", buildHandInputs],
+   ["홈", renderHome], ["기록", renderStats], ["진단", renderQuiz], ["드릴", renderDrill]
+  ].forEach(function(p){ try{ p[1](); }catch(e){ broke.push(p[0]); } });
+  if(broke.length) toast(broke.join(" · ") + " 화면을 새로 그리지 못했습니다");
+}
+function acctApply(id){
+  if(!acctSwitch(id)) return;
+  ACPIN = null;
+  acctReload();
+  renderAcct();
+}
+
+function openAcct(){
+  const m = document.getElementById("acct-m");
+  if(!m) return;
+  ACPIN = null;
+  renderAcct();
+  m.hidden = false;
+}
+function closeAcct(){
+  const m = document.getElementById("acct-m");
+  if(m) m.hidden = true;
+  ACPIN = null;
+}
+
 /* ---- 라우팅 & 초기화 ---- */
 function go(v){
   /* 토너먼트는 전광판이라 폭을 넓게, 나머지는 읽기 좋은 폭으로 */
@@ -5369,6 +5600,13 @@ window.addEventListener("DOMContentLoaded", function(){
   buildHandInputs();
   bankrollAdvice();
   renderHome();
+  renderAcctChip();
+  document.getElementById("acct-b").onclick = openAcct;
+  document.getElementById("acct-m").querySelectorAll("[data-mclose]")
+    .forEach(e=>e.onclick = closeAcct);
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && !document.getElementById("acct-m").hidden) closeAcct();
+  });
   document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.v));
   ["s-seats","s-stack","s-ante","s-bl","s-gt"].forEach(id=>{
     const e = document.getElementById(id);

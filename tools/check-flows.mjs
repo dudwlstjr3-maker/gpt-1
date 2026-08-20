@@ -504,6 +504,107 @@ group('실전 드릴');
   }
 }
 
+/* ─────────── 선수 계정 ─────────── */
+group('선수 계정');
+{
+  // 다음 dialog(prompt/confirm) 한 번을 이렇게 답하겠다고 미리 걸어 둔다
+  const answer = (v) => page.once('dialog', (d) => (v === false ? d.dismiss() : d.accept(v === true ? '' : v)));
+  const chip = () => txt('#acct-b');
+  const rows = () => page.locator('#acct-body .acrow');
+
+  // 이 계정에 기록을 심어 둔다 — 계정을 바꿨을 때 사라지는지 보려고.
+  // 화면이 실제로 그리는 모양이어야 하므로 저장 코드가 만드는 형태 그대로 넣는다.
+  const seedHand = (mark) => ({
+    at: 1700000000000, cls: 'AQs', pos: 'BTN', vpos: 'BB', pf: 'open', vt: '스테이션',
+    hole: ['As', 'Qs'], board: ['Ks', '7h', '2d'], mark,
+    streets: [{ n: '플랍', rec: '벳', my: '체크', eq: 0.55, evLoss: 0.4, tags: ['소극적'] }]
+  });
+  await page.evaluate((h) => DB.set('hands', h), [seedHand('A'), seedHand('A2')]);
+  const myHands = () => page.evaluate(() => DB.get('hands', []).map((h) => h.mark).join(','));
+
+  ok((await chip()).trim().length > 0, '헤더에 지금 계정 이름이 뜬다', (await chip()).replace(/\n/g, ' '));
+  ok(await page.locator('#acct-m').isHidden(), '계정 창은 처음엔 닫혀 있다');
+
+  await page.click('#acct-b');
+  await page.waitForTimeout(200);
+  ok(await page.locator('#acct-m').isVisible(), '헤더 칩을 누르면 계정 창이 열린다');
+  ok(await rows().count() === 1, '처음엔 계정이 하나다', String(await rows().count()));
+  ok((await txt('#acct-body')).includes('핸드 2'), '계정 줄에 그 계정의 기록 수가 보인다',
+    (await rows().first().innerText()).replace(/\n/g, ' | '));
+  ok(/PIN 은 보안이 아닙니다/.test(await txt('#acct-body')), 'PIN 이 보안이 아니라는 경고가 화면에 있다');
+
+  // 새 계정 만들기 → 곧바로 그쪽으로 전환된다
+  await page.fill('#ac-new', '테스터');
+  await page.click('#acct-body [data-ac="add"]');
+  await page.waitForTimeout(300);
+  ok(await rows().count() === 2, '계정이 하나 늘어난다', String(await rows().count()));
+  ok((await chip()).includes('테스터'), '만들자마자 새 계정으로 전환된다', (await chip()).replace(/\n/g, ' '));
+  ok((await rows().nth(1).innerText()).includes('지금'), '두 번째 줄에 «지금» 표시가 붙는다',
+    (await rows().nth(1).innerText()).replace(/\n/g, ' | '));
+  ok(await page.evaluate(() => DB.get('hands', []).length) === 0,
+    '새 계정에는 앞 사람 핸드가 안 보인다');
+  ok((await rows().nth(1).innerText()).includes('핸드 0'), '새 계정 요약은 0에서 시작한다',
+    (await rows().nth(1).innerText()).replace(/\n/g, ' | '));
+
+  // 이름 바꾸기 (prompt)
+  answer('테스터2');
+  await page.click('#acct-body .acrow:nth-of-type(2) [data-ac="nm"]');
+  await page.waitForTimeout(250);
+  ok((await chip()).includes('테스터2'), '이름을 바꾸면 헤더 칩도 따라 바뀐다', (await chip()).replace(/\n/g, ' '));
+
+  // PIN 걸기 (prompt)
+  answer('1357');
+  await page.click('#acct-body .acrow:nth-of-type(2) [data-ac="pin"]');
+  await page.waitForTimeout(250);
+  ok((await rows().nth(1).innerText()).includes('🔒'), 'PIN 을 걸면 자물쇠가 표시된다',
+    (await rows().nth(1).innerText()).replace(/\n/g, ' | '));
+
+  // 첫 계정으로 돌아가면 심어 둔 기록이 그대로 있다
+  await page.click('#acct-body .acrow:nth-of-type(1) [data-ac="go"]');
+  await page.waitForTimeout(300);
+  ok(await myHands() === 'A,A2', '계정을 되돌리면 그 계정 기록이 그대로 돌아온다', await myHands());
+
+  // PIN 건 계정으로 가려면 PIN 을 물어본다
+  await page.click('#acct-body .acrow:nth-of-type(2) [data-ac="go"]');
+  await page.waitForTimeout(250);
+  ok(await page.locator('#ac-pin-in').count() === 1, 'PIN 이 걸린 계정은 바로 안 들어가고 PIN 을 묻는다');
+  ok(!(await chip()).includes('테스터2'), '아직 전환되지 않았다', (await chip()).replace(/\n/g, ' '));
+
+  await page.fill('#ac-pin-in', '0000');
+  await page.click('#acct-body [data-ac="pinok"]');
+  await page.waitForTimeout(250);
+  ok(!(await chip()).includes('테스터2'), '틀린 PIN 으로는 안 들어간다', (await chip()).replace(/\n/g, ' '));
+
+  await page.fill('#ac-pin-in', '1357');
+  await page.click('#acct-body [data-ac="pinok"]');
+  await page.waitForTimeout(300);
+  ok((await chip()).includes('테스터2'), '맞는 PIN 이면 전환된다', (await chip()).replace(/\n/g, ' '));
+
+  // 새로고침해도 고른 계정이 유지된다
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(250);
+  ok((await chip()).includes('테스터2'), '새로고침해도 고른 계정이 유지된다', (await chip()).replace(/\n/g, ' '));
+
+  // 계정 삭제 (confirm) — 그 계정 기록도 함께 사라진다
+  await page.click('#acct-b');
+  await page.waitForTimeout(200);
+  answer(true);
+  await page.click('#acct-body .acrow:nth-of-type(2) [data-ac="del"]');
+  await page.waitForTimeout(300);
+  ok(await rows().count() === 1, '지우면 줄이 하나 남는다', String(await rows().count()));
+  ok(await page.evaluate(() => Object.keys(localStorage).filter((k) => /^hb\.u.*\.hands$/.test(k)).length) === 1,
+    '지운 계정의 저장 키까지 함께 사라진다');
+  ok(await myHands() === 'A,A2', '지운 뒤 남은 계정으로 자동 전환된다', await myHands());
+  ok(await page.locator('#acct-body [data-ac="del"]').count() === 0, '마지막 하나 남으면 삭제 버튼이 없다');
+
+  // ESC 로 닫힌다
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  ok(await page.locator('#acct-m').isHidden(), 'ESC 로 계정 창이 닫힌다');
+
+  await page.evaluate(() => DB.del('hands'));
+}
+
 /* ─────────── 테마 ─────────── */
 group('테마');
 {

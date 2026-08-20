@@ -353,6 +353,61 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
   await page.close();
 }
 
+/* ── 계정 창 ──
+   평소엔 hidden 이라 탭 순회에 안 걸린다. 열어 둔 상태로 따로 본다.
+   PIN 입력 줄까지 펼쳐야 좁은 폭에서 눌리는지 확인된다. */
+for (const vp of WIDTHS) {
+  const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1 });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 160)));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)); });
+  await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
+
+  // 아바타 색은 5종을 돌려쓰므로 5개를 다 띄워야 전부 검사된다.
+  // 하나는 PIN 이 걸려 있고, PIN 입력 줄까지 펼친 상태로 본다.
+  await page.evaluate(() => {
+    ['둘', '셋', '넷', '아주아주긴이름의선수'].forEach((n) => acctAdd(n));
+    const l = acctList();
+    acctSetPin(l[0].id, '1234');
+    openAcct();
+    ACPIN = l[0].id;
+    renderAcct();
+  });
+  await page.waitForTimeout(250);
+
+  const where = `${vp.n} ${vp.w}px · 계정 창`;
+  checks++;
+  if (!(await page.locator('#acct-m').isVisible())) { add(where, '계정 창이 열리지 않습니다'); }
+  else {
+    checks++;
+    if (await page.locator('#acct-body .acrow').count() !== 5) add(where, '계정 줄이 5개가 아닙니다');
+    checks++;
+    {
+      const cls = await page.locator('#acct-body .acav').evaluateAll((es) =>
+        [...new Set(es.map((e) => e.className.replace('acav big', '').trim() || 'n0'))].sort());
+      if (cls.length !== 5) add(where, `아바타 색이 5종 다 안 나옵니다 (${cls.join(',')})`);
+    }
+    checks++;
+    if (await page.locator('#ac-pin-in').count() !== 1) add(where, 'PIN 입력 줄이 펼쳐지지 않았습니다');
+
+    await scanText(page, where);
+    await scanOverflow(page, where, vp.w);
+    await scanClipped(page, where, '#acct-m');
+
+    if (vp.w === 1440) {
+      for (const th of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), th);
+        await page.waitForTimeout(400);
+        await scanContrast(page, `${where} · ${th === 'light' ? '밝게' : '어둡게'}`, '#acct-m');
+        if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${th}-acct.png`) });
+      }
+    }
+  }
+
+  if (errs.length) [...new Set(errs)].forEach((e) => add(where, '콘솔 ' + e));
+  await page.close();
+}
+
 await browser.close();
 server.close();
 
@@ -364,4 +419,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 계정 창)\n`);

@@ -504,6 +504,80 @@ group('실전 드릴');
   }
 }
 
+/* ─────────── 전적 ─────────── */
+group('전적');
+{
+  await page.evaluate(() => { DB.del('stats'); DB.del('drills'); });
+  await tab('rec');
+  const view = () => txt('#v-rec');
+
+  ok((await view()).includes('아직 기록이 없습니다'), '처음엔 빈 상태 안내가 나온다');
+  ok(/판단 30개부터|드릴을 돌리지 않았습니다/.test(await view()), '표본이 없으면 등급을 매기지 않는다고 알려준다');
+  ok(/추정값/.test(await view()), '드릴 등급이 추정값이라고 표시된다');
+
+  // 한 줄 남기기
+  await page.fill('#rc-name', '금요일 몬스터');
+  await page.fill('#rc-place', '3');
+  await page.fill('#rc-field', '42');
+  await page.fill('#rc-buyins', '3');
+  await page.fill('#rc-spent', '9');
+  await page.fill('#rc-prize', '25');
+  await page.click('#rc-add');
+  await page.waitForTimeout(350);
+
+  let row = await txt('#v-rec table tr:nth-child(2)');
+  ok(row.includes('금요일 몬스터'), '기록이 표에 한 줄로 남는다', row.replace(/\n/g, ' | '));
+  ok(row.includes('3위') && row.includes('42명'), '순위와 참가자 수가 함께 나온다', row.replace(/\n/g, ' | '));
+  ok(row.includes('3회'), '바이인 횟수가 나온다', row.replace(/\n/g, ' | '));
+  ok(/\+16만원/.test(row), '손익은 상금 − 지출 (25 − 9 = +16만원)', row.replace(/\n/g, ' | '));
+
+  ok((await view()).includes('출전'), '요약에 출전 수가 나온다');
+  ok(/바이인[\s\S]{0,40}3회/.test(await view()), '요약 바이인이 3회', (await view()).slice(0, 200).replace(/\n/g, ' | '));
+
+  // 우승으로 기록 — 순위 칸을 안 건드려도 1위로 들어간다
+  await page.fill('#rc-name', '데일리');
+  await page.fill('#rc-place', '9');
+  await page.fill('#rc-field', '30');
+  await page.fill('#rc-buyins', '1');
+  await page.fill('#rc-spent', '1');
+  await page.fill('#rc-prize', '12');
+  await page.click('#rc-win');
+  await page.waitForTimeout(350);
+
+  ok(await page.evaluate(() => recTotals().wins) === 1, '«우승으로 기록»은 순위 칸과 무관하게 1위로 넣는다',
+    String(await page.evaluate(() => recTotals().wins)));
+  ok(/우승/.test(await txt('#v-rec table')), '표에 우승이 표시된다');
+  ok(await page.evaluate(() => recTotals().buyins) === 4, '바이인 합계가 4회로 늘어난다',
+    String(await page.evaluate(() => recTotals().buyins)));
+
+  // 새로고침해도 남는다
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('rec');
+  ok((await view()).includes('금요일 몬스터') && (await view()).includes('데일리'),
+    '새로고침해도 전적이 남는다');
+
+  // 드릴 표본이 쌓이면 등급이 매겨진다
+  await page.evaluate(() => {
+    DB.set('drills', [{ at: Date.now(), n: 80, ok: 56, loss: 20, passive: 8, aggro: 5 }]);
+    renderRec();
+  });
+  await page.waitForTimeout(250);
+  ok(!/측정 중/.test(await view()), '표본이 차면 등급이 나온다');
+  ok(await page.locator('#v-rec .tag.g').count() >= 1, '등급표에서 지금 등급이 강조된다');
+
+  // 삭제
+  await page.click('#v-rec [data-rc="0"]');
+  await page.waitForTimeout(300);
+  ok(await page.evaluate(() => recAll().length) === 1, '한 줄을 지우면 하나만 남는다',
+    String(await page.evaluate(() => recAll().length)));
+
+  // 홈에도 요약이 뜬다
+  await tab('home');
+  ok(/전적/.test(await txt('#v-home')), '홈에 전적 요약이 나온다');
+
+  await page.evaluate(() => { DB.del('stats'); DB.del('drills'); });
+}
+
 /* ─────────── 선수 계정 ─────────── */
 group('선수 계정');
 {

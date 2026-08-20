@@ -1107,6 +1107,142 @@ group('드릴');
   }
 }
 
+/* ───────────────── 전적 ───────────────── */
+group('전적');
+{
+  const { DB, recAll, recAdd, recDel, recTotals, recNorm, drillRank, drillWindow,
+    DRANKS, DRANK_MIN, DRANK_WINDOW, acctMigrate, acctAdd, acctSwitch } = app;
+
+  ctx.localStorage.clear();
+  acctMigrate();
+
+  ok(recAll().length === 0, '처음엔 출전 기록이 없다');
+  ok(recTotals().n === 0 && recTotals().wins === 0, '빈 전적의 합계는 0이다');
+  ok(recTotals().roi === null, '지출이 0이면 회수율은 숫자를 내지 않는다 (0으로 나누지 않는다)');
+
+  // ── 한 줄 다듬기: 손으로 넣는 값이라 뭐가 들어와도 모양이 반듯해야 한다
+  {
+    const n = recNorm({ name: '  ', place: -3, field: -1, buyins: 0, spent: -500, prize: 'x' });
+    ok(n.name === '토너먼트', '이름이 비면 기본 이름을 붙인다', n.name);
+    ok(n.place === 0, '음수 순위는 0(미기입)으로 내린다', String(n.place));
+    ok(n.field === 0, '음수 참가자는 0으로 내린다', String(n.field));
+    ok(n.buyins === 1, '바이인은 최소 1회다 — 나갔으면 한 번은 냈다', String(n.buyins));
+    ok(n.spent === 0 && n.prize === 0, '음수·숫자가 아닌 금액은 0으로 둔다', `${n.spent}/${n.prize}`);
+    ok(typeof n.at === 'number' && n.at > 0, '날짜가 없으면 지금으로 채운다');
+    ok(recNorm({ place: 30, field: 9 }).place === 9,
+      '참가자보다 뒤 순위는 있을 수 없으니 참가자 수로 맞춘다', String(recNorm({ place: 30, field: 9 }).place));
+    ok(recNorm({ name: 'ㄱ'.repeat(80) }).name.length === 40, '이름은 40자에서 자른다');
+  }
+
+  // ── 쌓기 · 합계
+  recAdd({ at: 1000, name: '데일리', place: 1, field: 30, buyins: 2, spent: 20000, prize: 150000 });
+  recAdd({ at: 3000, name: '몬스터', place: 12, field: 40, buyins: 3, spent: 90000, prize: 0 });
+  recAdd({ at: 2000, name: '리그', place: 5, field: 25, buyins: 1, spent: 30000, prize: 40000 });
+
+  ok(recAll().length === 3, '세 줄이 쌓인다', String(recAll().length));
+  ok(recAll().map((x) => x.at).join(',') === '3000,2000,1000', '최근 것이 위로 오게 정렬된다',
+    recAll().map((x) => x.at).join(','));
+
+  const T = recTotals();
+  ok(T.n === 3, '출전 3회', String(T.n));
+  ok(T.wins === 1, '우승 1회 — 1위만 센다', String(T.wins));
+  ok(T.ft === 2, '파이널 테이블(9위 이내) 2회', String(T.ft));
+  ok(T.itm === 2, '상금권 2회 — 상금을 받은 대회', String(T.itm));
+  ok(T.buyins === 6, '바이인은 엔트리+리바이를 다 합쳐 6회', String(T.buyins));
+  ok(T.spent === 140000, '지출 합계 14만원', String(T.spent));
+  ok(T.prize === 190000, '상금 합계 19만원', String(T.prize));
+  ok(T.net === 50000, '손익 +5만원', String(T.net));
+  ok(Math.abs(T.roi - 50000 / 140000) < 1e-9, '회수율 = 손익 / 지출', String(T.roi));
+  ok(T.best === 1, '최고 순위 1위', String(T.best));
+
+  // 순위를 안 적은 줄은 «최고 순위» 계산을 망치면 안 된다
+  recAdd({ at: 500, name: '순위 미기입', place: 0, field: 0, buyins: 1, spent: 10000, prize: 0 });
+  ok(recTotals().best === 1, '순위 미기입(0)은 최고 순위로 안 친다', String(recTotals().best));
+  ok(recTotals().ft === 2, '순위 미기입은 파이널 테이블로도 안 친다', String(recTotals().ft));
+
+  ok(recDel(3) && recAll().length === 3, '한 줄을 지운다', String(recAll().length));
+  ok(recDel(99) === false, '없는 줄은 못 지운다');
+  ok(recDel(-1) === false, '음수 자리도 못 지운다');
+
+  // ── 계정별로 갈린다
+  {
+    const other = acctAdd('다른 선수');
+    acctSwitch(other);
+    ok(recAll().length === 0, '다른 계정에는 앞 사람 전적이 안 보인다', String(recAll().length));
+    recAdd({ at: 9000, name: '내 대회', place: 1, field: 10, buyins: 1, spent: 10000, prize: 50000 });
+    ok(recTotals().wins === 1, '새 계정에 따로 쌓인다', String(recTotals().wins));
+    acctSwitch(app.acctList()[0].id);
+    ok(recAll().length === 3 && recTotals().wins === 1, '돌아오면 원래 전적 그대로다',
+      `${recAll().length}줄 / 우승 ${recTotals().wins}`);
+  }
+
+  // ── 드릴 등급
+  {
+    ok(DRANKS.length === 6, '등급은 6단계', String(DRANKS.length));
+    for (let i = 1; i < DRANKS.length; i++) {
+      ok(DRANKS[i].ok > DRANKS[i - 1].ok, `${DRANKS[i].n} 의 선택률 문턱이 아래 등급보다 높다`);
+      ok(DRANKS[i].loss < DRANKS[i - 1].loss, `${DRANKS[i].n} 의 손실 문턱이 아래 등급보다 빡빡하다`);
+    }
+
+    ok(drillRank([]).rank === null, '기록이 없으면 등급을 매기지 않는다');
+    ok(drillRank([]).need === DRANK_MIN, `표본 ${DRANK_MIN}개가 필요하다고 알려준다`, String(drillRank([]).need));
+
+    const sess = (n, okc, loss) => ({ at: Date.now(), n, ok: okc, loss, passive: 0, aggro: 0 });
+    ok(drillRank([sess(DRANK_MIN - 1, 20, 1)]).rank === null,
+      `표본이 ${DRANK_MIN}개 미만이면 등급이 안 나온다`);
+    ok(drillRank([sess(DRANK_MIN, 30, 0)]).rank !== null, `표본이 ${DRANK_MIN}개면 등급이 나온다`);
+
+    // 전부 맞고 손실 0 → 최고 등급, 전부 틀리고 손실 큼 → 최저 등급
+    ok(drillRank([sess(100, 100, 0)]).rank.id === DRANKS[DRANKS.length - 1].id,
+      '다 맞히면 최고 등급', drillRank([sess(100, 100, 0)]).rank.n);
+    ok(drillRank([sess(100, 0, 300)]).rank.id === DRANKS[0].id,
+      '다 틀리면 최저 등급', drillRank([sess(100, 0, 300)]).rank.n);
+
+    // 둘 다 넘어야 올라간다 — 선택률만 높고 손실이 크면 못 올라간다
+    {
+      const r = drillRank([sess(100, 90, 100)]);
+      ok(r.rank.id === DRANKS[0].id,
+        '선택률이 높아도 판단당 손실이 크면 올라가지 못한다', `${r.rank.n} (손실 ${r.lossPer}BB)`);
+    }
+
+    // 최근 것만 센다 — 옛날 세션이 창 밖으로 밀려나야 한다
+    {
+      const recent = sess(DRANK_WINDOW, DRANK_WINDOW, 0);   // 최근: 전부 정답
+      const old = sess(DRANK_WINDOW, 0, DRANK_WINDOW * 5);  // 옛날: 전부 오답
+      const r = drillRank([recent, old]);
+      ok(r.spots === DRANK_WINDOW, `창 ${DRANK_WINDOW}개를 넘겨 담지 않는다`, String(r.spots));
+      ok(r.rank.id === DRANKS[DRANKS.length - 1].id,
+        '옛날 부진은 창 밖으로 밀려난다 — 지금 실력을 본다', r.rank.n);
+      ok(drillWindow([recent, old]).sessions === 1, '창을 채우면 더 담지 않는다',
+        String(drillWindow([recent, old]).sessions));
+    }
+
+    // 세션 하나가 창보다 작으면 이어서 담는다
+    {
+      const w = drillWindow([sess(10, 5, 1), sess(10, 5, 1), sess(10, 5, 1)]);
+      ok(w.spots === 30 && w.sessions === 3, '창이 안 차면 여러 세션을 이어 담는다', `${w.spots}개 / ${w.sessions}세션`);
+      ok(w.ok === 15, '정답 수도 함께 더한다', String(w.ok));
+    }
+
+    // 다음 등급까지 뭐가 모자란지
+    {
+      const r = drillRank([sess(100, 50, 50)]);
+      const gap = app.drillGap(r);
+      ok(gap.length > 0, '다음 등급까지 모자란 항목을 알려준다', gap.join(' / '));
+      ok(app.drillGap(drillRank([sess(100, 100, 0)])).length === 0, '최고 등급이면 더 알려줄 게 없다');
+    }
+  }
+
+  ok(app.ACCT_KEYS.indexOf('stats') >= 0, '전적은 계정별 키다 — 기기 공용이 아니다');
+  ok(app.STAT_KEYS.length === 1 && app.STAT_KEYS[0] === 'stats',
+    '전적 초기화는 stats 만 지운다 — 학습 초기화에 우승 횟수가 딸려가면 안 된다');
+  ok(app.LEARN_KEYS.indexOf('stats') < 0, '학습 데이터 초기화가 전적을 지우지 않는다');
+  ok(app.TOUR_KEYS.indexOf('stats') < 0, '대회 데이터 초기화가 전적을 지우지 않는다');
+
+  ctx.localStorage.clear();
+  acctMigrate();
+}
+
 /* ───────────────── 저장소 · 백업 ───────────────── */
 group('저장소 · 백업');
 {

@@ -987,7 +987,8 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
     <button data-v="hand"><i>2 · </i>핸드 분석</button>
     <button data-v="stats"><i>3 · </i>리크<i> · 기록</i></button>
     <button data-v="drill"><i>4 · </i>드릴</button>
-    <button data-v="tour"><i>5 · </i>토너먼트</button>
+    <button data-v="rec"><i>5 · </i>전적</button>
+    <button data-v="tour"><i>6 · </i>토너먼트</button>
     <button data-v="help">도움말</button>
   </nav>
   <div class="hdr-r">
@@ -1072,6 +1073,9 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
 <!-- ================= 실전 드릴 ================= -->
 <section class="view" id="v-drill"></section>
 
+<!-- ================= 전적 ================= -->
+<section class="view" id="v-rec"></section>
+
 <!-- ================= 토너먼트 ================= -->
 <section class="view" id="v-tour"></section>
 
@@ -1099,7 +1103,10 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
       <div style="flex:0 0 auto"><button class="btn sec sm" id="im-json">데이터 불러오기</button></div>
       <div style="flex:0 0 auto"><button class="btn sec sm" id="rs-all">학습 데이터 초기화</button></div>
       <div style="flex:0 0 auto"><button class="btn sec sm" id="rs-tour">대회 데이터 초기화</button></div>
+      <div style="flex:0 0 auto"><button class="btn sec sm" id="rs-rec">전적 초기화</button></div>
     </div>
+    <p class="small dim" style="margin-top:8px">초기화는 <b>지금 고른 계정</b>에만 적용됩니다 —
+    학습 데이터와 전적은 계정별로 갈리고, 대회 데이터는 이 기기 하나로 공용입니다.</p>
     <p class="small dim" style="margin-top:8px">내보내기는 이 브라우저에 저장된 <b>모든 항목</b>을 담습니다 —
     성향 진단(답한 문항 포함) · 핸드 기록 · 드릴 · 저장한 대회와 주간 일정 · 전광판 로고와 광고 슬라이드.</p>
     <input type="file" id="im-file" accept=".json" style="display:none">
@@ -3401,7 +3408,20 @@ function renderHome(){
     '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'drill\')">실전 드릴 돌리기</button></div>'+
     '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'tour\')">토너먼트 클락 열기</button></div>'+
     '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'stats\')">내 리크 보기</button></div>'+
+    '<div style="flex:0 0 auto"><button class="btn sec" onclick="go(\'rec\')">전적 보기</button></div>'+
     '</div></div>';
+  {
+    const T = recTotals(), R = drillRank(DB.get("drills", []));
+    if(T.n || R.rank)
+      h += '<div class="card"><h2>전적 <span class="small dim">— '+esc((curAcct()||{n:"선수"}).n)+'</span></h2>'+
+        '<div class="facts">'+
+        fact("출전", T.n+"회", T.best ? "최고 "+T.best+"위" : "") +
+        fact("우승", T.wins+"회", T.n ? "인더머니 "+T.itm+"회" : "") +
+        fact("바이인", T.buyins+"회", T.spent ? manwon(T.spent) : "") +
+        fact("드릴 등급", R.rank ? R.rank.n : "측정 중", R.rank ? "판단 "+R.spots+"개" : "판단 "+R.need+"개 더") +
+        '</div><div style="margin-top:10px">'+
+        '<button class="btn sec sm" onclick="go(\'rec\')">전적 자세히 보기</button></div></div>';
+  }
   if(hands.length){
     const tot = hands.reduce((a,x)=>a+x.streets.reduce((b,s)=>b+(s.evLoss||0),0),0);
     const tc = {}; hands.forEach(x=>x.streets.forEach(s=>(s.tags||[]).forEach(t=>tc[t]=(tc[t]||0)+1)));
@@ -3417,9 +3437,10 @@ function renderHome(){
     '<li><b>세션 세팅 + 핸드 입력</b> — 팟 오즈·SPR·승률을 계산하고, <b>당신 성향에 맞춘</b> 실행 지침을 냅니다.</li>'+
     '<li><b>탑 플레이어 렌즈</b> — 같은 스팟을 다른 스타일은 어떻게 푸는지, 당신과 뭐가 다른지 봅니다.</li>'+
     '<li><b>리크 대시보드</b> — 반복되는 실수를 쌓아 어디서 새는지 보여줍니다.</li>'+
-    '<li><b>실전 드릴</b> — 임의 스팟을 받고 액션을 고르면 선택지별 EV로 채점합니다. 배운 걸 손에 붙이는 단계입니다.</li></ol>'+
-    '<p class="muted small" style="margin-top:10px">위 네 가지는 <b>내 실력</b>을 위한 것이고, '+
-    '<b>5 · 토너먼트</b>는 성격이 다릅니다 — 오프라인 대회를 직접 열 때 화면에 띄워놓는 <b>운영용 클락·전광판</b>입니다.</p></div>';
+    '<li><b>실전 드릴</b> — 임의 스팟을 받고 액션을 고르면 선택지별 EV로 채점합니다. 배운 걸 손에 붙이는 단계입니다.</li>'+
+    '<li><b>전적</b> — 대회에 나갈 때마다 순위·바이인·상금을 한 줄씩 남깁니다. 드릴 등급도 여기 모입니다.</li></ol>'+
+    '<p class="muted small" style="margin-top:10px">위 다섯 가지는 <b>내 실력과 내 기록</b>을 위한 것이고, '+
+    '<b>6 · 토너먼트</b>는 성격이 다릅니다 — 오프라인 대회를 직접 열 때 화면에 띄워놓는 <b>운영용 클락·전광판</b>입니다.</p></div>';
   document.getElementById("v-home").innerHTML = h;
 }
 
@@ -5173,7 +5194,12 @@ function renderTDClock(v){
     '<details class="tdhelp"><summary>입력 방법 · 단축키 보기</summary><div class="small">'+
       '숫자는 칸에 직접 입력하거나 ± 버튼으로 바꿀 수 있습니다. 참가·리바이는 총 상금과 총 칩에 자동 반영됩니다.<br>'+ 
       '<b>스페이스</b> 시작·정지 · <b>← →</b> 레벨 이동 · <b>F</b> 전체화면 · '+
-      '<b>B</b> BUY-IN +1 · <b>E</b> ELIMINATE −1 · <b>R</b> REBUY-IN +1</div></details></div>';
+      '<b>B</b> BUY-IN +1 · <b>E</b> ELIMINATE −1 · <b>R</b> REBUY-IN +1</div></details>'+
+    '<hr style="margin:11px 0 9px">'+
+    '<div class="row"><div class="small dim" style="flex:1 1 160px">'+
+      '여기 숫자는 <b>대회 운영</b>용입니다. 내가 선수로 친 결과는 전적에 따로 남깁니다.</div>'+
+      '<div style="flex:0 0 auto"><button class="btn sec sm" onclick="go(\'rec\')">내 결과 기록하기</button></div>'+
+    '</div></div>';
 
   /* ===== 상금 배분 — 우리가 정한다 ===== */
   const sum = Math.round(TD.pay.reduce((a,b)=>a+b,0)*10)/10;
@@ -5390,7 +5416,11 @@ function acctSummary(id){
   const hands = acctPeek(id, "hands", []);
   const drills = acctPeek(id, "drills", []);
   const prof = acctPeek(id, "profile", null);
+  const st = acctPeek(id, "stats", null);
+  const tour = (st && Array.isArray(st.tour)) ? st.tour : [];
   const bits = [];
+  bits.push("출전 " + tour.length + "회");
+  if(tour.filter(x=>x.place === 1).length) bits.push("우승 " + tour.filter(x=>x.place === 1).length + "회");
   bits.push("핸드 " + (Array.isArray(hands) ? hands.length : 0));
   bits.push("드릴 " + (Array.isArray(drills) ? drills.length : 0) + "세션");
   bits.push(prof ? "진단 완료" : "진단 전");
@@ -5506,7 +5536,8 @@ function acctReload(){
   renderAcctChip();
   const broke = [];
   [["세팅", loadSetup], ["뱅크롤", bankrollAdvice], ["핸드 입력", buildHandInputs],
-   ["홈", renderHome], ["기록", renderStats], ["진단", renderQuiz], ["드릴", renderDrill]
+   ["홈", renderHome], ["기록", renderStats], ["진단", renderQuiz], ["드릴", renderDrill],
+   ["전적", renderRec]
   ].forEach(function(p){ try{ p[1](); }catch(e){ broke.push(p[0]); } });
   if(broke.length) toast(broke.join(" · ") + " 화면을 새로 그리지 못했습니다");
 }
@@ -5530,6 +5561,279 @@ function closeAcct(){
   ACPIN = null;
 }
 
+/* ============================================================
+   PART 10. 전적 — 출전 · 우승 · 바이인 · 드릴 등급
+   대회 운영(TD)은 매장 것이고, 여기 쌓이는 건 «내가 선수로서» 친 기록이다.
+   그래서 계정별로 갈리고, 대회를 하나 마칠 때마다 한 줄씩 손으로 남긴다.
+   ============================================================ */
+const recAll = () => { const s = DB.get("stats", null); return (s && Array.isArray(s.tour)) ? s.tour : []; };
+function recSave(list){
+  const s = DB.get("stats", {}) || {};
+  s.tour = list.slice(0, 400);
+  DB.set("stats", s);
+}
+/* 한 줄을 반듯한 모양으로 다듬는다 — 손으로 넣는 값이라 뭐가 들어올지 모른다 */
+function recNorm(e){
+  e = e || {};
+  const int = (x, lo) => { const v = Math.round(Number(x)); return isFinite(v) && v >= lo ? v : lo; };
+  const won = x => { const v = Math.round(Number(x)); return isFinite(v) && v > 0 ? v : 0; };
+  const field = int(e.field, 0);
+  let place = int(e.place, 0);
+  if(field && place > field) place = field;      // 참가자보다 뒤 순위는 있을 수 없다
+  return {
+    at: isFinite(Number(e.at)) && Number(e.at) > 0 ? Number(e.at) : Date.now(),
+    name: (String(e.name || "").trim() || "토너먼트").slice(0, 40),
+    place: place, field: field,
+    buyins: int(e.buyins, 1),
+    spent: won(e.spent), prize: won(e.prize)
+  };
+}
+function recAdd(e){
+  const list = recAll();
+  const row = recNorm(e);
+  list.unshift(row);
+  list.sort((a,b)=>b.at - a.at);
+  recSave(list);
+  return row;
+}
+function recDel(i){
+  const list = recAll();
+  if(i < 0 || i >= list.length) return false;
+  list.splice(i, 1);
+  recSave(list);
+  return true;
+}
+function recTotals(list){
+  list = list || recAll();
+  const sum = f => list.reduce((a,x)=>a + (f(x)||0), 0);
+  const placed = list.filter(x=>x.place > 0);
+  const spent = sum(x=>x.spent), prize = sum(x=>x.prize);
+  return {
+    n: list.length,
+    wins: list.filter(x=>x.place === 1).length,
+    ft: list.filter(x=>x.place > 0 && x.place <= 9).length,   // 파이널 테이블(9인) 진출
+    itm: list.filter(x=>x.prize > 0).length,                  // 상금권
+    buyins: sum(x=>x.buyins),
+    spent: spent, prize: prize, net: prize - spent,
+    /* 회수율 — 낸 돈 대비 받은 돈. 표본이 작으면 숫자가 튀니 화면에 표본을 같이 쓴다 */
+    roi: spent > 0 ? (prize - spent) / spent : null,
+    best: placed.length ? Math.min.apply(null, placed.map(x=>x.place)) : 0
+  };
+}
+
+/* ---- 드릴 등급 ----
+   바깥 세상의 랭크가 아니라 «이 앱 드릴 안에서만» 쓰는 눈금이다.
+   지금 실력을 보려는 것이니 전체가 아니라 최근 판단만 센다. */
+const DRANK_MIN = 30;       // 이보다 표본이 적으면 등급을 매기지 않는다
+const DRANK_WINDOW = 200;   // 최근 이만큼의 판단까지만 본다
+const DRANKS = [
+  {id:"b", n:"브론즈",   ok:0,    loss:99,   d:"기본기를 쌓는 중"},
+  {id:"s", n:"실버",     ok:0.45, loss:0.60, d:"크게 어긋나는 자리가 줄었다"},
+  {id:"g", n:"골드",     ok:0.58, loss:0.42, d:"표준 라인을 대체로 찾는다"},
+  {id:"p", n:"플래티넘", ok:0.68, loss:0.30, d:"어려운 스팟에서만 흔들린다"},
+  {id:"d", n:"다이아",   ok:0.78, loss:0.20, d:"손실이 거의 쌓이지 않는다"},
+  {id:"m", n:"마스터",   ok:0.86, loss:0.12, d:"드릴로는 더 볼 게 없다"}
+];
+/* 최근 세션부터 거슬러 올라가며 판단 수가 창을 채울 때까지만 담는다 */
+function drillWindow(list, cap){
+  cap = cap > 0 ? cap : DRANK_WINDOW;
+  const w = {spots:0, ok:0, loss:0, sessions:0};
+  (list || []).forEach(function(s){
+    if(w.spots >= cap) return;
+    w.spots += s.n || 0;
+    w.ok += s.ok || 0;
+    w.loss += s.loss || 0;
+    w.sessions++;
+  });
+  return w;
+}
+function drillRank(list){
+  const w = drillWindow(list);
+  const okRate = w.spots ? w.ok / w.spots : 0;
+  const lossPer = w.spots ? w.loss / w.spots : 0;
+  const base = {okRate:okRate, lossPer:lossPer, spots:w.spots, sessions:w.sessions};
+  if(w.spots < DRANK_MIN)
+    return Object.assign(base, {rank:null, i:-1, need:DRANK_MIN - w.spots, next:DRANKS[1]});
+  let i = 0;
+  for(let k = 0; k < DRANKS.length; k++)
+    if(okRate >= DRANKS[k].ok && lossPer <= DRANKS[k].loss) i = k;
+  return Object.assign(base, {rank:DRANKS[i], i:i, need:0, next:DRANKS[i+1] || null});
+}
+/* 다음 등급까지 뭐가 모자란지 — 둘 다 넘어야 올라간다 */
+function drillGap(r){
+  if(!r.next) return [];
+  const gap = [];
+  if(r.okRate < r.next.ok)
+    gap.push("최선 선택률 " + Math.round(r.okRate*100) + "% → " + Math.round(r.next.ok*100) + "%");
+  if(r.lossPer > r.next.loss)
+    gap.push("판단당 손실 " + nfmt(r.lossPer,2) + "BB → " + nfmt(r.next.loss,2) + "BB 아래로");
+  return gap;
+}
+
+/* ---- 진행 중인 대회에서 값을 미리 채운다 ---- */
+function recPrefill(){
+  if(!TD) return null;
+  return {name: TD.name || "토너먼트", field: TD.entries || 0,
+          buyin: TD.buyin || 0, rebuyPrice: TD.rebuyPrice || 0};
+}
+
+/* ---- 화면 ---- */
+function renderRec(){
+  const v = document.getElementById("v-rec");
+  if(!v) return;
+  const list = recAll(), T = recTotals(list);
+  const R = drillRank(DB.get("drills", []));
+  const a = curAcct() || {n:"선수"};
+  const i = Math.max(0, acctList().map(x=>x.id).indexOf(curAcctId()));
+
+  let h = '<div class="card"><h2>' + esc(a.n) + ' 전적</h2>' +
+    '<p class="small dim" style="margin:-4px 0 12px">이 계정에 쌓인 기록입니다. ' +
+    '헤더에서 계정을 바꾸면 그 사람 전적이 나옵니다.</p>' +
+    '<div class="facts">' +
+      fact("출전", T.n + "회", T.n ? "최고 " + (T.best ? T.best + "위" : "순위 미기입") : "아직 없음") +
+      fact("우승", T.wins + "회", T.n ? "파컬 " + T.ft + "회 · 인더머니 " + T.itm + "회" : "") +
+      fact("바이인", T.buyins + "회", T.n ? "출전당 " + nfmt(T.buyins / T.n, 1) + "회" : "") +
+      fact("드릴 등급", R.rank ? R.rank.n : "측정 중",
+           R.rank ? R.rank.d : "판단 " + R.need + "개 더 필요") +
+    '</div>';
+
+  if(T.n){
+    h += '<div class="facts" style="margin-top:8px">' +
+      fact("바이인 지출", manwon(T.spent), "") +
+      fact("받은 상금", manwon(T.prize), "") +
+      fact("손익", (T.net >= 0 ? "+" : "-") + manwon(Math.abs(T.net)), "") +
+      fact("회수율", T.roi === null ? "-" : (T.roi >= 0 ? "+" : "") + Math.round(T.roi*100) + "%",
+           "표본 " + T.n + "회") +
+      '</div>' +
+      '<p class="small dim" style="margin:9px 0 0">회수율은 표본이 수십 회는 쌓여야 뜻이 생깁니다. ' +
+      '지금 숫자는 <b>지나온 기록의 합</b>이지 실력의 추정치가 아닙니다.</p>';
+  }
+  h += '</div>';
+
+  /* 드릴 등급 */
+  h += '<div class="card"><h2>드릴 등급 <span class="small dim">— 추정값</span></h2>' +
+    '<p class="small muted" style="margin:-4px 0 12px">' +
+    '바깥 대회의 등급이 아니라 <b>이 앱 드릴 안에서만 쓰는 눈금</b>입니다. ' +
+    '최근 판단 ' + DRANK_WINDOW + '개까지만 세므로 지금 상태를 보여줍니다.</p>';
+  if(!R.rank){
+    h += '<div class="empty">판단 ' + DRANK_MIN + '개부터 등급을 매깁니다 — ' +
+      (R.spots ? R.need + '개 남았습니다.' : '아직 드릴을 돌리지 않았습니다.') +
+      '</div><div style="margin-top:11px"><button class="btn" onclick="go(\'drill\')">드릴 하러 가기</button></div>';
+  } else {
+    const gap = drillGap(R);
+    h += '<div class="facts">' +
+      fact("등급", R.rank.n, R.rank.d) +
+      fact("최선 선택률", Math.round(R.okRate*100) + "%", "판단 " + R.spots + "개") +
+      fact("판단당 손실", nfmt(R.lossPer,2) + " BB", R.sessions + "세션") +
+      fact("다음 등급", R.next ? R.next.n : "최고 등급", R.next ? "" : "더 올라갈 곳이 없습니다") +
+      '</div>';
+    if(gap.length)
+      h += '<div class="blk hi" style="margin-top:11px"><div class="t">' + esc(R.next.n) + ' 까지</div>' +
+        '<ul class="muted small" style="padding-left:18px;margin:6px 0 0">' +
+        gap.map(g=>'<li>' + esc(g) + '</li>').join("") + '</ul></div>';
+    h += '<div class="scrollx" style="margin-top:12px"><table><tr><th>등급</th><th>최선 선택률</th>' +
+      '<th>판단당 손실</th><th></th></tr>' +
+      DRANKS.map((d,k)=>'<tr' + (k===R.i ? ' style="background:var(--ac-bg)"' : '') + '>' +
+        '<td><b>' + esc(d.n) + '</b>' + (k===R.i ? ' <span class="tag g">지금</span>' : '') + '</td>' +
+        '<td data-l="최선 선택률">' + Math.round(d.ok*100) + '% 이상</td>' +
+        '<td data-l="판단당 손실">' + (d.loss > 90 ? "-" : nfmt(d.loss,2) + " BB 이하") + '</td>' +
+        '<td data-l="" class="small dim">' + esc(d.d) + '</td></tr>').join("") +
+      '</table></div></div>';
+  }
+
+  /* 기록 추가 */
+  const pf = recPrefill();
+  h += '<div class="card"><h2>출전 기록 남기기</h2>';
+  if(pf) h += '<p class="small" style="margin:-4px 0 11px;color:var(--ac-tx)">진행 중인 ' +
+    '<b>' + esc(pf.name) + '</b> 에서 값을 미리 채웠습니다.</p>';
+  else h += '<p class="small dim" style="margin:-4px 0 11px">대회를 하나 마칠 때마다 한 줄씩 남기세요. ' +
+    '토너먼트 탭에서 대회를 열어 두면 대회명과 참가자 수가 자동으로 채워집니다.</p>';
+  h += '<div class="grid g3">' +
+    '<div><label for="rc-name">대회명</label><input id="rc-name" maxlength="40" value="' +
+      esc(pf ? pf.name : "") + '" placeholder="예: 금요일 몬스터"></div>' +
+    '<div><label for="rc-date">날짜</label><input id="rc-date" type="date" value="' + todayISO() + '"></div>' +
+    '<div><label for="rc-place">내 순위 <span class="dim">(모르면 0)</span></label>' +
+      '<input id="rc-place" type="number" min="0" step="1" value="0"></div>' +
+    '<div><label for="rc-field">참가자 수</label><input id="rc-field" type="number" min="0" step="1" value="' +
+      (pf ? pf.field : 0) + '"></div>' +
+    '<div><label for="rc-buyins">바이인 횟수 <span class="dim">(엔트리+리바이)</span></label>' +
+      '<input id="rc-buyins" type="number" min="1" step="1" value="1"></div>' +
+    '<div><label for="rc-spent">지출 (만원)</label><input id="rc-spent" type="number" min="0" step="1" value="' +
+      (pf ? Math.round((pf.buyin || 0) / 10000) : 0) + '"></div>' +
+    '<div><label for="rc-prize">받은 상금 (만원)</label><input id="rc-prize" type="number" min="0" step="1" value="0"></div>' +
+    '</div>' +
+    '<p class="small dim" style="margin:9px 0 0" id="rc-hint"></p>' +
+    '<div class="row" style="margin-top:12px">' +
+    '<div style="flex:0 0 auto"><button class="btn" id="rc-add">기록 추가</button></div>' +
+    '<div style="flex:0 0 auto"><button class="btn sec" id="rc-win">우승으로 기록</button></div>' +
+    '</div></div>';
+
+  /* 목록 */
+  h += '<div class="card"><h2>출전 기록</h2>';
+  if(!list.length){
+    h += '<div class="empty">아직 기록이 없습니다. 위에서 한 줄 남겨보세요.</div>';
+  } else {
+    h += '<div class="scrollx"><table class="tstack"><tr><th>날짜</th><th>대회</th><th>순위</th>' +
+      '<th>바이인</th><th>지출</th><th>상금</th><th>손익</th><th></th></tr>' +
+      list.map(function(x, k){
+        const net = (x.prize || 0) - (x.spent || 0);
+        const pl = x.place ? (x.place + "위" + (x.field ? " / " + x.field + "명" : "")) : "-";
+        return '<tr>' +
+          '<td>' + new Date(x.at).toLocaleDateString() + '</td>' +
+          '<td data-l="대회">' + esc(x.name) + '</td>' +
+          '<td data-l="순위">' + (x.place === 1 ? '<b style="color:var(--warn-tx)">우승</b>' +
+              (x.field ? ' <span class="dim small">/ ' + x.field + '명</span>' : '') : pl) + '</td>' +
+          '<td data-l="바이인">' + x.buyins + '회</td>' +
+          '<td data-l="지출">' + manwon(x.spent) + '</td>' +
+          '<td data-l="상금">' + (x.prize ? manwon(x.prize) : '-') + '</td>' +
+          '<td data-l="손익" style="color:' + (net >= 0 ? 'var(--good-tx)' : 'var(--bad-tx)') + '">' +
+            (net >= 0 ? '+' : '-') + manwon(Math.abs(net)) + '</td>' +
+          '<td><button class="btn sec sm" data-rc="' + k + '">삭제</button></td></tr>';
+      }).join("") + '</table></div>';
+  }
+  h += '</div>';
+
+  v.innerHTML = h;
+
+  const add = win => {
+    const val = id => (document.getElementById(id) || {}).value;
+    const dt = Date.parse(val("rc-date") + "T12:00:00");
+    recAdd({
+      at: isFinite(dt) ? dt : Date.now(),
+      name: val("rc-name"),
+      place: win ? 1 : val("rc-place"),
+      field: val("rc-field"),
+      buyins: val("rc-buyins"),
+      spent: Math.round(Number(val("rc-spent")) * 10000),
+      prize: Math.round(Number(val("rc-prize")) * 10000)
+    });
+    renderRec(); renderHome();
+    toast(win ? "우승으로 기록했습니다" : "기록을 추가했습니다");
+  };
+  const ab = document.getElementById("rc-add");
+  if(ab) ab.onclick = ()=>add(false);
+  const wb = document.getElementById("rc-win");
+  if(wb) wb.onclick = ()=>add(true);
+  /* 바이인 횟수를 바꾸면 지출을 대회 값으로 다시 계산해 준다 — 손으로 고칠 수도 있게 둔다 */
+  const bi = document.getElementById("rc-buyins");
+  if(bi && pf) bi.onchange = function(){
+    const n = Math.max(1, Math.round(Number(bi.value) || 1));
+    const won = (pf.buyin || 0) + Math.max(0, n - 1) * (pf.rebuyPrice || 0);
+    const sp = document.getElementById("rc-spent");
+    if(sp) sp.value = Math.round(won / 10000);
+    const hint = document.getElementById("rc-hint");
+    if(hint) hint.textContent = "엔트리 " + manwon(pf.buyin) + " + 리바이 " + (n-1) + "회 = " + manwon(won) +
+      " — 다르면 직접 고치세요.";
+  };
+  v.querySelectorAll("[data-rc]").forEach(b => b.onclick = function(){
+    if(recDel(Number(b.dataset.rc))){ renderRec(); renderHome(); toast("기록을 지웠습니다"); }
+  });
+}
+const todayISO = () => {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+};
+
 /* ---- 라우팅 & 초기화 ---- */
 function go(v){
   /* 토너먼트는 전광판이라 폭을 넓게, 나머지는 읽기 좋은 폭으로 */
@@ -5542,6 +5846,7 @@ function go(v){
   if(v==="quiz") renderQuiz();
   if(v==="stats") renderStats();
   if(v==="drill") renderDrill();
+  if(v==="rec") renderRec();
   if(v==="tour") renderTour();
   window.scrollTo(0,0);
 }
@@ -5655,6 +5960,13 @@ window.addEventListener("DOMContentLoaded", function(){
       TOUR_KEYS.forEach(k=>DB.del(k));
       TD = null; TDADI = 0;
       renderTour(); renderHome(); toast("대회 데이터를 지웠습니다");
+    }
+  };
+  document.getElementById("rs-rec").onclick = function(){
+    if(confirm("지금 계정의 출전·우승·바이인 기록을 지웁니다.\n"+
+               "드릴 등급은 드릴 기록에서 나오므로 그대로 남습니다.\n\n되돌릴 수 없습니다. 계속할까요?")){
+      STAT_KEYS.forEach(k=>DB.del(k));
+      renderRec(); renderHome(); toast("전적을 지웠습니다");
     }
   };
 });

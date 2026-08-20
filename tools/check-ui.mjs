@@ -20,6 +20,7 @@ const TABS = [
   { v: 'hand', n: '핸드 분석' },
   { v: 'stats', n: '리크 · 기록' },
   { v: 'drill', n: '드릴' },
+  { v: 'rec', n: '전적' },
   { v: 'tour', n: '토너먼트' },
   { v: 'help', n: '도움말' },
 ];
@@ -353,6 +354,54 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
   await page.close();
 }
 
+/* ── 전적: 기록이 쌓인 상태 ──
+   탭 순회 때는 비어 있어서 표도 등급표도 안 그려진다. 채워 놓고 한 번 더 본다. */
+for (const vp of WIDTHS) {
+  const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1 });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 160)));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)); });
+  await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
+
+  await page.evaluate(() => {
+    // 우승 · 인더머니 · 꼴찌 · 순위 미기입을 한 줄씩 — 표의 모든 갈래를 그리게
+    recAdd({ at: Date.parse('2026-01-09T12:00'), name: '금요일 몬스터 리그', place: 1, field: 42, buyins: 3, spent: 90000, prize: 700000 });
+    recAdd({ at: Date.parse('2026-02-13T12:00'), name: '데일리', place: 6, field: 30, buyins: 1, spent: 10000, prize: 40000 });
+    recAdd({ at: Date.parse('2026-03-06T12:00'), name: '데일리', place: 28, field: 30, buyins: 4, spent: 40000, prize: 0 });
+    recAdd({ at: Date.parse('2026-04-03T12:00'), name: '이름이 아주아주 긴 대회 이름입니다', place: 0, field: 0, buyins: 1, spent: 10000, prize: 0 });
+    // 등급이 매겨질 만큼의 드릴 표본
+    DB.set('drills', [{ at: Date.now(), n: 60, ok: 39, loss: 22, passive: 9, aggro: 4 }]);
+    go('rec');
+  });
+  await page.waitForTimeout(300);
+
+  const where = `${vp.n} ${vp.w}px · 전적(기록 있음)`;
+  checks++;
+  if (await page.locator('#v-rec tbody tr, #v-rec table tr').count() < 5) add(where, '출전 기록 표가 그려지지 않았습니다');
+  checks++;
+  if (!(await page.locator('#v-rec').innerText()).includes('우승')) add(where, '우승 표시가 없습니다');
+  checks++;
+  {
+    const t = await page.locator('#v-rec').innerText();
+    if (/측정 중/.test(t)) add(where, `드릴 표본을 넣었는데 등급이 «측정 중» 입니다`);
+  }
+
+  await scanText(page, where);
+  await scanOverflow(page, where, vp.w);
+  await scanClipped(page, where);
+  if (vp.w === 1440) {
+    for (const th of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), th);
+      await page.waitForTimeout(400);
+      await scanContrast(page, `${where} · ${th === 'light' ? '밝게' : '어둡게'}`);
+      if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `${th}-rec-full.png`), fullPage: true });
+    }
+  }
+
+  if (errs.length) [...new Set(errs)].forEach((e) => add(where, '콘솔 ' + e));
+  await page.close();
+}
+
 /* ── 계정 창 ──
    평소엔 hidden 이라 탭 순회에 안 걸린다. 열어 둔 상태로 따로 본다.
    PIN 입력 줄까지 펼쳐야 좁은 폭에서 눌리는지 확인된다. */
@@ -419,4 +468,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 계정 창)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 전적 · 계정 창)\n`);

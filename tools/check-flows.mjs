@@ -525,7 +525,7 @@ group('전적');
   await page.click('#rc-add');
   await page.waitForTimeout(350);
 
-  let row = await txt('#v-rec table tr:nth-child(2)');
+  let row = await txt('#rc-tbl tr:nth-child(2)');
   ok(row.includes('금요일 몬스터'), '기록이 표에 한 줄로 남는다', row.replace(/\n/g, ' | '));
   ok(row.includes('3위') && row.includes('42명'), '순위와 참가자 수가 함께 나온다', row.replace(/\n/g, ' | '));
   ok(row.includes('3회'), '바이인 횟수가 나온다', row.replace(/\n/g, ' | '));
@@ -546,7 +546,7 @@ group('전적');
 
   ok(await page.evaluate(() => recTotals().wins) === 1, '«우승으로 기록»은 순위 칸과 무관하게 1위로 넣는다',
     String(await page.evaluate(() => recTotals().wins)));
-  ok(/우승/.test(await txt('#v-rec table')), '표에 우승이 표시된다');
+  ok(/우승/.test(await txt('#rc-tbl')), '표에 우승이 표시된다');
   ok(await page.evaluate(() => recTotals().buyins) === 4, '바이인 합계가 4회로 늘어난다',
     String(await page.evaluate(() => recTotals().buyins)));
 
@@ -564,6 +564,37 @@ group('전적');
   await page.waitForTimeout(250);
   ok(!/측정 중/.test(await view()), '표본이 차면 등급이 나온다');
   ok(await page.locator('#v-rec .tag.g').count() >= 1, '등급표에서 지금 등급이 강조된다');
+
+  // 두 줄이 쌓였으니 묶어 보기가 나온다
+  ok(/묶어 보기/.test(await view()), '기록이 둘 이상이면 묶어 보기가 나온다');
+  ok(/대회별/.test(await view()) && /달별/.test(await view()), '대회별·달별 표가 둘 다 있다');
+  {
+    const grp = await txt('#rc-byname');
+    ok(/금요일 몬스터/.test(grp) && /데일리/.test(grp), '두 대회가 모두 묶여 나온다', grp.replace(/\n/g, ' | ').slice(0, 160));
+    ok((await page.locator('#rc-byname tr').count()) === 3, '대회별은 머리글 + 두 대회', String(await page.locator('#rc-byname tr').count()));
+    ok((await page.locator('#rc-bymonth tr').count()) === 2, '같은 달이면 달별은 한 줄로 묶인다', String(await page.locator('#rc-bymonth tr').count()));
+  }
+
+  // CSV — 실제로 내려받아 내용을 본다
+  {
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 8000 }).catch(() => null),
+      page.click('#rc-csv'),
+    ]);
+    ok(!!dl, 'CSV 내보내기 버튼이 파일을 만든다');
+    if (dl) {
+      // 크로미움은 이름에 한글이 하나라도 있으면 이름을 통째로 버리고 «download» 로 저장한다.
+      // 확장자가 사라지면 더블클릭으로 안 열리니, ASCII 로만 짓는지 확인한다.
+      ok(/\.csv$/.test(dl.suggestedFilename()), '파일 이름이 .csv 로 끝난다', dl.suggestedFilename());
+      ok(/^[\x20-\x7e]+$/.test(dl.suggestedFilename()), '파일 이름이 ASCII 라 브라우저가 안 버린다',
+        dl.suggestedFilename());
+      const p = await dl.path();
+      const body = p ? fs.readFileSync(p, 'utf8') : '';
+      ok(body.charCodeAt(0) === 0xfeff, '엑셀용 BOM 이 붙어 있다');
+      ok(body.split('\r\n').length === 3, '머리글 + 기록 2줄', String(body.split('\r\n').length));
+      ok(body.includes('금요일 몬스터') && body.includes('데일리'), '두 대회가 다 담긴다');
+    }
+  }
 
   // 삭제
   await page.click('#v-rec [data-rc="0"]');
@@ -757,6 +788,26 @@ group('백업');
   const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('hb.')));
   ok(keys.length > 0, 'hb. 접두사로 저장된다', keys.join(', '));
   ok(keys.every((k) => k.startsWith('hb.')), 'hb. 밖의 키를 만들지 않는다');
+
+  // 내보내기 버튼이 실제로 쓸 수 있는 파일을 주는지 — 이름이 한글이면 브라우저가 버린다
+  await tab('help');
+  const [dl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 8000 }).catch(() => null),
+    page.click('#ex-json'),
+  ]);
+  ok(!!dl, '데이터 내보내기가 파일을 만든다');
+  if (dl) {
+    ok(/\.json$/.test(dl.suggestedFilename()), '백업 파일 이름이 .json 으로 끝난다', dl.suggestedFilename());
+    ok(/^[\x20-\x7e]+$/.test(dl.suggestedFilename()), '백업 파일 이름도 ASCII 다', dl.suggestedFilename());
+    const p = await dl.path();
+    const body = p ? fs.readFileSync(p, 'utf8') : '';
+    let parsed = null;
+    try { parsed = JSON.parse(body); } catch (e) { /* 아래에서 잡힌다 */ }
+    ok(!!parsed && !!parsed.data, '백업 파일이 읽을 수 있는 JSON 이다', body.slice(0, 80));
+    if (parsed && parsed.data)
+      ok(Object.keys(parsed.data).length > 0, '백업에 내용이 담긴다',
+        Object.keys(parsed.data).join(', ').slice(0, 120));
+  }
 }
 
 if (errs.length) fails.push(`[콘솔] 페이지 오류 ${errs.length}건\n      ` + [...new Set(errs)].slice(0, 5).join('\n      '));

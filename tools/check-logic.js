@@ -1233,6 +1233,46 @@ group('전적');
     }
   }
 
+  // ── 묶어 보기
+  {
+    const L = [
+      { at: Date.parse('2026-03-06T12:00'), name: '데일리', place: 1, field: 30, buyins: 1, spent: 10000, prize: 120000 },
+      { at: Date.parse('2026-03-20T12:00'), name: '데일리', place: 20, field: 30, buyins: 2, spent: 20000, prize: 0 },
+      { at: Date.parse('2026-04-03T12:00'), name: '몬스터', place: 4, field: 50, buyins: 3, spent: 90000, prize: 300000 }
+    ].map(app.recNorm);
+
+    const byName = app.recByName(L);
+    ok(byName.length === 2, '대회 이름별로 묶인다', String(byName.length));
+    ok(byName[0].key === '데일리', '자주 나간 대회가 위로 온다', byName[0].key);
+    ok(byName[0].T.n === 2 && byName[0].T.wins === 1, '데일리는 2회 출전 1회 우승',
+      `${byName[0].T.n}회 / 우승 ${byName[0].T.wins}`);
+    ok(byName[0].T.buyins === 3, '묶어도 바이인이 합쳐진다', String(byName[0].T.buyins));
+    ok(byName[0].T.net === 90000, '데일리 손익 +9만원', String(byName[0].T.net));
+    ok(byName[1].T.net === 210000, '몬스터 손익 +21만원', String(byName[1].T.net));
+    ok(byName.reduce((a, g) => a + g.T.n, 0) === L.length, '묶어도 출전 수 합계는 그대로다');
+    ok(byName.reduce((a, g) => a + g.T.spent, 0) === app.recTotals(L).spent, '묶어도 지출 합계는 그대로다');
+
+    const byMonth = app.recByMonth(L);
+    ok(byMonth.length === 2, '달별로 묶인다', String(byMonth.length));
+    ok(byMonth[0].key === '2026-04', '최근 달이 위로 온다', byMonth[0].key);
+    ok(byMonth[1].key === '2026-03' && byMonth[1].T.n === 2, '3월은 2회 출전',
+      `${byMonth[1].key} ${byMonth[1].T.n}회`);
+    ok(app.monthKey(Date.parse('2026-01-05T12:00')) === '2026-01', '한 자리 달도 두 자리로 적는다',
+      app.monthKey(Date.parse('2026-01-05T12:00')));
+
+    // ── CSV
+    const csv = app.recCSV(L);
+    const lines = csv.split('\r\n');
+    ok(csv.charCodeAt(0) === 0xfeff, '엑셀이 한글을 알아보게 BOM 을 붙인다');
+    ok(lines.length === L.length + 1, '머리글 한 줄 + 기록 줄', String(lines.length));
+    ok(lines[0].replace('﻿', '').split(',').length === 8, '열이 8개', lines[0]);
+    ok(lines[1].includes('"데일리"'), '대회명이 들어간다', lines[1]);
+    ok(lines[1].includes('"110000"'), '손익이 원 단위로 들어간다 (12만 − 1만)', lines[1]);
+    ok(app.recCSV([app.recNorm({ name: '큰"따옴표" 대회' })]).includes('""따옴표""'),
+      '이름에 따옴표가 있어도 열이 안 깨진다');
+    ok(app.recCSV([]).split('\r\n').length === 1, '기록이 없으면 머리글만');
+  }
+
   ok(app.ACCT_KEYS.indexOf('stats') >= 0, '전적은 계정별 키다 — 기기 공용이 아니다');
   ok(app.STAT_KEYS.length === 1 && app.STAT_KEYS[0] === 'stats',
     '전적 초기화는 stats 만 지운다 — 학습 초기화에 우승 횟수가 딸려가면 안 된다');

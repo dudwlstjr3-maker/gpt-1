@@ -5634,6 +5634,40 @@ function recTotals(list){
   };
 }
 
+/* ---- 묶어 보기 ----
+   같은 대회를 여러 번 나가면 «어디서 잘 되는지»가 한 줄에 안 보인다. 묶어서 합계를 낸다. */
+function recGroup(list, keyf){
+  const map = {}, order = [];
+  (list || recAll()).forEach(function(x){
+    const k = keyf(x);
+    if(!map[k]){ map[k] = []; order.push(k); }
+    map[k].push(x);
+  });
+  return order.map(k => ({key:k, rows:map[k], T:recTotals(map[k])}));
+}
+const monthKey = at => {
+  const d = new Date(at);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+};
+/* 자주 나간 대회부터, 같으면 많이 딴 순서 */
+const recByName = list => recGroup(list, x=>x.name).sort((a,b)=>b.T.n - a.T.n || b.T.net - a.T.net);
+/* 최근 달부터 */
+const recByMonth = list => recGroup(list, x=>monthKey(x.at)).sort((a,b)=>a.key < b.key ? 1 : a.key > b.key ? -1 : 0);
+
+/* ---- 표 계산용으로 내보내기 ----
+   엑셀이 UTF-8 을 알아보게 BOM 을 앞에 붙인다. 없으면 한글이 깨진다. */
+function recCSV(list){
+  list = list || recAll();
+  const q = s => '"' + String(s === null || s === undefined ? "" : s).replace(/"/g, '""') + '"';
+  const head = ["날짜","대회","순위","참가자","바이인 횟수","지출(원)","상금(원)","손익(원)"];
+  const body = list.map(function(x){
+    const d = new Date(x.at);
+    return [d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"),
+      x.name, x.place || "", x.field || "", x.buyins, x.spent, x.prize, (x.prize||0) - (x.spent||0)];
+  });
+  return "﻿" + [head].concat(body).map(r => r.map(q).join(",")).join("\r\n");
+}
+
 /* ---- 드릴 등급 ----
    바깥 세상의 랭크가 아니라 «이 앱 드릴 안에서만» 쓰는 눈금이다.
    지금 실력을 보려는 것이니 전체가 아니라 최근 판단만 센다. */
@@ -5723,6 +5757,40 @@ function renderRec(){
   }
   h += '</div>';
 
+  /* 묶어 보기 — 두 줄 넘게 쌓였을 때만. 한 줄짜리는 아래 표와 똑같아서 자리만 먹는다 */
+  if(list.length >= 2){
+    const netTd = n => '<td data-l="손익" style="color:' + (n >= 0 ? 'var(--good-tx)' : 'var(--bad-tx)') + '">' +
+      (n >= 0 ? '+' : '-') + manwon(Math.abs(n)) + '</td>';
+    h += '<div class="card"><h2>묶어 보기</h2>' +
+      '<h3 style="margin-top:2px">대회별</h3>' +
+      '<div class="scrollx"><table class="tstack" id="rc-byname"><tr><th>대회</th><th>출전</th><th>우승</th>' +
+      '<th>바이인</th><th>지출</th><th>상금</th><th>손익</th></tr>' +
+      recByName(list).map(function(g){
+        return '<tr><td>' + esc(g.key) + '</td>' +
+          '<td data-l="출전">' + g.T.n + '회</td>' +
+          '<td data-l="우승">' + (g.T.wins ? '<b style="color:var(--warn-tx)">' + g.T.wins + '회</b>' : '-') + '</td>' +
+          '<td data-l="바이인">' + g.T.buyins + '회</td>' +
+          '<td data-l="지출">' + manwon(g.T.spent) + '</td>' +
+          '<td data-l="상금">' + (g.T.prize ? manwon(g.T.prize) : '-') + '</td>' +
+          netTd(g.T.net) + '</tr>';
+      }).join("") + '</table></div>' +
+      '<h3 style="margin-top:16px">달별</h3>' +
+      '<div class="scrollx"><table class="tstack" id="rc-bymonth"><tr><th>달</th><th>출전</th><th>우승</th>' +
+      '<th>바이인</th><th>지출</th><th>상금</th><th>손익</th></tr>' +
+      recByMonth(list).map(function(g){
+        const p = g.key.split("-");
+        return '<tr><td>' + p[0] + '년 ' + Number(p[1]) + '월</td>' +
+          '<td data-l="출전">' + g.T.n + '회</td>' +
+          '<td data-l="우승">' + (g.T.wins ? '<b style="color:var(--warn-tx)">' + g.T.wins + '회</b>' : '-') + '</td>' +
+          '<td data-l="바이인">' + g.T.buyins + '회</td>' +
+          '<td data-l="지출">' + manwon(g.T.spent) + '</td>' +
+          '<td data-l="상금">' + (g.T.prize ? manwon(g.T.prize) : '-') + '</td>' +
+          netTd(g.T.net) + '</tr>';
+      }).join("") + '</table></div>' +
+      '<p class="small dim" style="margin:11px 0 0">한 대회의 출전이 몇 번 안 되면 손익은 운입니다. ' +
+      '<b>출전 수를 같이 보고</b> 판단하세요.</p></div>';
+  }
+
   /* 드릴 등급 */
   h += '<div class="card"><h2>드릴 등급 <span class="small dim">— 추정값</span></h2>' +
     '<p class="small muted" style="margin:-4px 0 12px">' +
@@ -5806,7 +5874,7 @@ function renderRec(){
   if(!list.length){
     h += '<div class="empty">아직 기록이 없습니다. 위에서 한 줄 남겨보세요.</div>';
   } else {
-    h += '<div class="scrollx"><table class="tstack"><tr><th>날짜</th><th>대회</th><th>순위</th>' +
+    h += '<div class="scrollx"><table class="tstack" id="rc-tbl"><tr><th>날짜</th><th>대회</th><th>순위</th>' +
       '<th>바이인</th><th>지출</th><th>상금</th><th>손익</th><th></th></tr>' +
       list.map(function(x, k){
         const net = (x.prize || 0) - (x.spent || 0);
@@ -5822,7 +5890,11 @@ function renderRec(){
           '<td data-l="손익" style="color:' + (net >= 0 ? 'var(--good-tx)' : 'var(--bad-tx)') + '">' +
             (net >= 0 ? '+' : '-') + manwon(Math.abs(net)) + '</td>' +
           '<td><button class="btn sec sm" data-rc="' + k + '">삭제</button></td></tr>';
-      }).join("") + '</table></div>';
+      }).join("") + '</table></div>' +
+      '<div class="row" style="margin-top:12px"><div style="flex:0 0 auto">' +
+      '<button class="btn sec sm" id="rc-csv">표 계산용으로 내보내기 (CSV)</button></div>' +
+      '<div class="small dim" style="flex:1 1 160px">엑셀·구글 시트에서 바로 열립니다. ' +
+      '전체 백업은 도움말 탭에 있습니다.</div></div>';
   }
   h += '</div>';
 
@@ -5858,6 +5930,11 @@ function renderRec(){
     if(hint) hint.textContent = "엔트리 " + manwon(pf.buyin) + " + 리바이 " + (n-1) + "회 = " + manwon(won) +
       " — 다르면 직접 고치세요.";
   };
+  const cs = document.getElementById("rc-csv");
+  if(cs) cs.onclick = function(){
+    saveFile("holdem-record-" + acctFileTag() + "-" + todayISO() + ".csv", recCSV(list), "text/csv");
+    toast((curAcct()||{n:"선수"}).n + " 전적을 CSV 로 내보냈습니다");
+  };
   v.querySelectorAll("[data-rc]").forEach(b => b.onclick = function(){
     if(recDel(Number(b.dataset.rc))){ renderRec(); renderHome(); toast("기록을 지웠습니다"); }
   });
@@ -5866,6 +5943,31 @@ const todayISO = () => {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 };
+
+/* ---- 파일 내려주기 ----
+   확인한 것: 크로미움은 <a download> 이름에 한글이 하나라도 있으면 이름을 통째로 버리고
+   «download» 로 저장한다 — 확장자까지 사라져서 더블클릭으로 안 열린다.
+   그래서 파일 이름은 ASCII 로만 만든다. 화면 글씨는 한글 그대로 둔다. */
+function asciiName(s, fallback){
+  const t = String(s || "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+  return t || fallback;
+}
+function saveFile(name, text, mime){
+  const b = new Blob([text], {type:(mime || "text/plain") + ";charset=utf-8"});
+  const el = document.createElement("a");
+  el.href = URL.createObjectURL(b);
+  el.download = name;
+  /* 문서에 붙였다 떼야 download 속성이 확실히 먹는다 */
+  document.body.appendChild(el);
+  el.click();
+  el.remove();
+  setTimeout(()=>URL.revokeObjectURL(el.href), 1000);
+}
+/* 계정마다 파일이 구분되게 — 이름이 한글이면 몇 번째 계정인지로 대신한다 */
+function acctFileTag(){
+  const i = acctList().map(x=>x.id).indexOf(curAcctId());
+  return asciiName((curAcct() || {}).n, "p" + (i + 1));
+}
 
 /* ---- 라우팅 & 초기화 ---- */
 const VIEWS = ["home","quiz","hand","stats","drill","rec","tour","help"];
@@ -5983,11 +6085,8 @@ window.addEventListener("DOMContentLoaded", function(){
   document.getElementById("s-stack").onchange = renderActs;
   document.getElementById("ex-json").onclick = function(){
     const d = {v:5, at:Date.now(), app:APP_VER, data:hbDump()};
-    const b = new Blob([JSON.stringify(d,null,2)], {type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(b);
-    a.download = "홀덤분석_백업_"+new Date().toISOString().slice(0,10)+".json";
-    a.click();
+    saveFile("holdem-backup-"+todayISO()+".json", JSON.stringify(d,null,2), "application/json");
+    toast("백업 파일을 내려받았습니다");
   };
   document.getElementById("im-json").onclick = ()=>document.getElementById("im-file").click();
   document.getElementById("im-file").onchange = function(e){

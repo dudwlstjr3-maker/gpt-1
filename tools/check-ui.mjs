@@ -391,6 +391,11 @@ for (const vp of WIDTHS) {
     const t = await page.locator('#v-rec').innerText();
     if (/측정 중/.test(t)) add(where, `드릴 표본을 넣었는데 등급이 «측정 중» 입니다`);
   }
+  checks++;
+  {
+    const t = await page.locator('#v-rec').innerText();
+    if (!/묶어 보기/.test(t) || !/대회별/.test(t) || !/달별/.test(t)) add(where, '묶어 보기 표가 안 나옵니다');
+  }
 
   await scanText(page, where);
   await scanOverflow(page, where, vp.w);

@@ -49,12 +49,19 @@ function declaredNames(code) {
   return [...names];
 }
 
+// 값을 복사해 두면 `TD = tdNew()` 같은 재할당을 검증 쪽에서 볼 수 없다.
+// 그래서 살아 있는 접근자로 내보낸다 — 읽기/쓰기 모두 원본 바인딩으로 간다.
+// (직접 eval 은 감싼 함수 바깥의 렉시컬 스코프를 본다. const 는 쓰기만 실패하고 읽기는 된다.)
 function exportEpilogue(code) {
   const names = declaredNames(code);
   if (!names.length) return '';
-  return `\n;(function(){var __o=globalThis.__APP||(globalThis.__APP={});${names
-    .map((n) => `try{__o[${JSON.stringify(n)}]=eval(${JSON.stringify(n)})}catch(e){}`)
-    .join('')}})();\n`;
+  const defs = names.map((n) => {
+    const q = JSON.stringify(n);
+    return `try{Object.defineProperty(__o,${q},{configurable:true,enumerable:true,` +
+      `get:function(){try{return eval(${q})}catch(e){return undefined}},` +
+      `set:function(__v){try{eval(${q}+"=__v")}catch(e){}}})}catch(e){}`;
+  });
+  return `\n;(function(){var __o=globalThis.__APP||(globalThis.__APP={});${defs.join('')}})();\n`;
 }
 
 /**
@@ -86,8 +93,13 @@ function loadApp(file, opts = {}) {
     if (ctx.document._lastError) errors.push(ctx.document._lastError);
   }
 
-  // 전역 함수 선언과 렉시컬 const 를 한 객체로 합쳐 준다
-  const app = Object.assign(Object.create(null), ctx.__APP || {});
+  // 전역 함수 선언과 렉시컬 const 를 한 객체로 합쳐 준다.
+  // __APP 의 접근자는 그대로 옮겨야 살아 있는 바인딩이 유지된다.
+  const app = Object.create(null);
+  const src = ctx.__APP || {};
+  for (const k of Object.getOwnPropertyNames(src)) {
+    Object.defineProperty(app, k, Object.getOwnPropertyDescriptor(src, k));
+  }
   for (const k of Object.getOwnPropertyNames(sandbox)) {
     if (!(k in app) && typeof sandbox[k] === 'function' && !/^[A-Z]/.test(k)) app[k] = sandbox[k];
   }

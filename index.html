@@ -115,6 +115,9 @@ nav{display:flex;gap:4px;flex-wrap:wrap}
 nav button{background:none;border:0;color:var(--tx2);padding:7px 12px;border-radius:8px;
   cursor:pointer;font-size:13.5px;font-weight:600;font-family:inherit;transition:background .15s,color .15s}
 nav button:hover{background:var(--card);color:var(--tx)}
+nav button i{font-style:normal;opacity:.62;font-weight:600}
+nav button.on i{opacity:.75}
+.logo .ver{font-style:normal;font-size:11.5px;font-weight:700;color:var(--tx3);margin-left:2px;letter-spacing:0}
 nav button.on{background:var(--ac);color:var(--on-ac);font-weight:700}
 .view{display:none;padding-top:18px}
 .view.on{display:block}
@@ -449,6 +452,43 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
 .lvregbox{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;margin:7px 0 4px;
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
+/* --- 내 대회 · 주간 일정표 --- */
+.tdsched{width:min(100%,780px);margin:0 auto 7px}
+.wkgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:10px}
+.wkday{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 6px;min-width:0}
+.wkday.on{border-color:var(--ac);background:var(--ac-bg)}
+.wkh{font-size:12.5px;font-weight:700;color:var(--tx2);text-align:center;margin-bottom:6px;
+  display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.wkday.sun .wkh{color:var(--bad-tx)}.wkday.sat .wkh{color:var(--ac2-tx)}
+.wkt{font-size:10.5px;font-weight:800;background:var(--ac);color:var(--on-ac);border-radius:20px;padding:0 6px}
+.wkitem{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+  color:var(--tx);border-radius:7px;padding:5px 7px;margin:0 0 5px;cursor:pointer;font-family:inherit;
+  transition:border-color .15s,background .15s}
+.wkitem:hover{border-color:var(--ac);background:var(--card2)}
+.wkitem b{display:block;font-size:12.5px;color:var(--ac-tx);font-variant-numeric:tabular-nums}
+.wkitem b.dim{color:var(--tx3)}
+.wkitem span{display:block;font-size:12px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wkempty{text-align:center;color:var(--tx3);font-size:12px;padding:3px 0}
+.prtbl{width:100%;min-width:640px}
+.prtbl th,.prtbl td{padding:6px 7px;font-size:12.5px;vertical-align:middle}
+.prtbl .prtime{width:118px;padding:4px 7px;font-size:12.5px}
+.prtbl .pract{white-space:nowrap}
+.prtbl .pract button{margin:0 0 0 4px;padding:4px 9px;font-size:11.5px;border-radius:6px}
+.daypick{display:flex;gap:3px;flex-wrap:wrap}
+.dbtn{background:var(--bg2);border:1px solid var(--line);color:var(--tx3);border-radius:6px;
+  width:26px;height:26px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;
+  transition:background .15s,color .15s,border-color .15s}
+.dbtn:hover{border-color:var(--ac);color:var(--tx)}
+.dbtn.on{background:var(--ac);border-color:var(--ac);color:var(--on-ac)}
+.dbtn.sun{color:var(--bad-tx)}.dbtn.sat{color:var(--ac2-tx)}
+.dbtn.sun.on,.dbtn.sat.on{color:var(--on-ac)}
+@media(max-width:760px){
+  .wkgrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:460px){
+  .wkgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 /* 전광판 로고 고르기 */
 .logobox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 2px;
   padding:11px 12px;background:var(--bg2);border:1px solid var(--line);border-radius:10px}
@@ -600,14 +640,14 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
 }
 </style>
 <script>
-/* 테마는 그림이 그려지기 전에 정해야 깜빡임이 없다. 저장된 값이 없으면 OS 설정을 따른다. */
+/* 테마는 그림이 그려지기 전에 정해야 깜빡임이 없다.
+   기본은 어둡게 — 이 앱은 조명을 낮춘 홀에서 쓰이고, 전광판도 어둡다.
+   밝은 곳에서 쓰는 사람은 헤더의 버튼으로 바꾸면 그 선택이 저장된다. */
 (function(){
   try{
     var t = localStorage.getItem("hb.theme");
     if(t) t = JSON.parse(t);
-    if(t !== "light" && t !== "dark")
-      t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", t);
+    document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
   }catch(e){ document.documentElement.setAttribute("data-theme","dark"); }
 })();
 </script>
@@ -2230,7 +2270,7 @@ function quadrant(a){
 }
 function profileCard(p){
   if(!p) return '<div class="card"><h2>1 · 성향 진단이 아직 없습니다</h2>'+
-    '<p class="muted">핸드 시나리오를 풀면 5개 축으로 당신의 성향을 잡아냅니다. '+
+    '<p class="muted">핸드 시나리오를 풀면 7개 축으로 당신의 성향을 잡아냅니다. '+
     '<b>중간에 그만둬도 저장</b>되고 다음에 이어서 쌓입니다. 드릴에서 고른 액션도 함께 반영됩니다. (전체 '+QMAX+'문항)</p>'+
     '<button class="btn" onclick="go(\'quiz\')">진단 시작하기</button></div>';
   const a = p.axes;
@@ -2406,7 +2446,7 @@ function renderHome(){
       '</div>';
   }
   h += '<div class="card"><h3>이 도구를 쓰는 순서</h3><ol class="muted" style="padding-left:20px;margin:0">'+
-    '<li><b>성향 진단</b> — 핸드 시나리오로 5축 성향을 잡습니다.</li>'+
+    '<li><b>성향 진단</b> — 핸드 시나리오로 7축 성향을 잡습니다.</li>'+
     '<li><b>세션 세팅 + 핸드 입력</b> — 팟 오즈·SPR·승률을 계산하고, <b>당신 성향에 맞춘</b> 실행 지침을 냅니다.</li>'+
     '<li><b>탑 플레이어 렌즈</b> — 같은 스팟을 다른 스타일은 어떻게 푸는지, 당신과 뭐가 다른지 봅니다.</li>'+
     '<li><b>리크 대시보드</b> — 반복되는 실수를 쌓아 어디서 새는지 보여줍니다.</li>'+
@@ -2954,6 +2994,64 @@ function tdSaveCustom(name){
                levels:JSON.parse(JSON.stringify(TD.levels))});
   DB.set("tdcustom", arr.slice(0,20));
 }
+/* ============================================================
+   대회 프로필 · 주간 일정표
+   매장은 같은 대회를 매주 반복해서 연다. 그때마다 설정을 다시 넣지 않도록
+   대회를 통째로 이름 붙여 보관하고, 요일·시각을 달아 주간 일정표로 본다.
+   hb.tdprofiles = [{id, n, days:[0=일 …6=토], time:"HH:MM", memo, ...setup}]
+   ============================================================ */
+const DAYN = ["일","월","화","수","목","금","토"];
+const tdProfiles = () => { const a = DB.get("tdprofiles", []); return Array.isArray(a) ? a : []; };
+const tdProfilesSet = a => DB.set("tdprofiles", a.slice(0, 60));
+
+/* "19:30" 처럼 실제로 존재하는 시각만 통과시킨다. 아니면 빈 문자열. */
+function tdCleanTime(t){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t||"").trim());
+  if(!m) return "";
+  const h = +m[1], mi = +m[2];
+  if(h > 23 || mi > 59) return "";
+  return String(h).padStart(2,"0") + ":" + m[2];
+}
+/* 현재 대회 설정을 프로필 한 장으로 굳힌다. 진행 상태(남은 시간·인원)는 담지 않는다. */
+function tdProfileFrom(D, name, days, time, memo){
+  return Object.assign(tdSetupPack(D), {
+    id: "p" + Date.now() + Math.floor(Math.random()*1000),
+    n: name || D.name || "이름 없는 대회",
+    days: Array.isArray(days) ? [...new Set(days.filter(d=>d>=0 && d<=6))].sort((a,b)=>a-b) : [],
+    time: tdCleanTime(time),
+    memo: memo || "",
+    payN: D.payN, pay: Array.isArray(D.pay) ? D.pay.slice() : [],
+    at: Date.now()
+  });
+}
+/* 프로필을 현재 대회에 얹는다. 대회를 새로 여는 것이라 진행 상태는 초기화한다. */
+function tdProfileApply(P){
+  TD = tdNew();
+  ["_tpl","_count","_brkEvery","_brkMin","name","venue","buyin","startStack",
+   "rebuyPrice","rebuyStack","payCurve","payMode","poolPct","payShow","payN"].forEach(k=>{
+    if(P[k] !== undefined) TD[k] = P[k];
+  });
+  TD.levels = Array.isArray(P.levels) ? JSON.parse(JSON.stringify(P.levels)) : [];
+  TD.pay    = Array.isArray(P.pay)    ? P.pay.slice() : [];
+  TD.payManual = false; TD.started = false;
+  TD.lvl = 0; TD.remain = TD.levels.length ? (TD.levels[0].min||1)*60000 : 0;
+  TD.running = false; TD.paused = false; TD.endsAt = null;
+  tdSave();
+}
+/* "19:30" → 1170. 정렬용. 시각이 없으면 맨 뒤로 보낸다. */
+function tdMinOfDay(t){
+  const c = tdCleanTime(t);
+  if(!c) return 24*60 + 1;
+  return (+c.slice(0,2))*60 + (+c.slice(3,5));
+}
+/* 요일별로 묶어 돌려준다. idx 0=일 … 6=토 */
+function tdWeek(){
+  const wk = [[],[],[],[],[],[],[]];
+  for(const P of tdProfiles())
+    for(const d of (P.days||[])) if(d>=0 && d<=6) wk[d].push(P);
+  return wk.map(list => list.sort((a,b)=> tdMinOfDay(a.time) - tdMinOfDay(b.time) || a.n.localeCompare(b.n)));
+}
+
 function tdNew(){
   return {name:"DAILY", venue:"파이널 나인 소사벌점", buyin:10000, startStack:2000000, rebuyPrice:10000, rebuyStack:3000000,
           entries:9, rebuys:0, players:9, started:false,
@@ -3250,6 +3348,148 @@ function renderTour(){
 }
 const lvBad = l => !l.brk && (l.bb<=0 || l.sb>l.bb || l.min<=0);
 
+/* ---- 내 대회 · 주간 일정표 카드 ---- */
+function tdScheduleCard(){
+  const list = tdProfiles(), wk = tdWeek(), today = new Date().getDay();
+  const hasAny = list.length > 0;
+
+  let h = '<div class="card tdsched"><h3>내 대회 · 주간 일정 '+
+    '<span class="small dim">— 자주 여는 대회를 저장해 두고 그날 바로 엽니다</span></h3>';
+
+  if(!hasAny){
+    h += '<div class="empty" style="padding:20px 10px">아직 저장한 대회가 없습니다.<br>'+
+      '<span class="small">아래에서 대회를 설정한 뒤 <b>「이 대회 저장」</b>을 누르면 여기에 쌓입니다.</span></div>';
+  } else {
+    /* 주간 표 — 오늘 칸을 강조한다 */
+    h += '<div class="wkgrid">';
+    for(let d=0; d<7; d++){
+      h += '<div class="wkday'+(d===today?' on':'')+(d===0?' sun':d===6?' sat':'')+'">'+
+        '<div class="wkh">'+DAYN[d]+(d===today?' <span class="wkt">오늘</span>':'')+'</div>';
+      h += wk[d].length
+        ? wk[d].map(P=>'<button class="wkitem" data-open="'+esc(P.id)+'" title="'+esc(P.n)+' 열기">'+
+            (P.time ? '<b>'+esc(P.time)+'</b>' : '<b class="dim">시각 미정</b>')+
+            '<span>'+esc(P.n)+'</span></button>').join("")
+        : '<div class="wkempty">—</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+
+    /* 목록 — 여기서 요일·시각을 고치고, 열거나 지운다 */
+    h += '<div class="scrollx" style="margin-top:12px"><table class="prtbl"><tr>'+
+      '<th>대회</th><th>바이인</th><th>스택</th><th>요일</th><th>시각</th><th></th></tr>'+
+      list.map(P=>'<tr data-id="'+esc(P.id)+'">'+
+        '<td><b>'+esc(P.n)+'</b>'+(P.memo?'<div class="small dim">'+esc(P.memo)+'</div>':'')+'</td>'+
+        '<td>'+manwon(P.buyin)+'</td>'+
+        '<td>'+manchip(P.startStack)+'</td>'+
+        '<td><div class="daypick">'+DAYN.map((dn,d)=>
+            '<button type="button" class="dbtn'+((P.days||[]).indexOf(d)>=0?' on':'')+
+            (d===0?' sun':d===6?' sat':'')+'" data-day="'+d+'">'+dn+'</button>').join("")+'</div></td>'+
+        '<td><input class="prtime" type="time" value="'+esc(P.time||"")+'"></td>'+
+        '<td class="pract">'+
+          '<button class="btn sm" data-act="open">열기</button>'+
+          '<button class="btn sec sm" data-act="over">덮어쓰기</button>'+
+          '<button class="btn sec sm" data-act="del">삭제</button>'+
+        '</td></tr>').join("")+
+      '</table></div>'+
+      '<div class="notice">「열기」는 그 설정으로 새 대회를 준비합니다 — 진행 중인 대회의 시간·인원은 이어지지 않습니다. '+
+      '「덮어쓰기」는 지금 화면의 설정을 그 대회에 저장합니다.</div>';
+  }
+
+  /* 저장 줄 */
+  h += '<hr><div class="row" style="align-items:flex-end">'+
+    '<div style="flex:1 1 180px"><label>지금 설정을 이 이름으로 저장</label>'+
+      '<input id="td-pr-name" placeholder="예: 금요일 몬스터" value=""></div>'+
+    '<div style="flex:0 0 auto"><label>시각</label><input id="td-pr-time" type="time" style="width:120px"></div>'+
+    '<div style="flex:0 0 auto"><button class="btn" id="td-pr-save">이 대회 저장</button></div>'+
+    '</div>'+
+    '<div style="margin-top:8px"><label>여는 요일 <span class="dim">(안 골라도 됩니다)</span></label>'+
+      '<div class="daypick" id="td-pr-days">'+DAYN.map((dn,d)=>
+        '<button type="button" class="dbtn'+(d===0?' sun':d===6?' sat':'')+'" data-day="'+d+'">'+dn+'</button>').join("")+
+      '</div></div>';
+
+  return h + '</div>';
+}
+
+/* 일정표 카드의 버튼·입력을 연결한다 */
+function bindScheduleCard(v){
+  const box = v.querySelector(".tdsched");
+  if(!box) return;
+
+  /* 주간 표에서 바로 열기 */
+  box.querySelectorAll(".wkitem").forEach(b=>b.onclick = ()=>{
+    const P = tdProfiles().filter(x=>x.id===b.dataset.open)[0];
+    if(!P) return;
+    tdProfileApply(P);
+    toast('「'+P.n+'」 설정을 불러왔습니다');
+    renderTour();
+  });
+
+  /* 목록의 요일 · 시각 · 동작 */
+  box.querySelectorAll(".prtbl tr[data-id]").forEach(tr=>{
+    const id = tr.dataset.id;
+    const upd = fn => {
+      const arr = tdProfiles();
+      const P = arr.filter(x=>x.id===id)[0];
+      if(!P) return;
+      fn(P);
+      tdProfilesSet(arr);
+    };
+    tr.querySelectorAll(".dbtn").forEach(b=>b.onclick = ()=>{
+      const d = +b.dataset.day;
+      upd(P=>{
+        P.days = P.days || [];
+        const i = P.days.indexOf(d);
+        if(i>=0) P.days.splice(i,1); else P.days.push(d);
+        P.days.sort();
+      });
+      renderTour();
+    });
+    const ti = tr.querySelector(".prtime");
+    if(ti) ti.onchange = ()=>{ upd(P=>{ P.time = tdCleanTime(ti.value); }); renderTour(); };
+
+    tr.querySelectorAll("[data-act]").forEach(b=>b.onclick = ()=>{
+      const arr = tdProfiles();
+      const P = arr.filter(x=>x.id===id)[0];
+      if(!P) return;
+      if(b.dataset.act === "open"){
+        tdProfileApply(P);
+        toast('「'+P.n+'」 설정을 불러왔습니다');
+        renderTour();
+      } else if(b.dataset.act === "over"){
+        if(!confirm('「'+P.n+'」을 지금 화면의 설정으로 덮어쓸까요?')) return;
+        const keep = {id:P.id, n:P.n, days:P.days, time:P.time, memo:P.memo};
+        Object.assign(P, tdProfileFrom(TD, keep.n, keep.days, keep.time, keep.memo), {id:keep.id});
+        tdProfilesSet(arr);
+        toast('「'+P.n+'」에 덮어썼습니다');
+        renderTour();
+      } else if(b.dataset.act === "del"){
+        if(!confirm('「'+P.n+'」을 지웁니다. 되돌릴 수 없습니다.')) return;
+        tdProfilesSet(arr.filter(x=>x.id!==id));
+        toast("지웠습니다");
+        renderTour();
+      }
+    });
+  });
+
+  /* 새 프로필 저장 */
+  const dayBox = box.querySelector("#td-pr-days");
+  if(dayBox) dayBox.querySelectorAll(".dbtn").forEach(b=>b.onclick = ()=>b.classList.toggle("on"));
+  const sv = box.querySelector("#td-pr-save");
+  if(sv) sv.onclick = ()=>{
+    const nameEl = box.querySelector("#td-pr-name");
+    const name = (nameEl.value||"").trim();
+    if(!name){ toast("대회 이름을 적어주세요"); nameEl.focus(); return; }
+    const arr = tdProfiles();
+    if(arr.length >= 60){ toast("저장 한도(60개)에 닿았습니다 — 안 쓰는 대회를 지워주세요"); return; }
+    const days = [...dayBox.querySelectorAll(".dbtn.on")].map(b=>+b.dataset.day);
+    const time = box.querySelector("#td-pr-time").value || "";
+    arr.unshift(tdProfileFrom(TD, name, days, time, ""));
+    tdProfilesSet(arr);
+    toast('「'+name+'」을 저장했습니다');
+    renderTour();
+  };
+}
+
 function renderTDSetup(v){
   if(!TD){ TD = tdNew(); tdRestoreSetup(TD); }
   const D = TD;
@@ -3270,7 +3510,8 @@ function renderTDSetup(v){
   }
   const man = n => Math.round((n||0)/10000*100)/100;
 
-  let h = '<div class="card"><h2>5 · 토너먼트 운영 (클락 · 전광판)</h2>'+
+  let h = tdScheduleCard() +
+    '<div class="card"><h2>5 · 토너먼트 운영 (클락 · 전광판)</h2>'+
     '<p>국내 홀덤펍·해외 토너먼트 기본 구조를 고른 뒤 <b>매장명·대회명·BUY-IN·REBUY-IN·스택·레벨표</b>를 미리 정하고 대회를 여세요.</p>'+
 
     '<div class="step"><span class="num">1</span> 기본 구조 선택 <span class="sub">선택 후 아래 값을 자유롭게 수정할 수 있습니다</span></div>'+
@@ -3341,6 +3582,7 @@ function renderTDSetup(v){
     D.levels = buildLevels(t, D._count, D._brkEvery, D._brkMin);
     D.lvl = 0; D.remain = (D.levels[0].min||1)*60000; D.running = false; D.paused = false; D.endsAt = null;
   };
+  bindScheduleCard(v);
   v.querySelectorAll(".tplb").forEach(b=>b.onclick=()=>{
     grab(); applyTpl(TSTRUCT.filter(s=>s.id===b.dataset.id)[0]); tdSave(); renderTDSetup(v);
   });

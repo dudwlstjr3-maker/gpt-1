@@ -240,6 +240,80 @@ group('토너먼트');
   ok(typeof manwon === 'function' && typeof manchip === 'function', '만원/만칩 표시 함수 존재');
 }
 
+/* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
+group('대회 프로필');
+{
+  const { tdProfiles, tdProfilesSet, tdProfileFrom, tdProfileApply, tdWeek, tdMinOfDay, tdNew, buildLevels, TSTRUCT, DAYN } = app;
+  ok(Array.isArray(DAYN) && DAYN.length === 7 && DAYN[0] === '일', '요일 이름 7개, 일요일부터');
+
+  okNear(tdMinOfDay('19:30'), 19 * 60 + 30, '시각 → 분 변환');
+  okNear(tdMinOfDay('00:00'), 0, '자정 = 0분');
+  ok(tdMinOfDay('') > 24 * 60, '시각이 없으면 맨 뒤로 정렬');
+  ok(tdMinOfDay('말도 안 되는 값') > 24 * 60, '엉뚱한 시각도 맨 뒤로');
+
+  // 현재 대회를 세워 프로필로 굳혔다가 되살린다
+  ctx.__APP.TD = tdNew();
+  const D = ctx.__APP.TD;
+  const st = TSTRUCT.find((t) => t.id === 'f9_daily');
+  D.levels = buildLevels(st, 12, 4, 10);
+  D.buyin = 10000; D.startStack = 2000000; D.rebuyPrice = 10000; D.rebuyStack = 3000000;
+  D.payN = 9; D.pay = app.payoutPct(9, 1); D.payCurve = 1; D.poolPct = 90; D.payShow = 5;
+
+  const P = tdProfileFrom(D, '금요일 몬스터', [5, 1], '19:30', '메모');
+  ok(P.n === '금요일 몬스터', '프로필 이름 저장');
+  ok(JSON.stringify(P.days) === '[1,5]', '요일이 정렬돼 저장', JSON.stringify(P.days));
+  ok(P.time === '19:30', '시각 저장');
+  ok(P.buyin === 10000 && P.startStack === 2000000, '바이인·스택 저장');
+  ok(Array.isArray(P.levels) && P.levels.length === D.levels.length, '레벨표 저장');
+  ok(P.levels !== D.levels, '레벨표가 깊은 복사 (원본과 공유하지 않음)');
+  ok(P.remain === undefined && P.running === undefined, '진행 상태는 담지 않음');
+  ok(typeof P.id === 'string' && P.id.length > 1, '고유 id 부여');
+  const P2 = tdProfileFrom(D, 'x', [], '', '');
+  ok(P2.id !== P.id, '연달아 만들어도 id 가 겹치지 않음');
+  ok(P2.time === '', '시각이 비면 빈 문자열');
+  const P3 = tdProfileFrom(D, '', null, '25:99', '');
+  ok(P3.n.length > 0, '이름이 비면 대회명으로 채움');
+  ok(JSON.stringify(P3.days) === '[]', 'days 가 배열이 아니면 빈 배열');
+  ok(P3.time === '', '말이 안 되는 시각은 버림');
+
+  // 저장 → 주간 표
+  tdProfilesSet([P, Object.assign({}, P2, { n: '수요일 데일리', days: [3], time: '20:00' })]);
+  ok(tdProfiles().length === 2, '프로필 2개 저장');
+  const wk = tdWeek();
+  ok(wk.length === 7, '주간 표가 7칸');
+  ok(wk[1].length === 1 && wk[1][0].n === '금요일 몬스터', '월요일 칸에 배치');
+  ok(wk[5].length === 1, '금요일 칸에도 같은 대회 배치(요일 복수 선택)');
+  ok(wk[3].length === 1 && wk[3][0].n === '수요일 데일리', '수요일 칸 배치');
+  ok(wk[0].length === 0 && wk[2].length === 0, '지정 안 한 요일은 비어 있음');
+
+  // 같은 요일 안에서는 시각순
+  tdProfilesSet([
+    Object.assign({}, P, { id: 'a', n: '늦은 대회', days: [2], time: '22:00' }),
+    Object.assign({}, P, { id: 'b', n: '이른 대회', days: [2], time: '13:00' }),
+    Object.assign({}, P, { id: 'c', n: '시각 미정', days: [2], time: '' }),
+  ]);
+  const tue = tdWeek()[2];
+  ok(tue.map((x) => x.n).join(',') === '이른 대회,늦은 대회,시각 미정',
+    '같은 요일은 시각순, 미정은 맨 뒤', tue.map((x) => x.n).join(','));
+
+  // 불러오면 설정은 오고 진행 상태는 초기화된다
+  ctx.__APP.TD.started = true; ctx.__APP.TD.running = true; ctx.__APP.TD.lvl = 5; ctx.__APP.TD.players = 42;
+  tdProfileApply(P);
+  const T = ctx.__APP.TD;
+  ok(T.buyin === 10000 && T.startStack === 2000000, '불러오기: 바이인·스택 복원');
+  ok(T.levels.length === P.levels.length, '불러오기: 레벨표 복원');
+  ok(T.levels !== P.levels, '불러오기: 레벨표가 프로필과 공유되지 않음');
+  ok(T.started === false && T.running === false, '불러오기: 진행 상태 초기화');
+  ok(T.lvl === 0, '불러오기: 1레벨부터');
+  ok(T.remain === (T.levels[0].min || 1) * 60000, '불러오기: 남은 시간이 1레벨 길이');
+  ok(T.payManual === false, '불러오기: 상금 수동 편집 해제');
+
+  // 저장 한도
+  tdProfilesSet(new Array(100).fill(0).map((_, i) => Object.assign({}, P, { id: 'z' + i })));
+  ok(tdProfiles().length === 60, `저장 한도 60개로 잘림 (실제 ${tdProfiles().length})`);
+  tdProfilesSet([]);
+}
+
 /* ───────────────── 성향 진단 ───────────────── */
 group('성향 진단');
 {

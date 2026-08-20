@@ -3,9 +3,9 @@
 이 앱은 단일 HTML이라 테스트 러너가 따로 없다. 수정 후에는 **반드시 두 층 다** 돌린다.
 
 ```
-node tools/check-logic.js          # 1층 — 로직   (376건)
+node tools/check-logic.js          # 1층 — 로직   (393건)
 node tools/check-ui.mjs            # 2층 — 화면   (150회)
-node tools/check-flows.mjs         # 3층 — 조작   (76건)
+node tools/check-flows.mjs         # 3층 — 조작   (96건)
 node tools/check-ui.mjs --shots    # 화면 + 스크린샷(tools/_shots/)
 ```
 
@@ -27,6 +27,7 @@ node tools/check-ui.mjs --shots    # 화면 + 스크린샷(tools/_shots/)
 검증 항목: 포커 수식 4개(참조 구현 대조 + 소스 문자열 대조), 핸드 평가기, 승률,
 `analyze` 통합, **액션 순서 엔진**(차례·블라인드·BB 옵션·3벳·체크레이즈·올인·헤즈업),
 **시퀀스 → 분석 어댑터**(실제 팟에서 나온 필요 승률·MDF·EV),
+**포지션별 레인지 표**(표에 보이는 레인지 = 엔진이 쓰는 레인지),
 토너먼트 프리셋·레벨·상금 배분, 대회 프로필·주간 일정, 성향 진단 60문항·7축,
 드릴 260핸드, 저장소와 **백업 커버리지**(소스의 `DB.set(...)` 키를 긁어 백업이 전부 담는지 대조 —
 v3.1 까지 `quizans`·`drillaxis` 가 빠져 있었다).

@@ -541,6 +541,71 @@ group('시퀀스 → 분석');
   }
 }
 
+/* ───────────────── 포지션별 레인지 표 ───────────────── */
+group('포지션별 레인지');
+{
+  const { rngFor, rngPct, rngCombos, canOpen, OPEN_PCT, VTYPE, RNG_SIT, posList, rangeClasses, cap } = app;
+  ok(Array.isArray(RNG_SIT) && RNG_SIT.length === 3, '상황 3가지 (오픈·콜·3벳)');
+  ok(RNG_SIT.every((x) => x.id && x.n && x.d), '상황마다 이름·설명이 있다');
+
+  // 자리가 늦을수록 오픈 레인지가 넓다
+  const seq = ['UTG', 'HJ', 'CO', 'BTN'];
+  let mono = true;
+  for (let i = 1; i < seq.length; i++)
+    if (rngPct(rngFor(seq[i], 'open', 'unknown')) <= rngPct(rngFor(seq[i - 1], 'open', 'unknown'))) mono = false;
+  ok(mono, '자리가 늦을수록 오픈 레인지가 넓어진다',
+    seq.map((p) => `${p} ${rngPct(rngFor(p, 'open', 'unknown')).toFixed(1)}%`).join(' → '));
+
+  // 표시하는 % 가 OPEN_PCT 와 어긋나지 않는다 (표와 계산이 같은 값이어야 한다)
+  for (const p of ['UTG', 'CO', 'BTN', 'SB']) {
+    const got = rngPct(rngFor(p, 'open', 'unknown'));
+    ok(Math.abs(got - OPEN_PCT[p]) < 3, `${p} 표시 %가 OPEN_PCT(${OPEN_PCT[p]}%)와 맞는다 (${got.toFixed(1)}%)`);
+  }
+  // 그리고 analyze 가 쓰는 것과 정확히 같은 레인지여야 한다
+  for (const p of ['UTG', 'BTN']) {
+    const fromTable = rngFor(p, 'open', 'unknown').join(',');
+    const fromEngine = rangeClasses(cap(OPEN_PCT[p] * VTYPE.unknown.w)).join(',');
+    ok(fromTable === fromEngine, `${p}: 표에 보이는 레인지 = 엔진이 쓰는 레인지`);
+  }
+
+  // BB 는 먼저 들어오는 자리가 아니다
+  ok(canOpen('BB') === false, 'BB 는 «먼저 들어올» 자리로 치지 않는다');
+  ok(canOpen('SB') === true && canOpen('BTN') === true, 'SB·BTN 은 먼저 들어올 수 있다');
+
+  // 성향이 레인지 폭을 움직인다
+  const tight = rngPct(rngFor('CO', 'open', 'nit'));
+  const base = rngPct(rngFor('CO', 'open', 'unknown'));
+  const loose = rngPct(rngFor('CO', 'open', 'station'));
+  ok(tight < base, `타이트한 상대는 좁다 (${tight.toFixed(1)}% < ${base.toFixed(1)}%)`);
+  ok(loose > base, `루즈한 상대는 넓다 (${loose.toFixed(1)}% > ${base.toFixed(1)}%)`);
+
+  // 3벳은 콜보다, 콜은 오픈보다 좁거나 같다
+  ok(rngPct(rngFor(null, '3bet', 'unknown')) < rngPct(rngFor(null, 'call', 'unknown')),
+    '3벳 레인지가 콜 레인지보다 좁다');
+
+  // 어떤 조합에서도 100% 를 넘거나 비지 않는다
+  let bad = null;
+  for (const vt of Object.keys(VTYPE)) {
+    for (const sit of ['open', 'call', '3bet']) {
+      for (const p of posList(9).concat(posList(2))) {
+        if (sit === 'open' && !canOpen(p)) continue;
+        const cls = rngFor(p, sit, vt);
+        const pv = rngPct(cls);
+        if (!Number.isFinite(pv) || pv <= 0 || pv > 100) { bad = `${p}/${sit}/${vt} → ${pv}`; break; }
+        if (rngCombos(cls) <= 0) { bad = `${p}/${sit}/${vt} 조합 0개`; break; }
+        if (new Set(cls).size !== cls.length) { bad = `${p}/${sit}/${vt} 중복 핸드`; break; }
+      }
+      if (bad) break;
+    }
+    if (bad) break;
+  }
+  ok(!bad, '모든 자리·상황·성향 조합에서 0~100% 안의 유효한 레인지가 나온다', bad);
+
+  // 레인지는 센 핸드부터 채워진다
+  ok(rngFor('UTG', 'open', 'unknown')[0] === 'AA', '가장 좁은 레인지의 첫 핸드는 AA');
+  ok(rngFor('BTN', 'open', 'unknown').includes('AA'), '넓은 레인지에도 AA 는 들어 있다');
+}
+
 /* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
 group('대회 프로필');
 {

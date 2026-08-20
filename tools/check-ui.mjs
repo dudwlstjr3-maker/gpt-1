@@ -84,9 +84,14 @@ async function scanOverflow(page, where, vw) {
       if (!el.offsetParent) continue;
       const r = el.getBoundingClientRect();
       if (r.width === 0) continue;
-      const cs = getComputedStyle(el);
-      // 스스로 가로 스크롤을 갖는 컨테이너는 넘쳐도 정상이다
-      if (cs.overflowX === 'auto' || cs.overflowX === 'scroll' || cs.overflowX === 'hidden') continue;
+      // 스스로, 또는 조상 중 하나가 가로 스크롤을 갖는다면 넘쳐도 정상이다.
+      // (넓은 표를 .scrollx 로 감싼 경우 — 표는 그 안에서 스크롤된다)
+      let scrolled = false;
+      for (let e = el; e && e !== document.body; e = e.parentElement) {
+        const ox = getComputedStyle(e).overflowX;
+        if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') { scrolled = true; break; }
+      }
+      if (scrolled) continue;
       if (r.right > vw + 1 || r.left < -1) {
         out.els.push({ tag: el.tagName.toLowerCase(), cls: el.className?.toString().slice(0, 40) || '', id: el.id || '', right: Math.round(r.right), left: Math.round(r.left) });
       }

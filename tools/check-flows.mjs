@@ -266,6 +266,64 @@ group('액션 순서 입력');
     '액션이 없으면 무엇이 빠졌는지 알려준다', (await txt('#h-out')).slice(0, 120));
 }
 
+/* ─────────── 포지션별 레인지 표 ─────────── */
+group('포지션별 레인지');
+{
+  await tab('hand');
+  ok(await page.locator('#rng-ref .rngtbl').count() === 1, '레인지 표가 렌더된다');
+  const t = await txt('#rng-ref');
+  ok(/UTG/.test(t) && /BTN/.test(t), '자리별 행이 나온다');
+  ok(/솔버 출력이 아닙니다/.test(t), '솔버가 아니라 근사라고 밝힌다');
+  ok(/뒤에 아무도 없어/.test(t), 'BB 는 먼저 들어올 자리가 아니라고 설명한다');
+
+  // 자리가 늦을수록 넓어진다
+  const pcts = await page.evaluate(() =>
+    [...document.querySelectorAll('#rng-ref .rngtbl .rpc')].map((e) => parseFloat(e.textContent)));
+  ok(pcts.length >= 4, '레인지 %가 자리마다 표시된다', pcts.join(', '));
+  let up = true;
+  for (let i = 1; i < 4; i++) if (!(pcts[i] > pcts[i - 1])) up = false;
+  ok(up, '자리가 늦을수록 % 가 커진다', pcts.join(' → '));
+
+  // 그리드 펼치기
+  await page.click('[data-grid="BTN"]');
+  await page.waitForTimeout(250);
+  ok(await page.locator('#rng-ref .g13').count() === 1, 'BTN 그리드가 펼쳐진다');
+  ok(await page.locator('#rng-ref .g13 .in').count() > 20, '그리드에 레인지가 칠해진다',
+    `${await page.locator('#rng-ref .g13 .in').count()}칸`);
+  await page.click('[data-grid="BTN"]');
+  await page.waitForTimeout(220);
+  ok(await page.locator('#rng-ref .g13').count() === 0, '다시 누르면 접힌다');
+
+  // 성향을 바꾸면 폭이 움직인다
+  const before = (await page.evaluate(() =>
+    parseFloat(document.querySelector('#rng-ref .rngtbl .rpc').textContent)));
+  await page.selectOption('#rng-vt', 'nit');
+  await page.waitForTimeout(280);
+  const after = (await page.evaluate(() =>
+    parseFloat(document.querySelector('#rng-ref .rngtbl .rpc').textContent)));
+  ok(after < before, `타이트한 상대를 고르면 좁아진다 (${before}% → ${after}%)`);
+  await page.selectOption('#rng-vt', 'unknown');
+  await page.waitForTimeout(250);
+
+  // 콜 · 3벳은 자리별로 나누지 않는다
+  await page.locator('#rng-sit button').filter({ hasText: '3벳' }).click();
+  await page.waitForTimeout(280);
+  ok(await page.locator('#rng-ref .rngtbl').count() === 0, '3벳은 자리별 표를 만들지 않는다');
+  ok(await page.locator('#rng-ref .g13').count() === 1, '3벳은 레인지 하나를 그리드로 보여준다');
+  ok(/자리에 따라 나누지 않습니다/.test(await txt('#rng-ref')), '왜 자리별이 아닌지 설명한다');
+  await page.locator('#rng-sit button').filter({ hasText: '먼저' }).click();
+  await page.waitForTimeout(250);
+
+  // 인원을 바꾸면 자리도 따라간다
+  await page.evaluate(() => { document.getElementById('sess-d').open = true; });
+  await page.selectOption('#s-seats', '9');
+  await page.waitForTimeout(320);
+  ok(/UTG\+1/.test(await txt('#rng-ref')), '9맥스로 바꾸면 자리가 늘어난다');
+  await page.selectOption('#s-seats', '6');
+  await page.waitForTimeout(280);
+  await page.evaluate(() => { document.getElementById('sess-d').open = false; });
+}
+
 /* ─────────── 세션 세팅 접기 ─────────── */
 group('세션 세팅');
 {

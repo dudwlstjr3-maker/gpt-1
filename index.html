@@ -1250,6 +1250,7 @@ function handState(cfg, seq){
     const p = nextTurn();
     if(!p) break;
     const toCall = Math.max(0, Math.min(S.betTo - S.cm[p], left(p)));
+    const potB = S.pot, cmB = S.cm[p], invB = S.inv[p];   // 이 액션 직전 상태 (분석에 그대로 쓴다)
     const a = step.a;
 
     if(a === "fold"){
@@ -1262,7 +1263,9 @@ function handState(cfg, seq){
       if(left(p) <= 1e-9) S.allin[p]=true;
     } else if(a === "bet" || a === "raise"){
       const cap = S.cm[p] + left(p);                           // 올인까지
-      const to = Math.min(r1(step.to), cap);
+      /* 사용자가 넣은 금액은 반올림하지 않는다. 하프팟 2.75BB 같은 값이 2.8 로 밀리면
+         필요 승률·MDF 가 미묘하게 어긋난다. 화면에 쓸 때만 반올림한다. */
+      const to = Math.min(+step.to || 0, cap);
       if(to <= S.betTo + 1e-9 && to < cap - 1e-9) { S.err = "직전 금액보다 커야 합니다"; break; }
       const add = to - S.cm[p];
       S.cm[p]=to; S.inv[p]+=add; S.pot+=add;
@@ -1272,7 +1275,8 @@ function handState(cfg, seq){
     } else { S.err = "모르는 액션입니다: " + a; break; }
 
     S.acted[p] = true; S.lastActor = p;
-    S.log[S.street].push({pos:p, a:a, to:r1(S.cm[p]), toCall:r1(toCall), hero:p===cfg.hero});
+    S.log[S.street].push({pos:p, a:a, to:r1(S.cm[p]), toCall:r1(toCall), hero:p===cfg.hero,
+                          potBefore:potB, cmBefore:cmB, invBefore:invB, raw:{to:S.cm[p], toCall:toCall}});
     S.applied++;
     if(live().length <= 1){ S.over = true; S.ended = "fold"; }
   }
@@ -1299,6 +1303,81 @@ function handState(cfg, seq){
   S.minRaiseTo = S.toAct ? r1(Math.min(S.betTo + S.minRaise, S.cm[S.toAct] + left(S.toAct))) : 0;
   S.allinTo = S.toAct ? r1(S.cm[S.toAct] + left(S.toAct)) : 0;
   return S;
+}
+
+/* 프리플랍 전개를 레인지 가정용 시나리오 하나로 요약한다.
+   팟·투입액은 시퀀스에서 정확히 뽑아 쓰므로, 여기서 고르는 건 "상대 레인지를 어떻게 볼까"뿐이다. */
+function pfScenarioOf(S, hero){
+  const pf = S.log[0] || [];
+  const raises = pf.filter(e=>e.a==="bet"||e.a==="raise");
+  const heroRaises = raises.filter(e=>e.pos===hero);
+  if(raises.length === 0) return "limp";                 // 아무도 안 올림 — 림프 팟
+  if(raises.length >= 2){
+    // 3벳 이상이 오갔다. 마지막으로 올린 게 나인지 상대인지로 갈린다
+    return raises[raises.length-1].pos === hero ? "3b_call" : "call_3b";
+  }
+  return raises[0].pos === hero ? "open_call" : "call_open";
+}
+
+/** 액션 시퀀스를 analyze 가 먹는 형태로 바꾼다.
+ *  스트리트마다 "내가 마지막으로 내린 판단"을 분석 지점으로 잡는다. */
+function seqToInput(cfg, seq, cards){
+  const S = handState(cfg, seq);
+  const hero = cfg.hero;
+  if(S.err) return {err:"액션 순서가 규칙에 맞지 않습니다 — "+S.err};
+  if(!cards.hole || cards.hole.length !== 2) return {err:"내 홀카드 2장을 골라주세요."};
+
+  const board = cards.board || [];
+  const flop = board.slice(0,3), turn = board.slice(3,4), river = board.slice(4,5);
+  if(board.length && board.length < 3) return {err:"플랍은 3장 모두 넣거나 전부 비워주세요."};
+
+  /* 플랍을 본 상대 = 프리플랍이 끝났을 때 남아 있던 사람 */
+  const foldedIn = st => {
+    const out = {};
+    for(let k=0;k<=st;k++) for(const e of S.log[k]) if(e.a==="fold") out[e.pos]=k;
+    return out;
+  };
+  const foldedPre = foldedIn(0);
+  const vils = posList(cfg.seats).filter(p=>p!==hero && !(p in foldedPre));
+  if(!vils.length) return {err:"상대가 모두 접었습니다 — 분석할 스팟이 없습니다."};
+
+  /* 스트리트별로 내가 마지막에 내린 판단을 뽑는다 */
+  const streets = [];
+  let heroFolded = false;
+  for(let i=1;i<=3;i++){
+    if(board.length < BOARD_NEED[i]) break;
+    const log = S.log[i] || [];
+    const mine = log.filter(e=>e.pos===hero);
+    if(!mine.length) break;
+    const E = mine[mine.length-1];
+    const toCall = E.raw.toCall;
+    streets.push({
+      pot: Math.max(0, E.potBefore - toCall),   // analyze 규약: 상대가 걸기 "전" 팟
+      vSize: toCall,                            // 내가 더 넣어야 하는 금액
+      mAct: E.a === "bet" || E.a === "raise" ? E.a : E.a,
+      mSize: (E.a==="bet"||E.a==="raise") ? E.raw.to : 0,
+      hInv: E.invBefore,
+      liveVils: vils.filter(p=>{ const f = foldedIn(i)[p]; return f===undefined || f>=i; }),
+      more: mine.length > 1                     // 이 스트리트에 내 판단이 두 번 이상 있었다
+    });
+    if(E.a === "fold"){ heroFolded = true; break; }
+  }
+
+  /* 액션을 넣은 상대(=마지막으로 올린 사람) 를 기준 상대로 삼는다 */
+  const lastAgg = [3,2,1,0].map(k=>S.aggBy[k]).filter(p=>p && p!==hero)[0];
+  const vpos = lastAgg && vils.indexOf(lastAgg)>=0 ? lastAgg : vils[vils.length-1];
+
+  return {
+    seats: +cfg.seats, gt: cfg.gt, stack: cfg.stack,
+    pos: hero, vpos: vpos, pf: streets.length ? pfScenarioOf(S, hero) : "pf_only",
+    vt: cfg.seatVT[vpos] || "unknown",
+    vils: vils.map(p=>({pos:p, vt:cfg.seatVT[p] || "unknown"})),
+    agg: Math.max(0, vils.indexOf(vpos)),
+    hole: cards.hole, flop: flop, turn: turn, river: river, board: board,
+    acts: [{},{},{}],                 // 예전 경로용 자리 (streets 가 있으면 안 쓰인다)
+    streets: streets.length ? streets : null,
+    seqState: S, heroFolded: heroFolded
+  };
 }
 
 /** 지금 차례인 사람이 고를 수 있는 액션 */
@@ -1741,7 +1820,12 @@ function analyze(inp){
     const bd = boards[i];
     const needLen = 3+i;
     if(bd.length < needLen) break;
-    const a = inp.acts[i] || {};
+    /* 액션 시퀀스로 넣은 핸드는 실제 팟·투입액·콜할 금액을 그대로 받는다(OV).
+       그 경우 아래의 자체 팟 추적 대신 스트리트마다 주어진 값을 쓴다.
+       예전 형태(스트리트별 상대/나 액션 1개씩)로 부른 곳은 OV 가 없어 그대로 동작한다. */
+    const OV = inp.streets && inp.streets[i];
+    if(OV){ pot = OV.pot; hInv = OV.hInv; }
+    const a = OV ? {v:OV.vSize>0?"bet":"check", vs:OV.vSize, m:OV.mAct, ms:OV.mSize} : (inp.acts[i] || {});
     const vAct = a.v || "check", vSize = +a.vs || 0, mAct = a.m || "check", mSize = +a.ms || 0;
 
     /* 상대 액션 반영해 레인지 좁히기 */
@@ -1921,7 +2005,12 @@ function analyze(inp){
                            vilCount:vilNow.length, vt:vt})
     });
 
-    /* 팟 갱신 */
+    /* 팟 갱신 — 시퀀스로 넣은 핸드는 다음 스트리트 값이 이미 주어져 있으므로 건드리지 않는다 */
+    if(OV){
+      if(mAct==="fold") break;
+      vilR = vilNowAll;
+      continue;
+    }
     let add = 0;
     if(facing){
       add += vSize;

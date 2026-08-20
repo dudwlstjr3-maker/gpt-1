@@ -376,6 +376,158 @@ group('액션 순서');
   }
 }
 
+/* ───────────────── 시퀀스 → 분석 어댑터 ───────────────── */
+group('시퀀스 → 분석');
+{
+  const { seqToInput, pfScenarioOf, handState, analyze } = app;
+  const R = '23456789TJQKA', SU = 'shdc';
+  const C = (s) => R.indexOf(s[0]) * 4 + SU.indexOf(s[1]);
+  const cfg = (o) => Object.assign({
+    seats: 6, ante: 0, stack: 100, hero: 'BTN', gt: 'cash', boardLen: 0,
+    seatVT: {},
+  }, o);
+  const cards = (hole, board) => ({ hole: hole.map(C), board: (board || []).map(C) });
+
+  // BTN 오픈 → BB 콜 → 플랍에서 BB 가 하프팟 벳, 내가 콜
+  const pre = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'fold' }, { a: 'call' }];
+  {
+    const seq = pre.concat([{ a: 'bet', to: 2.75 }, { a: 'call' }]);
+    const c = cards(['Ah', 'Kh'], ['Ks', '7d', '2c']);
+    const inp = seqToInput(cfg({ boardLen: 3 }), seq, c);
+    ok(!inp.err, '어댑터가 입력을 만든다', inp.err);
+    if (!inp.err) {
+      ok(inp.pf === 'open_call', '내가 오픈하고 상대가 콜 → open_call', inp.pf);
+      ok(inp.pos === 'BTN' && inp.vpos === 'BB', '내 자리·상대 자리', `${inp.pos} vs ${inp.vpos}`);
+      ok(inp.vils.length === 1, '상대는 한 명');
+      const st = inp.streets[0];
+      ok(!!st, '플랍 분석 지점이 생긴다');
+      // 팟 5.5 에서 상대가 2.75 벳 → 내가 2.75 콜. 규약상 pot = 상대가 걸기 전 팟
+      okNear(st.vSize, 2.75, '내가 더 넣어야 하는 금액 = 상대 벳');
+      okNear(st.pot, 5.5, '상대가 걸기 전 팟 5.5BB');
+      okNear(st.hInv, 2.5, '플랍 시작 시 내 투입 2.5BB');
+      ok(st.mAct === 'call', '내 액션은 콜', st.mAct);
+      // 이 값이 명세의 수식과 정확히 맞는지
+      okNear(st.vSize / (st.pot + 2 * st.vSize), 2.75 / 11, '필요 승률 = 벳/(팟+2×벳) = 2.75/11');
+      okNear(st.pot / (st.pot + st.vSize), 5.5 / 8.25, 'MDF = 팟/(팟+벳)');
+    }
+  }
+  // 체크-레이즈: 내가 벳하고 상대가 레이즈, 내가 콜 → 차액만 넣는다
+  {
+    const seq = pre.concat([{ a: 'check' }, { a: 'bet', to: 3 }, { a: 'raise', to: 10 }, { a: 'call' }]);
+    const inp = seqToInput(cfg({ boardLen: 3 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c']));
+    ok(!inp.err, '체크-레이즈 스팟도 만들어진다', inp.err);
+    if (!inp.err) {
+      const st = inp.streets[0];
+      okNear(st.vSize, 7, '체크-레이즈에 콜할 금액은 차액 7BB');
+      // 내가 콜하기 직전 팟 = 5.5 + 3 + 10 = 18.5, 규약상 pot = 18.5 - 7
+      okNear(st.pot, 11.5, '규약상 팟 = 콜 직전 팟 − 콜할 금액');
+      okNear(st.vSize / (st.pot + 2 * st.vSize), 7 / 25.5, '필요 승률 = 7/(18.5+7)');
+      // EV 도 맞는지 — 이겼을 때 18.5 를 먹고 졌을 때 7 을 잃는다
+      const eq = 0.4;
+      okNear(eq * (st.pot + st.vSize) - (1 - eq) * st.vSize, eq * 18.5 - (1 - eq) * 7,
+        'EV(콜) = 승률×콜직전팟 − (1−승률)×콜할금액');
+      ok(st.more === true, '이 스트리트에 내 판단이 두 번 있었다고 표시된다');
+    }
+  }
+  // 내가 먼저 치는 자리 — 콜할 금액 0
+  {
+    const seq = pre.concat([{ a: 'check' }, { a: 'bet', to: 3 }]);
+    const inp = seqToInput(cfg({ boardLen: 3 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c']));
+    const st = inp.streets[0];
+    okNear(st.vSize, 0, '체크가 돌아오면 콜할 금액 0');
+    okNear(st.pot, 5.5, '내가 치기 전 팟');
+    ok(st.mAct === 'bet' && st.mSize === 3, '내 벳 3BB 가 기록된다', `${st.mAct} ${st.mSize}`);
+  }
+  // 시나리오 판정
+  {
+    const mk = (seq) => pfScenarioOf(handState(cfg(), seq), 'BTN');
+    ok(mk([{ a: 'call' }, { a: 'call' }, { a: 'call' }, { a: 'call' }, { a: 'call' }, { a: 'check' }]) === 'limp',
+      '아무도 안 올리면 림프 팟');
+    ok(mk([{ a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'call' }, { a: 'fold' }, { a: 'fold' }]) === 'call_open',
+      '상대가 오픈하고 내가 콜 → call_open');
+    ok(mk([{ a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'raise', to: 8 }, { a: 'fold' }, { a: 'fold' }]) === '3b_call',
+      '내가 3벳 → 3b_call');
+    ok(mk([{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'raise', to: 8 }, { a: 'fold' }]) === 'call_3b',
+      '상대가 3벳 → call_3b');
+  }
+  // 어댑터 결과를 analyze 에 그대로 넣어도 되는지 — 그리고 앱이 낸 값이 수식과 일치하는지
+  {
+    const seq = pre.concat([{ a: 'bet', to: 2.75 }, { a: 'call' }]);
+    const inp = seqToInput(cfg({ boardLen: 3 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c']));
+    let res = null, err = null;
+    try { res = analyze(inp); } catch (e) { err = e; }
+    ok(!err, 'analyze 가 시퀀스 입력을 받는다', err && err.stack);
+    if (res && res.streets && res.streets[0]) {
+      const s = res.streets[0];
+      okNear(s.pot, 5.5, 'analyze 가 실제 팟을 쓴다');
+      okNear(s.vSize, 2.75, 'analyze 가 실제 콜할 금액을 쓴다');
+      okNear(s.reqE, 2.75 / 11, '필요 승률이 실제 액션에서 나온다');
+      okNear(s.mdf, 5.5 / 8.25, 'MDF 가 실제 액션에서 나온다');
+      okNear(s.alpha + s.mdf, 1, '알파+MDF = 1');
+      ok(s.eq > 0 && s.eq < 1, '승률이 0~1');
+      ok(s.rec !== '폴드', `톱페어 톱킥커에 폴드는 아니다 (${s.rec})`);
+      okNear(s.effStack, 100 - 2.5, '유효 스택 = 스택 − 플랍 시작 시 투입');
+    }
+  }
+  // 턴·리버까지 이어지는 핸드
+  {
+    const seq = pre.concat([
+      { a: 'bet', to: 2.75 }, { a: 'call' },      // 플랍
+      { a: 'bet', to: 6 }, { a: 'call' },         // 턴
+      { a: 'check' }, { a: 'check' },             // 리버
+    ]);
+    const inp = seqToInput(cfg({ boardLen: 5 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c', '3h', '9s']));
+    ok(!inp.err, '세 스트리트 핸드가 만들어진다', inp.err);
+    ok(inp.streets.length === 3, '플랍·턴·리버 세 지점', String(inp.streets && inp.streets.length));
+    if (inp.streets && inp.streets.length === 3) {
+      okNear(inp.streets[1].pot, 11, '턴 시작 팟 = 5.5 + 2.75×2');
+      okNear(inp.streets[1].hInv, 5.25, '턴 시작 시 내 투입 = 2.5 + 2.75');
+      okNear(inp.streets[2].pot, 23, '리버 시작 팟 = 11 + 6×2');
+      const res = analyze(inp);
+      ok(res.streets.length === 3, 'analyze 도 세 스트리트를 낸다');
+      const bad = res.streets.filter((s) => !Number.isFinite(s.eq) || !Number.isFinite(s.reqE));
+      ok(bad.length === 0, '세 스트리트 모두 NaN 없음');
+    }
+  }
+  // 내가 접으면 거기서 멈춘다
+  {
+    const seq = pre.concat([{ a: 'bet', to: 8 }, { a: 'fold' }]);
+    const inp = seqToInput(cfg({ boardLen: 5 }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c', '3h', '9s']));
+    ok(inp.heroFolded === true, '내가 접었다고 표시된다');
+    ok(inp.streets.length === 1, '접은 스트리트까지만 분석한다', String(inp.streets && inp.streets.length));
+  }
+  // 프리플랍만
+  {
+    const seq = [{ a: 'fold' }, { a: 'fold' }, { a: 'fold' }, { a: 'raise', to: 2.5 }];
+    const inp = seqToInput(cfg(), seq, cards(['Ah', 'Kh'], []));
+    ok(inp.pf === 'pf_only', '보드가 없으면 프리플랍만 분석', inp.pf);
+    const res = analyze(inp);
+    ok(res.pfOnly === true, 'analyze 가 프리플랍 전용으로 처리');
+  }
+  // 멀티웨이
+  {
+    const seq = [{ a: 'fold' }, { a: 'raise', to: 2.5 }, { a: 'call' }, { a: 'call' }, { a: 'fold' }, { a: 'call' },
+      { a: 'check' }, { a: 'check' }, { a: 'bet', to: 5 }, { a: 'call' }];   // 플랍까지
+    const inp = seqToInput(cfg({ boardLen: 3, hero: 'BTN' }), seq, cards(['Ah', 'Kh'], ['Ks', '7d', '2c']));
+    ok(!inp.err, '멀티웨이 입력이 만들어진다', inp.err);
+    ok(inp.vils.length === 3, '상대 3명 (HJ·CO·BB)', inp.vils.map((v) => v.pos).join(','));
+    ok(inp.pf === 'call_open', 'HJ 가 오픈하고 내가 콜 → call_open', inp.pf);
+  }
+  // 예전 입력 형태도 계속 동작해야 한다
+  {
+    const old = {
+      seats: 6, gt: 'cash', stack: 100, pos: 'BTN', vpos: 'BB', pf: 'open_call',
+      vt: 'unknown', vils: [{ pos: 'BB', vt: 'unknown' }], agg: 0,
+      hole: [C('Ah'), C('Kh')], flop: [C('Ks'), C('7d'), C('2c')], turn: [], river: [],
+      board: [C('Ks'), C('7d'), C('2c')],
+      acts: [{ v: 'bet', vs: 5, m: 'call', ms: 0 }, {}, {}],
+    };
+    const res = analyze(old);
+    ok(res.streets && res.streets.length >= 1, '예전 형태 입력도 그대로 분석된다');
+    okNear(res.streets[0].vSize, 5, '예전 형태의 상대 벳이 쓰인다');
+  }
+}
+
 /* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
 group('대회 프로필');
 {

@@ -500,7 +500,7 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   padding:6px 9px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;font-size:12.5px}
 .lvregbox label{color:var(--tx2);font-weight:700}.lvregbox select{width:auto;min-width:100px;padding:5px 8px;font-size:12.5px}
 /* --- 포지션별 레인지 참고표 --- */
-.rngtbl{width:100%;min-width:560px}
+.rngtbl{width:100%;min-width:640px}
 .rngtbl th,.rngtbl td{padding:8px 9px;vertical-align:middle}
 .rngtbl tr.on>td{background:var(--ac-bg)}
 .rngtbl tr.rdim>td{opacity:.75}
@@ -508,6 +508,7 @@ details[open] summary{margin-bottom:8px;color:var(--tx)}
   border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-right:7px}
 .rbar i{display:block;height:100%;background:var(--ac);border-radius:5px}
 .rpc{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.rpc.rme{color:var(--ac-tx)}
 .rex{line-height:1.9}
 .rex span{display:inline-block;background:var(--bg2);border:1px solid var(--line);border-radius:5px;
   padding:1px 6px;font-size:11.5px;margin:0 3px 0 0;font-variant-numeric:tabular-nums}
@@ -914,6 +915,10 @@ details.numd summary b{color:var(--ac-tx);margin-right:5px}
       <div style="flex:2"><label>이번 세션 목표</label><select id="s-goal">
         <option>연습 · 복기 위주</option><option>수익 목표</option><option>특정 리크 교정</option></select></div>
       <div style="flex:0 0 auto"><button class="btn sec sm" id="s-save">세팅 저장</button></div>
+    </div>
+    <div style="margin-top:12px"><label>권장 플레이 스타일 <span class="dim">— 내가 어느 폭으로 들어갈지</span></label>
+      <div class="bg" id="s-style" data-stylepick="1" style="display:flex"></div>
+      <div class="small dim" id="s-style-d" style="margin-top:5px"></div>
     </div>
     <div id="br-advice"></div>
     </details>
@@ -1702,7 +1707,7 @@ function hbRestore(d){
   return n;
 }
 /* 초기화 범위를 두 갈래로 나눈다 — 학습 데이터와 매장 운영 데이터는 성격이 다르다 */
-const LEARN_KEYS = ["profile","quizans","drillaxis","hands","setup","drills","drillcfg"];
+const LEARN_KEYS = ["profile","quizans","drillaxis","hands","setup","drills","drillcfg","hstyle"];
 const TOUR_KEYS  = ["td","tdsetup","tdcustom","tdprofiles","tdslides","adcfg","logo","btheme"];
 
 /* 드릴에서 모은 성향 근거. 문항 하나보다 가볍게 반영한다(가중치 0.35). */
@@ -1824,6 +1829,26 @@ const getProfile = () => DB.get("profile", null);
    PART 3. 핸드 분석 엔진 (모듈 B) + 탑 플레이어 렌즈 (모듈 C)
    ============================================================ */
 const cap = x => Math.max(1, Math.min(100, x));
+
+/* ---- 권장 플레이 스타일 ----
+   내가 어느 폭으로 들어가고 어디까지 받아줄지를 한 눈금으로 움직인다.
+   이건 «내 플레이» 기준일 뿐, 상대 레인지를 읽는 값은 건드리지 않는다
+   (상대가 얼마나 넓은지는 자리별 «상대 성향»으로 따로 잡는다).
+   기본은 타이트 — 라이브·펍에서는 넓게 들어가는 쪽이 훨씬 비싸게 물린다. */
+const HSTYLES = [
+  {id:"tight", n:"타이트", open:0.78, thr:1.07, marg:0.00,
+   d:"좁게 들어가고 애매하면 접습니다. 상대가 잘 안 접는 판에 맞습니다."},
+  {id:"std",   n:"표준",   open:1.00, thr:1.00, marg:-0.02,
+   d:"교과서적인 표준 레인지입니다."},
+  {id:"loose", n:"넓게",   open:1.22, thr:0.95, marg:-0.05,
+   d:"넓게 들어가고 얇은 밸류도 받습니다. 상대가 잘 접는 판에서만 통합니다."}
+];
+const hStyle = () => HSTYLES.filter(x=>x.id===DB.get("hstyle","tight"))[0] || HSTYLES[0];
+/* 내 오픈 기준. BB 는 «공짜로 보는 자리»라 100 을 그대로 둔다. */
+function openPctFor(pos){
+  const base = OPEN_PCT[pos] !== undefined ? OPEN_PCT[pos] : 25;
+  return base >= 100 ? 100 : Math.round(cap(base * hStyle().open) * 10) / 10;
+}
 const PFS = [
  {id:"open_call", t:"내가 오픈 → 상대 콜",        pot:5.5, agg:true,  hInv:2.5, vInv:2.5,
   hR:p=>rangeClasses(OPEN_PCT[p]||25),   vR:(p,w)=>rangeClasses(cap(30*w), 8*w)},
@@ -1900,13 +1925,17 @@ function analyze(inp){
 
   /* ---------- 프리플랍 ---------- */
   const p = handPct(cl);
-  const openP = OPEN_PCT[inp.pos]!==undefined ? OPEN_PCT[inp.pos] : 25;
+  const ST = hStyle();
+  const openStd = OPEN_PCT[inp.pos]!==undefined ? OPEN_PCT[inp.pos] : 25;
+  const openP = openPctFor(inp.pos);
+  const styleNote = ST.id==="std" || openP>=100 ? ""
+    : " (권장 스타일 <b>"+esc(ST.n)+"</b> — 표준 "+nfmt(openStd)+"% 를 "+nfmt(openP)+"% 로 잡았습니다)";
   const ip = ipVs(seats, inp.pos, inp.vpos);
-  res.pf = {cls:cl, pct:p, openPct:openP, ip:ip};
-  res.pf.rec = p <= openP*0.55 ? {a:"오픈 · 3벳 후보", why:"상위 "+nfmt(p)+"% 핸드입니다. "+inp.pos+"에서 충분히 강합니다."}
-             : p <= openP      ? {a:"오픈 (2.2~2.5BB)", why:inp.pos+" 표준 오픈 레인지(상위 "+openP+"%) 안에 들어옵니다."}
-             : p <= openP*1.3  ? {a:"경계선 — 상황에 따라", why:"표준 레인지 바로 바깥(상위 "+nfmt(p)+"%)입니다. 뒷사람이 타이트하면 오픈, 공격적이면 폴드."}
-             :                   {a:"폴드", why:inp.pos+"에서 상위 "+nfmt(p)+"% 핸드는 넓습니다. 표준은 "+openP+"%까지입니다."};
+  res.pf = {cls:cl, pct:p, openPct:openP, openStd:openStd, style:ST.id, ip:ip};
+  res.pf.rec = p <= openP*0.55 ? {a:"오픈 · 3벳 후보", why:"상위 "+nfmt(p)+"% 핸드입니다. "+inp.pos+"에서 충분히 강합니다."+styleNote}
+             : p <= openP      ? {a:"오픈 (2.2~2.5BB)", why:inp.pos+" 오픈 레인지(상위 "+nfmt(openP)+"%) 안에 들어옵니다."+styleNote}
+             : p <= openP*1.3  ? {a:"경계선 — 상황에 따라", why:"오픈 레인지 바로 바깥(상위 "+nfmt(p)+"%)입니다. 뒷사람이 타이트하면 오픈, 공격적이면 폴드."+styleNote}
+             :                   {a:"폴드", why:inp.pos+"에서 상위 "+nfmt(p)+"% 핸드는 넓습니다. 여기서는 "+nfmt(openP)+"%까지가 기준입니다."+styleNote};
   if(scen.id==="pf_only"){ res.pfOnly = true; return res; }
 
   /* 멀티웨이: 상대가 여러 명일 수 있다. agg = 액션을 넣은 상대, 나머지는 콜러로 본다. */
@@ -1916,8 +1945,9 @@ function analyze(inp){
   res.vils = vils.map((v,k)=>({pos:v.pos, vt:vtOf(k)}));
   res.nV = nV; res.aggI = aggI;
   const B0 = 1/(nV+1);                       // 아무 우위 없을 때의 승률
-  const T_RAISE = Math.min(0.95, B0*1.44), T_BIG = Math.min(0.92, B0*1.40),
-        T_THIN  = Math.min(0.85, B0*1.12), T_CHK = B0*0.88;
+  /* 권장 스타일이 밸류·콜 문턱을 함께 움직인다 (타이트하면 더 확실할 때만 친다) */
+  const T_RAISE = Math.min(0.95, B0*1.44*ST.thr), T_BIG = Math.min(0.92, B0*1.40*ST.thr),
+        T_THIN  = Math.min(0.85, B0*1.12*ST.thr), T_CHK = B0*0.88;
 
   let vilR = vils.map((v,k)=>expandRange(scen.vR(v.pos, vtOf(k).w), hole));
   res.pf.vilClasses = scen.vR(vils[aggI].pos, vtOf(aggI).w);
@@ -1983,7 +2013,7 @@ function analyze(inp){
         why.push("승률 "+pct(eq)+"는 상대 콜 레인지 상대로도 앞섭니다. 여기서 안 키우면 리버에서 팟이 작아집니다."); }
       else if(edge>=0.06){ rec="콜"; kind="call"; freq="콜 100%";
         why.push("필요 승률 "+pct(reqE)+"보다 실제 승률 "+pct(eq)+"가 "+Math.round(edge*100)+"%p 높습니다. 명확한 콜입니다."); }
-      else if(edge>=-0.02){ rec="콜 (경계선)"; kind="marginal"; freq="콜 60~70% / 폴드 30~40%";
+      else if(edge>=ST.marg){ rec="콜 (경계선)"; kind="marginal"; freq="콜 60~70% / 폴드 30~40%";
         why.push("필요 "+pct(reqE)+" vs 실제 "+pct(eq)+" — 거의 동전 던지기입니다. 상대가 블러프를 많이 하면 콜, 얌전하면 폴드."); }
       else if((dr.fd||dr.oesd) && spr>=2.2 && i<2){ rec="세미블러프 레이즈 또는 콜"; kind="semibluff"; size=Math.round(vSize*2.8*10)/10;
         freq="레이즈 40% / 콜 40% / 폴드 20%";
@@ -2603,6 +2633,22 @@ function renderActs(){
   if(c) c.onclick = ()=>{ HI.seq = []; buildHandInputs(); };
 }
 
+/* 권장 스타일 고르개. 세션 세팅과 레인지 표 양쪽에 같은 값을 그린다. */
+function renderStylePick(){
+  const cur = hStyle();
+  document.querySelectorAll("[data-stylepick]").forEach(box=>{
+    box.innerHTML = HSTYLES.map(x=>'<button data-st="'+x.id+'" class="'+(cur.id===x.id?"on":"")+'">'+esc(x.n)+'</button>').join("");
+    box.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+      DB.set("hstyle", b.dataset.st);
+      buildHandInputs();
+      const out = document.getElementById("h-out");
+      if(out && out.innerHTML.trim()) runAnalysis();     // 결과가 떠 있으면 바로 다시 계산
+    });
+  });
+  const d = document.getElementById("s-style-d");
+  if(d) d.textContent = cur.d;
+}
+
 /* 접힌 세션 세팅 줄에 지금 값을 요약해 둔다 — 펴지 않아도 무엇으로 계산 중인지 보이게 */
 function renderSessLine(){
   const el = document.getElementById("sess-line");
@@ -2612,7 +2658,8 @@ function renderSessLine(){
   const seats = {2:"헤즈업", 6:"6맥스", 9:"9맥스"}[+g("s-seats").value] || g("s-seats").value+"인";
   const ante = +g("s-ante").value || 0;
   el.textContent = [gt, seats, (+g("s-stack").value||100)+"BB",
-                    g("s-bl").value, ante>0 ? "앤티 "+nfmt(ante)+"BB" : null]
+                    g("s-bl").value, ante>0 ? "앤티 "+nfmt(ante)+"BB" : null,
+                    "권장 "+hStyle().n]
                    .filter(Boolean).join(" · ");
 }
 /* ---- 포지션별 레인지 참고표 ----
@@ -2662,30 +2709,36 @@ function renderRangeRef(){
     '</div></div>'+
     '<div style="flex:0 1 240px"><label>상대 성향</label><select id="rng-vt">'+
       Object.keys(VTYPE).map(k=>'<option value="'+k+'"'+(RNG.vt===k?" selected":"")+'>'+esc(VTYPE[k].n)+'</option>').join("")+
-    '</select></div></div>'+
+    '</select></div>'+
+    '<div style="flex:0 0 auto"><label>내 권장 스타일</label>'+
+      '<div class="bg" data-stylepick="1" style="display:flex"></div></div></div>'+
     '<div class="small dim" style="margin-top:6px">'+esc(sit.d)+'</div>';
 
   if(RNG.sit === "open"){
     /* 오픈 레인지만 자리에 따라 달라진다 */
     h += '<div class="scrollx" style="margin-top:11px"><table class="rngtbl"><tr>'+
-      '<th>자리</th><th>레인지</th><th>조합</th><th>어떤 핸드까지</th><th></th></tr>'+
+      '<th>자리</th><th>상대가 들고 올 폭</th><th>조합</th><th>내가 들어갈 폭</th>'+
+      '<th>어떤 핸드까지</th><th></th></tr>'+
       L.map(p=>{
         if(!canOpen(p))
           return '<tr class="rdim"><td><b>'+esc(p)+'</b></td>'+
-            '<td colspan="4" class="small dim">뒤에 아무도 없어 «먼저 들어오는» 자리가 아닙니다 — '+
+            '<td colspan="5" class="small dim">뒤에 아무도 없어 «먼저 들어오는» 자리가 아닙니다 — '+
             '앞에서 올라온 것을 받을지 말지의 문제입니다.</td></tr>';
         const cls = rngFor(p, "open", RNG.vt), pctv = rngPct(cls), open = RNG.open === p;
+        const mine = openPctFor(p);
         return '<tr'+(open?' class="on"':'')+'>'+
           '<td><b>'+esc(p)+'</b></td>'+
           '<td><div class="rbar"><i style="width:'+Math.min(100, pctv).toFixed(1)+'%"></i></div>'+
             '<span class="rpc">'+nfmt(pctv)+'%</span></td>'+
           '<td>'+rngCombos(cls)+'개</td>'+
-          '<td class="rex">'+cls.slice(0,10).map(c=>'<span>'+esc(c)+'</span>').join("")+
-            (cls.length>10 ? '<span class="more">… +'+(cls.length-10)+'</span>' : '')+'</td>'+
+          '<td><span class="rpc rme">'+nfmt(mine)+'%</span></td>'+
+          '<td class="rex">'+cls.slice(0,8).map(c=>'<span>'+esc(c)+'</span>').join("")+
+            (cls.length>8 ? '<span class="more">… +'+(cls.length-8)+'</span>' : '')+'</td>'+
           '<td><button class="btn sec sm" data-grid="'+esc(p)+'">'+(open?"접기":"펼치기")+'</button></td>'+
         '</tr>'+
-        (open ? '<tr class="rgridrow"><td colspan="5">'+
-          rngGridBlock(cls, esc(p)+' 자리에서 먼저 들어올 때의 레인지입니다.', null)+'</td></tr>' : '');
+        (open ? '<tr class="rgridrow"><td colspan="6">'+
+          rngGridBlock(cls, esc(p)+' 자리 상대가 먼저 들어올 때의 레인지입니다.',
+            "«내가 들어갈 폭»은 권장 스타일이 정합니다 — 상대를 읽는 값과는 별개입니다.")+'</td></tr>' : '');
       }).join("") + '</table></div>';
   } else {
     /* 엔진이 이 상황에서는 자리를 보지 않는다 — 자리별로 나눠 놓으면 같은 표가 여섯 줄 반복될 뿐이다 */
@@ -2709,9 +2762,16 @@ function renderRangeRef(){
     RNG.open = (RNG.open === b.dataset.grid) ? null : b.dataset.grid;
     renderRangeRef();
   });
+  /* 이 카드를 다시 그릴 때마다 스타일 고르개도 다시 채운다 —
+     안 그러면 성향을 바꾸거나 그리드를 펼쳤을 때 버튼이 빈 채로 남는다. */
+  renderStylePick();
 }
 
-function buildHandInputs(){ syncTarget(); renderSessLine(); renderHole(); renderSeats(); renderVT(); renderActs(); renderRangeRef(); }
+/* 스타일 고르개는 레인지 표 안에도 그려지므로 그 카드를 만든 뒤에 붙인다 */
+function buildHandInputs(){
+  syncTarget(); renderSessLine(); renderHole(); renderSeats(); renderVT(); renderActs(); renderRangeRef();
+  renderStylePick();
+}
 
 function readHandInput(){
   if(HI.c.h0==null || HI.c.h1==null) return {err:"내 홀카드 2장을 골라주세요."};

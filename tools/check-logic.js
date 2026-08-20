@@ -606,6 +606,79 @@ group('포지션별 레인지');
   ok(rngFor('BTN', 'open', 'unknown').includes('AA'), '넓은 레인지에도 AA 는 들어 있다');
 }
 
+/* ───────────────── 권장 플레이 스타일 ───────────────── */
+group('권장 스타일');
+{
+  const { HSTYLES, hStyle, openPctFor, OPEN_PCT, DB, analyze, rngFor, rngPct } = app;
+  ok(Array.isArray(HSTYLES) && HSTYLES.length === 3, '스타일 3단계 (타이트·표준·넓게)');
+  ok(HSTYLES.every((x) => x.id && x.n && x.d), '스타일마다 이름·설명이 있다');
+
+  ctx.localStorage.clear();
+  ok(hStyle().id === 'tight', '기본값은 타이트', hStyle().id);
+
+  // 타이트가 표준보다 좁고, 넓게가 표준보다 넓다
+  const at = (st, pos) => { DB.set('hstyle', st); return openPctFor(pos); };
+  for (const pos of ['UTG', 'HJ', 'CO', 'BTN', 'SB']) {
+    const t = at('tight', pos), s = at('std', pos), l = at('loose', pos);
+    ok(t < s && s < l, `${pos}: 타이트 ${t}% < 표준 ${s}% < 넓게 ${l}%`);
+    ok(Math.abs(s - OPEN_PCT[pos]) < 0.1, `${pos}: 표준은 OPEN_PCT 그대로 (${s}% vs ${OPEN_PCT[pos]}%)`);
+  }
+  // BB 는 공짜로 보는 자리라 좁히지 않는다
+  ok(at('tight', 'BB') === 100 && at('loose', 'BB') === 100, 'BB 는 어느 스타일에서도 100%');
+
+  // 자리 순서는 어느 스타일에서도 유지된다
+  for (const st of ['tight', 'std', 'loose']) {
+    DB.set('hstyle', st);
+    const seq2 = ['UTG', 'HJ', 'CO', 'BTN'];
+    let up = true;
+    for (let i = 1; i < seq2.length; i++) if (!(openPctFor(seq2[i]) > openPctFor(seq2[i - 1]))) up = false;
+    ok(up, `${st}: 자리가 늦을수록 넓다`);
+  }
+
+  // 상대 레인지를 읽는 값은 스타일과 무관해야 한다 (내 플레이 기준일 뿐)
+  DB.set('hstyle', 'tight');
+  const vTight = rngPct(rngFor('CO', 'open', 'unknown'));
+  DB.set('hstyle', 'loose');
+  const vLoose = rngPct(rngFor('CO', 'open', 'unknown'));
+  ok(Math.abs(vTight - vLoose) < 1e-9,
+    '권장 스타일은 상대 레인지 읽기를 바꾸지 않는다', `${vTight} vs ${vLoose}`);
+
+  // 실제 분석에서 타이트가 더 적게 친다
+  const R = '23456789TJQKA', SU = 'shdc';
+  const C = (x) => R.indexOf(x[0]) * 4 + SU.indexOf(x[1]);
+  const mk = () => ({
+    seats: 6, gt: 'cash', stack: 100, pos: 'BTN', vpos: 'BB', pf: 'open_call',
+    vt: 'unknown', vils: [{ pos: 'BB', vt: 'unknown' }], agg: 0,
+    hole: [C('9h'), C('9d')], flop: [C('Ks'), C('7d'), C('2c')], turn: [], river: [],
+    board: [C('Ks'), C('7d'), C('2c')],
+    acts: [{ v: 'check', vs: 0, m: 'check', ms: 0 }, {}, {}],
+  });
+  DB.set('hstyle', 'tight');
+  const rt = analyze(mk()).streets[0];
+  DB.set('hstyle', 'loose');
+  const rl = analyze(mk()).streets[0];
+  // 승률은 몬테카를로라 표본만큼 흔들린다. 스타일이 승률을 «바꾸는» 수준인지만 본다.
+  ok(Math.abs(rt.eq - rl.eq) < 0.02,
+    '승률 자체는 스타일과 무관하다 (계산이지 취향이 아니다)',
+    `타이트 ${(rt.eq * 100).toFixed(1)}% vs 넓게 ${(rl.eq * 100).toFixed(1)}%`);
+  const aggr = (r) => /벳|레이즈/.test(r.rec);
+  ok(!(aggr(rt) && !aggr(rl)) , `같은 스팟에서 타이트가 더 공격적이면 안 된다 (타이트 "${rt.rec}" / 넓게 "${rl.rec}")`);
+
+  // 프리플랍 권장: 타이트에서 더 자주 접는다
+  const pfWith = (st, hole) => {
+    DB.set('hstyle', st);
+    const inp = Object.assign(mk(), { hole: hole.map(C), pf: 'pf_only', flop: [], board: [] });
+    return analyze(inp).pf;
+  };
+  const marginal = ['9h', '7d'];   // 97o — BTN 표준 레인지 언저리
+  const pt = pfWith('tight', marginal), pl = pfWith('loose', marginal);
+  ok(pt.openPct < pl.openPct, `타이트가 오픈 기준을 좁게 잡는다 (${pt.openPct}% vs ${pl.openPct}%)`);
+  ok(pt.style === 'tight' && pl.style === 'loose', '결과에 어떤 스타일로 계산했는지 실린다');
+  ok(pt.openStd === OPEN_PCT.BTN, '표준값도 함께 실어 비교할 수 있다');
+
+  DB.set('hstyle', 'tight');
+}
+
 /* ───────────────── 대회 프로필 · 주간 일정 ───────────────── */
 group('대회 프로필');
 {

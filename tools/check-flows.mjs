@@ -277,12 +277,17 @@ group('포지션별 레인지');
   ok(/뒤에 아무도 없어/.test(t), 'BB 는 먼저 들어올 자리가 아니라고 설명한다');
 
   // 자리가 늦을수록 넓어진다
-  const pcts = await page.evaluate(() =>
-    [...document.querySelectorAll('#rng-ref .rngtbl .rpc')].map((e) => parseFloat(e.textContent)));
-  ok(pcts.length >= 4, '레인지 %가 자리마다 표시된다', pcts.join(', '));
-  let up = true;
-  for (let i = 1; i < 4; i++) if (!(pcts[i] > pcts[i - 1])) up = false;
-  ok(up, '자리가 늦을수록 % 가 커진다', pcts.join(' → '));
+  const readPcts = (sel) => page.evaluate((s) =>
+    [...document.querySelectorAll(s)].map((e) => parseFloat(e.textContent)), sel);
+  const vil = await readPcts('#rng-ref .rngtbl .rpc:not(.rme)');
+  const mine = await readPcts('#rng-ref .rngtbl .rpc.rme');
+  ok(vil.length >= 4, '상대 레인지 %가 자리마다 표시된다', vil.join(', '));
+  ok(mine.length === vil.length, '내가 들어갈 폭도 자리마다 표시된다', mine.join(', '));
+  const rising = (a) => a.slice(0, 4).every((v, i, arr) => i === 0 || v > arr[i - 1]);
+  ok(rising(vil), '상대 레인지: 자리가 늦을수록 % 가 커진다', vil.join(' → '));
+  ok(rising(mine), '내 레인지: 자리가 늦을수록 % 가 커진다', mine.join(' → '));
+  ok(mine.every((m, i) => m < vil[i]), '기본 스타일(타이트)에서는 내 폭이 상대 표준보다 좁다',
+    mine.map((m, i) => `${m}<${vil[i]}`).join(' '));
 
   // 그리드 펼치기
   await page.click('[data-grid="BTN"]');
@@ -304,6 +309,21 @@ group('포지션별 레인지');
   ok(after < before, `타이트한 상대를 고르면 좁아진다 (${before}% → ${after}%)`);
   await page.selectOption('#rng-vt', 'unknown');
   await page.waitForTimeout(250);
+
+  // 권장 스타일을 바꾸면 «내가 들어갈 폭»만 움직이고 상대 읽기는 그대로
+  const styleBtns = page.locator('#rng-ref [data-stylepick] button');
+  ok(await styleBtns.count() === 3, '레인지 표에도 스타일 고르개가 있다');
+  const vilBefore = await readPcts('#rng-ref .rngtbl .rpc:not(.rme)');
+  const mineBefore = await readPcts('#rng-ref .rngtbl .rpc.rme');
+  await styleBtns.filter({ hasText: '넓게' }).click();
+  await page.waitForTimeout(320);
+  const vilAfter = await readPcts('#rng-ref .rngtbl .rpc:not(.rme)');
+  const mineAfter = await readPcts('#rng-ref .rngtbl .rpc.rme');
+  ok(mineAfter[0] > mineBefore[0], `넓게로 바꾸면 내 폭이 넓어진다 (${mineBefore[0]}% → ${mineAfter[0]}%)`);
+  ok(JSON.stringify(vilAfter) === JSON.stringify(vilBefore),
+    '스타일을 바꿔도 상대 레인지 읽기는 그대로다', `${vilBefore.join(',')} vs ${vilAfter.join(',')}`);
+  await styleBtns.filter({ hasText: '타이트' }).click();
+  await page.waitForTimeout(300);
 
   // 콜 · 3벳은 자리별로 나누지 않는다
   await page.locator('#rng-sit button').filter({ hasText: '3벳' }).click();

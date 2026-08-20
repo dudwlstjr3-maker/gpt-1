@@ -5741,6 +5741,26 @@ function renderRec(){
       '</table></div></div>';
   }
 
+  /* 연습 누적 — 드릴 말고 «핸드 분석»으로 쌓은 것 */
+  {
+    const hands = DB.get("hands", []);
+    const p = getProfile();
+    if(hands.length){
+      const tot = hands.reduce((a,x)=>a + (x.streets||[]).reduce((b,s)=>b + (s.evLoss||0), 0), 0);
+      const tc = {};
+      hands.forEach(x=>(x.streets||[]).forEach(s=>(s.tags||[]).forEach(t=>tc[t] = (tc[t]||0) + 1)));
+      const top = Object.keys(tc).sort((x,y)=>tc[y] - tc[x])[0];
+      h += '<div class="card"><h2>연습 누적 <span class="small dim">— 핸드 분석으로 쌓은 것</span></h2>' +
+        '<div class="facts">' +
+        fact("복기 핸드", hands.length + "개", "") +
+        fact("핸드당 EV 손실", nfmt(tot / hands.length, 2) + " BB", "권장 액션 대비") +
+        fact("최다 리크", top || "-", top ? tc[top] + "회" : "") +
+        fact("성향 진단", p ? "완료" : "아직", p ? "핸드 분석에 반영 중" : "먼저 해두면 좋습니다") +
+        '</div><div style="margin-top:10px">' +
+        '<button class="btn sec sm" onclick="go(\'stats\')">리크 자세히 보기</button></div></div>';
+    }
+  }
+
   /* 기록 추가 */
   const pf = recPrefill();
   h += '<div class="card"><h2>출전 기록 남기기</h2>';

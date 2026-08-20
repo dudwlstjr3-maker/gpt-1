@@ -371,6 +371,12 @@ for (const vp of WIDTHS) {
     recAdd({ at: Date.parse('2026-04-03T12:00'), name: '이름이 아주아주 긴 대회 이름입니다', place: 0, field: 0, buyins: 1, spent: 10000, prize: 0 });
     // 등급이 매겨질 만큼의 드릴 표본
     DB.set('drills', [{ at: Date.now(), n: 60, ok: 39, loss: 22, passive: 9, aggro: 4 }]);
+    // 연습 누적 카드가 그려지도록 핸드도 (저장 코드가 만드는 모양 그대로)
+    DB.set('hands', [{
+      at: Date.now(), cls: 'AQs', pos: 'BTN', vpos: 'BB', pf: 'open', vt: '스테이션',
+      hole: ['As', 'Qs'], board: ['Ks', '7h', '2d'],
+      streets: [{ n: '플랍', rec: '벳', my: '체크', eq: 0.55, evLoss: 0.4, tags: ['소극적'] }]
+    }]);
     go('rec');
   });
   await page.waitForTimeout(300);

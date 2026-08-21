@@ -242,9 +242,10 @@ group('블라인드 사다리');
       shown.length ? shown[shown.length - 1].join('/') : '없음');
     if (ante) ok(shown[2][2] === 600, `${label}: 레벨 표 3레벨 앤티 칸이 600`, String(shown[2][2]));
     // 전광판에도
-    ok(/100\s*\/\s*200/.test(await txt('.bblind')), `${label}: 전광판 1레벨이 100/200`,
-      (await txt('.bblind')).replace(/\n/g, ' | ').slice(0, 100));
-    ok(ante ? /ANTE/.test(await txt('.bblind')) : true, `${label}: 앤티 줄 표시`);
+    ok(/100\s*\/\s*200/.test(await txt('.bba')), `${label}: 전광판 1레벨이 100/200`,
+      (await txt('.bba')).replace(/\n/g, ' | ').slice(0, 100));
+    ok(/ANTE/.test(await txt('.bba')), `${label}: BLINDS 옆에 ANTE 칸이 있다`,
+      (await txt('.bba')).replace(/\n/g, ' | '));
   }
 
   await page.evaluate(() => localStorage.removeItem('hb.td'));
@@ -357,7 +358,7 @@ group('진행');
           if (boxed && !onlyLeft) out.push(el.className || el.tagName);
         }
       };
-      check('.tdwrap, .bhead, .bblind, .bprize, .bstats > div, .bmini .mi');
+      check('.tdwrap, .bhead, .bbody, .bcol, .bcenter, .bregbox, .bba, .bb1');
       const wrap = getComputedStyle(scope);
       if ((parseFloat(wrap.borderTopWidth) || 0) > 0) out.push('전광판 바깥테두리');
       return out;
@@ -511,23 +512,64 @@ group('진행');
     ok(Math.abs(game.cx - mid) < 24, '대회명이 전광판 한가운데에 온다',
       `대회명 중심 ${game.cx}px · 전광판 중심 ${mid}px`);
 
-    // 레지·휴식은 멀리서도 읽히게
-    const mv = await page.locator('.bmini .mv').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
-    ok(mv >= 24, '레지 마감·휴식 숫자가 24px 이상으로 커졌다', `${mv}px`);
+    // 레지 마감은 머리 오른쪽에, 휴식은 오른쪽 정보 칸에 — 둘 다 멀리서 읽히게
+    const reg = await page.locator('#td-toreg').evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    ok(reg >= 24, '레지 마감 숫자가 24px 이상', `${reg}px`);
+    const brk = await page.locator('#td-tobreak').evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    ok(brk >= 20, '다음 휴식 숫자가 20px 이상', `${brk}px`);
 
     // 블라인드가 상자 한가운데에, 상자 밖으로 안 새고
-    const bl = await page.locator('.bblind').evaluate((e) => {
-      const b = e.getBoundingClientRect();
-      const v = e.querySelector('.blindvals').getBoundingClientRect();
-      const lv = e.querySelector('.lvrow').getBoundingClientRect();
-      return { boxCx: b.left + b.width / 2, valCx: v.left + v.width / 2,
-        lvTop: lv.top, boxTop: b.top, over: e.scrollHeight - e.clientHeight };
+    // 참고한 전광판처럼 BLINDS 와 ANTE 가 한 줄에 나란히, 가운데 칸 중심에 놓인다
+    const bl = await page.evaluate(() => {
+      const c = document.querySelector('.bcenter').getBoundingClientRect();
+      const ba = document.querySelector('.bba').getBoundingClientRect();
+      const cells = [...document.querySelectorAll('.bb1')].map((e) => {
+        const r = e.getBoundingClientRect();
+        return { top: Math.round(r.top), k: e.querySelector('.k').textContent.trim() };
+      });
+      const clk = document.getElementById('td-time').getBoundingClientRect();
+      return { cCx: c.left + c.width / 2, baCx: ba.left + ba.width / 2, cells,
+        clkCx: clk.left + clk.width / 2 };
     });
-    ok(Math.abs(bl.valCx - bl.boxCx) < 12, '블라인드 숫자가 상자 한가운데에 온다',
-      `숫자 중심 ${Math.round(bl.valCx)} · 상자 중심 ${Math.round(bl.boxCx)}`);
-    ok(bl.lvTop >= bl.boxTop - 1, '레벨 표시가 상자 위로 새어 나가지 않는다',
-      `레벨 ${Math.round(bl.lvTop)} · 상자 ${Math.round(bl.boxTop)}`);
-    ok(bl.over <= 1, '블라인드 상자 안에 내용이 다 들어간다', `${bl.over}px 넘침`);
+    ok(bl.cells.length === 2, 'BLINDS 와 ANTE 두 칸', bl.cells.map((x) => x.k).join(' · '));
+    ok(bl.cells.length === 2 && bl.cells[0].top === bl.cells[1].top,
+      'BLINDS 와 ANTE 가 한 줄에 나란히', bl.cells.map((x) => x.top).join(' vs '));
+    ok(Math.abs(bl.baCx - bl.cCx) < 12, '블라인드 줄이 가운데 칸 중심에 온다',
+      `${Math.round(bl.baCx)} vs ${Math.round(bl.cCx)}`);
+    ok(Math.abs(bl.clkCx - bl.cCx) < 12, '시계도 가운데 칸 중심에 온다',
+      `${Math.round(bl.clkCx)} vs ${Math.round(bl.cCx)}`);
+
+    // 세 단 배치 — 상금(왼쪽) · 시계(가운데) · 정보(오른쪽)
+    {
+      const cols = await page.evaluate(() => {
+        const g = (s) => { const e = document.querySelector(s); if (!e) return null;
+          const r = e.getBoundingClientRect(); return Math.round(r.left + r.width / 2); };
+        return { prize: g('.bprize'), center: g('.bcenter'), stat: g('.bstat') };
+      });
+      ok(cols.prize !== null && cols.center !== null && cols.stat !== null, '세 단이 다 있다');
+      ok(cols.prize < cols.center && cols.center < cols.stat,
+        '왼쪽 상금 · 가운데 시계 · 오른쪽 정보 순서다',
+        `${cols.prize} < ${cols.center} < ${cols.stat}`);
+    }
+    // 오른쪽 정보 항목
+    {
+      const keys = await page.locator('.bstat .k').allInnerTexts();
+      for (const want of ['PLAYERS', 'TOTAL TIME', 'TOTAL STACK', 'AVG STACK', 'NEXT BREAK'])
+        ok(keys.some((k) => k.trim() === want), `오른쪽에 ${want} 가 있다`, keys.join(' · '));
+    }
+    // 경과 시간이 실제로 흐른다
+    {
+      const el = () => page.locator('#td-elapsed').innerText();
+      // −30초 는 «남은 시간» 을 깎으므로 경과가 30초 늘어난다 (+30초 는 그 반대)
+      const before = await el();
+      await page.click('#td-m30');
+      await page.waitForTimeout(300);
+      ok(await el() !== before, '남은 시간을 깎으면 TOTAL TIME 이 그만큼 늘어난다',
+        `${before} → ${await el()}`);
+      await page.click('#td-p30');
+      await page.waitForTimeout(300);
+      ok(await el() === before, '되돌리면 원래대로', `${await el()} vs ${before}`);
+    }
   }
 
   // ── 접기 / 펴기 — 상금 배분과 레벨 표가 같은 방식·같은 자리

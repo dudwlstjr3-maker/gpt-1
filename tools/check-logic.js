@@ -226,6 +226,9 @@ group('토너먼트');
         }
       }
       ok(!bad, `${id}: 블라인드가 100/200 → 5000/10000 까지 표 그대로`, bad);
+      ok(t.min === 7, `${id}: 레벨 시간 7분 (매장 확인)`, String(t.min));
+      ok(lv.every((x) => x.min === 7), `${id}: 모든 레벨이 7분`,
+        [...new Set(lv.map((x) => x.min))].join(','));
       ok(lv.length === WANT.length, `${id}: 5000/10000 에서 끝난다`, `${lv.length}레벨`);
 
       // 앤티 — 싯앤고는 없고, 몬스터·리그는 3레벨부터 BB 와 같은 금액

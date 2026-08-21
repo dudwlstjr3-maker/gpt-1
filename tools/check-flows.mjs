@@ -195,6 +195,28 @@ group('로고');
   await page.evaluate(() => { DB.del('logo'); renderTour(); });
   await page.waitForTimeout(300);
 
+  // 파이널나인 로고가 처음부터 들어 있다
+  ok(await page.evaluate(() => tdLogo().startsWith('data:image/')),
+    '아무것도 안 올려도 기본 로고가 들어 있다', (await page.evaluate(() => tdLogo())).slice(0, 30));
+  ok(await page.evaluate(() => tdLogoIsDefault()) === true, '그게 파이널나인 기본 로고다');
+  ok(await page.locator('.lgprev img').count() === 1, '설정 화면에 로고 미리보기가 뜬다');
+  ok(await page.locator('#td-logo-def').count() === 0, '기본 로고 상태에서는 «기본으로» 버튼이 없다');
+
+  // 지우면 진짜로 없어져야 한다 — 지웠는데 기본이 되살아나면 못 지운다
+  await page.click('#td-logo-del');
+  await page.waitForTimeout(350);
+  ok(await page.evaluate(() => tdLogo()) === '', '지우면 로고가 없어진다');
+  ok(await page.locator('.lgnone').count() === 1, '«로고 없음» 이 뜬다');
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+  ok(await page.evaluate(() => tdLogo()) === '', '새로고침해도 지운 상태가 유지된다 (기본이 되살아나지 않는다)');
+
+  // 되돌리기
+  ok(await page.locator('#td-logo-def').count() === 1, '지운 뒤엔 «파이널나인 기본 로고» 버튼이 나온다');
+  await page.click('#td-logo-def');
+  await page.waitForTimeout(350);
+  ok(await page.evaluate(() => tdLogoIsDefault()) === true, '기본 로고로 되돌릴 수 있다');
+
   ok(await page.locator('#td-logo-url').count() === 1, '이미지 주소를 넣는 칸이 있다');
   ok(await page.locator('#td-logo-pick').count() === 1, '파일에서 고르는 버튼도 있다');
   ok(/Ctrl\+V|복사/.test(await txt('.logobox')), '복사한 이미지를 붙여넣는 방법이 적혀 있다',
@@ -228,8 +250,8 @@ group('로고');
     ok(Math.abs(c) < 24, '로고가 있어도 대회명은 화면 한가운데', `${c}px 어긋남`);
   }
 
-  // 로고를 지워도 가운데 그대로여야 한다
-  await page.evaluate(() => { DB.del('logo'); renderTour(); });
+  // 로고를 지워도 가운데 그대로여야 한다 (빈 값이 «없음», del 은 기본 로고로 되돌리기)
+  await page.evaluate(() => { DB.set('logo', ''); renderTour(); });
   await page.waitForTimeout(400);
   ok(await page.locator('.blogo img').count() === 0, '지우면 로고가 사라진다');
   {
@@ -241,9 +263,11 @@ group('로고');
     ok(Math.abs(c) < 24, '로고가 없어도 대회명은 같은 자리 — 가운데', `${c}px 어긋남`);
   }
 
-  await page.evaluate(() => { localStorage.removeItem('hb.td'); });
+  // 다음 검사를 위해 기본 로고 상태로 되돌린다
+  await page.evaluate(() => { DB.del('logo'); localStorage.removeItem('hb.td'); });
   await page.reload({ waitUntil: 'networkidle' });
   await tab('tour');
+  ok(await page.evaluate(() => tdLogoIsDefault()) === true, '기본 로고 상태로 되돌아왔다');
 }
 
 /* ─────────── 진행 줄 ─────────── */
@@ -253,6 +277,30 @@ group('진행');
   await page.click('#td-quick');
   await page.waitForTimeout(600);
   ok(await page.locator('#td-screen').count() === 1, '대회를 시작하면 전광판이 뜬다');
+
+  // 전광판은 네모 칸 없이 한 화면으로 읽혀야 한다
+  {
+    const boxes = await page.evaluate(() => {
+      const out = [];
+      const scope = document.getElementById('td-screen');
+      const check = (sel) => {
+        for (const el of scope.querySelectorAll(sel)) {
+          const cs = getComputedStyle(el);
+          const w = ['Top', 'Right', 'Bottom', 'Left'].map((s) => parseFloat(cs['border' + s + 'Width']) || 0);
+          // 구역을 나누는 세로선 하나(왼쪽만)는 테두리가 아니라 구분선으로 본다
+          const onlyLeft = w[3] > 0 && w[0] === 0 && w[1] === 0 && w[2] === 0;
+          const boxed = w.filter((x) => x > 0).length >= 2;
+          if (boxed && !onlyLeft) out.push(el.className || el.tagName);
+        }
+      };
+      check('.tdwrap, .bhead, .bblind, .bprize, .bstats > div, .bmini .mi');
+      const wrap = getComputedStyle(scope);
+      if ((parseFloat(wrap.borderTopWidth) || 0) > 0) out.push('전광판 바깥테두리');
+      return out;
+    });
+    ok(boxes.length === 0, '전광판에 네모 테두리가 없다', boxes.join(', '));
+  }
+  ok(await page.locator('.blogo img').count() === 1, '전광판에 기본 로고가 뜬다');
 
   // 없앤 것들이 정말 없는지
   ok(await page.locator('.tdboard').count() === 0, '전광판 꾸미기 카드가 없다');

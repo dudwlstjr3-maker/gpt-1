@@ -244,8 +244,26 @@ group('블라인드 사다리');
     // 전광판에도
     ok(/100\s*\/\s*200/.test(await txt('.bba')), `${label}: 전광판 1레벨이 100/200`,
       (await txt('.bba')).replace(/\n/g, ' | ').slice(0, 100));
-    ok(/ANTE/.test(await txt('.bba')), `${label}: BLINDS 옆에 ANTE 칸이 있다`,
-      (await txt('.bba')).replace(/\n/g, ' | '));
+    {
+      const cells = await page.locator('.bb1').evaluateAll((es) => es.map((e) => ({
+        k: e.querySelector('.k').textContent.trim(),
+        top: Math.round(e.getBoundingClientRect().top) })));
+      if (ante) {
+        ok(cells.length === 2, `${label}: BLINDS 와 ANTE 두 칸`, cells.map((x) => x.k).join(' · '));
+        ok(cells.length === 2 && cells[0].top === cells[1].top,
+          `${label}: 두 칸이 한 줄에 나란히`, cells.map((x) => x.top).join(' vs '));
+      } else {
+        ok(cells.length === 1 && cells[0].k === 'BLINDS',
+          `${label}: 앤티가 없으니 BLINDS 한 칸만`, cells.map((x) => x.k).join(' · '));
+      }
+      // 어느 쪽이든 블라인드 줄은 가운데 칸 중심에 온다
+      const off = await page.evaluate(() => {
+        const c = document.querySelector('.bcenter').getBoundingClientRect();
+        const b = document.querySelector('.bba').getBoundingClientRect();
+        return Math.round((b.left + b.width / 2) - (c.left + c.width / 2));
+      });
+      ok(Math.abs(off) < 12, `${label}: 블라인드 줄이 가운데에 온다`, `${off}px 어긋남`);
+    }
   }
 
   await page.evaluate(() => localStorage.removeItem('hb.td'));
@@ -531,9 +549,9 @@ group('진행');
       return { cCx: c.left + c.width / 2, baCx: ba.left + ba.width / 2, cells,
         clkCx: clk.left + clk.width / 2 };
     });
-    ok(bl.cells.length === 2, 'BLINDS 와 ANTE 두 칸', bl.cells.map((x) => x.k).join(' · '));
-    ok(bl.cells.length === 2 && bl.cells[0].top === bl.cells[1].top,
-      'BLINDS 와 ANTE 가 한 줄에 나란히', bl.cells.map((x) => x.top).join(' vs '));
+    // 싯앤고는 앤티가 없으니 BLINDS 한 칸만 — 빈 칸이 있으면 블라인드가 가운데에서 밀린다
+    ok(bl.cells.length === 1 && bl.cells[0].k === 'BLINDS',
+      '앤티 없는 대회는 BLINDS 한 칸만', bl.cells.map((x) => x.k).join(' · '));
     ok(Math.abs(bl.baCx - bl.cCx) < 12, '블라인드 줄이 가운데 칸 중심에 온다',
       `${Math.round(bl.baCx)} vs ${Math.round(bl.cCx)}`);
     ok(Math.abs(bl.clkCx - bl.cCx) < 12, '시계도 가운데 칸 중심에 온다',

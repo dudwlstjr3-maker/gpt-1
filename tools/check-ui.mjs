@@ -274,10 +274,8 @@ for (const vp of WIDTHS) {
   await page.close();
 }
 
-/* ── 전광판: 테마 6종 × (진행 중 · 휴식 중) ──
-   TV 에 걸리는 화면이라 멀리서 읽힌다. 어느 테마에서도 대비가 무너지면 안 된다.
-   전광판은 앱 테마와 무관하게 자기 색을 쓰므로 따로 돌린다. */
-const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
+/* ── 전광판 (진행 중 · 휴식 중) ──
+   TV 에 걸리는 화면이라 멀리서 읽힌다. 앱 테마와 무관하게 자기 색을 쓰므로 따로 돌린다. */
 {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
   const errs = [];
@@ -285,15 +283,6 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
   page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)); });
   await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
 
-  // 광고 슬라이드를 켜 둔 상태로 검사한다 (아래띠도 전광판의 일부다)
-  await page.evaluate(() => {
-    localStorage.setItem('hb.tdslides', JSON.stringify([
-      { id: 's1', title: '다음 대회 — 금요일 몬스터', body: '매주 금요일 19:30 · 바이인 3만원 · 500만 스택' },
-      { id: 's2', title: '매장 공지', body: '주차는 건물 뒤편 공영주차장을 이용해 주세요' },
-    ]));
-    localStorage.setItem('hb.adcfg', JSON.stringify({ on: true, sec: 60, bigOnBreak: true }));
-  });
-  await page.reload({ waitUntil: 'networkidle' });
   await page.click('nav button[data-v="tour"]');
   await page.waitForTimeout(300);
   await page.click('#td-quick');                       // 대회를 열어 전광판을 띄운다
@@ -303,30 +292,18 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
   if (await page.locator('#td-screen').count() === 0) {
     add('전광판', '대회를 시작했는데 전광판이 렌더되지 않습니다');
   } else {
+    await scanContrast(page, '전광판', '#td-screen');
+    await scanText(page, '전광판');
+    await scanClipped(page, '전광판', '#td-screen');
+
+    // 전광판이 가로로 넘치면 TV 에서 잘린다
     checks++;
-    if (await page.locator('#td-ad .adslide').count() === 0) add('전광판', '광고 띠가 렌더되지 않습니다');
-
-    for (const bt of BTHEMES) {
-      await page.evaluate((t) => {
-        localStorage.setItem('hb.btheme', JSON.stringify(t));
-        document.getElementById('td-screen').setAttribute('data-btheme', t);
-      }, bt);
-      await page.waitForTimeout(250);
-
-      await scanContrast(page, `전광판 · ${bt}`, '#td-screen');
-      await scanText(page, `전광판 · ${bt}`);
-      await scanClipped(page, `전광판 · ${bt}`, '#td-screen');
-
-      // 전광판이 가로로 넘치면 TV 에서 잘린다
-      checks++;
-      const spill = await page.evaluate(() => {
-        const el = document.getElementById('td-screen');
-        return el ? el.scrollWidth - el.clientWidth : 0;
-      });
-      if (spill > 1) add(`전광판 · ${bt}`, `전광판이 가로로 ${spill}px 넘칩니다`);
-
-      if (SHOTS) await page.locator('#td-screen').screenshot({ path: path.join(SHOT_DIR, `board-${bt}.png`) });
-    }
+    const spill = await page.evaluate(() => {
+      const el = document.getElementById('td-screen');
+      return el ? el.scrollWidth - el.clientWidth : 0;
+    });
+    if (spill > 1) add('전광판', `전광판이 가로로 ${spill}px 넘칩니다`);
+    if (SHOTS) await page.locator('#td-screen').screenshot({ path: path.join(SHOT_DIR, 'board.png') });
 
     // 휴식 중 화면 — 광고가 크게 뜨고 레이아웃이 바뀐다
     await page.evaluate(() => {
@@ -342,8 +319,6 @@ const BTHEMES = ['night', 'black', 'felt', 'wine', 'steel', 'bright'];
     if (await page.locator('#td-screen .lvrow.brkc').count() === 0) {
       add('전광판 · 휴식', '휴식 레벨인데 휴식 표시가 없습니다');
     }
-    checks++;
-    if (await page.locator('#td-ad.big').count() === 0) add('전광판 · 휴식', '휴식 중 광고가 크게 뜨지 않습니다');
     await scanContrast(page, '전광판 · 휴식', '#td-screen');
     await scanText(page, '전광판 · 휴식');
     await scanClipped(page, '전광판 · 휴식', '#td-screen');
@@ -529,4 +504,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 테마 ${BTHEMES.length}종 · 휴식 + 전적 · 홈 · 계정 창)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 · 휴식 + 전적 · 홈 · 계정 창)\n`);

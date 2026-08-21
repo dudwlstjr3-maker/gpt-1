@@ -116,50 +116,64 @@ group('상금 사다리');
   await page.click('#td-quick');
   await page.waitForTimeout(600);
   ok(await page.locator('.ladbox').count() === 1, '상금 사다리 카드가 뜬다');
-  const on = await page.locator('#td-poolmode button.on').innerText();
-  ok(/사다리/.test(on), '상금 방식이 사다리로 켜져 있다', on);
 
-  // 세는 기준을 고르는 옵션은 없다 — 언제나 합산
-  ok(await page.locator('#td-lad-basis').count() === 0, '«엔트리만» 선택지는 없다 (항상 합산)');
-  ok(/엔트리\+리바이/.test(await txt('.ladbox')), '합산해서 센다고 화면에 쓰여 있다');
+  // 「모인 돈의 %」 방식은 없앴다 — 상금은 엔트리 개수로만 정한다
+  ok(await page.locator('#td-poolmode').count() === 0, '«모인 돈의 %» 방식 선택지가 없다');
+  ok(await page.locator('#td-poolpct').count() === 0, '비율 입력 칸이 없다');
+  ok(await page.locator('#td-lad-basis').count() === 0, '«엔트리만» 선택지도 없다 (항상 합산)');
 
-  // 9명 시작 → 9개 → 10만원
+  // 버튼은 둘 — 7엔트리당 10만원 / 3엔트리당 1만원
+  const ladq = page.locator('#td-ladq button');
+  ok(await ladq.count() === 2, '상금 버튼은 두 개', String(await ladq.count()));
+  const labels = await ladq.allInnerTexts();
+  ok(labels.some((t) => /7엔트리당 10만원/.test(t)), '「7엔트리당 10만원」 버튼', labels.join(' | '));
+  ok(labels.some((t) => /3엔트리당 1만원/.test(t)), '「3엔트리당 1만원」 버튼', labels.join(' | '));
+  ok(await page.locator('#td-ladq button.on').count() === 1, '지금 쓰는 값이 버튼에 표시된다');
+  ok(/7엔트리당 10만원/.test(await page.locator('#td-ladq button.on').innerText()),
+    '리그 프리셋은 7엔트리당 10만원으로 켜져 있다', await page.locator('#td-ladq button.on').innerText());
+
+  ok(/바이인과 리바이를 합친/.test(await txt('.ladbox')), '엔트리가 바이인+리바이라고 화면에 쓰여 있다');
+
+  // 9명 시작 → 9엔트리 → 10만원
   let lad = await txt('.ladbox');
-  ok(/9개/.test(lad), '엔트리+리바이 합계가 표시된다', lad.replace(/\n/g, ' | ').slice(0, 140));
-  ok(/10만원/.test(lad), '9개면 상금 10만원', lad.replace(/\n/g, ' | ').slice(0, 200));
+  ok(/9엔트리/.test(lad), '바이인+리바이 합계가 엔트리로 표시된다', lad.replace(/\n/g, ' | ').slice(0, 140));
+  ok(/10만원/.test(lad), '9엔트리면 상금 10만원', lad.replace(/\n/g, ' | ').slice(0, 200));
 
   // 구간표
   ok(await page.locator('.ladtbl tr.on').count() === 1, '지금 구간이 표에서 강조된다');
   const band = await txt('.ladtbl tr.on');
-  ok(/9~13/.test(band), '지금 구간은 9~13개', band.replace(/\n/g, ' '));
+  ok(/9~13/.test(band), '지금 구간은 9~13엔트리', band.replace(/\n/g, ' '));
 
   // 리바이를 늘리면 사다리가 올라간다
   for (let i = 0; i < 5; i++) { await page.click('#td-ops [data-act="r+"]'); await page.waitForTimeout(120); }
   await page.waitForTimeout(300);
   lad = await txt('.ladbox');
-  ok(/14개/.test(lad), '리바이 5개를 더하면 14개', lad.replace(/\n/g, ' | ').slice(0, 140));
-  ok(/20만원/.test(lad), '14개면 상금 20만원', lad.replace(/\n/g, ' | ').slice(0, 200));
+  ok(/14엔트리/.test(lad), '리바이 5개를 더하면 14엔트리', lad.replace(/\n/g, ' | ').slice(0, 140));
+  ok(/20만원/.test(lad), '14엔트리면 상금 20만원', lad.replace(/\n/g, ' | ').slice(0, 200));
 
   // 운영 카드 상금도 따라간다 (전광판 총 상금은 레지 마감 전까지 가려져 있다)
   const ops = await txt('#td-ops');
   ok(/20만원/.test(ops), '운영 카드 상금이 사다리를 따른다', ops.replace(/\n/g, ' | '));
-  ok(/사다리 14개/.test(ops), '상금 라벨이 비율이 아니라 사다리라고 알려준다', ops.replace(/\n/g, ' | '));
+  ok(/상금 \(14엔트리\)/.test(ops), '상금 라벨이 몇 엔트리 기준인지 알려준다', ops.replace(/\n/g, ' | '));
   ok(/레지 마감 후 공개|PRIZE/.test(await txt('#td-screen')), '전광판은 레지 마감 전까지 상금을 가린다');
 
-  // 설정을 바꾸면 반영된다
+  // 데일리 버튼 — 3엔트리당 1만원
+  await ladq.filter({ hasText: '3엔트리당 1만원' }).click();
+  await page.waitForTimeout(350);
+  ok(/4만원/.test(await txt('.ladbox')), '데일리로 바꾸면 14엔트리는 4만원 (3개당 1만원)',
+    (await txt('.ladbox')).replace(/\n/g, ' | ').slice(0, 200));
+  await ladq.filter({ hasText: '7엔트리당 10만원' }).click();
+  await page.waitForTimeout(350);
+  ok(/20만원/.test(await txt('.ladbox')), '다시 몬스터로 돌아온다',
+    (await txt('.ladbox')).replace(/\n/g, ' | ').slice(0, 200));
+
+  // 직접 고칠 수도 있다
   await page.fill('#td-lad-amt', '5'); await page.dispatchEvent('#td-lad-amt', 'change');
   await page.waitForTimeout(320);
-  ok(/10만원/.test(await txt('.ladbox')), '한 묶음을 5만원으로 바꾸면 14개는 10만원',
+  ok(/10만원/.test(await txt('.ladbox')), '한 묶음을 5만원으로 바꾸면 14엔트리는 10만원',
     (await txt('.ladbox')).replace(/\n/g, ' | ').slice(0, 200));
+  ok(await page.locator('#td-ladq button.on').count() === 0, '손으로 고치면 어느 버튼도 안 켜진다');
   await page.fill('#td-lad-amt', '10'); await page.dispatchEvent('#td-lad-amt', 'change');
-  await page.waitForTimeout(300);
-
-  // 비율 방식으로 되돌릴 수 있다
-  await page.locator('#td-poolmode button').filter({ hasText: '모인 돈' }).click();
-  await page.waitForTimeout(350);
-  ok(await page.locator('.ladbox').count() === 0, '비율 방식으로 바꾸면 사다리 카드가 사라진다');
-  ok(await page.locator('#td-poolpct').count() === 1, '비율 입력이 돌아온다');
-  await page.locator('#td-poolmode button').filter({ hasText: '사다리' }).click();
   await page.waitForTimeout(300);
 
   // 새로고침해도 유지
@@ -173,118 +187,84 @@ group('상금 사다리');
   await tab('tour');
 }
 
-/* ─────────── 내 스택 ─────────── */
-group('내 스택');
+/* ─────────── 진행 줄 ─────────── */
+group('진행');
 {
   await tab('tour');
-  await page.click('#td-quick');
-  await page.waitForTimeout(600);
-
-  ok(await page.locator('.tdmystack').count() === 1, '내 스택 카드가 있다');
-  ok(/내 칩을 넣으면/.test(await txt('.tdmystack')), '칩을 안 넣었으면 안내만 나온다',
-    (await txt('.tdmystack')).replace(/\n/g, ' | ').slice(0, 120));
-  ok(/어림/.test(await txt('.tdmystack')), '구간 지침이 어림이라고 적혀 있다');
-
-  const lv = await page.evaluate(() => { const l = curLv(); return { sb: l.sb, bb: l.bb, ante: l.ante }; });
-
-  // 10BB 를 넣으면 푸시·폴드 구간이 나와야 한다
-  await page.fill('#td-my', String(lv.bb * 10));
-  await page.dispatchEvent('#td-my', 'change');
-  await page.waitForTimeout(400);
-  let box = await txt('.tdmystack');
-  ok(/\b10 BB\b/.test(box), '넣은 칩이 BB 수로 환산된다', box.replace(/\n/g, ' | ').slice(0, 160));
-  ok(/숏 구간/.test(box), '10BB 는 숏 구간', box.replace(/\n/g, ' | ').slice(0, 200));
-
-  // 4BB → 위기
-  await page.fill('#td-my', String(lv.bb * 4));
-  await page.dispatchEvent('#td-my', 'change');
-  await page.waitForTimeout(400);
-  box = await txt('.tdmystack');
-  ok(/위기 구간/.test(box), '4BB 는 위기 구간', box.replace(/\n/g, ' | ').slice(0, 200));
-
-  // 평균으로
-  await page.click('#td-my-avg');
-  await page.waitForTimeout(400);
-  const avg = await page.evaluate(() => tdAvg());
-  ok(await page.inputValue('#td-my') === String(avg), '«평균으로» 를 누르면 평균 스택이 들어간다',
-    `${await page.inputValue('#td-my')} vs ${avg}`);
-  ok(/100%/.test(await txt('.tdmystack')), '평균과 같으면 평균 대비 100%',
-    (await txt('.tdmystack')).replace(/\n/g, ' | ').slice(0, 160));
-
-  // 새로고침해도 남는다 — 4시간짜리 대회 도중에 날아가면 안 된다
-  await page.reload({ waitUntil: 'networkidle' });
-  await tab('tour');
-  ok(await page.inputValue('#td-my') === String(avg), '새로고침해도 내 칩이 남는다',
-    await page.inputValue('#td-my'));
-
-  // 인원 칸이 내 칩 칸에 휘말리지 않는지 (같은 .cntin 핸들러를 쓴다)
-  await page.fill('#td-ops input[data-f="entries"]', '12');
-  await page.dispatchEvent('#td-ops input[data-f="entries"]', 'change');
-  await page.waitForTimeout(400);
-  ok(await page.evaluate(() => TD.entries) === 12, '참가 인원은 그대로 참가 인원에 들어간다',
-    String(await page.evaluate(() => TD.entries)));
-  ok(await page.evaluate(() => TD.myChips) === avg, '내 칩이 인원 입력에 덮이지 않는다',
-    String(await page.evaluate(() => TD.myChips)));
-
-  await page.evaluate(() => { localStorage.removeItem('hb.td'); });
-  await page.reload({ waitUntil: 'networkidle' });
-  await tab('tour');
-}
-
-/* ─────────── 전광판 테마 · 광고 슬라이드 ─────────── */
-group('전광판 꾸미기');
-{
-  await tab('tour');
-  ok(await page.locator('.tdboard').count() === 1, '전광판 꾸미기 카드가 있다');
-  ok(await page.locator('.thcard').count() === 6, '테마 6종이 나온다', `${await page.locator('.thcard').count()}종`);
-  ok((await txt('.tdboard')).includes('아직 슬라이드가 없습니다'), '처음엔 슬라이드가 없다');
-
-  // 슬라이드 두 장 추가하고 문구를 넣는다
-  await page.click('#td-ad-add'); await page.waitForTimeout(280);
-  await page.click('#td-ad-add'); await page.waitForTimeout(280);
-  ok(await page.locator('.adrow').count() === 2, '슬라이드 2장이 생긴다');
-  await page.locator('.adrow').nth(0).locator('.adtitle').fill('다음 대회 — 금요일 몬스터');
-  await page.locator('.adrow').nth(0).locator('.adbody').fill('매주 금요일 19:30');
-  await page.locator('.adrow').nth(1).locator('.adtitle').fill('매장 공지');
-  await page.waitForTimeout(250);
-
-  // 대회를 열어 전광판에 실제로 뜨는지
   await page.click('#td-quick');
   await page.waitForTimeout(600);
   ok(await page.locator('#td-screen').count() === 1, '대회를 시작하면 전광판이 뜬다');
-  ok(await page.locator('#td-ad .adslide').count() >= 1, '전광판에 광고 띠가 뜬다');
-  const ad = await txt('#td-ad');
-  ok(ad.includes('금요일 몬스터'), '첫 슬라이드 내용이 나온다', ad.replace(/\n/g, ' | '));
+
+  // 없앤 것들이 정말 없는지
+  ok(await page.locator('.tdboard').count() === 0, '전광판 꾸미기 카드가 없다');
+  ok(await page.locator('.thcard').count() === 0, '테마 고르개가 없다');
+  ok(await page.locator('#td-ad').count() === 0, '광고 띠가 없다');
+  ok(await page.locator('.tdmystack').count() === 0, '내 스택 카드가 없다');
 
   // 전광판에는 운영 정보가 나가면 안 된다
   const board = await txt('#td-screen');
   ok(!/매출|하우스|모인 돈|바이인 합계/.test(board), '전광판에 매출·하우스 몫이 나가지 않는다');
 
-  // 테마 전환
-  const before = await page.getAttribute('#td-screen', 'data-btheme');
-  await page.click('.thcard[data-bt="bright"]');
-  await page.waitForTimeout(250);
-  ok(await page.getAttribute('#td-screen', 'data-btheme') === 'bright', `테마를 누르면 전광판만 바뀐다 (${before} → bright)`);
-  ok(await page.getAttribute('html', 'data-theme') === 'dark', '전광판 테마는 앱 테마를 건드리지 않는다');
-  await page.reload({ waitUntil: 'networkidle' });
-  await tab('tour');
-  ok(await page.getAttribute('#td-screen', 'data-btheme') === 'bright', '새로고침해도 전광판 테마가 유지된다');
+  // 진행 버튼 — 딱 일곱 개, 한 줄
+  const btns = await page.locator('.tdrow1 > button').allInnerTexts();
+  ok(btns.length === 7, '진행 버튼은 일곱 개', btns.join(' | '));
+  ok(!/시간/.test(await txt('.tdrow1')), '「시간」 같은 그룹 라벨이 없다', btns.join(' | '));
+  for (const want of ['◀ 이전 레벨', '다음 레벨 ▶', '−30초', '+30초', '전체화면', '종료 · 다음 대회 설정'])
+    ok(btns.some((t) => t.trim() === want), `「${want}」 버튼이 있다`, btns.join(' | '));
+  ok(/시작|일시정지|계속/.test(btns[0]), '첫 버튼은 시작·일시정지', btns[0]);
 
-  // 광고 끄기
-  await page.click('#td-ad-on button[data-on="0"]');
-  await page.waitForTimeout(350);
-  ok(await page.locator('#td-ad').count() === 0, '끄면 광고 띠가 사라진다');
-  await page.click('#td-ad-on button[data-on="1"]');
-  await page.waitForTimeout(350);
-  ok(await page.locator('#td-ad').count() === 1, '다시 켜면 나타난다');
+  // 한 줄에 다 들어가는지 — 1440px 에서 접히면 «한 줄로 깔끔하게»가 아니다.
+  // 정렬 차이로 1~2px 어긋나는 건 줄바꿈이 아니므로 버튼 높이의 절반을 기준으로 본다.
+  {
+    const box = await page.locator('.tdrow1 > button').evaluateAll((es) => {
+      const r = es.map((e) => e.getBoundingClientRect());
+      return { spread: Math.max(...r.map((x) => x.top)) - Math.min(...r.map((x) => x.top)),
+        h: Math.min(...r.map((x) => x.height)) };
+    });
+    ok(box.spread < box.h / 2, '데스크톱에서 버튼이 한 줄에 놓인다',
+      `세로로 ${Math.round(box.spread)}px 벌어짐 (버튼 높이 ${Math.round(box.h)}px)`);
+    ok(box.spread === 0, '버튼 높이가 서로 맞는다', `${Math.round(box.spread)}px 어긋남`);
+  }
 
-  // 순서 바꾸기 · 삭제
-  await page.locator('.adrow').nth(1).locator('[data-act="up"]').click();
+  // ±30초가 실제로 30초를 움직이는지
+  {
+    const remain = () => page.evaluate(() => TD.remain);
+    const before = await remain();
+    await page.click('#td-m30');
+    await page.waitForTimeout(250);
+    const after = await remain();
+    ok(before - after === 30000, '−30초가 정확히 30초를 뺀다', `${before} → ${after}`);
+    await page.click('#td-p30');
+    await page.waitForTimeout(250);
+    ok(await remain() === before, '+30초로 되돌아온다', String(await remain()));
+  }
+
+  // 시작 / 일시정지
+  await page.click('#td-run');
   await page.waitForTimeout(300);
-  ok((await page.locator('.adrow').nth(0).locator('.adtitle').inputValue()) === '매장 공지', '↑ 로 순서가 바뀐다');
-  await page.locator('.adrow').nth(0).locator('[data-act="del"]').click();
+  ok(await page.evaluate(() => TD.running) === true, '시작을 누르면 시계가 간다');
+  ok(/일시정지/.test(await txt('#td-run')), '버튼 글씨가 일시정지로 바뀐다', await txt('#td-run'));
+  await page.click('#td-run');
   await page.waitForTimeout(300);
-  ok(await page.locator('.adrow').count() === 1, '삭제하면 한 장이 남는다');
+  ok(await page.evaluate(() => TD.running) === false, '다시 누르면 멈춘다');
+
+  // 레벨 이동
+  {
+    const lv = () => page.evaluate(() => TD.lvl);
+    await page.click('#td-next');
+    await page.waitForTimeout(300);
+    ok(await lv() === 1, '다음 레벨로 넘어간다', String(await lv()));
+    await page.click('#td-prev');
+    await page.waitForTimeout(300);
+    ok(await lv() === 0, '이전 레벨로 돌아온다', String(await lv()));
+  }
+
+  // 종료 → 설정 화면
+  page.once('dialog', (d) => d.accept());
+  await page.click('#td-end');
+  await page.waitForTimeout(450);
+  ok(await page.locator('#td-screen').count() === 0, '종료하면 전광판이 닫힌다');
+  ok(await page.locator('#td-quick').count() === 1, '다음 대회 설정 화면으로 돌아온다');
 }
 
 /* ─────────── 핸드 분석: 예시 ─────────── */

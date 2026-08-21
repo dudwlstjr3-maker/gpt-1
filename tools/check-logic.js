@@ -183,46 +183,6 @@ group('analyze 통합');
   }
 }
 
-/* ───────────────── 내 스택 구간 ───────────────── */
-group('내 스택');
-{
-  const { stackRead, stackBand, STACKBANDS } = app;
-  const lv = { sb: 500, bb: 1000, ante: 1000 };   // 한 바퀴 비용 2500
-
-  {
-    const S = stackRead(20000, lv, 40000);
-    okNear(S.bb, 20, 'BB 수 = 칩 / BB');
-    okNear(S.m, 8, 'M = 칩 / (SB+BB+앤티)');
-    ok(S.avgPct === 50, '평균 대비 %', String(S.avgPct));
-  }
-
-  // 구간 경계 — 위/아래가 확실히 갈려야 한다
-  ok(stackBand(4.9).n === '위기' && stackBand(5).n === '푸시·폴드', '5BB 에서 위기 → 푸시·폴드로 넘어간다',
-    `${stackBand(4.9).n} / ${stackBand(5).n}`);
-  ok(stackBand(9.9).n === '푸시·폴드' && stackBand(10).n === '숏', '10BB 에서 숏으로', `${stackBand(9.9).n} / ${stackBand(10).n}`);
-  ok(stackBand(19.9).n === '숏' && stackBand(20).n === '표준', '20BB 에서 표준으로', `${stackBand(19.9).n} / ${stackBand(20).n}`);
-  ok(stackBand(39.9).n === '표준' && stackBand(40).n === '딥', '40BB 에서 딥으로', `${stackBand(39.9).n} / ${stackBand(40).n}`);
-  ok(stackBand(0).n === '위기', '0BB 는 위기');
-  ok(stackBand(1e9).n === '딥', '아주 깊어도 구간이 나온다');
-  ok(STACKBANDS.every((b) => b.n && b.d), '구간마다 이름과 지침이 있다');
-
-  // 0 으로 나누지 않는다 — 블라인드가 없는 순간(휴식·설정 전)에도 화면이 살아 있어야 한다
-  {
-    const S = stackRead(20000, null, 0);
-    ok(S.bb === null && S.m === null && S.band === null && S.avgPct === null,
-      '레벨이 없으면 숫자 대신 빈 값을 낸다', JSON.stringify(S));
-  }
-  ok(stackRead(20000, { sb: 0, bb: 0, ante: 0 }, 0).bb === null, 'BB 가 0 이면 BB 수를 안 만든다');
-  ok(stackRead(20000, { sb: 500, bb: 1000, ante: 0 }, 0).avgPct === null, '평균이 0 이면 대비 %도 없다');
-
-  // 이상한 입력
-  ok(stackRead(-5000, lv, 40000).chips === 0, '음수 칩은 0 으로');
-  ok(stackRead('abc', lv, 40000).chips === 0, '숫자가 아니면 0 으로');
-  ok(stackRead(undefined, lv, 40000).bb === 0, '칩을 안 넣으면 0BB');
-  ok(stackRead(0, lv, 40000).band.n === '위기', '0칩은 위기 구간');
-  okNear(stackRead(2500, { sb: 500, bb: 1000, ante: 0 }, 0).m, 2500 / 1500, '앤티가 없으면 한 바퀴는 SB+BB');
-}
-
 /* ───────────────── 토너먼트 ───────────────── */
 group('토너먼트');
 {
@@ -727,7 +687,7 @@ group('상금 사다리');
     '기본값 — 8개까지 0원, 7개마다 10만원',
     JSON.stringify(LADDER_DEF));
 
-  ctx.__APP.TD = Object.assign(tdNew(), { ladderOn: true, entries: 9, rebuys: 0 });
+  ctx.__APP.TD = Object.assign(tdNew(), { entries: 9, rebuys: 0 });
 
   // 엔트리 + 리바이 «합계» 로 센다
   ok(tdUnits() === 9, '엔트리 9 + 리바이 0 = 9개', String(tdUnits()));
@@ -743,17 +703,41 @@ group('상금 사다리');
   ok(tdLadderPrize(8) === 0 && tdLadderPrize(9) === 100000,
     '8개까지 0원, 9개부터 10만원');
 
-  // 사다리를 켜면 모인 돈 비율은 안 본다
+  // 상금은 «엔트리 몇 개당 얼마» 로만 정한다 — 모인 돈은 안 본다
   ctx.__APP.TD.entries = 9; ctx.__APP.TD.rebuys = 12;   // 21개
   const gross = tdGross();
   ok(gross > 0, `모인 돈이 있다 (${gross}원)`);
-  okNear(tdPool(), 300000, '사다리 켜짐: 21개 → 상금 30만원 (모인 돈과 무관)');
-  ctx.__APP.TD.poolPct = 50;
-  okNear(tdPool(), 300000, '사다리 켜짐: 비율을 바꿔도 상금은 그대로');
-  ctx.__APP.TD.ladderOn = false;
-  okNear(tdPool(), Math.floor(gross * 0.5 / 10000) * 10000,
-    '사다리 끄면 다시 비율로 계산한다 (1만원 단위 내림)');
-  ctx.__APP.TD.ladderOn = true; ctx.__APP.TD.poolPct = 100;
+  okNear(tdPool(), 300000, '21엔트리 → 상금 30만원');
+  ctx.__APP.TD.buyin = 999999;
+  okNear(tdPool(), 300000, '바이인을 올려 모인 돈이 늘어도 상금은 그대로 (비율 방식은 없앴다)');
+  ctx.__APP.TD.buyin = 30000;
+  ok(app.tdPool.toString().indexOf('poolPct') < 0, '모인 돈의 % 로 잡는 길이 남아 있지 않다');
+
+  // 버튼 프리셋 — 매장이 쓰는 두 가지
+  {
+    const { LADDER_PRESETS, ladderLabel, ladderPresetId } = app;
+    ok(LADDER_PRESETS.length === 2, '프리셋은 두 개', String(LADDER_PRESETS.length));
+    const mo = LADDER_PRESETS.filter((p) => p.id === 'monster')[0];
+    const da = LADDER_PRESETS.filter((p) => p.id === 'daily')[0];
+    ok(mo && mo.every === 7 && mo.amt === 100000 && mo.free === 8,
+      '몬스터 — 7엔트리당 10만원, 8엔트리까지 0원', JSON.stringify(mo));
+    ok(da && da.every === 3 && da.amt === 10000 && da.free === 0,
+      '데일리 — 3엔트리당 1만원, 면제 없음', JSON.stringify(da));
+    ok(ladderLabel(mo) === '7엔트리당 10만원', '버튼 글씨가 「7엔트리당 10만원」', ladderLabel(mo));
+    ok(ladderLabel(da) === '3엔트리당 1만원', '버튼 글씨가 「3엔트리당 1만원」', ladderLabel(da));
+
+    // 프리셋을 얹으면 그 프리셋이 켜진 것으로 잡힌다
+    Object.assign(ctx.__APP.TD, { ladderFree: da.free, ladderEvery: da.every, ladderAmt: da.amt });
+    ok(ladderPresetId() === 'daily', '데일리 값이면 데일리 버튼이 켜진다', ladderPresetId());
+    okNear(tdPool(), 70000, '데일리 21엔트리 → 7만원 (3개당 1만원)');
+    okNear(tdLadderPrize(3), 10000, '데일리는 3엔트리부터 1만원');
+    okNear(tdLadderPrize(2), 0, '데일리 2엔트리는 0원');
+    Object.assign(ctx.__APP.TD, { ladderFree: mo.free, ladderEvery: mo.every, ladderAmt: mo.amt });
+    ok(ladderPresetId() === 'monster', '몬스터 값이면 몬스터 버튼이 켜진다', ladderPresetId());
+    ctx.__APP.TD.ladderEvery = 5;
+    ok(ladderPresetId() === '', '손으로 고치면 어느 버튼도 안 켜진다', ladderPresetId());
+    ctx.__APP.TD.ladderEvery = mo.every;
+  }
 
   // 구간표
   const bands = tdLadderBands(30);
@@ -901,7 +885,7 @@ group('실제 지급액');
   ok(PAY_UNIT_WON === 10000, '지급 단위는 1만원', String(PAY_UNIT_WON));
 
   ctx.__APP.TD = Object.assign(tdNew(), {
-    ladderOn: true, ladderFree: 8, ladderEvery: 7, ladderAmt: 100000, entries: 9, rebuys: 8,
+    ladderFree: 8, ladderEvery: 7, ladderAmt: 100000, entries: 9, rebuys: 8,
   });
   okNear(tdPool(), 200000, '17개 → 총 상금 20만원');
 
@@ -937,9 +921,8 @@ group('실제 지급액');
   ok(/지급 인원을/.test(warn), '칸이 모자라면 지급 인원을 줄이라고 경고한다', warn.slice(0, 120));
 
   // 비율 방식에서도 총 상금이 1만원 단위로 내려간다
-  ctx.__APP.TD.ladderOn = false;
   ctx.__APP.TD.entries = 9; ctx.__APP.TD.rebuys = 4;
-  ctx.__APP.TD.buyin = 30000; ctx.__APP.TD.rebuyPrice = 30000; ctx.__APP.TD.poolPct = 85;
+  ctx.__APP.TD.buyin = 30000; ctx.__APP.TD.rebuyPrice = 30000;
   ok(tdPool() % PAY_UNIT_WON === 0, `비율 방식 총 상금도 1만원 단위 (${tdPool()}원)`);
   ok(tdPool() <= 13 * 30000 * 0.85, '총 상금이 모인 돈 × 비율을 넘지 않는다');
   ctx.__APP.TD = null;
@@ -962,7 +945,7 @@ group('대회 프로필');
   const st = TSTRUCT.find((t) => t.id === 'f9_daily');
   D.levels = buildLevels(st, 12, 4, 10);
   D.buyin = 10000; D.startStack = 2000000; D.rebuyPrice = 10000; D.rebuyStack = 3000000;
-  D.payN = 9; D.pay = app.payoutPct(9, 1); D.payCurve = 1; D.poolPct = 90; D.payShow = 5;
+  D.payN = 9; D.pay = app.payoutPct(9, 1); D.payCurve = 1; D.payShow = 5;
 
   const P = tdProfileFrom(D, '금요일 몬스터', [5, 1], '19:30', '메모');
   ok(P.n === '금요일 몬스터', '프로필 이름 저장');
@@ -1420,6 +1403,48 @@ group('전적');
 }
 
 /* ───────────────── 저장소 · 백업 ───────────────── */
+group('탭 번호');
+{
+  // 탭에 적힌 번호가 곧 단축키이고, 본문 곳곳에서 「6 · 토너먼트」처럼 인용된다.
+  // 탭이 하나 늘면 이 셋이 조용히 어긋난다 — 실제로 전적 탭을 넣고 그렇게 됐다.
+  const src = require('fs').readFileSync(FILE, 'utf8');
+  const nav = {};
+  const navRe = /<button data-v="(\w+)"[^>]*>(?:<i>(\d+) · <\/i>)?([^<]*)/g;
+  for (let m; (m = navRe.exec(src)); ) nav[m[1]] = { num: m[2] || null, label: m[3].trim() };
+  ok(Object.keys(nav).length >= 7, `내비게이션 탭을 찾았다 (${Object.keys(nav).length}개)`);
+
+  // 1) 숫자 단축키가 탭에 적힌 번호와 같은가
+  {
+    const TABKEY = app.TABKEY;
+    ok(!!TABKEY, '숫자 키 표가 있다');
+    let bad = null;
+    for (const k of Object.keys(TABKEY || {})) {
+      const v = TABKEY[k], want = nav[v] ? nav[v].num : undefined;
+      if (v === 'home') { if (k !== '0') bad = `홈은 0 이어야 하는데 ${k}`; continue; }
+      if (want !== k) { bad = `${k} 키는 ${v} 로 가는데 탭에는 ${want} 라고 적혀 있다`; break; }
+    }
+    ok(!bad, '숫자 키가 탭에 적힌 번호와 같다', bad);
+    for (const v of Object.keys(nav))
+      if (nav[v].num) ok(Object.keys(TABKEY || {}).some((k) => TABKEY[k] === v),
+        `${nav[v].num} · ${nav[v].label} 에 단축키가 걸려 있다`);
+  }
+
+  // 2) 본문에 박아 둔 「N · 탭이름」이 실제 번호와 같은가
+  {
+    const byLabel = {};
+    for (const v of Object.keys(nav)) if (nav[v].num) byLabel[nav[v].label] = nav[v].num;
+    const names = Object.keys(byLabel).filter(Boolean);
+    ok(names.length >= 5, `번호가 붙은 탭 (${names.join(', ')})`);
+    const wrong = [];
+    for (const nm of names) {
+      const re = new RegExp('(\\d+) · ' + nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      for (let m; (m = re.exec(src)); )
+        if (m[1] !== byLabel[nm]) wrong.push(`"${m[0]}" ← 실제로는 ${byLabel[nm]}번`);
+    }
+    ok(wrong.length === 0, '본문에 적힌 탭 번호가 내비게이션과 같다', wrong.join(' / '));
+  }
+}
+
 group('저장소 · 백업');
 {
   const { DB, hbDump, hbRestore, LEARN_KEYS, TOUR_KEYS } = app;

@@ -683,11 +683,33 @@ group('권장 스타일');
 group('상금 사다리');
 {
   const { tdNew, tdLadderPrize, tdLadderBands, tdUnits, tdPool, tdGross, tdLadder, TSTRUCT, LADDER_DEF } = app;
-  ok(LADDER_DEF.free === 8 && LADDER_DEF.every === 7 && LADDER_DEF.amt === 100000,
-    '기본값 — 8개까지 0원, 7개마다 10만원',
-    JSON.stringify(LADDER_DEF));
+  // 기본 상금 사다리는 «기본으로 골라져 있는 대회» 의 값이어야 한다.
+  // 따로 박아 두면 처음 열었을 때 싯앤고인데 몬스터 상금이 잡힌다 (v4.7 까지 그랬다).
+  {
+    const def = TSTRUCT.filter((t) => t.id === app.TD_DEFAULT_TPL)[0];
+    ok(!!def, `기본 대회 프리셋이 있다 (${app.TD_DEFAULT_TPL})`);
+    ok(!!(def && def.prizeLadder), '기본 대회에 상금 사다리가 정해져 있다');
+    if (def && def.prizeLadder)
+      ok(LADDER_DEF.free === def.prizeLadder.free && LADDER_DEF.every === def.prizeLadder.every &&
+         LADDER_DEF.amt === def.prizeLadder.amt,
+        '기본 상금 사다리가 기본 대회의 값과 같다',
+        `${JSON.stringify(LADDER_DEF)} vs ${JSON.stringify(def.prizeLadder)}`);
+    // 새 대회를 열면 이름과 상금이 서로 맞아야 한다
+    const fresh = tdNew();
+    ok(fresh.ladderEvery === def.prizeLadder.every && fresh.ladderAmt === def.prizeLadder.amt &&
+       fresh.ladderFree === def.prizeLadder.free,
+      '새 대회의 상금 사다리가 기본 대회를 따른다',
+      `${fresh.ladderEvery}엔트리당 ${fresh.ladderAmt}원 (면제 ${fresh.ladderFree})`);
+    ctx.__APP.TD = Object.assign(tdNew(), { entries: 9, rebuys: 0 });
+    ok(tdPool() <= tdGross(),
+      '처음 연 대회에서 상금이 모인 돈을 넘지 않는다 — 넘으면 하우스 몫이 음수로 뜬다',
+      `상금 ${tdPool()}원 · 모인 돈 ${tdGross()}원`);
+  }
 
-  ctx.__APP.TD = Object.assign(tdNew(), { entries: 9, rebuys: 0 });
+  // 아래 검사들은 몬스터 사다리(8까지 0원 · 7개마다 10만원) 기준이라 명시적으로 얹는다
+  const MON = app.LADDER_PRESETS.filter((p) => p.id === 'monster')[0];
+  ctx.__APP.TD = Object.assign(tdNew(), { entries: 9, rebuys: 0,
+    ladderFree: MON.free, ladderEvery: MON.every, ladderAmt: MON.amt });
 
   // 엔트리 + 리바이 «합계» 로 센다
   ok(tdUnits() === 9, '엔트리 9 + 리바이 0 = 9개', String(tdUnits()));
@@ -761,9 +783,9 @@ group('상금 사다리');
   ok(tdLadder().every >= 1, '묶음 크기는 1 미만이 될 수 없다');
   ctx.__APP.TD.ladderEvery = 0;
   ok(tdLadder().every === 1, '0 을 넣어도 1 로 막는다');
-  ctx.__APP.TD.ladderFree = LADDER_DEF.free;
-  ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
-  ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
+  ctx.__APP.TD.ladderFree = MON.free;
+  ctx.__APP.TD.ladderEvery = MON.every;
+  ctx.__APP.TD.ladderAmt = MON.amt;
 
   // 상금 사다리 키가 블라인드 사다리(ladder)와 겹치면 blindsAt 이 오작동한다
   for (const t of TSTRUCT) {
@@ -784,9 +806,9 @@ group('상금 사다리');
   ctx.__APP.TD.rebuys = 6;
   ok(tdUnits() === 18, '엉뚱한 설정이 남아 있어도 합산으로만 센다', String(tdUnits()));
   delete ctx.__APP.TD.ladderBasis;
-  ctx.__APP.TD.ladderFree = LADDER_DEF.free;
-  ctx.__APP.TD.ladderEvery = LADDER_DEF.every;
-  ctx.__APP.TD.ladderAmt = LADDER_DEF.amt;
+  ctx.__APP.TD.ladderFree = MON.free;
+  ctx.__APP.TD.ladderEvery = MON.every;
+  ctx.__APP.TD.ladderAmt = MON.amt;
 
   // 데일리 프리셋 — 3개당 1만원, 면제 없음
   const dy = TSTRUCT.find((t) => t.id === 'f9_daily');

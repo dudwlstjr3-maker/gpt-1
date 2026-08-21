@@ -18,7 +18,8 @@ function serve() {
       const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || FILE;
       const f = path.join(ROOT, rel);
       if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rep.writeHead(404); return rep.end('404'); }
-      rep.writeHead(200, { 'Content-Type': /\.html$/.test(f) ? 'text/html; charset=utf-8' : 'application/octet-stream' });
+      const MIME = { '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.json': 'application/json' };
+      rep.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
       fs.createReadStream(f).pipe(rep);
     });
     s.listen(PORT, () => res(s));
@@ -187,6 +188,64 @@ group('상금 사다리');
   await tab('tour');
 }
 
+/* ─────────── 전광판 로고 ─────────── */
+group('로고');
+{
+  await tab('tour');
+  await page.evaluate(() => { DB.del('logo'); renderTour(); });
+  await page.waitForTimeout(300);
+
+  ok(await page.locator('#td-logo-url').count() === 1, '이미지 주소를 넣는 칸이 있다');
+  ok(await page.locator('#td-logo-pick').count() === 1, '파일에서 고르는 버튼도 있다');
+  ok(/Ctrl\+V|복사/.test(await txt('.logobox')), '복사한 이미지를 붙여넣는 방법이 적혀 있다',
+    (await txt('.logobox')).replace(/\n/g, ' | ').slice(0, 160));
+
+  // 아무 주소나 넣으면 안 된다
+  await page.fill('#td-logo-url', '그냥 글자');
+  await page.click('#td-logo-get');
+  await page.waitForTimeout(400);
+  ok(await page.evaluate(() => DB.get('logo', '')) === '', 'http 주소가 아니면 저장하지 않는다');
+
+  // 진짜 주소에서 받아 «파일 안에» 굳히는지 — 같은 서버의 이미지로 확인한다
+  await page.fill('#td-logo-url', `http://localhost:${PORT}/tools/fixtures/logo.png`);
+  await page.click('#td-logo-get');
+  await page.waitForFunction(() => DB.get('logo', '').length > 0, null, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  const saved = await page.evaluate(() => DB.get('logo', ''));
+  ok(/^data:image\//.test(saved), '주소로 받은 그림이 data URI 로 굳는다 (인터넷 끊겨도 뜬다)',
+    saved.slice(0, 40));
+
+  // 전광판에 실제로 뜨고, 로고가 있어도 대회명은 가운데 그대로
+  await page.click('#td-quick');
+  await page.waitForTimeout(700);
+  ok(await page.locator('.blogo img').count() === 1, '전광판 왼쪽에 로고가 뜬다');
+  {
+    const c = await page.evaluate(() => {
+      const g = document.querySelector('.bgame').getBoundingClientRect();
+      const s = document.querySelector('#td-screen').getBoundingClientRect();
+      return Math.round(g.left + g.width / 2) - Math.round(s.left + s.width / 2);
+    });
+    ok(Math.abs(c) < 24, '로고가 있어도 대회명은 화면 한가운데', `${c}px 어긋남`);
+  }
+
+  // 로고를 지워도 가운데 그대로여야 한다
+  await page.evaluate(() => { DB.del('logo'); renderTour(); });
+  await page.waitForTimeout(400);
+  ok(await page.locator('.blogo img').count() === 0, '지우면 로고가 사라진다');
+  {
+    const c = await page.evaluate(() => {
+      const g = document.querySelector('.bgame').getBoundingClientRect();
+      const s = document.querySelector('#td-screen').getBoundingClientRect();
+      return Math.round(g.left + g.width / 2) - Math.round(s.left + s.width / 2);
+    });
+    ok(Math.abs(c) < 24, '로고가 없어도 대회명은 같은 자리 — 가운데', `${c}px 어긋남`);
+  }
+
+  await page.evaluate(() => { localStorage.removeItem('hb.td'); });
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+}
+
 /* ─────────── 진행 줄 ─────────── */
 group('진행');
 {
@@ -239,14 +298,34 @@ group('진행');
     ok(await remain() === before, '+30초로 되돌아온다', String(await remain()));
   }
 
-  // 시작 / 일시정지
-  await page.click('#td-run');
-  await page.waitForTimeout(300);
-  ok(await page.evaluate(() => TD.running) === true, '시작을 누르면 시계가 간다');
-  ok(/일시정지/.test(await txt('#td-run')), '버튼 글씨가 일시정지로 바뀐다', await txt('#td-run'));
-  await page.click('#td-run');
-  await page.waitForTimeout(300);
-  ok(await page.evaluate(() => TD.running) === false, '다시 누르면 멈춘다');
+  // 시작 / 일시정지 — 글씨가 바뀌어도 칸 크기는 그대로여야 옆 버튼이 안 밀린다
+  {
+    const runBox = () => page.locator('#td-run').evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return { w: Math.round(r.width), h: Math.round(r.height), t: e.textContent.trim() };
+    });
+    const nextLeft = () => page.locator('#td-prev').evaluate((e) => Math.round(e.getBoundingClientRect().left));
+
+    const a = await runBox(), aL = await nextLeft();
+    ok(a.t === '시작', '처음엔 «시작»', a.t);
+
+    await page.click('#td-run');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(() => TD.running) === true, '시작을 누르면 시계가 간다');
+    const b = await runBox(), bL = await nextLeft();
+    ok(b.t === '일시정지', '버튼 글씨가 «일시정지» 로 바뀐다', b.t);
+    ok(a.w === b.w, '시작 → 일시정지 로 바뀌어도 칸 너비가 같다', `${a.w}px → ${b.w}px`);
+    ok(a.h === b.h, '높이도 같다', `${a.h}px → ${b.h}px`);
+    ok(aL === bL, '옆 버튼이 밀리지 않는다', `${aL}px → ${bL}px`);
+
+    await page.click('#td-run');
+    await page.waitForTimeout(300);
+    ok(await page.evaluate(() => TD.running) === false, '다시 누르면 멈춘다');
+    const c = await runBox(), cL = await nextLeft();
+    ok(c.t === '계속', '멈추면 «계속»', c.t);
+    ok(a.w === c.w && aL === cL, '«계속» 일 때도 칸 너비와 옆 버튼 자리가 같다',
+      `${a.w}px vs ${c.w}px · ${aL}px vs ${cL}px`);
+  }
 
   // 레벨 이동
   {
@@ -257,6 +336,75 @@ group('진행');
     await page.click('#td-prev');
     await page.waitForTimeout(300);
     ok(await lv() === 0, '이전 레벨로 돌아온다', String(await lv()));
+  }
+
+  // ── 전광판: 지금 무슨 게임인지가 제일 커야 한다
+  {
+    const size = (sel) => page.locator(sel).evaluate((e) => {
+      const cs = getComputedStyle(e), r = e.getBoundingClientRect();
+      return { px: parseFloat(cs.fontSize), cx: Math.round(r.left + r.width / 2) };
+    });
+    const game = await size('.bgame'), venue = await size('.bvenue');
+    ok(game.px > venue.px * 2, '대회명이 매장명보다 두 배 넘게 크다',
+      `대회명 ${game.px}px · 매장명 ${venue.px}px`);
+    ok(/싯앤고/.test(await txt('.bgame')), '대회명이 «싯앤고» 다 (데일리 아님)', await txt('.bgame'));
+    ok(!/데일리/.test(await txt('#td-screen')), '전광판 어디에도 «데일리» 가 없다');
+
+    // 화면 한가운데인가
+    const mid = await page.locator('#td-screen').evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return Math.round(r.left + r.width / 2);
+    });
+    ok(Math.abs(game.cx - mid) < 24, '대회명이 전광판 한가운데에 온다',
+      `대회명 중심 ${game.cx}px · 전광판 중심 ${mid}px`);
+
+    // 레지·휴식은 멀리서도 읽히게
+    const mv = await page.locator('.bmini .mv').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    ok(mv >= 24, '레지 마감·휴식 숫자가 24px 이상으로 커졌다', `${mv}px`);
+
+    // 블라인드가 상자 한가운데에, 상자 밖으로 안 새고
+    const bl = await page.locator('.bblind').evaluate((e) => {
+      const b = e.getBoundingClientRect();
+      const v = e.querySelector('.blindvals').getBoundingClientRect();
+      const lv = e.querySelector('.lvrow').getBoundingClientRect();
+      return { boxCx: b.left + b.width / 2, valCx: v.left + v.width / 2,
+        lvTop: lv.top, boxTop: b.top, over: e.scrollHeight - e.clientHeight };
+    });
+    ok(Math.abs(bl.valCx - bl.boxCx) < 12, '블라인드 숫자가 상자 한가운데에 온다',
+      `숫자 중심 ${Math.round(bl.valCx)} · 상자 중심 ${Math.round(bl.boxCx)}`);
+    ok(bl.lvTop >= bl.boxTop - 1, '레벨 표시가 상자 위로 새어 나가지 않는다',
+      `레벨 ${Math.round(bl.lvTop)} · 상자 ${Math.round(bl.boxTop)}`);
+    ok(bl.over <= 1, '블라인드 상자 안에 내용이 다 들어간다', `${bl.over}px 넘침`);
+  }
+
+  // ── 상금 배분 접기 / 펴기
+  {
+    const fold = page.locator('.tdpayout .tdfold');
+    ok(await fold.count() === 1, '상금 배분이 접었다 폈다 하는 카드다');
+    ok(await fold.evaluate((e) => e.open) === true, '처음엔 펴져 있다');
+    ok(await page.locator('#td-ladq').isVisible(), '펴져 있으면 상금 버튼이 보인다');
+
+    await page.click('.tdpayout .tdfoldsum');
+    await page.waitForTimeout(300);
+    ok(await fold.evaluate((e) => e.open) === false, '제목을 누르면 접힌다');
+    ok(!(await page.locator('#td-ladq').isVisible()), '접으면 내용이 숨는다');
+    ok(/상금/.test(await txt('.tdpayout .tdfoldsum')), '접혀 있어도 요약이 보인다',
+      (await txt('.tdpayout .tdfoldsum')).replace(/\n/g, ' | '));
+
+    // 시계가 1초마다 다시 그려도 접힘이 유지돼야 한다
+    await page.click('#td-run');
+    await page.waitForTimeout(1400);
+    ok(await fold.evaluate((e) => e.open) === false, '시계가 도는 동안에도 접힌 채로 있다');
+    await page.click('#td-run');
+    await page.waitForTimeout(300);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await tab('tour');
+    ok(await page.locator('.tdpayout .tdfold').evaluate((e) => e.open) === false,
+      '새로고침해도 접힌 상태가 남는다');
+    await page.click('.tdpayout .tdfoldsum');
+    await page.waitForTimeout(300);
+    ok(await page.locator('.tdpayout .tdfold').evaluate((e) => e.open) === true, '다시 누르면 펴진다');
   }
 
   // 종료 → 설정 화면

@@ -202,6 +202,64 @@ group('토너먼트');
     ok(l1 && l1.sb === 100 && l1.bb === 200, `데일리 1레벨 100/200 (실제 ${l1 && l1.sb + '/' + l1.bb})`);
   }
 
+  /* ── 매장이 확인해 준 파이널나인 블라인드 사다리 ──
+     싯앤고와 몬스터가 같은 표를 쓰고, 몬스터만 3레벨(300/600)부터 앤티가 붙는다.
+     이건 «추정» 이 아니라 매장이 알려준 값이라 한 칸이라도 어긋나면 잡아야 한다. */
+  {
+    const WANT = [[100,200],[200,400],[300,600],[400,800],[500,1000],[600,1200],[700,1400],
+      [800,1600],[900,1800],[1000,2000],[2000,4000],[3000,6000],[4000,8000],[5000,10000]];
+    ok(app.F9_LADDER.length === WANT.length, `사다리는 ${WANT.length}레벨`, String(app.F9_LADDER.length));
+
+    for (const id of ['f9_daily', 'f9_monster', 'f9_league']) {
+      const t = TSTRUCT.find((x) => x.id === id);
+      ok(!!t, `${id} 프리셋 존재`);
+      if (!t) continue;
+      ok(t.count === WANT.length, `${id}: 레벨 개수가 ${WANT.length}`, String(t.count));
+
+      const lv = buildLevels(t, WANT.length, 0, 0).filter((x) => !x.brk);
+      let bad = null;
+      for (let i = 0; i < WANT.length; i++) {
+        if (!lv[i] || lv[i].sb !== WANT[i][0] || lv[i].bb !== WANT[i][1]) {
+          bad = `${i+1}레벨 ${WANT[i][0]}/${WANT[i][1]} 이어야 하는데 ` +
+                (lv[i] ? lv[i].sb + '/' + lv[i].bb : '없음');
+          break;
+        }
+      }
+      ok(!bad, `${id}: 블라인드가 100/200 → 5000/10000 까지 표 그대로`, bad);
+      ok(lv.length === WANT.length, `${id}: 5000/10000 에서 끝난다`, `${lv.length}레벨`);
+
+      // 앤티 — 싯앤고는 없고, 몬스터·리그는 3레벨부터 BB 와 같은 금액
+      if (id === 'f9_daily') {
+        ok(lv.every((x) => x.ante === 0), '싯앤고는 앤티가 없다',
+          lv.map((x) => x.ante).filter((x) => x).join(','));
+      } else {
+        ok(lv[0].ante === 0 && lv[1].ante === 0, `${id}: 1~2레벨은 앤티 없음`,
+          `${lv[0].ante} / ${lv[1].ante}`);
+        ok(lv[2].ante === 600, `${id}: 3레벨(300/600)부터 앤티 600`, String(lv[2].ante));
+        let anteBad = null;
+        for (let i = 2; i < lv.length; i++)
+          if (lv[i].ante !== lv[i].bb) { anteBad = `${i+1}레벨 앤티 ${lv[i].ante} ≠ BB ${lv[i].bb}`; break; }
+        ok(!anteBad, `${id}: 3레벨부터 앤티는 언제나 BB 와 같다`, anteBad);
+      }
+    }
+
+    // 10레벨까지는 100/200 씩, 그 뒤로는 1000/2000 씩 오른다 (매장이 말한 리듬)
+    {
+      const L = app.F9_LADDER;
+      let step = null;
+      for (let i = 1; i < 10; i++)
+        if (L[i][0] - L[i-1][0] !== 100 || L[i][1] - L[i-1][1] !== 200)
+          { step = `${i+1}레벨에서 100/200 씩이 아니다`; break; }
+      ok(!step, '10레벨(1000/2000)까지는 100/200 씩 오른다', step);
+      let jump = null;
+      for (let i = 10; i < L.length; i++)
+        if (L[i][0] - L[i-1][0] !== 1000 || L[i][1] - L[i-1][1] !== 2000)
+          { jump = `${i+1}레벨에서 1000/2000 씩이 아니다`; break; }
+      ok(!jump, '11레벨부터는 1000/2000 씩 뛴다', jump);
+      ok(L.every((x) => x[1] === x[0] * 2), 'BB 는 언제나 SB 의 두 배');
+    }
+  }
+
   // 모든 프리셋: 1레벨이 100/200 인지(국내 펍) · 블라인드가 단조 증가인지
   for (const t of TSTRUCT) {
     const lv = buildLevels(t, 20, 0, 0).filter((x) => !x.brk);

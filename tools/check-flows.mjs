@@ -188,6 +188,70 @@ group('상금 사다리');
   await tab('tour');
 }
 
+/* ─────────── 파이널나인 블라인드 사다리 ─────────── */
+group('블라인드 사다리');
+{
+  const WANT = [[100,200],[200,400],[300,600],[400,800],[500,1000],[600,1200],[700,1400],
+    [800,1600],[900,1800],[1000,2000],[2000,4000],[3000,6000],[4000,8000],[5000,10000]];
+
+  for (const [tpl, label, ante] of [['f9_daily', '싯앤고', false], ['f9_monster', '몬스터', true]]) {
+    await page.evaluate(() => localStorage.removeItem('hb.td'));
+    await page.reload({ waitUntil: 'networkidle' });
+    await tab('tour');
+    await page.evaluate((t) => {
+      const b = [...document.querySelectorAll('.tplb')].find((x) => x.dataset.id === t);
+      if (b) b.click();
+    }, tpl);
+    await page.waitForTimeout(400);
+
+    const lv = await page.evaluate(() =>
+      TD.levels.filter((l) => !l.brk).map((l) => [l.sb, l.bb, l.ante]));
+    ok(lv.length === WANT.length, `${label}: 레벨이 ${WANT.length}개`, String(lv.length));
+    ok(JSON.stringify(lv.map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
+      `${label}: 100/200 → 5000/10000 표 그대로`,
+      lv.map((x) => x[0] + '/' + x[1]).join(' · '));
+
+    if (ante) {
+      ok(lv[0][2] === 0 && lv[1][2] === 0 && lv[2][2] === 600,
+        `${label}: 앤티가 3레벨(300/600)부터 600`,
+        lv.slice(0, 4).map((x) => x[2]).join(','));
+      ok(lv.slice(2).every((x) => x[2] === x[1]), `${label}: 3레벨부터 앤티는 BB 와 같다`);
+    } else {
+      ok(lv.every((x) => x[2] === 0), `${label}: 앤티가 없다`);
+    }
+
+    // 화면(레벨 표)에도 그대로 나오는지
+    await page.click('#td-quick');
+    await page.waitForTimeout(600);
+    if (!(await page.locator('.tdlevels .tdfold').evaluate((e) => e.open))) {
+      await page.click('.tdlevels .tdfoldsum');
+      await page.waitForTimeout(350);
+    }
+    // 값이 input 안에 있어서 innerText 로는 안 보인다 — 칸을 직접 읽는다
+    const shown = await page.evaluate(() => {
+      const sb = [...document.querySelectorAll('.tdlevels .lvin[data-f="sb"]')].map((e) => +e.value);
+      const bb = [...document.querySelectorAll('.tdlevels .lvin[data-f="bb"]')].map((e) => +e.value);
+      const an = [...document.querySelectorAll('.tdlevels .lvin[data-f="ante"]')].map((e) => +e.value);
+      return sb.map((v, i) => [v, bb[i], an[i]]);
+    });
+    ok(JSON.stringify(shown.map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
+      `${label}: 레벨 표 화면에도 표 그대로 나온다`,
+      shown.map((x) => x[0] + '/' + x[1]).join(' · '));
+    ok(shown.length && shown[shown.length - 1][0] === 5000 && shown[shown.length - 1][1] === 10000,
+      `${label}: 마지막 줄이 5000/10000`,
+      shown.length ? shown[shown.length - 1].join('/') : '없음');
+    if (ante) ok(shown[2][2] === 600, `${label}: 레벨 표 3레벨 앤티 칸이 600`, String(shown[2][2]));
+    // 전광판에도
+    ok(/100\s*\/\s*200/.test(await txt('.bblind')), `${label}: 전광판 1레벨이 100/200`,
+      (await txt('.bblind')).replace(/\n/g, ' | ').slice(0, 100));
+    ok(ante ? /ANTE/.test(await txt('.bblind')) : true, `${label}: 앤티 줄 표시`);
+  }
+
+  await page.evaluate(() => localStorage.removeItem('hb.td'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await tab('tour');
+}
+
 /* ─────────── 전광판 로고 ─────────── */
 group('로고');
 {

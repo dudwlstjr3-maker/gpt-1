@@ -292,9 +292,19 @@ for (const vp of WIDTHS) {
   if (await page.locator('#td-screen').count() === 0) {
     add('전광판', '대회를 시작했는데 전광판이 렌더되지 않습니다');
   } else {
-    await scanContrast(page, '전광판', '#td-screen');
+    // 대회마다 색이 다르므로 여섯 색 전부 대비를 본다 — 하나만 보면 나머지가 눈을 감는다
+    const HUES = await page.evaluate(() => GAME_HUES);
+    checks++;
+    if (!Array.isArray(HUES) || HUES.length < 5) add('전광판', `대회 색이 너무 적습니다 (${HUES && HUES.length})`);
+    for (const hue of HUES) {
+      await page.evaluate((h) => document.getElementById('td-screen').setAttribute('data-game', h), hue);
+      await page.waitForTimeout(160);
+      await scanContrast(page, `전광판 · ${hue}`, '#td-screen');
+      await scanClipped(page, `전광판 · ${hue}`, '#td-screen');
+      if (SHOTS) await page.locator('#td-screen').screenshot({ path: path.join(SHOT_DIR, `board-${hue}.png`) });
+    }
+    await page.evaluate(() => document.getElementById('td-screen').setAttribute('data-game', 'green'));
     await scanText(page, '전광판');
-    await scanClipped(page, '전광판', '#td-screen');
 
     // 전광판이 가로로 넘치면 TV 에서 잘린다
     checks++;
@@ -504,4 +514,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 · 휴식 + 전적 · 홈 · 계정 창)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 색 6종 · 휴식 + 전적 · 홈 · 계정 창)\n`);

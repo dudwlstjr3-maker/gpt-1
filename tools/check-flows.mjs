@@ -392,6 +392,47 @@ group('진행');
       const cs = getComputedStyle(e), r = e.getBoundingClientRect();
       return { px: parseFloat(cs.fontSize), cx: Math.round(r.left + r.width / 2) };
     });
+    // 대회마다 색이 달라야 «무슨 게임인지» 를 글씨 읽기 전에 안다
+    {
+      const hueOf = () => page.getAttribute('#td-screen', 'data-game');
+      const gameColor = () => page.locator('.bgame').evaluate((e) => getComputedStyle(e).color);
+      const seen = {};
+      for (const tpl of ['f9_daily', 'f9_monster', 'f9_league']) {
+        await page.evaluate(() => { localStorage.removeItem('hb.td'); });
+        await page.reload({ waitUntil: 'networkidle' });
+        await tab('tour');
+        await page.evaluate((t) => {
+          const btn = [...document.querySelectorAll('.tplb')].find((x) => x.dataset.id === t);
+          if (btn) btn.click();
+        }, tpl);
+        await page.waitForTimeout(320);
+        await page.click('#td-quick');
+        await page.waitForTimeout(600);
+        seen[tpl] = { hue: await hueOf(), color: await gameColor(), name: await txt('.bgame') };
+      }
+      ok(new Set(Object.values(seen).map((x) => x.hue)).size === 3,
+        '싯앤고 · 몬스터 · 몬스터 리그가 서로 다른 색이다',
+        Object.entries(seen).map(([k, v]) => `${k}=${v.hue}`).join(' · '));
+      ok(new Set(Object.values(seen).map((x) => x.color)).size === 3,
+        '대회명 글씨 색이 실제로 셋 다 다르다',
+        Object.values(seen).map((v) => v.color).join(' · '));
+      ok(seen.f9_daily.name === '싯앤고', '싯앤고 이름', seen.f9_daily.name);
+      ok(seen.f9_monster.name === '몬스터', '몬스터 이름', seen.f9_monster.name);
+      ok(seen.f9_league.name === '몬스터 리그',
+        '몬스터 리그가 제 이름으로 뜬다 (예전엔 WEEKLY TOURNAMENT 였다)', seen.f9_league.name);
+
+      // 레벨과 진행바도 같은 색을 쓴다 — 화면 전체가 그 게임의 색이 된다
+      const lv = await page.locator('.lvrow').evaluate((e) => getComputedStyle(e).color);
+      ok(lv === seen.f9_league.color, '레벨 표시도 대회 색을 따른다', `${lv} vs ${seen.f9_league.color}`);
+
+      // 다시 기본 대회로
+      await page.evaluate(() => { localStorage.removeItem('hb.td'); });
+      await page.reload({ waitUntil: 'networkidle' });
+      await tab('tour');
+      await page.click('#td-quick');
+      await page.waitForTimeout(600);
+    }
+
     const game = await size('.bgame'), venue = await size('.bvenue');
     ok(game.px > venue.px * 2, '대회명이 매장명보다 두 배 넘게 크다',
       `대회명 ${game.px}px · 매장명 ${venue.px}px`);
@@ -425,11 +466,32 @@ group('진행');
     ok(bl.over <= 1, '블라인드 상자 안에 내용이 다 들어간다', `${bl.over}px 넘침`);
   }
 
-  // ── 상금 배분 접기 / 펴기
+  // ── 접기 / 펴기 — 상금 배분과 레벨 표가 같은 방식·같은 자리
   {
+    const cards = [
+      { sel: '.tdpayout', name: '상금 배분', inner: '#td-ladq', open0: true },
+      { sel: '.tdlevels', name: '레벨 표', inner: '.lvtbl, table', open0: false },
+    ];
+    for (const c of cards) {
+      ok(await page.locator(c.sel + ' .tdfold').count() === 1, `${c.name}이 접었다 폈다 하는 카드다`);
+      ok(await page.locator(c.sel + ' .tdfoldsum').count() === 1, `${c.name}의 접기 손잡이가 제목 줄에 있다`);
+      ok(await page.locator(c.sel + ' #td-lvtoggle2, ' + c.sel + ' .row > div > button.btn.sec').count() === 0
+        || c.sel === '.tdpayout', `${c.name}에 예전 방식의 별도 토글 버튼이 없다`);
+    }
+    // 손잡이가 두 카드에서 같은 자리(오른쪽 끝)에 있는지
+    {
+      const pos = await page.evaluate(() => [...document.querySelectorAll('.tdfoldsum i')].map((e) => {
+        const r = e.getBoundingClientRect(), card = e.closest('.card').getBoundingClientRect();
+        return Math.round(card.right - r.right);
+      }));
+      ok(pos.length === 2, '접기 손잡이가 두 개다', String(pos.length));
+      ok(pos.length === 2 && Math.abs(pos[0] - pos[1]) <= 1,
+        '두 카드의 접기 손잡이가 같은 자리에 있다', pos.join(' vs ') + 'px (카드 오른쪽에서)');
+    }
+    ok(await page.locator('#td-lvtoggle2').count() === 0, '레벨 표의 예전 토글 버튼이 없어졌다');
+
     const fold = page.locator('.tdpayout .tdfold');
-    ok(await fold.count() === 1, '상금 배분이 접었다 폈다 하는 카드다');
-    ok(await fold.evaluate((e) => e.open) === true, '처음엔 펴져 있다');
+    ok(await fold.evaluate((e) => e.open) === true, '상금 배분은 처음엔 펴져 있다');
     ok(await page.locator('#td-ladq').isVisible(), '펴져 있으면 상금 버튼이 보인다');
 
     await page.click('.tdpayout .tdfoldsum');
@@ -439,20 +501,35 @@ group('진행');
     ok(/상금/.test(await txt('.tdpayout .tdfoldsum')), '접혀 있어도 요약이 보인다',
       (await txt('.tdpayout .tdfoldsum')).replace(/\n/g, ' | '));
 
+    // 레벨 표도 같은 방식으로 열린다
+    const lvf = page.locator('.tdlevels .tdfold');
+    ok(await lvf.evaluate((e) => e.open) === false, '레벨 표는 처음엔 접혀 있다');
+    ok(/전체 \d+행/.test(await txt('.tdlevels .tdfoldsum')), '접혀 있어도 몇 행인지 보인다',
+      (await txt('.tdlevels .tdfoldsum')).replace(/\n/g, ' | '));
+    await page.click('.tdlevels .tdfoldsum');
+    await page.waitForTimeout(350);
+    ok(await lvf.evaluate((e) => e.open) === true, '제목을 누르면 레벨 표가 펴진다');
+    ok(await page.locator('.tdlevels table').count() >= 1, '펴면 레벨 표가 보인다');
+
     // 시계가 1초마다 다시 그려도 접힘이 유지돼야 한다
     await page.click('#td-run');
     await page.waitForTimeout(1400);
-    ok(await fold.evaluate((e) => e.open) === false, '시계가 도는 동안에도 접힌 채로 있다');
+    ok(await fold.evaluate((e) => e.open) === false, '시계가 도는 동안에도 상금 배분은 접힌 채로 있다');
+    ok(await lvf.evaluate((e) => e.open) === true, '레벨 표도 펴진 채로 있다');
     await page.click('#td-run');
     await page.waitForTimeout(300);
 
     await page.reload({ waitUntil: 'networkidle' });
     await tab('tour');
     ok(await page.locator('.tdpayout .tdfold').evaluate((e) => e.open) === false,
-      '새로고침해도 접힌 상태가 남는다');
+      '새로고침해도 상금 배분 접힘이 남는다');
+    ok(await page.locator('.tdlevels .tdfold').evaluate((e) => e.open) === true,
+      '새로고침해도 레벨 표 펴짐이 남는다');
     await page.click('.tdpayout .tdfoldsum');
     await page.waitForTimeout(300);
     ok(await page.locator('.tdpayout .tdfold').evaluate((e) => e.open) === true, '다시 누르면 펴진다');
+    await page.click('.tdlevels .tdfoldsum');
+    await page.waitForTimeout(300);
   }
 
   // 종료 → 설정 화면

@@ -206,10 +206,16 @@ group('블라인드 사다리');
 
     const lv = await page.evaluate(() =>
       TD.levels.filter((l) => !l.brk).map((l) => [l.sb, l.bb, l.ante]));
-    ok(lv.length === WANT.length, `${label}: 레벨이 ${WANT.length}개`, String(lv.length));
-    ok(JSON.stringify(lv.map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
-      `${label}: 100/200 → 5000/10000 표 그대로`,
-      lv.map((x) => x[0] + '/' + x[1]).join(' · '));
+    ok(lv.length === 20, `${label}: 레벨이 20개 (확인 14 + 추정 6)`, String(lv.length));
+    ok(JSON.stringify(lv.slice(0, WANT.length).map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
+      `${label}: 확인 구간(1~14)이 표 그대로`,
+      lv.slice(0, WANT.length).map((x) => x[0] + '/' + x[1]).join(' · '));
+    ok(lv[13][0] === 5000 && lv[13][1] === 10000, `${label}: 14레벨이 5000/10000`,
+      lv[13].slice(0, 2).join('/'));
+    ok(lv.slice(WANT.length).every((x, i, a) => x[1] === x[0] * 2 &&
+      x[0] > (i ? a[i - 1][0] : lv[WANT.length - 1][0])),
+      `${label}: 추정 구간(15~20)도 계속 오르고 SB:BB = 1:2`,
+      lv.slice(WANT.length).map((x) => x[0] + '/' + x[1]).join(' · '));
 
     if (ante) {
       ok(lv[0][2] === 0 && lv[1][2] === 0 && lv[2][2] === 600,
@@ -234,17 +240,24 @@ group('블라인드 사다리');
       const an = [...document.querySelectorAll('.tdlevels .lvin[data-f="ante"]')].map((e) => +e.value);
       return sb.map((v, i) => [v, bb[i], an[i]]);
     });
-    ok(JSON.stringify(shown.map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
-      `${label}: 레벨 표 화면에도 표 그대로 나온다`,
-      shown.map((x) => x[0] + '/' + x[1]).join(' · '));
-    ok(shown.length && shown[shown.length - 1][0] === 5000 && shown[shown.length - 1][1] === 10000,
-      `${label}: 마지막 줄이 5000/10000`,
-      shown.length ? shown[shown.length - 1].join('/') : '없음');
+    ok(JSON.stringify(shown.slice(0, WANT.length).map((x) => [x[0], x[1]])) === JSON.stringify(WANT),
+      `${label}: 레벨 표 화면에도 확인 구간이 표 그대로`,
+      shown.slice(0, WANT.length).map((x) => x[0] + '/' + x[1]).join(' · '));
+    ok(shown.length === 20, `${label}: 레벨 표에 20줄`, String(shown.length));
+    // 확인 못 한 줄은 «추정» 이라고 화면에 적혀 있어야 한다
+    {
+      const est = await page.locator('.lvest').count();
+      ok(est === 6, `${label}: 추정 6줄에 «추정» 표시`, String(est));
+      const tblTxt = await txt('.tdlevels table');
+      ok(/추정/.test(tblTxt), `${label}: 레벨 표에 «추정» 글자가 보인다`);
+    }
     if (ante) ok(shown[2][2] === 600, `${label}: 레벨 표 3레벨 앤티 칸이 600`, String(shown[2][2]));
     // 전광판에도
     ok(/100\s*\/\s*200/.test(await txt('.bba')), `${label}: 전광판 1레벨이 100/200`,
       (await txt('.bba')).replace(/\n/g, ' | ').slice(0, 100));
     {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(200);
       const cells = await page.locator('.bb1').evaluateAll((es) => es.map((e) => ({
         k: e.querySelector('.k').textContent.trim(),
         top: Math.round(e.getBoundingClientRect().top) })));
@@ -256,6 +269,32 @@ group('블라인드 사다리');
         ok(cells.length === 1 && cells[0].k === 'BLINDS',
           `${label}: 앤티가 없으니 BLINDS 한 칸만`, cells.map((x) => x.k).join(' · '));
       }
+      // 레벨이 올라가 자릿수가 늘어도 두 칸이 옆으로 밀리면 안 된다.
+      // (14레벨 5,000/10,000 에서 화면이 통째로 흔들리던 문제)
+      if (ante) {
+        const pos = [];
+        for (const n of [1, 3, 13, 14, 15, 20]) {
+          await page.evaluate((lv) => {
+            let c = 0, i = 0;
+            for (; i < TD.levels.length; i++) { if (!TD.levels[i].brk) { c++; if (c === lv) break; } }
+            TD.lvl = i; TD.remain = (TD.levels[i].min || 1) * 60000; tdSave(); renderTour();
+            window.scrollTo(0, 0);
+          }, n);
+          await page.waitForTimeout(220);
+          pos.push(await page.locator('.bb1').evaluateAll((es) => es.map((e) => {
+            const r = e.getBoundingClientRect();
+            return Math.round(r.left + r.width / 2);
+          })));
+        }
+        const bCx = [...new Set(pos.map((x) => x[0]))];
+        const aCx = [...new Set(pos.map((x) => x[1]))];
+        ok(bCx.length === 1, `${label}: 레벨이 올라가도 BLINDS 칸이 안 움직인다`, bCx.join(' · '));
+        ok(aCx.length === 1, `${label}: 레벨이 올라가도 ANTE 칸이 안 움직인다`, aCx.join(' · '));
+        // 원래 자리로
+        await page.evaluate(() => { TD.lvl = 0; TD.remain = (TD.levels[0].min || 1) * 60000; tdSave(); renderTour(); });
+        await page.waitForTimeout(250);
+      }
+
       // 어느 쪽이든 블라인드 줄은 가운데 칸 중심에 온다
       const off = await page.evaluate(() => {
         const c = document.querySelector('.bcenter').getBoundingClientRect();
@@ -419,14 +458,25 @@ group('진행');
   // ±30초가 실제로 30초를 움직이는지
   {
     const remain = () => page.evaluate(() => TD.remain);
+    const lvLen = await page.evaluate(() => (curLv().min || 0) * 60000);
     const before = await remain();
     await page.click('#td-m30');
     await page.waitForTimeout(250);
     const after = await remain();
-    ok(before - after === 30000, '−30초가 정확히 30초를 뺀다', `${before} → ${after}`);
+    ok(before - after === 30000, '−30초가 남은 시간에서 정확히 30초를 뺀다', `${before} → ${after}`);
     await page.click('#td-p30');
     await page.waitForTimeout(250);
     ok(await remain() === before, '+30초로 되돌아온다', String(await remain()));
+
+    // 레벨 길이(7분)를 넘어서면 안 된다 — 넘으면 7분짜리 레벨에 7:30 이 찍힌다
+    for (let i = 0; i < 5; i++) { await page.click('#td-p30'); await page.waitForTimeout(90); }
+    await page.waitForTimeout(250);
+    ok(await remain() === lvLen, '+30초를 여러 번 눌러도 레벨 길이를 넘지 않는다',
+      `${await remain()} / 상한 ${lvLen}`);
+    ok(await page.evaluate(() => curLv().min) === 7, '레벨 길이 설정(7분)은 그대로다',
+      String(await page.evaluate(() => curLv().min)));
+    ok(/^0?7:00$/.test(await page.locator('#td-time').innerText()),
+      '시계가 7:00 을 넘어가지 않는다', await page.locator('#td-time').innerText());
   }
 
   // 시작 / 일시정지 — 글씨가 바뀌어도 칸 크기는 그대로여야 옆 버튼이 안 밀린다
@@ -538,6 +588,8 @@ group('진행');
 
     // 블라인드가 상자 한가운데에, 상자 밖으로 안 새고
     // 참고한 전광판처럼 BLINDS 와 ANTE 가 한 줄에 나란히, 가운데 칸 중심에 놓인다
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(200);
     const bl = await page.evaluate(() => {
       const c = document.querySelector('.bcenter').getBoundingClientRect();
       const ba = document.querySelector('.bba').getBoundingClientRect();

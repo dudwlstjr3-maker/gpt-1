@@ -208,15 +208,20 @@ group('토너먼트');
   {
     const WANT = [[100,200],[200,400],[300,600],[400,800],[500,1000],[600,1200],[700,1400],
       [800,1600],[900,1800],[1000,2000],[2000,4000],[3000,6000],[4000,8000],[5000,10000]];
-    ok(app.F9_LADDER.length === WANT.length, `사다리는 ${WANT.length}레벨`, String(app.F9_LADDER.length));
+    ok(app.F9_LADDER_OK.length === WANT.length, `확인된 사다리는 ${WANT.length}레벨`,
+      String(app.F9_LADDER_OK.length));
+    ok(app.F9_OK_LEVELS === WANT.length, '확인 구간 경계가 14레벨', String(app.F9_OK_LEVELS));
+    ok(app.F9_LADDER.length === 20, '추정을 이어 붙여 20레벨', String(app.F9_LADDER.length));
+    ok(app.F9_LADDER.slice(0, WANT.length).every((x, i) => x[0] === WANT[i][0] && x[1] === WANT[i][1]),
+      '앞 14레벨은 확인값 그대로 (추정이 덮어쓰지 않는다)');
 
     for (const id of ['f9_daily', 'f9_monster', 'f9_league']) {
       const t = TSTRUCT.find((x) => x.id === id);
       ok(!!t, `${id} 프리셋 존재`);
       if (!t) continue;
-      ok(t.count === WANT.length, `${id}: 레벨 개수가 ${WANT.length}`, String(t.count));
+      ok(t.count === 20, `${id}: 레벨 개수가 20`, String(t.count));
 
-      const lv = buildLevels(t, WANT.length, 0, 0).filter((x) => !x.brk);
+      const lv = buildLevels(t, 20, 0, 0).filter((x) => !x.brk);
       let bad = null;
       for (let i = 0; i < WANT.length; i++) {
         if (!lv[i] || lv[i].sb !== WANT[i][0] || lv[i].bb !== WANT[i][1]) {
@@ -225,11 +230,20 @@ group('토너먼트');
           break;
         }
       }
-      ok(!bad, `${id}: 블라인드가 100/200 → 5000/10000 까지 표 그대로`, bad);
+      ok(!bad, `${id}: 확인 구간(1~14) 블라인드가 표 그대로`, bad);
       ok(t.min === 7, `${id}: 레벨 시간 7분 (매장 확인)`, String(t.min));
       ok(lv.every((x) => x.min === 7), `${id}: 모든 레벨이 7분`,
         [...new Set(lv.map((x) => x.min))].join(','));
-      ok(lv.length === WANT.length, `${id}: 5000/10000 에서 끝난다`, `${lv.length}레벨`);
+      ok(lv.length === 20, `${id}: 20레벨까지 만든다`, `${lv.length}레벨`);
+      ok(lv[13].sb === 5000 && lv[13].bb === 10000, `${id}: 14레벨이 5000/10000 (확인 구간 끝)`,
+        lv[13].sb + '/' + lv[13].bb);
+      // 추정 구간도 계속 오르고 SB:BB 는 1:2 를 지킨다
+      let estBad = null;
+      for (let i = WANT.length; i < lv.length; i++) {
+        if (lv[i].bb !== lv[i].sb * 2) { estBad = `${i+1}레벨 BB 가 SB 의 두 배가 아니다`; break; }
+        if (lv[i].sb <= lv[i-1].sb) { estBad = `${i+1}레벨이 앞 레벨보다 안 크다`; break; }
+      }
+      ok(!estBad, `${id}: 추정 구간(15~20)도 계속 오르고 SB:BB = 1:2`, estBad);
 
       // 앤티 — 싯앤고는 없고, 몬스터·리그는 3레벨부터 BB 와 같은 금액
       if (id === 'f9_daily') {
@@ -246,9 +260,9 @@ group('토너먼트');
       }
     }
 
-    // 10레벨까지는 100/200 씩, 그 뒤로는 1000/2000 씩 오른다 (매장이 말한 리듬)
+    // 10레벨까지는 100/200 씩, 그 뒤로는 1000/2000 씩 오른다 (매장이 말한 리듬) — 확인 구간만
     {
-      const L = app.F9_LADDER;
+      const L = app.F9_LADDER_OK;
       let step = null;
       for (let i = 1; i < 10; i++)
         if (L[i][0] - L[i-1][0] !== 100 || L[i][1] - L[i-1][1] !== 200)

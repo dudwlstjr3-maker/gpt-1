@@ -503,6 +503,155 @@ for (const vp of WIDTHS) {
   await page.close();
 }
 
+/* ── 휴대폰 전광판 ──
+   전광판 검사를 1600px 에서만 돌렸더니 좁은 화면이 통째로 사각지대였다.
+   실제로 오른쪽 정보단이 한 줄에 셋씩 밀려 「3,666,667」과 「28:00」이 겹쳐 찍혔다.
+   세로·가로 두 방향에서, 평소 화면과 전체화면을 모두 본다. */
+for (const vp of [{ w: 390, h: 844, n: '휴대폰 세로' }, { w: 844, h: 390, n: '휴대폰 가로' }]) {
+  const page = await browser.newPage({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1 });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message.slice(0, 160)));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text().slice(0, 160)); });
+  await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
+  await page.click('nav button[data-v="tour"]');
+  await page.waitForTimeout(300);
+  await page.click('#td-quick');
+  await page.waitForTimeout(500);
+  // 자릿수가 긴 값(총 칩·평균 스택)이 있어야 겹침이 드러난다
+  await page.evaluate(() => { TD.entries = 24; TD.players = 18; TD.rebuys = 6; tdAutoPay(); tdSave(); renderTour(); });
+  await page.waitForTimeout(300);
+
+  const where = `전광판 ${vp.n}`;
+  checks++;
+  if (await page.locator('#td-screen').count() === 0) { add(where, '전광판이 렌더되지 않습니다'); }
+  else {
+    /* 값끼리 겹치는지 — 잘림 검사만으로는 안 걸린다.
+       칸이 좁으면 글자가 상자 밖으로 흘러 옆 칸을 침범한다. */
+    const overlap = async (w2) => {
+      checks++;
+      const hits = await page.evaluate(() => {
+        const els = [...document.querySelectorAll('#td-screen .bcol .v, #td-screen .bcol .k, #td-screen .bb1 .v')]
+          .filter((e) => e.offsetParent);
+        const box = els.map((e) => {
+          const r = e.getBoundingClientRect();
+          // 실제로 그려진 글자 폭 (상자보다 넓으면 밖으로 흘러나온 것)
+          const rng = document.createRange(); rng.selectNodeContents(e);
+          const tr = rng.getBoundingClientRect();
+          return { t: e.textContent.trim().slice(0, 24),
+            l: Math.min(r.left, tr.left), r: Math.max(r.right, tr.right),
+            top: Math.min(r.top, tr.top), b: Math.max(r.bottom, tr.bottom) };
+        });
+        const out = [];
+        for (let i = 0; i < box.length; i++) for (let j = i + 1; j < box.length; j++) {
+          const a = box[i], c = box[j];
+          const ox = Math.min(a.r, c.r) - Math.max(a.l, c.l);
+          const oy = Math.min(a.b, c.b) - Math.max(a.top, c.top);
+          if (ox > 2 && oy > 2) out.push(`"${a.t}" ↔ "${c.t}"`);
+        }
+        return out.slice(0, 4);
+      });
+      for (const h of hits) add(w2, `전광판 값이 서로 겹칩니다: ${h}`);
+    };
+
+    await scanText(page, where);
+    await scanOverflow(page, where, vp.w);
+    await scanClipped(page, where, '#td-screen');
+    await scanContrast(page, where, '#td-screen');
+    await overlap(where);
+
+    // 전체화면 — 아이폰과 같이 API 가 없는 상황으로 만들어 CSS 덮개를 켠다
+    await page.evaluate(() => {
+      delete Element.prototype.requestFullscreen;
+      delete Element.prototype.webkitRequestFullscreen;
+    });
+    await page.click('#td-full');
+    await page.waitForTimeout(450);
+    const wf = `${where} · 전체화면`;
+    checks++;
+    if (!(await page.locator('#td-screen').evaluate((e) => e.classList.contains('fson'))))
+      add(wf, '전체화면이 켜지지 않습니다');
+    checks++;
+    {
+      const b = await page.locator('#td-screen').boundingBox();
+      if (!b || Math.abs(b.width - vp.w) > 1 || Math.abs(b.height - vp.h) > 1)
+        add(wf, `전광판이 화면을 다 덮지 않습니다 (${JSON.stringify(b)})`);
+    }
+    // 시계가 접히면 «07:» / «00» 으로 두 줄이 된다 — 실제로 그랬다
+    checks++;
+    {
+      const t = await page.locator('#td-time').evaluate((e) => {
+        const cs = getComputedStyle(e);
+        return { h: e.getBoundingClientRect().height, lh: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2 };
+      });
+      if (t.h > t.lh * 1.6) add(wf, `시계가 두 줄로 접혔습니다 (높이 ${Math.round(t.h)}px, 한 줄 ${Math.round(t.lh)}px)`);
+    }
+    await scanText(page, wf);
+    await scanOverflow(page, wf, vp.w);
+    await scanClipped(page, wf, '#td-screen');
+    await scanContrast(page, wf, '#td-screen');
+    await overlap(wf);
+    if (SHOTS) await page.screenshot({ path: path.join(SHOT_DIR, `board-${vp.w}x${vp.h}-fs.png`) });
+  }
+
+  if (errs.length) [...new Set(errs)].forEach((e) => add(where, '콘솔 ' + e));
+  await page.close();
+}
+
+/* ── 휴대폰 탭바 ──
+   탭을 아래로 내렸다. 흐림(backdrop-filter)이 걸린 조상 안에서는 position:fixed 가
+   그 조상 기준이 돼 탭바가 헤더 안에 갇힌다 — 눈으로는 잘 안 보이고 손으로만 걸린다.
+   그래서 «화면 맨 아래에 붙어 있는가» 를 좁은 폭마다 재 본다. */
+for (const w of [320, 360, 390, 430, 700]) {
+  const page = await browser.newPage({ viewport: { width: w, height: 780 }, deviceScaleFactor: 1 });
+  await page.goto(`http://localhost:${PORT}/${FILE}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(200);
+  const where = `탭바 ${w}px`;
+  const m = await page.evaluate(() => {
+    const nav = document.getElementById('nav');
+    const r = nav.getBoundingClientRect();
+    const bs = [...nav.querySelectorAll('button')].map((b) => ({
+      v: b.dataset.v, w: Math.round(b.clientWidth), sw: Math.round(b.scrollWidth),
+      h: Math.round(b.clientHeight), fixed: getComputedStyle(nav).position,
+    }));
+    const wrap = document.querySelector('.wrap');
+    const pad = parseFloat(getComputedStyle(wrap).paddingBottom);
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(r.height), bs, pad };
+  });
+  checks++;
+  if (m.bs[0].fixed !== 'fixed') add(where, `탭바가 화면에 고정돼 있지 않습니다 (${m.bs[0].fixed})`);
+  checks++;
+  if (Math.abs(m.bottom - 780) > 1) add(where, `탭바가 화면 맨 아래에 안 붙었습니다 (bottom=${m.bottom}, 화면 780)`);
+  checks++;
+  if (m.bs.length !== 8) add(where, `탭이 8개가 아닙니다 (${m.bs.length})`);
+  checks++;
+  {
+    const small = m.bs.filter((b) => b.h < 44);
+    if (small.length) add(where, `손가락으로 누르기엔 작은 탭: ${small.map((b) => b.v + ' ' + b.h + 'px').join(', ')}`);
+  }
+  checks++;
+  {
+    const cut = m.bs.filter((b) => b.sw - b.w > 1);
+    if (cut.length) add(where, `탭 글씨가 잘립니다: ${cut.map((b) => `${b.v} ${b.w}→${b.sw}`).join(', ')}`);
+  }
+  checks++;
+  if (m.pad < m.h) add(where, `본문 아래 여백(${m.pad}px)이 탭바 높이(${m.h}px)보다 작아 마지막 줄이 가려집니다`);
+  // 탭바가 실제로 눌리는가 — 겹친 것이 있으면 손으로만 걸린다
+  checks++;
+  {
+    const hit = await page.evaluate(() => {
+      const b = document.querySelector('nav button[data-v="rec"]');
+      const r = b.getBoundingClientRect();
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return !!top && (top === b || b.contains(top));
+    });
+    if (!hit) add(where, '탭바 위에 다른 것이 덮여 있어 안 눌립니다');
+  }
+  await scanText(page, where);
+  await scanOverflow(page, where, w);
+  await scanContrast(page, where, '#nav');
+  await page.close();
+}
+
 await browser.close();
 server.close();
 
@@ -514,4 +663,4 @@ if (problems.length) {
   process.exit(1);
 }
 console.log(`✓ 화면 검증 통과 — 문제 0건 / 점검 ${checks}회 ` +
-  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 색 6종 · 휴식 + 전적 · 홈 · 계정 창)\n`);
+  `(${TABS.length}탭 × ${WIDTHS.length}폭 + 전광판 색 6종 · 휴식 + 전적 · 홈 · 계정 창 · 탭바 5폭 · 휴대폰 전광판)\n`);

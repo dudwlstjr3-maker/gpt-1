@@ -708,6 +708,93 @@ group('진행');
     await page.waitForTimeout(300);
   }
 
+  /* ── 전체화면 — 두 갈래를 다 눌러 본다 ──
+     ① 브라우저가 열어 주는 경우(데스크톱 · 안드로이드)
+     ② 아예 API 가 없는 경우(아이폰 사파리) — 예전엔 여기서 버튼이 먹통이었다 */
+  group('전체화면');
+  {
+    const fson = () => page.locator('#td-screen').evaluate((e) => e.classList.contains('fson'));
+    const locked = () => page.evaluate(() => document.body.classList.contains('fslock'));
+
+    ok((await fson()) === false, '처음에는 전체화면이 아니다');
+    ok(await page.locator('#td-fsx').count() === 1, '나가기 버튼이 전광판 안에 있다');
+    ok(await page.locator('#td-fsx').isVisible() === false, '평소엔 나가기 버튼이 안 보인다');
+
+    await page.click('#td-full');
+    await page.waitForTimeout(450);
+    ok((await fson()) === true, '전체화면 버튼을 누르면 전광판이 전체화면이 된다');
+    ok((await txt('#td-full')).includes('끄기'), '버튼 글씨가 「전체화면 끄기」로 바뀐다', await txt('#td-full'));
+    ok(await page.locator('#td-fsx').isVisible() === true, '전체화면에서는 나가기 버튼이 보인다');
+
+    // 전광판 노드를 통째로 갈아 끼우면 브라우저가 전체화면을 취소한다.
+    // 전체화면으로 걸어 두고 인원만 만져도 화면이 튀어나오던 자리다.
+    await page.keyboard.press('b');
+    await page.waitForTimeout(400);
+    ok((await fson()) === true, '인원 +1 을 해도 전체화면이 유지된다');
+    ok(await page.locator('#td-fsx').count() === 1, '다시 그려도 나가기 버튼이 남는다');
+    ok(await page.locator('#td-lv tr').count() > 1, '운영 카드도 같이 다시 그려진다');
+
+    await page.click('#td-fsx');
+    await page.waitForTimeout(450);
+    ok((await fson()) === false, '나가기를 누르면 전체화면이 풀린다');
+    ok((await txt('#td-full')).trim() === '전체화면', '버튼 글씨도 돌아온다', await txt('#td-full'));
+    ok((await locked()) === false, '나가면 뒤 페이지 스크롤 잠금도 풀린다');
+
+    // ② Fullscreen API 를 지워서 아이폰 사파리와 같은 상황을 만든다
+    await page.evaluate(() => {
+      delete Element.prototype.requestFullscreen;
+      delete Element.prototype.webkitRequestFullscreen;
+    });
+    ok(await page.evaluate(() => !document.createElement('div').requestFullscreen),
+      'Fullscreen API 가 없는 상태를 만들었다');
+
+    await page.click('#td-full');
+    await page.waitForTimeout(450);
+    ok((await fson()) === true, 'API 가 없어도 전체화면이 켜진다 (CSS 로 덮는다)');
+    ok((await locked()) === true, '흉내낸 전체화면에서는 뒤 페이지가 안 굴러간다');
+    ok(await page.evaluate(() => !document.fullscreenElement), '이건 진짜 전체화면이 아니다');
+    {
+      const box = await page.locator('#td-screen').boundingBox();
+      const vp = page.viewportSize();
+      ok(box && Math.abs(box.width - vp.width) <= 1 && Math.abs(box.height - vp.height) <= 1,
+        '전광판이 화면을 빈틈없이 덮는다', JSON.stringify(box));
+      ok(box && Math.abs(box.x) <= 1 && Math.abs(box.y) <= 1, '왼쪽 위 모서리에 딱 붙는다', JSON.stringify(box));
+    }
+    ok(await page.locator('#td-fsx').isVisible() === true, '흉내낸 전체화면에도 나가는 길이 보인다');
+
+    // 브라우저가 Esc 를 처리해 주지 않으므로 직접 붙였다
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    ok((await fson()) === false, 'Esc 로 나갈 수 있다');
+    ok((await locked()) === false, 'Esc 로 나가면 잠금도 풀린다');
+
+    // 덮개가 화면을 정말 가리는지 — 이 상태에서는 탭도 못 눌러야 정상이다
+    await page.click('#td-full');
+    await page.waitForTimeout(350);
+    {
+      const hit = await page.evaluate(() => {
+        const b = document.querySelector('nav button[data-v="home"]');
+        const r = b.getBoundingClientRect();
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return top === b || b.contains(top);
+      });
+      ok(hit === false, '덮개가 켜져 있으면 뒤 탭은 눌리지 않는다');
+    }
+    // 그래서 나가는 길은 숫자 단축키로도 열어 둔다 — 탭을 옮기면 덮개가 걷혀야 한다
+    await page.evaluate(() => go('home'));
+    await page.waitForTimeout(250);
+    ok((await locked()) === false, '다른 탭으로 가면 덮개가 걷힌다');
+    ok(await page.locator('#td-screen').evaluate((e) => !e.classList.contains('fson')),
+      '탭을 옮기면 전체화면 표시도 지워진다');
+    await tab('tour');
+
+    // 다음 검사들을 위해 브라우저 기본 상태로 되돌린다
+    await page.reload({ waitUntil: 'networkidle' });
+    await tab('tour');
+    ok(await page.locator('#td-screen').count() === 1, '새로고침해도 전광판이 그대로 뜬다');
+    ok((await fson()) === false, '새로고침하면 전체화면은 꺼진 상태로 시작한다');
+  }
+
   // 종료 → 설정 화면
   page.once('dialog', (d) => d.accept());
   await page.click('#td-end');

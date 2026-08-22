@@ -1506,7 +1506,8 @@ group('탭 번호');
   // 탭이 하나 늘면 이 셋이 조용히 어긋난다 — 실제로 전적 탭을 넣고 그렇게 됐다.
   const src = require('fs').readFileSync(FILE, 'utf8');
   const nav = {};
-  const navRe = /<button data-v="(\w+)"[^>]*>(?:<i>(\d+) · <\/i>)?([^<]*)/g;
+  // 번호는 «칩» 이라 <i class="n"> 안에 숫자만 들어 있다. 도움말은 ? 를 쓴다.
+  const navRe = /<button data-v="(\w+)"[^>]*>(?:<i class="n">([\d?])<\/i>)?([^<]*)/g;
   for (let m; (m = navRe.exec(src)); ) nav[m[1]] = { num: m[2] || null, label: m[3].trim() };
   ok(Object.keys(nav).length >= 7, `내비게이션 탭을 찾았다 (${Object.keys(nav).length}개)`);
 
@@ -1534,6 +1535,7 @@ group('탭 번호');
     ok(names.length >= 5, `번호가 붙은 탭 (${names.join(', ')})`);
     const wrong = [];
     for (const nm of names) {
+      if (!/^\d+$/.test(byLabel[nm])) continue;        // ? 는 본문에 인용되지 않는다
       const re = new RegExp('(\\d+) · ' + nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       for (let m; (m = re.exec(src)); )
         if (m[1] !== byLabel[nm]) wrong.push(`"${m[0]}" ← 실제로는 ${byLabel[nm]}번`);

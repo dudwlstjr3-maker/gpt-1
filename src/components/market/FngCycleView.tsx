@@ -47,6 +47,13 @@ export function CyclePhaseBadge({ cycle, size = 'xs' }: { cycle: FngCycle; size?
   );
 }
 
+/** 백분위를 말로 옮긴다. 숫자만으로는 8% 가 높은지 낮은지 헷갈린다. */
+function positionLabel(p: number): string {
+  if (p >= 70) return '기간 상단권';
+  if (p <= 30) return '기간 하단권';
+  return '기간 중간권';
+}
+
 function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) {
   const c = useChangeColor();
   const unavailable = h.percentile === null;
@@ -67,8 +74,8 @@ function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) 
           )}
         </div>
         <div className="shrink-0 text-right">
-          <p className="tnum text-[13px] font-bold" style={{ color: 'var(--fg-strong)' }}>
-            {unavailable ? NO_VALUE : `상위 ${formatNumber(100 - (h.percentile ?? 0), 0)}%`}
+          <p className="text-[12.5px] font-bold" style={{ color: 'var(--fg-strong)' }}>
+            {unavailable ? NO_VALUE : positionLabel(h.percentile ?? 0)}
           </p>
           <p className="tnum text-[10px]" style={{ color: c.color(h.change) }}>
             {c.glyph(h.change)} {h.change === null ? NO_VALUE : `${formatSigned(h.change, 1)}점`}
@@ -96,8 +103,8 @@ function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) 
       ) : null}
 
       {!unavailable ? (
-        <p className="mt-1 text-[10px] text-subtle">
-          이 기간 {h.windowDays}일 중 현재 점수보다 낮았던 날이 {formatNumber(h.percentile, 0)}%
+        <p className="tnum mt-1 text-[10px] text-subtle">
+          기간 내 위치 {formatNumber(h.percentile, 0)}% — {h.windowDays}일 중 현재 점수보다 낮았던 날의 비율입니다.
         </p>
       ) : null}
     </li>

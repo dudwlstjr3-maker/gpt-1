@@ -1,0 +1,842 @@
+/**
+ * DEMO 어댑터 — API 키 없이도 앱 전체를 확인할 수 있게 하는 고정 샘플 데이터.
+ *
+ * 규칙
+ *  - 실데이터와 절대 섞이지 않는다. 모드는 스냅샷 단위로 하나다.
+ *  - 모든 값은 시드 고정이라 재현 가능하다.
+ *  - 점수는 하드코딩이 아니라 실제 엔진이 계산한다.
+ *  - 뉴스는 실제 매체를 사칭하지 않도록 가상의 샘플 매체명을 쓴다.
+ */
+
+import { mulberry32, gaussianFrom, hashSeed } from '@/lib/rng';
+import { CATALOG, catalogFor, type CatalogItem } from '@/lib/catalog';
+import { getSession } from '@/lib/marketHours';
+import { clamp, round } from '@/lib/stats';
+import type {
+  CalendarEvent,
+  DataSource,
+  EventCategory,
+  EventImportance,
+  FlowSummary,
+  MacroIndicator,
+  MarketId,
+  Meta,
+  NewsItem,
+  Quote,
+  RangeKey,
+  SeriesPoint,
+} from '@/types';
+import type { EngineInput } from '@/server/fng/engine';
+import { COMPONENTS } from '@/server/fng/definitions';
+import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
+import { getWorld, type DemoWorld } from './world';
+
+const DEMO_SOURCE: DataSource = {
+  name: 'DEMO 합성 데이터 (실제 시세 아님)',
+  delayMinutes: 0,
+  terms: '고정 시드로 생성한 샘플입니다. 투자 판단에 사용할 수 없습니다.',
+};
+
+/** 시장별 표시 지연(분) — DEMO 에서도 지연 배지 동작을 재현한다. */
+const DELAY_MIN: Record<MarketId, number> = { us: 15, kr: 20, crypto: 1 };
+
+/* ------------------------------------------------------------------ */
+/* 시리즈 매핑                                                          */
+/* ------------------------------------------------------------------ */
+
+interface SeriesRef {
+  values: number[];
+  dates: number[];
+  /** 표시 값으로 변환 */
+  scale?: number;
+}
+
+function seriesFor(world: DemoWorld, item: CatalogItem): SeriesRef | null {
+  const d = world.dates;
+  const cd = world.cryptoDates;
+  const s = world.s;
+  const c = world.c;
+
+  switch (item.id) {
+    case 'spx': return { values: s.spx, dates: d };
+    case 'ndx': return { values: s.ndx, dates: d };
+    case 'dji': return { values: s.dji, dates: d };
+    case 'rut': return { values: s.rut, dates: d };
+    case 'vix': return { values: s.vix, dates: d };
+    case 'ust2': return { values: s.ust2, dates: d };
+    case 'ust10': return { values: s.ust10, dates: d };
+    case 'us_spread_10_2':
+      return { values: s.ust10.map((v, i) => (v - s.ust2[i]) * 100), dates: d };
+    case 'dxy': return { values: s.dxy, dates: d };
+    case 'gold': return { values: s.gold, dates: d };
+    case 'wti': return { values: s.wti, dates: d };
+    case 'nvda': return { values: s.nvda, dates: d };
+    case 'aapl': return { values: s.aapl, dates: d };
+    case 'msft': return { values: s.msft, dates: d };
+    case 'amzn': return { values: s.amzn, dates: d };
+    case 'tsla': return { values: s.tsla, dates: d };
+
+    case 'kospi': return { values: s.kospi, dates: d };
+    case 'kosdaq': return { values: s.kosdaq, dates: d };
+    case 'kospi200': return { values: s.kospi200, dates: d };
+    case 'vkospi': return { values: s.vkospi, dates: d };
+    case 'usdkrw': return { values: s.usdkrw, dates: d };
+    case 'ktb3': return { values: s.ktb3, dates: d };
+    case 'ktb10': return { values: s.ktb10, dates: d };
+    case 'samsung': return { values: s.samsung.map((v) => Math.round(v / 10) * 10), dates: d };
+    case 'hynix': return { values: s.hynix.map((v) => Math.round(v / 100) * 100), dates: d };
+    case 'hyundai': return { values: s.hyundai.map((v) => Math.round(v / 100) * 100), dates: d };
+    case 'naver': return { values: s.naver.map((v) => Math.round(v / 100) * 100), dates: d };
+    case 'kakao': return { values: s.kakao.map((v) => Math.round(v / 50) * 50), dates: d };
+
+    case 'btc': return { values: c.btc, dates: cd };
+    case 'eth': return { values: c.eth, dates: cd };
+    case 'xrp': return { values: c.xrp, dates: cd };
+    case 'sol': return { values: c.sol, dates: cd };
+    case 'bnb': return { values: c.bnb, dates: cd };
+    case 'total_mcap': return { values: c.totalMcap.map((v) => v / 1e9), dates: cd };
+    case 'total_vol': return { values: c.totalVol.map((v) => v / 1e9), dates: cd };
+    case 'btc_dom': return { values: c.btcDom, dates: cd };
+    case 'stable_mcap': return { values: c.stableMcap.map((v) => v / 1e9), dates: cd };
+    case 'funding': return { values: c.funding, dates: cd };
+    case 'open_interest': return { values: c.openInterest.map((v) => v / 1e9), dates: cd };
+    case 'liquidations': return { values: c.liquidations.map((v) => v / 1e9), dates: cd };
+    default: return null;
+  }
+}
+
+/** 결정적 거래량 생성 */
+function volumeFor(item: CatalogItem, values: number[], index: number): number | null {
+  if (!item.hasVolume) return null;
+  const r = mulberry32(hashSeed(item.id) ^ index);
+  const prev = values[index - 1] ?? values[index];
+  const move = Math.abs((values[index] - prev) / (prev || 1));
+  const base =
+    item.market === 'kr' && item.kind === 'equity'
+      ? 9_000_000
+      : item.market === 'us' && item.kind === 'equity'
+        ? 42_000_000
+        : item.market === 'crypto'
+          ? 18_000
+          : 620_000_000;
+  return Math.round(base * (0.65 + r() * 0.7) * (1 + move * 9));
+}
+
+/* ------------------------------------------------------------------ */
+/* Quote 생성                                                           */
+/* ------------------------------------------------------------------ */
+
+function makeMeta(ctx: AdapterContext, market: MarketId, extraNotes?: string[]): Meta {
+  const delay = DELAY_MIN[market];
+  const staleShift = ctx.scenario === 'stale' ? 3 * 86400_000 : 0;
+  const asOf = new Date(ctx.now.getTime() - delay * 60_000 - staleShift).toISOString();
+  return {
+    asOf,
+    fetchedAt: new Date(ctx.now.getTime() - staleShift).toISOString(),
+    freshness: ctx.scenario === 'stale' ? 'stale' : delay > 5 ? 'delayed' : 'live',
+    sources: [{ ...DEMO_SOURCE, delayMinutes: delay }],
+    ...(extraNotes && extraNotes.length ? { notes: extraNotes } : {}),
+  };
+}
+
+/** partial 시나리오에서 값이 비는 종목 */
+const PARTIAL_BROKEN_QUOTES = new Set(['tsla', 'kakao', 'liquidations']);
+
+function buildQuote(world: DemoWorld, item: CatalogItem, ctx: AdapterContext): Quote {
+  const ref = seriesFor(world, item);
+  const session = getSession(item.market, ctx.now).phase;
+
+  if (!ref || ref.values.length < 2) {
+    return {
+      id: item.id,
+      name: item.name,
+      symbol: item.symbol,
+      market: item.market,
+      kind: item.kind,
+      price: null,
+      change: null,
+      changePct: null,
+      currency: item.currency,
+      unit: item.unit,
+      precision: item.precision,
+      volume: null,
+      spark: [],
+      session,
+      meta: makeMeta(ctx, item.market, ['시계열을 찾을 수 없습니다.']),
+      unavailableReason: '데이터 소스 미연결',
+    };
+  }
+
+  const broken = ctx.scenario === 'partial' && PARTIAL_BROKEN_QUOTES.has(item.id);
+  const i = ref.values.length - 1;
+  const price = broken ? null : round(ref.values[i], Math.max(item.precision, 4));
+  const prev = ref.values[i - 1];
+  const change = price === null ? null : round(price - prev, Math.max(item.precision, 4));
+  const changePct = price === null || prev === 0 ? null : round(((price - prev) / Math.abs(prev)) * 100, 2);
+
+  const spark: SeriesPoint[] = [];
+  const start = Math.max(0, ref.values.length - 30);
+  for (let k = start; k < ref.values.length; k += 1) {
+    spark.push({ t: ref.dates[k], v: round(ref.values[k], 6) });
+  }
+
+  return {
+    id: item.id,
+    name: item.name,
+    symbol: item.symbol,
+    market: item.market,
+    kind: item.kind,
+    price,
+    change,
+    changePct,
+    currency: item.currency,
+    unit: item.unit,
+    precision: item.precision,
+    volume: broken ? null : volumeFor(item, ref.values, i),
+    ...(item.hasVolume ? { volumeUnit: 'count' as const } : {}),
+    spark: broken ? [] : spark,
+    session,
+    meta: makeMeta(ctx, item.market, broken ? ['제공사 응답 오류 (DEMO 부분 실패 재현)'] : undefined),
+    ...(broken ? { unavailableReason: '제공사 응답 오류로 값을 받지 못했습니다.' } : {}),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* 시나리오별 강제 결측                                                   */
+/* ------------------------------------------------------------------ */
+
+const PARTIAL_FORCED_MISSING: Record<MarketId, Record<string, string>> = {
+  us: {
+    us_equity_pcr_5d: '옵션 데이터 제공사 응답 없음 (DEMO 부분 실패 재현)',
+  },
+  kr: {
+    kr_foreign_net_20d: '투자자별 매매동향 수집 실패 (DEMO 부분 실패 재현)',
+    kr_inst_net_20d: '투자자별 매매동향 수집 실패 (DEMO 부분 실패 재현)',
+    kr_pcr_5d: '파생 통계 응답 지연 (DEMO 부분 실패 재현)',
+    kr_margin_chg_20d: '신용잔고 데이터 지연 (DEMO 부분 실패 재현)',
+    kosdaq_rel_kospi_60d: '신용잔고 데이터 지연 (DEMO 부분 실패 재현)',
+  },
+  crypto: {},
+};
+
+/* ------------------------------------------------------------------ */
+/* 캘린더                                                               */
+/* ------------------------------------------------------------------ */
+
+function kstIso(y: number, m: number, d: number, hh: number, mm: number): string {
+  const pad = (v: number) => String(v).padStart(2, '0');
+  return `${y}-${pad(m)}-${pad(d)}T${pad(hh)}:${pad(mm)}:00+09:00`;
+}
+
+function nthWeekday(y: number, m: number, weekday: number, nth: number): number {
+  const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const offset = (weekday - first + 7) % 7;
+  return 1 + offset + (nth - 1) * 7;
+}
+
+interface EventTemplate {
+  key: string;
+  title: string;
+  country: 'US' | 'KR' | 'GLOBAL';
+  category: EventCategory;
+  importance: EventImportance;
+  forecast: string | null;
+  previous: string | null;
+  unit: string | null;
+  note?: string;
+  /** 해당 월의 발표일/시각 계산 */
+  when: (y: number, m: number) => { d: number; hh: number; mm: number } | null;
+}
+
+const TEMPLATES: EventTemplate[] = [
+  {
+    key: 'fomc',
+    title: 'FOMC 정책금리 결정',
+    country: 'US',
+    category: 'central_bank',
+    importance: 'high',
+    forecast: '4.00%',
+    previous: '4.25%',
+    unit: '%',
+    note: '기자회견 03:30 KST',
+    when: (y, m) => ([3, 4, 6, 7, 9, 10, 12].includes(m) ? { d: nthWeekday(y, m, 4, 3) + 1, hh: 3, mm: 0 } : null),
+  },
+  {
+    key: 'bok',
+    title: '한국은행 금융통화위원회',
+    country: 'KR',
+    category: 'central_bank',
+    importance: 'high',
+    forecast: '2.50%',
+    previous: '2.50%',
+    unit: '%',
+    note: '통화정책방향 의결',
+    when: (y, m) => ([1, 2, 4, 5, 7, 8, 10, 11].includes(m) ? { d: nthWeekday(y, m, 4, 4), hh: 10, mm: 0 } : null),
+  },
+  {
+    key: 'us_cpi',
+    title: '미국 소비자물가지수 (CPI)',
+    country: 'US',
+    category: 'inflation',
+    importance: 'high',
+    forecast: '전년비 +2.7%',
+    previous: '전년비 +2.9%',
+    unit: '%',
+    when: (y, m) => ({ d: nthWeekday(y, m, 3, 2), hh: 21, mm: 30 }),
+  },
+  {
+    key: 'us_pce',
+    title: '미국 근원 PCE 물가지수',
+    country: 'US',
+    category: 'inflation',
+    importance: 'high',
+    forecast: '전년비 +2.6%',
+    previous: '전년비 +2.7%',
+    unit: '%',
+    when: (y, m) => ({ d: Math.min(nthWeekday(y, m, 5, 4) + 1, 28), hh: 22, mm: 30 }),
+  },
+  {
+    key: 'us_nfp',
+    title: '미국 고용보고서 (비농업 고용·실업률)',
+    country: 'US',
+    category: 'employment',
+    importance: 'high',
+    forecast: '+11.5만 명 / 4.3%',
+    previous: '+7.3만 명 / 4.4%',
+    unit: '명',
+    when: (y, m) => ({ d: nthWeekday(y, m, 5, 1), hh: 22, mm: 30 }),
+  },
+  {
+    key: 'us_ism',
+    title: '미국 ISM 제조업 PMI',
+    country: 'US',
+    category: 'pmi',
+    importance: 'medium',
+    forecast: '49.2',
+    previous: '48.7',
+    unit: 'pt',
+    when: (y, m) => ({ d: 2, hh: 23, mm: 0 }),
+  },
+  {
+    key: 'kr_cpi',
+    title: '한국 소비자물가지수',
+    country: 'KR',
+    category: 'inflation',
+    importance: 'high',
+    forecast: '전년비 +2.0%',
+    previous: '전년비 +2.1%',
+    unit: '%',
+    when: () => ({ d: 2, hh: 8, mm: 0 }),
+  },
+  {
+    key: 'kr_pmi',
+    title: '한국 S&P Global 제조업 PMI',
+    country: 'KR',
+    category: 'pmi',
+    importance: 'medium',
+    forecast: '49.8',
+    previous: '49.5',
+    unit: 'pt',
+    when: () => ({ d: 1, hh: 9, mm: 30 }),
+  },
+  {
+    key: 'us_gdp',
+    title: '미국 GDP 성장률 (속보치)',
+    country: 'US',
+    category: 'gdp',
+    importance: 'high',
+    forecast: '전기비 연율 +1.8%',
+    previous: '+2.1%',
+    unit: '%',
+    when: (y, m) => ([1, 4, 7, 10].includes(m) ? { d: Math.min(nthWeekday(y, m, 4, 4), 30), hh: 22, mm: 30 } : null),
+  },
+  {
+    key: 'kr_gdp',
+    title: '한국 GDP 성장률 (속보치)',
+    country: 'KR',
+    category: 'gdp',
+    importance: 'medium',
+    forecast: '전기비 +0.5%',
+    previous: '+0.6%',
+    unit: '%',
+    when: (y, m) => ([1, 4, 7, 10].includes(m) ? { d: Math.min(nthWeekday(y, m, 4, 4) - 2, 28), hh: 8, mm: 0 } : null),
+  },
+  {
+    key: 'kr_expiry',
+    title: 'KOSPI200 선물·옵션 동시만기',
+    country: 'KR',
+    category: 'expiry',
+    importance: 'medium',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '만기일 수급 변동성 확대 가능',
+    when: (y, m) => ({ d: nthWeekday(y, m, 4, 2), hh: 15, mm: 20 }),
+  },
+  {
+    key: 'us_expiry',
+    title: '미국 주식·지수 옵션 만기',
+    country: 'US',
+    category: 'expiry',
+    importance: 'medium',
+    forecast: null,
+    previous: null,
+    unit: null,
+    when: (y, m) => ({ d: nthWeekday(y, m, 5, 3), hh: 5, mm: 0 }),
+  },
+  {
+    key: 'nvda_earnings',
+    title: '엔비디아 분기 실적 발표',
+    country: 'US',
+    category: 'earnings',
+    importance: 'high',
+    forecast: 'EPS 1.42달러',
+    previous: 'EPS 1.31달러',
+    unit: 'USD',
+    note: '장 마감 후 발표',
+    when: (y, m) => ([2, 5, 8, 11].includes(m) ? { d: nthWeekday(y, m, 3, 4), hh: 6, mm: 20 } : null),
+  },
+  {
+    key: 'samsung_earnings',
+    title: '삼성전자 잠정 실적 발표',
+    country: 'KR',
+    category: 'earnings',
+    importance: 'high',
+    forecast: '영업이익 9.2조원',
+    previous: '영업이익 8.4조원',
+    unit: 'KRW',
+    when: (y, m) => ([1, 4, 7, 10].includes(m) ? { d: 8, hh: 8, mm: 30 } : null),
+  },
+  {
+    key: 'eth_upgrade',
+    title: '이더리움 네트워크 업그레이드 예정',
+    country: 'GLOBAL',
+    category: 'crypto',
+    importance: 'medium',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '메인넷 적용 일정은 변경될 수 있음',
+    when: (y, m) => (m % 3 === 2 ? { d: 12, hh: 20, mm: 0 } : null),
+  },
+  {
+    key: 'token_unlock',
+    title: '주요 알트코인 대규모 토큰 언락',
+    country: 'GLOBAL',
+    category: 'crypto',
+    importance: 'low',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '유통량 증가에 따른 변동성 가능',
+    when: () => ({ d: 15, hh: 9, mm: 0 }),
+  },
+];
+
+function buildCalendar(ctx: AdapterContext): CalendarEvent[] {
+  const now = ctx.now.getTime();
+  const base = new Date(now);
+  const out: CalendarEvent[] = [];
+  const source: DataSource = { ...DEMO_SOURCE, delayMinutes: 0 };
+
+  for (let offset = -1; offset <= 1; offset += 1) {
+    const cursor = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
+    const y = cursor.getUTCFullYear();
+    const m = cursor.getUTCMonth() + 1;
+    for (const t of TEMPLATES) {
+      const when = t.when(y, m);
+      if (!when) continue;
+      const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const day = clamp(when.d, 1, daysInMonth);
+      const iso = kstIso(y, m, day, when.hh, when.mm);
+      const t0 = Date.parse(iso);
+      if (Number.isNaN(t0)) continue;
+      if (t0 < now - 5 * 86400_000 || t0 > now + 32 * 86400_000) continue;
+      const past = t0 <= now;
+      out.push({
+        id: `${t.key}-${y}${String(m).padStart(2, '0')}`,
+        title: t.title,
+        country: t.country,
+        category: t.category,
+        importance: t.importance,
+        scheduledAt: iso,
+        timeTbd: false,
+        forecast: t.forecast,
+        previous: t.previous,
+        actual: past && t.forecast ? t.forecast.replace(/(\d+\.\d+)/, (mm2) => (Number(mm2) + 0.1).toFixed(1)) : null,
+        unit: t.unit,
+        ...(t.note ? { note: t.note } : {}),
+        source,
+      });
+    }
+  }
+  out.sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* 뉴스 (가상의 샘플 매체 — 실제 매체를 사칭하지 않는다)                     */
+/* ------------------------------------------------------------------ */
+
+interface NewsTemplate {
+  summaryKo: string;
+  titleOriginal: string;
+  outlet: string;
+  markets: MarketId[];
+  hoursAgo: number;
+}
+
+const NEWS_TEMPLATES: NewsTemplate[] = [
+  {
+    summaryKo: '연준 위원 발언에서 추가 인하 시점에 대한 신중론이 나오며 단기 금리 기대가 소폭 되돌려졌습니다.',
+    titleOriginal: '[DEMO] Fed official signals patience on further cuts',
+    outlet: '샘플 통신 A',
+    markets: ['us'],
+    hoursAgo: 2,
+  },
+  {
+    summaryKo: '반도체 업종 중심으로 외국인 순매수가 이어지며 지수 방어력이 유지됐다는 시장 코멘트가 나왔습니다.',
+    titleOriginal: '[DEMO] 외국인, 반도체 중심 순매수 지속',
+    outlet: '샘플 경제신문 B',
+    markets: ['kr'],
+    hoursAgo: 4,
+  },
+  {
+    summaryKo: '무기한 선물 펀딩비가 완만한 양수 구간에 머물며 과열 신호는 제한적이라는 분석이 제시됐습니다.',
+    titleOriginal: '[DEMO] Perp funding stays mildly positive',
+    outlet: '샘플 크립토 미디어 C',
+    markets: ['crypto'],
+    hoursAgo: 5,
+  },
+  {
+    summaryKo: '원/달러 환율이 장중 변동성을 키우며 수입물가와 외국인 수급에 미칠 영향이 거론됐습니다.',
+    titleOriginal: '[DEMO] 원/달러 환율 변동성 확대',
+    outlet: '샘플 경제신문 B',
+    markets: ['kr'],
+    hoursAgo: 7,
+  },
+  {
+    summaryKo: '하이일드 신용스프레드가 최근 범위 상단 부근에 머물며 위험자산 선호가 다소 약화됐다는 평가가 나왔습니다.',
+    titleOriginal: '[DEMO] High yield spreads hover near recent highs',
+    outlet: '샘플 통신 A',
+    markets: ['us'],
+    hoursAgo: 9,
+  },
+  {
+    summaryKo: '스테이블코인 시가총액 증가세가 이어지며 대기 매수 여력이 유지되고 있다는 온체인 리포트가 공개됐습니다.',
+    titleOriginal: '[DEMO] Stablecoin supply keeps grinding higher',
+    outlet: '샘플 리서치 D',
+    markets: ['crypto'],
+    hoursAgo: 13,
+  },
+  {
+    summaryKo: '중소형주 상대 강도가 개선되며 위험선호가 일부 회복됐다는 관측이 제시됐습니다.',
+    titleOriginal: '[DEMO] Small caps narrow the performance gap',
+    outlet: '샘플 리서치 D',
+    markets: ['us'],
+    hoursAgo: 18,
+  },
+  {
+    summaryKo: '옵션 만기를 앞두고 파생 수급에 따른 지수 변동성이 커질 수 있다는 점이 언급됐습니다.',
+    titleOriginal: '[DEMO] 만기 주간 파생 수급 주목',
+    outlet: '샘플 경제신문 B',
+    markets: ['kr', 'us'],
+    hoursAgo: 22,
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* 거시 지표                                                            */
+/* ------------------------------------------------------------------ */
+
+function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
+  const i = world.dates.length - 1;
+  const ci = world.cryptoDates.length - 1;
+  const s = world.s;
+  const c = world.c;
+  const meta = makeMeta(ctx, 'us');
+  const metaKr = makeMeta(ctx, 'kr');
+  const metaCr = makeMeta(ctx, 'crypto');
+
+  const spread = (s.ust10[i] - s.ust2[i]) * 100;
+  const spreadPrev = (s.ust10[i - 1] - s.ust2[i - 1]) * 100;
+
+  const mk = (
+    id: string,
+    name: string,
+    group: MacroIndicator['group'],
+    value: number | null,
+    previous: number | null,
+    unit: MacroIndicator['unit'],
+    precision: number,
+    featured: boolean,
+    risk: { level: MacroIndicator['riskLevel']; note: string },
+    m: Meta,
+    suffix?: string,
+  ): MacroIndicator => ({
+    id,
+    name,
+    group,
+    value,
+    previous,
+    unit,
+    precision,
+    ...(suffix ? { suffix } : {}),
+    trend:
+      value === null || previous === null
+        ? 'unknown'
+        : value > previous
+          ? 'up'
+          : value < previous
+            ? 'down'
+            : 'flat',
+    riskLevel: risk.level,
+    riskNote: risk.note,
+    featured,
+    releaseDate: m.asOf,
+    nextRelease: null,
+    meta: m,
+  });
+
+  const vixNow = s.vix[i];
+  const vkospiNow = s.vkospi[i];
+  const usdkrwNow = s.usdkrw[i];
+  const hyNow = s.hyOas[i];
+
+  return [
+    mk('us_policy_rate', '미국 기준금리', '미국', 4.25, 4.5, 'percent', 2, true,
+      { level: 'watch', note: '인하 사이클 진행 중 — 발표 일정 확인' }, meta),
+    mk('kr_policy_rate', '한국 기준금리', '한국', 2.5, 2.75, 'percent', 2, true,
+      { level: 'normal', note: '완화 기조 유지' }, metaKr),
+    mk('us_cpi', '미국 CPI (전년비)', '미국', 2.9, 3.0, 'percent', 1, true,
+      { level: 'watch', note: '목표치 2% 상회' }, meta),
+    mk('kr_cpi', '한국 CPI (전년비)', '한국', 2.1, 2.2, 'percent', 1, false,
+      { level: 'normal', note: '목표 부근' }, metaKr),
+    mk('us_core_pce', '미국 근원 PCE (전년비)', '미국', 2.7, 2.8, 'percent', 1, false,
+      { level: 'watch', note: '연준이 가장 중시하는 물가 지표' }, meta),
+    mk('us_unemployment', '미국 실업률', '미국', 4.4, 4.3, 'percent', 1, true,
+      { level: 'watch', note: '완만한 상승 추세' }, meta),
+    mk('us_nfp', '미국 비농업 고용 (천 명)', '미국', 73, 105, 'count', 0, false,
+      { level: 'watch', note: '고용 증가 속도 둔화' }, meta),
+    mk('us_pmi', '미국 ISM 제조업 PMI', '미국', 48.7, 49.1, 'point', 1, false,
+      { level: 'alert', note: '50 미만 = 위축 국면' }, meta),
+    mk('kr_pmi', '한국 제조업 PMI', '한국', 49.5, 48.9, 'point', 1, false,
+      { level: 'watch', note: '50 부근에서 등락' }, metaKr),
+    mk('us_spread', '미국 10년-2년 금리차', '미국', round(spread, 1), round(spreadPrev, 1), 'bp', 1, true,
+      spread < 0
+        ? { level: 'alert', note: '장단기 금리 역전 상태' }
+        : spread < 20
+          ? { level: 'watch', note: '역전 해소 초기 구간' }
+          : { level: 'normal', note: '정상 스프레드' },
+      meta),
+    mk('dxy', '달러지수 DXY', '글로벌', round(s.dxy[i], 2), round(s.dxy[i - 1], 2), 'point', 2, false,
+      s.dxy[i] > 106 ? { level: 'watch', note: '강달러 — 신흥국 자금 유출 압력' } : { level: 'normal', note: '중립 범위' }, meta),
+    mk('usdkrw', 'USD/KRW', '한국', round(usdkrwNow, 2), round(s.usdkrw[i - 1], 2), 'point', 2, true,
+      usdkrwNow > 1420
+        ? { level: 'alert', note: '원화 약세 심화 구간' }
+        : usdkrwNow > 1380
+          ? { level: 'watch', note: '원화 약세 압력' }
+          : { level: 'normal', note: '안정 범위' }, metaKr),
+    mk('hy_oas', '미국 하이일드 스프레드', '미국', round(hyNow, 2), round(s.hyOas[i - 1], 2), 'percent', 2, true,
+      hyNow > 4.5
+        ? { level: 'alert', note: '신용 위험 확대' }
+        : hyNow > 3.8
+          ? { level: 'watch', note: '스프레드 확대 추세' }
+          : { level: 'normal', note: '안정 범위' }, meta),
+    mk('gold', '금 (온스당)', '글로벌', round(s.gold[i], 2), round(s.gold[i - 1], 2), 'currency', 2, false,
+      { level: 'normal', note: '안전자산 수요 참고' }, meta),
+    mk('wti', 'WTI 원유', '글로벌', round(s.wti[i], 2), round(s.wti[i - 1], 2), 'currency', 2, false,
+      s.wti[i] > 95 ? { level: 'watch', note: '유가 상승 — 물가 압력' } : { level: 'normal', note: '중립 범위' }, meta),
+    mk('spx_pe', 'S&P 500 예상 P/E', '미국', 21.4, 21.1, 'ratio', 1, false,
+      { level: 'watch', note: '장기 평균 대비 높은 편' }, meta),
+    mk('kospi_pe', 'KOSPI P/E', '한국', 11.2, 11.0, 'ratio', 1, false,
+      { level: 'normal', note: '장기 평균 부근' }, metaKr),
+    mk('kospi_pb', 'KOSPI P/B', '한국', 1.02, 1.0, 'ratio', 2, false,
+      { level: 'normal', note: '1배 부근' }, metaKr),
+    mk('kospi_div', 'KOSPI 배당수익률', '한국', 2.05, 2.08, 'percent', 2, false,
+      { level: 'normal', note: '' }, metaKr),
+    mk('crypto_mcap', '크립토 전체 시가총액', '크립토', round(c.totalMcap[ci] / 1e9, 1), round(c.totalMcap[ci - 1] / 1e9, 1), 'usd_bn', 1, false,
+      { level: 'normal', note: '' }, metaCr),
+    mk('btc_dom', 'BTC 도미넌스', '크립토', round(c.btcDom[ci], 2), round(c.btcDom[ci - 1], 2), 'percent', 2, false,
+      c.btcDom[ci] > 58 ? { level: 'watch', note: '알트코인 회피 성향' } : { level: 'normal', note: '' }, metaCr),
+    mk('vix', 'VIX', '미국', round(vixNow, 2), round(s.vix[i - 1], 2), 'point', 2, true,
+      vixNow > 28
+        ? { level: 'alert', note: '변동성 급등 — 위험회피 강화' }
+        : vixNow > 20
+          ? { level: 'watch', note: '경계 구간' }
+          : { level: 'normal', note: '안정 구간' }, meta),
+    mk('vkospi', 'VKOSPI', '한국', round(vkospiNow, 2), round(s.vkospi[i - 1], 2), 'point', 2, true,
+      vkospiNow > 25
+        ? { level: 'alert', note: '변동성 급등' }
+        : vkospiNow > 19
+          ? { level: 'watch', note: '경계 구간' }
+          : { level: 'normal', note: '안정 구간' }, metaKr),
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/* 구간별 시계열                                                         */
+/* ------------------------------------------------------------------ */
+
+const RANGE_DAYS: Record<RangeKey, number> = { '1D': 1, '1W': 7, '1M': 30, '3M': 92, '1Y': 365, '3Y': 1095 };
+
+function expandWeekly(values: number[], dates: number[], id: string): SeriesPoint[] {
+  const take = Math.min(7, values.length);
+  const slice = values.slice(-take);
+  const dslice = dates.slice(-take);
+  const r = mulberry32(hashSeed(`${id}-1w`));
+  const g = gaussianFrom(r);
+  const out: SeriesPoint[] = [];
+  for (let i = 0; i < slice.length - 1; i += 1) {
+    const a = slice[i];
+    const b = slice[i + 1];
+    const ta = dslice[i];
+    const tb = dslice[i + 1];
+    for (let k = 0; k < 6; k += 1) {
+      const w = k / 6;
+      const v = a + (b - a) * w + Math.abs(a) * 0.0022 * g();
+      out.push({ t: Math.round(ta + (tb - ta) * w), v: round(v, 6) });
+    }
+  }
+  out.push({ t: dslice[dslice.length - 1], v: round(slice[slice.length - 1], 6) });
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* 어댑터                                                               */
+/* ------------------------------------------------------------------ */
+
+export class DemoAdapter implements MarketAdapter {
+  readonly id = 'demo';
+  readonly mode = 'DEMO' as const;
+
+  async getQuotes(market: MarketId, ctx: AdapterContext): Promise<Quote[]> {
+    if (ctx.scenario === 'empty') return [];
+    const world = getWorld(ctx.now);
+    return catalogFor(market).map((item) => buildQuote(world, item, ctx));
+  }
+
+  async getFngInput(market: MarketId, ctx: AdapterContext): Promise<EngineInput> {
+    const world = getWorld(ctx.now);
+    const dates = market === 'crypto' ? world.cryptoDates : world.dates;
+    const metrics = world.metrics[market];
+    const asOfIso = new Date(ctx.now.getTime() - DELAY_MIN[market] * 60_000).toISOString();
+    const metricAsOf: Record<string, string> = {};
+    for (const key of Object.keys(metrics)) metricAsOf[key] = asOfIso;
+
+    const sources: Record<string, DataSource[]> = {};
+    for (const comp of COMPONENTS[market]) {
+      sources[comp.id] = [{ ...DEMO_SOURCE, delayMinutes: DELAY_MIN[market] }];
+    }
+
+    const forcedMissing = ctx.scenario === 'partial' ? PARTIAL_FORCED_MISSING[market] : {};
+
+    return {
+      market,
+      dates,
+      metrics: ctx.scenario === 'empty' ? {} : metrics,
+      forcedMissing,
+      metricAsOf,
+      sources,
+      freshnessLimitHours: market === 'crypto' ? 6 : 30,
+    };
+  }
+
+  async getBenchmark(market: MarketId, ctx: AdapterContext): Promise<BenchmarkSeries | null> {
+    const world = getWorld(ctx.now);
+    const map: Record<MarketId, { id: string; name: string; values: number[]; dates: number[]; precision: number }> = {
+      us: { id: 'spx', name: 'S&P 500', values: world.s.spx, dates: world.dates, precision: 2 },
+      kr: { id: 'kospi', name: 'KOSPI', values: world.s.kospi, dates: world.dates, precision: 2 },
+      crypto: { id: 'btc', name: 'BTC', values: world.c.btc, dates: world.cryptoDates, precision: 0 },
+    };
+    const m = map[market];
+    const take = Math.min(m.values.length, 1100);
+    const values = m.values.slice(-take);
+    const dates = m.dates.slice(-take);
+    return {
+      id: m.id,
+      name: m.name,
+      series: values.map((v, i) => ({ t: dates[i], v: round(v, 6) })),
+      precision: m.precision,
+    };
+  }
+
+  async getFlows(ctx: AdapterContext): Promise<FlowSummary> {
+    const world = getWorld(ctx.now);
+    const i = world.dates.length - 1;
+    const missing = ctx.scenario === 'partial' || ctx.scenario === 'empty';
+    return {
+      foreign: missing ? null : world.s.foreignDaily[i],
+      institution: missing ? null : world.s.instDaily[i],
+      individual: missing ? null : world.s.indivDaily[i],
+      unit: 'krw_100m',
+      meta: makeMeta(ctx, 'kr', missing ? ['투자자별 매매동향 수집 실패 (DEMO 재현)'] : undefined),
+    };
+  }
+
+  async getMacro(ctx: AdapterContext): Promise<MacroIndicator[]> {
+    if (ctx.scenario === 'empty') return [];
+    return buildMacro(getWorld(ctx.now), ctx);
+  }
+
+  async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {
+    if (ctx.scenario === 'empty') return [];
+    return buildCalendar(ctx);
+  }
+
+  async getNews(ctx: AdapterContext): Promise<NewsItem[]> {
+    if (ctx.scenario === 'empty') return [];
+    const now = ctx.now.getTime();
+    return NEWS_TEMPLATES.map((t, i) => ({
+      id: `demo-news-${i}`,
+      summaryKo: t.summaryKo,
+      titleOriginal: t.titleOriginal,
+      outlet: t.outlet,
+      publishedAt: new Date(now - t.hoursAgo * 3600_000).toISOString(),
+      url: '',
+      markets: t.markets,
+      summaryOrigin: 'derived' as const,
+    }));
+  }
+
+  async getAssetSeries(id: string, range: RangeKey, ctx: AdapterContext): Promise<SeriesPoint[]> {
+    const world = getWorld(ctx.now);
+    const item = CATALOG.find((c) => c.id === id);
+    if (!item) return [];
+    const ref = seriesFor(world, item);
+    if (!ref) return [];
+
+    if (range === '1D') {
+      const intra = world.intraday[intradayKeyFor(id)];
+      if (intra) return intra;
+    }
+    if (range === '1W') return expandWeekly(ref.values, ref.dates, id);
+
+    const perYear = item.market === 'crypto' ? 365 : 252;
+    const days = RANGE_DAYS[range];
+    const take = Math.min(ref.values.length, Math.max(10, Math.round((days / 365) * perYear)));
+    const values = ref.values.slice(-take);
+    const dates = ref.dates.slice(-take);
+    return values.map((v, i) => ({ t: dates[i], v: round(v, 6) }));
+  }
+
+  async getUsdKrw(ctx: AdapterContext): Promise<number | null> {
+    const world = getWorld(ctx.now);
+    return round(world.s.usdkrw[world.s.usdkrw.length - 1], 2);
+  }
+}
+
+/** catalog id → world.intraday 키 */
+function intradayKeyFor(id: string): string {
+  const map: Record<string, string> = {
+    total_mcap: 'totalMcap',
+    total_vol: 'totalVol',
+    btc_dom: 'btcDom',
+    stable_mcap: 'stableMcap',
+    open_interest: 'openInterest',
+    us_spread_10_2: 'ust10',
+  };
+  return map[id] ?? id;
+}
+
+export const demoAdapter = new DemoAdapter();

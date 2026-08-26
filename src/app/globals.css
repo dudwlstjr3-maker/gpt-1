@@ -1,0 +1,317 @@
+@import 'tailwindcss';
+
+/* ==================================================================
+   Market Mood 3 — 디자인 토큰
+   다크 기본 / 라이트 지원. 색상만으로 의미를 전달하지 않는다.
+   대비는 WCAG 2.2 AA(본문 4.5:1, 큰 텍스트 3:1)를 기준으로 골랐다.
+   ================================================================== */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0a0d14;
+  --bg-elevated: #0f141e;
+  --surface: #141a26;
+  --surface-2: #1b2333;
+  --surface-3: #232d40;
+  --border: #26314a;
+  --border-strong: #35435f;
+
+  --fg: #e9eef8;
+  --fg-strong: #ffffff;
+  --muted-fg: #98a5bd;
+  --subtle-fg: #6f7d96;
+  --flat-fg: #9aa6bd;
+
+  --accent: #6ea8fe;
+  --accent-fg: #0a0d14;
+  --focus: #8ab4ff;
+
+  /* Fear → Greed */
+  --stage-extreme-fear: #ff6b6b;
+  --stage-fear: #ffa657;
+  --stage-neutral: #e3c567;
+  --stage-greed: #66d19e;
+  --stage-extreme-greed: #34d399;
+
+  /* 등락 — 한국식 */
+  --kr-up: #ff6b6b;
+  --kr-down: #6ba8ff;
+  /* 등락 — 글로벌식 */
+  --gl-up: #4ade80;
+  --gl-down: #ff6b6b;
+
+  --warn: #ffc46b;
+  --danger: #ff6b6b;
+  --ok: #4ade80;
+
+  --skeleton: #1e2637;
+  --skeleton-shine: #2a3448;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f4f6fa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f4f9;
+  --surface-3: #e6ebf3;
+  --border: #dde3ec;
+  --border-strong: #c3ccdb;
+
+  --fg: #131a26;
+  --fg-strong: #05080f;
+  --muted-fg: #5a6678;
+  --subtle-fg: #77828f;
+  --flat-fg: #5a6678;
+
+  --accent: #1f5fd0;
+  --accent-fg: #ffffff;
+  --focus: #1f5fd0;
+
+  --stage-extreme-fear: #c62828;
+  --stage-fear: #a75208;
+  --stage-neutral: #7d6300;
+  --stage-greed: #157a45;
+  --stage-extreme-greed: #046b4f;
+
+  --kr-up: #c62828;
+  --kr-down: #1657c4;
+  --gl-up: #15803d;
+  --gl-down: #c62828;
+
+  --warn: #8a5a00;
+  --danger: #c62828;
+  --ok: #15803d;
+
+  --skeleton: #e6ebf3;
+  --skeleton-shine: #f2f5f9;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 20px -14px rgb(16 24 40 / 0.24);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-strong: var(--fg-strong);
+  --color-muted: var(--muted-fg);
+  --color-subtle: var(--subtle-fg);
+  --color-accent: var(--accent);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic',
+    'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+/* ------------------------------ 기본 ------------------------------ */
+
+* {
+  min-width: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 숫자는 자릿수가 흔들리지 않도록 tabular */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 키보드로 포커스했을 때만 나타나는 건너뛰기 링크 */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   컴포넌트 클래스는 반드시 @layer components 안에 둔다.
+   레이어 밖의 CSS 는 Tailwind 유틸리티(@layer utilities)보다 우선순위가 높아서,
+   .snap-row 의 display:flex 가 lg:hidden 을 이겨버리는 식의 버그가 생긴다.
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  /* --------------------------- 카드 / 표면 --------------------------- */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-flat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .hairline {
+    border-color: var(--border);
+  }
+
+  /* --------------------------- 가로 스크롤 --------------------------- */
+
+  .snap-row {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .snap-row::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-item {
+    scroll-snap-align: center;
+    flex: 0 0 auto;
+  }
+
+  .scroll-x {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  /* ----------------------------- 스켈레톤 ----------------------------- */
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--skeleton) 25%, var(--skeleton-shine) 37%, var(--skeleton) 63%);
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: 8px;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0 50%;
+    }
+  }
+}
+
+/* ------------------------------ 모션 ------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .skeleton {
+    animation: none;
+    background: var(--skeleton);
+  }
+}
+
+@layer components {
+  /* --------------------------- 게이지 그라데이션 --------------------------- */
+
+  .fng-gradient-bar {
+    background: linear-gradient(
+      90deg,
+      var(--stage-extreme-fear) 0%,
+      var(--stage-fear) 25%,
+      var(--stage-neutral) 50%,
+      var(--stage-greed) 75%,
+      var(--stage-extreme-greed) 100%
+    );
+  }
+
+  /* --------------------------- 안전 영역 --------------------------- */
+
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* 하단 탭 높이만큼 본문 여백 확보 */
+  .main-pad {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (min-width: 1024px) {
+    .main-pad {
+      padding-bottom: 32px;
+    }
+  }
+
+  /* ------------------------------ 표 ------------------------------ */
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .data-table th,
+  .data-table td {
+    padding: 7px 10px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table th:first-child,
+  .data-table td:first-child {
+    text-align: left;
+  }
+  .data-table thead th {
+    color: var(--muted-fg);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+  }
+}

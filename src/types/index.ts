@@ -1,0 +1,477 @@
+/**
+ * Market Mood 3 — 도메인 타입 정의
+ *
+ * 서버 어댑터 / API 응답 / 클라이언트 UI 가 공유하는 단일 계약(contract)이다.
+ * 모든 수치 필드는 "값이 없음(null)"과 "값이 0"을 명확히 구분한다.
+ */
+
+/* ------------------------------------------------------------------ */
+/* 공통                                                                 */
+/* ------------------------------------------------------------------ */
+
+export type MarketId = 'us' | 'kr' | 'crypto';
+
+export const MARKET_IDS: MarketId[] = ['us', 'kr', 'crypto'];
+
+export const MARKET_LABEL: Record<MarketId, string> = {
+  us: '미국',
+  kr: '한국',
+  crypto: '크립토',
+};
+
+/** 데이터 제공 모드. DEMO 와 LIVE 는 절대 한 응답 안에서 섞이지 않는다. */
+export type DataMode = 'LIVE' | 'DEMO';
+
+/** 개별 섹션(카드 묶음)의 상태. UI 의 스켈레톤/빈값/오류 분기를 결정한다. */
+export type SectionStatus = 'ok' | 'loading' | 'empty' | 'partial' | 'stale' | 'error';
+
+/** 실시간성 표시. */
+export type Freshness = 'live' | 'delayed' | 'stale' | 'demo';
+
+export interface DataSource {
+  /** 화면에 노출되는 출처명 */
+  name: string;
+  /** 출처 링크(없을 수 있음) */
+  url?: string;
+  /** 지연 시간(분). 0 이면 실시간. null 이면 알 수 없음 */
+  delayMinutes: number | null;
+  /** 이용약관/재배포 조건 메모 */
+  terms?: string;
+}
+
+export interface Meta {
+  /** 데이터 기준 시각 (ISO8601, UTC) */
+  asOf: string;
+  /** 서버가 이 값을 받아온 시각 */
+  fetchedAt: string;
+  freshness: Freshness;
+  sources: DataSource[];
+  /** 이 섹션에서 실패했거나 비어 있는 항목의 사유 */
+  notes?: string[];
+}
+
+export interface Section<T> {
+  status: SectionStatus;
+  data: T | null;
+  meta: Meta;
+  /** status 가 error/partial 일 때 사용자에게 보여줄 메시지 */
+  error?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* 시장 세션                                                            */
+/* ------------------------------------------------------------------ */
+
+export type SessionPhase = 'pre' | 'regular' | 'post' | 'closed' | 'holiday' | 'always';
+
+export const SESSION_LABEL: Record<SessionPhase, string> = {
+  pre: '장전',
+  regular: '장중',
+  post: '장후',
+  closed: '마감',
+  holiday: '휴장',
+  always: '24시간 거래',
+};
+
+export interface MarketSession {
+  market: MarketId;
+  phase: SessionPhase;
+  /** 다음 상태 전환까지 남은 밀리초 (always 면 null) */
+  msToNext: number | null;
+  /** 다음 전환 라벨 (예: "장 시작까지") */
+  nextLabel: string | null;
+  /** 휴장 사유 */
+  holidayName?: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* 가격                                                                 */
+/* ------------------------------------------------------------------ */
+
+export type QuoteKind = 'index' | 'equity' | 'crypto' | 'fx' | 'rate' | 'commodity' | 'volatility' | 'spread' | 'stat';
+
+export type Unit = 'point' | 'currency' | 'percent' | 'bp' | 'ratio' | 'count' | 'usd_bn' | 'krw_bn';
+
+export interface SeriesPoint {
+  /** epoch ms (UTC) */
+  t: number;
+  v: number;
+}
+
+export interface Quote {
+  id: string;
+  /** 한국어 표시명 */
+  name: string;
+  /** 원문/티커 */
+  symbol: string;
+  market: MarketId;
+  kind: QuoteKind;
+  /** 현재가. null 이면 값 없음(0 아님) */
+  price: number | null;
+  /** 등락액 */
+  change: number | null;
+  /** 등락률(%) */
+  changePct: number | null;
+  /** 표시 통화 (KRW/USD/null=무통화) */
+  currency: 'KRW' | 'USD' | null;
+  unit: Unit;
+  /** 소수점 자리수 */
+  precision: number;
+  /** 거래량 (없으면 null) */
+  volume: number | null;
+  volumeUnit?: Unit;
+  /** 30포인트 내외의 미니 차트 */
+  spark: SeriesPoint[];
+  session: SessionPhase;
+  meta: Meta;
+  /** 값이 없을 때 사용자에게 보여줄 사유 */
+  unavailableReason?: string;
+}
+
+export interface FlowSummary {
+  /** 투자자별 당일 순매수 (단위: 억원) */
+  foreign: number | null;
+  institution: number | null;
+  individual: number | null;
+  unit: 'krw_100m';
+  meta: Meta;
+}
+
+/* ------------------------------------------------------------------ */
+/* Fear & Greed                                                        */
+/* ------------------------------------------------------------------ */
+
+export type FngStageId = 'extreme_fear' | 'fear' | 'neutral' | 'greed' | 'extreme_greed';
+
+export interface FngStage {
+  id: FngStageId;
+  label: string;
+  min: number;
+  max: number;
+}
+
+export const FNG_STAGES: FngStage[] = [
+  { id: 'extreme_fear', label: '극단적 공포', min: 0, max: 19 },
+  { id: 'fear', label: '공포', min: 20, max: 39 },
+  { id: 'neutral', label: '중립', min: 40, max: 59 },
+  { id: 'greed', label: '탐욕', min: 60, max: 79 },
+  { id: 'extreme_greed', label: '극단적 탐욕', min: 80, max: 100 },
+];
+
+export type Confidence = 'high' | 'medium' | 'low';
+
+export const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  high: '높음',
+  medium: '보통',
+  low: '낮음',
+};
+
+/** 구성요소를 이루는 하위 지표 */
+export interface SubMetricResult {
+  id: string;
+  label: string;
+  /** 구성요소 내부 가중치 (합 100) */
+  weight: number;
+  /** 0~100 백분위 점수. null = 결측 */
+  score: number | null;
+  /** 원시값 */
+  raw: number | null;
+  rawLabel: string;
+  /** 값이 클수록 공포인가? (true 면 점수 산출 시 반전) */
+  inverted: boolean;
+  /** 결측 사유 */
+  missingReason?: string;
+  /** 마지막 관측 시각 */
+  asOf: string | null;
+}
+
+export interface ComponentResult {
+  id: string;
+  label: string;
+  /** 시장 전체에서의 가중치(%) — 모든 구성요소 합 = 100 */
+  weight: number;
+  /** 결측 재조정 후 실제 적용된 가중치(%) */
+  effectiveWeight: number;
+  /** 0~100. null = 결측 */
+  score: number | null;
+  /** 전일 대비 구성요소 점수 변화 */
+  deltaDay: number | null;
+  /** 총점 변화에 대한 기여도(점) */
+  contributionDay: number | null;
+  description: string;
+  sources: DataSource[];
+  subMetrics: SubMetricResult[];
+  available: boolean;
+  missingReason?: string;
+  asOf: string | null;
+}
+
+export interface FngHistoryPoint {
+  /** epoch ms */
+  t: number;
+  /** null = 해당일 산출 불가 */
+  v: number | null;
+  formulaVersion: string;
+}
+
+export interface FngDriver {
+  componentId: string;
+  label: string;
+  /** 점수 기여도(점). 양수=상승요인, 음수=하락요인 */
+  contribution: number;
+  detail: string;
+}
+
+export interface FngScore {
+  market: MarketId;
+  /** 0~100. null 이면 "산출 불가" */
+  score: number | null;
+  stage: FngStage | null;
+  /** 산출 불가 사유 */
+  unavailableReason?: string;
+
+  deltaDay: number | null;
+  deltaWeek: number | null;
+  deltaMonth: number | null;
+
+  /** 최근 30일 미니 차트 */
+  spark: FngHistoryPoint[];
+
+  /** 데이터 충족률 0~1 (최신 구성요소 가중치 합 / 100) */
+  coverage: number;
+  /** 신선도 점수 0~1 */
+  freshnessScore: number;
+  confidence: Confidence;
+  confidenceReason: string;
+
+  /** 산식 버전 */
+  formulaVersion: string;
+  /** 산출 시각 */
+  computedAt: string;
+  /** 사용된 역사적 분포 길이 */
+  lookbackDays: number;
+
+  components: ComponentResult[];
+  topPositive: FngDriver | null;
+  topNegative: FngDriver | null;
+
+  meta: Meta;
+}
+
+export interface FngDetail extends FngScore {
+  /** 1M/3M/1Y/3Y 를 모두 담는 최대 길이 히스토리 */
+  history: FngHistoryPoint[];
+  /** 대표 시장 가격 (점수와 겹쳐 보기용) */
+  benchmark: {
+    id: string;
+    name: string;
+    series: SeriesPoint[];
+    precision: number;
+  } | null;
+  methodology: {
+    version: string;
+    summary: string;
+    steps: string[];
+    winsorization: string;
+    coverageRule: string;
+    scaleWarning: string;
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* 거시 지표 / 캘린더 / 뉴스                                             */
+/* ------------------------------------------------------------------ */
+
+export type MacroTrend = 'up' | 'down' | 'flat' | 'unknown';
+
+export interface MacroIndicator {
+  id: string;
+  name: string;
+  /** 소속: 미국 / 한국 / 글로벌 / 크립토 */
+  group: '미국' | '한국' | '글로벌' | '크립토';
+  value: number | null;
+  previous: number | null;
+  unit: Unit;
+  precision: number;
+  /** 표시용 접미사 (예: "%", "bp") */
+  suffix?: string;
+  trend: MacroTrend;
+  /** 위험 신호 여부 — 색상이 아닌 텍스트로도 표기 */
+  riskLevel: 'normal' | 'watch' | 'alert' | 'unknown';
+  riskNote: string;
+  /** 홈 화면 요약에 노출할지 */
+  featured: boolean;
+  releaseDate: string | null;
+  nextRelease: string | null;
+  meta: Meta;
+}
+
+export type EventImportance = 'high' | 'medium' | 'low';
+
+export type EventCategory =
+  | 'central_bank'
+  | 'inflation'
+  | 'employment'
+  | 'pmi'
+  | 'gdp'
+  | 'expiry'
+  | 'earnings'
+  | 'crypto';
+
+export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
+  central_bank: '통화정책',
+  inflation: '물가',
+  employment: '고용',
+  pmi: 'PMI',
+  gdp: 'GDP',
+  expiry: '옵션만기',
+  earnings: '실적',
+  crypto: '크립토',
+};
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  country: 'US' | 'KR' | 'GLOBAL';
+  category: EventCategory;
+  importance: EventImportance;
+  /** KST 기준 시각 (ISO8601 with +09:00) */
+  scheduledAt: string;
+  /** 시각 미정 여부 */
+  timeTbd: boolean;
+  forecast: string | null;
+  previous: string | null;
+  actual: string | null;
+  unit: string | null;
+  note?: string;
+  source: DataSource;
+}
+
+export interface NewsItem {
+  id: string;
+  /** 한국어 요약 (1~2문장) */
+  summaryKo: string;
+  /** 원문 제목 */
+  titleOriginal: string;
+  outlet: string;
+  publishedAt: string;
+  url: string;
+  markets: MarketId[];
+  /** 요약이 기계 번역/요약인지 명시 */
+  summaryOrigin: 'provider' | 'derived';
+}
+
+/* ------------------------------------------------------------------ */
+/* 오늘의 시장 요약                                                      */
+/* ------------------------------------------------------------------ */
+
+export interface SummaryLine {
+  /** fact = 관측된 수치, interpretation = 해석 */
+  kind: 'fact' | 'interpretation' | 'insufficient';
+  text: string;
+  /** 근거가 된 데이터 id 목록 */
+  evidence: string[];
+}
+
+export interface MarketSummary {
+  lines: SummaryLine[];
+  generatedAt: string;
+  /** 근거 부족 여부 */
+  insufficient: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* 스냅샷 (API 최상위 응답)                                               */
+/* ------------------------------------------------------------------ */
+
+export interface SnapshotSections {
+  sessions: Section<MarketSession[]>;
+  fng: Section<FngScore[]>;
+  quotes: Section<Record<MarketId, Quote[]>>;
+  flows: Section<FlowSummary>;
+  macro: Section<MacroIndicator[]>;
+  calendar: Section<CalendarEvent[]>;
+  news: Section<NewsItem[]>;
+  summary: Section<MarketSummary>;
+}
+
+export type SectionKey = keyof SnapshotSections;
+
+export interface Snapshot {
+  mode: DataMode;
+  /** DEMO 시나리오 이름 (LIVE 면 null) */
+  scenario: DemoScenario | null;
+  /** 서버가 스냅샷을 조립한 시각 */
+  generatedAt: string;
+  /** 마지막 전체 업데이트 시각 = 섹션 중 가장 오래된 fetchedAt */
+  lastFullUpdate: string;
+  /** USD/KRW — 통화 전환에 사용 */
+  usdKrw: number | null;
+  formulaVersion: string;
+  sections: SnapshotSections;
+  /** 스냅샷 전체가 실패한 경우 */
+  fatalError?: string;
+}
+
+export type DemoScenario = 'normal' | 'loading' | 'empty' | 'partial' | 'stale' | 'error';
+
+export const DEMO_SCENARIOS: { id: DemoScenario; label: string; description: string }[] = [
+  { id: 'normal', label: '정상', description: '모든 섹션이 정상 응답합니다.' },
+  { id: 'loading', label: '로딩', description: '응답이 지연되어 스켈레톤이 표시됩니다.' },
+  { id: 'empty', label: '빈값', description: '데이터가 비어 있는 상태입니다.' },
+  { id: 'partial', label: '부분 실패', description: '일부 구성요소가 결측되어 재조정/산출 불가가 발생합니다.' },
+  { id: 'stale', label: '오래된 데이터', description: '기준 시각이 오래되어 stale 배지가 표시됩니다.' },
+  { id: 'error', label: '전체 오류', description: '스냅샷 조립이 실패한 상태입니다.' },
+];
+
+/* ------------------------------------------------------------------ */
+/* 자산 상세                                                            */
+/* ------------------------------------------------------------------ */
+
+export type RangeKey = '1D' | '1W' | '1M' | '3M' | '1Y' | '3Y';
+
+export interface AssetDetail {
+  quote: Quote;
+  ranges: Record<RangeKey, SeriesPoint[]>;
+  /** 같은 시장의 F&G 점수(겹쳐보기용) */
+  fngOverlay: Record<RangeKey, FngHistoryPoint[]>;
+  mode: DataMode;
+}
+
+/* ------------------------------------------------------------------ */
+/* 알림                                                                 */
+/* ------------------------------------------------------------------ */
+
+export type AlertRuleType =
+  | 'fng_stage_change'
+  | 'fng_threshold'
+  | 'price_target'
+  | 'price_move'
+  | 'risk_spike'
+  | 'calendar_reminder';
+
+export interface AlertRule {
+  id: string;
+  type: AlertRuleType;
+  enabled: boolean;
+  label: string;
+  /** 대상 (시장 id 또는 quote id) */
+  target: string;
+  /** 임계값 */
+  threshold?: number;
+  direction?: 'above' | 'below' | 'both';
+  /** 쿨다운(분) */
+  cooldownMinutes: number;
+  createdAt: number;
+}
+
+export interface AlertEvent {
+  id: string;
+  ruleId: string;
+  title: string;
+  body: string;
+  firedAt: number;
+  /** 중복 방지 키 */
+  dedupeKey: string;
+  read: boolean;
+}

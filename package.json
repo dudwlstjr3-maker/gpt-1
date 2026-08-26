@@ -1,0 +1,31 @@
+{
+  "name": "market-mood-3",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Market Mood 3 — 미국·한국·크립토 투자심리 대시보드 (모바일 우선 PWA)",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "npm run icons && next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "icons": "node scripts/generate-icons.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "next": "15.5.24",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

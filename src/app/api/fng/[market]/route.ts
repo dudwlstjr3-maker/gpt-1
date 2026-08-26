@@ -1,0 +1,89 @@
+/**
+ * Fear & Greed 상세 — 긴 히스토리(최대 3년), 구성요소 전체, 산출 방법.
+ * 홈 스냅샷보다 계산량이 크므로 별도 캐시(TTL 10분)를 쓴다.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { swr } from '@/server/cache';
+import { getAdapter } from '@/server/adapters/registry';
+import { computeFng } from '@/server/fng/engine';
+import {
+  COVERAGE_RULE_TEXT,
+  FORMULA_VERSION,
+  METHODOLOGY_STEPS,
+  SCALE_WARNING,
+  WINSOR_TEXT,
+} from '@/server/fng/definitions';
+import { kstDateKey } from '@/lib/format';
+import { DEMO_SCENARIOS, MARKET_IDS, type DemoScenario, type FngDetail, type MarketId, type Meta } from '@/types';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+const DETAIL_HISTORY_DAYS = 1150;
+const VALID_SCENARIO = new Set<string>(DEMO_SCENARIOS.map((s) => s.id));
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ market: string }> }) {
+  const { market: marketParam } = await params;
+  if (!MARKET_IDS.includes(marketParam as MarketId)) {
+    return NextResponse.json({ error: '알 수 없는 시장입니다.' }, { status: 404 });
+  }
+  const market = marketParam as MarketId;
+
+  const rawScenario = req.nextUrl.searchParams.get('scenario') ?? 'normal';
+  const scenario = (VALID_SCENARIO.has(rawScenario) ? rawScenario : 'normal') as DemoScenario;
+
+  const { adapter } = getAdapter();
+  const now = new Date();
+  const ctx = { now, scenario };
+
+  if (adapter.mode === 'DEMO' && scenario === 'error') {
+    return NextResponse.json({ error: 'DEMO 전체 오류 시나리오입니다.' }, { status: 503 });
+  }
+
+  try {
+    const key = `${adapter.mode}:${scenario}:${kstDateKey(now)}:fng-detail:${market}`;
+    const result = await swr(
+      key,
+      async (): Promise<FngDetail> => {
+        const input = await adapter.getFngInput(market, ctx);
+        const meta: Meta = {
+          asOf: now.toISOString(),
+          fetchedAt: now.toISOString(),
+          freshness: scenario === 'stale' ? 'stale' : 'delayed',
+          sources: Object.values(input.sources)[0] ?? [],
+        };
+        const { latest, history } = computeFng(input, {
+          historyDays: DETAIL_HISTORY_DAYS,
+          meta,
+          computedAt: now.toISOString(),
+        });
+        const benchmark = await adapter.getBenchmark(market, ctx);
+
+        return {
+          ...latest,
+          history,
+          benchmark,
+          methodology: {
+            version: FORMULA_VERSION,
+            summary:
+              '공개·라이선스 데이터를 구성요소별로 수집해 역사적 분포와 비교한 백분위를 가중평균한 자체 산출 지수입니다. 외부 서비스의 공식 지수를 복제하지 않습니다.',
+            steps: METHODOLOGY_STEPS,
+            winsorization: WINSOR_TEXT,
+            coverageRule: COVERAGE_RULE_TEXT,
+            scaleWarning: SCALE_WARNING,
+          },
+        };
+      },
+      { ttlMs: 600_000 },
+    );
+
+    return NextResponse.json(
+      { mode: adapter.mode, scenario: adapter.mode === 'DEMO' ? scenario : null, detail: result.value },
+      { headers: { 'cache-control': 'no-store' } },
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: `점수 상세를 불러오지 못했습니다: ${message}` }, { status: 502 });
+  }
+}

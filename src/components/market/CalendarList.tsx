@@ -1,0 +1,117 @@
+'use client';
+
+/** 경제 캘린더 — 국가·중요도·예상치·이전치·발표치·KST 시각·남은 시간. */
+
+import Link from 'next/link';
+import { useData } from '@/components/providers/DataProvider';
+import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
+import { Badge } from '@/components/ui/Badge';
+import { useNow } from '@/lib/useNow';
+import { formatCountdown, formatKstDate, formatKstTime, NO_VALUE } from '@/lib/format';
+import { EVENT_CATEGORY_LABEL, type CalendarEvent, type EventImportance } from '@/types';
+
+const COUNTRY_LABEL: Record<CalendarEvent['country'], string> = { US: '미국', KR: '한국', GLOBAL: '글로벌' };
+
+const IMPORTANCE: Record<EventImportance, { label: string; glyph: string; tone: 'danger' | 'warn' | 'neutral' }> = {
+  high: { label: '높음', glyph: '●●●', tone: 'danger' },
+  medium: { label: '보통', glyph: '●●○', tone: 'warn' },
+  low: { label: '낮음', glyph: '●○○', tone: 'neutral' },
+};
+
+export function EventRow({ event, now }: { event: CalendarEvent; now: number | null }) {
+  const t = Date.parse(event.scheduledAt);
+  const imp = IMPORTANCE[event.importance];
+  const past = now !== null && t <= now;
+
+  return (
+    <li className="border-b border-border px-3 py-2.5 last:border-b-0">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge tone="neutral" size="xs">
+              {COUNTRY_LABEL[event.country]}
+            </Badge>
+            <Badge tone={imp.tone} size="xs" title={`중요도 ${imp.label}`}>
+              <span aria-hidden="true">{imp.glyph}</span>
+              {imp.label}
+            </Badge>
+            <span className="text-[10px] text-subtle">{EVENT_CATEGORY_LABEL[event.category]}</span>
+          </div>
+          <p className="mt-1 text-[13px] leading-snug font-semibold break-keep text-fg">{event.title}</p>
+          {event.note ? <p className="mt-0.5 text-[10px] text-subtle">{event.note}</p> : null}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="tnum text-[12px] font-semibold text-fg-strong">
+            {formatKstTime(event.scheduledAt)}
+            {event.timeTbd ? '*' : ''}
+          </p>
+          <p className="tnum text-[10px] text-subtle">{formatKstDate(event.scheduledAt)} KST</p>
+          <p className="tnum mt-0.5 text-[10px]" style={{ color: past ? 'var(--subtle-fg)' : 'var(--accent)' }}>
+            {now === null ? '—' : formatCountdown(t - now)}
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+        <div className="flex gap-1">
+          <dt className="text-subtle">예상</dt>
+          <dd className="tnum text-fg">{event.forecast ?? NO_VALUE}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt className="text-subtle">이전</dt>
+          <dd className="tnum text-fg">{event.previous ?? NO_VALUE}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt className="text-subtle">발표</dt>
+          <dd className="tnum font-semibold" style={{ color: event.actual ? 'var(--accent)' : 'var(--subtle-fg)' }}>
+            {event.actual ?? '미발표'}
+          </dd>
+        </div>
+      </dl>
+    </li>
+  );
+}
+
+/** 홈 미리보기 — 오늘 남은 일정 위주로 최대 4건 */
+export function CalendarPreview() {
+  const { snapshot, refresh } = useData();
+  const now = useNow(30_000);
+  const section = snapshot?.sections.calendar ?? null;
+
+  return (
+    <section aria-labelledby="calendar-preview-title" className="mt-5 px-3">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <h2 id="calendar-preview-title" className="text-base font-bold text-fg-strong">
+          오늘의 경제 일정
+        </h2>
+        <Link href="/calendar" className="text-[11px] font-semibold text-accent hover:underline">
+          전체 캘린더 →
+        </Link>
+      </div>
+
+      <SectionGate
+        section={section}
+        onRetry={refresh}
+        loading={<SkeletonCard height={40} lines={3} />}
+        empty={<EmptyState title="예정된 일정이 없습니다" description="다음 일정이 등록되면 여기에 표시됩니다." />}
+      >
+        {(events) => {
+          const ref = now ?? Date.now();
+          const upcoming = events.filter((e) => Date.parse(e.scheduledAt) >= ref - 6 * 3600_000).slice(0, 4);
+          if (upcoming.length === 0) {
+            return <EmptyState title="남은 일정이 없습니다" description="오늘 예정된 주요 지표 발표가 없습니다." />;
+          }
+          return (
+            <div className="card overflow-hidden">
+              <ul>
+                {upcoming.map((e) => (
+                  <EventRow key={e.id} event={e} now={now} />
+                ))}
+              </ul>
+            </div>
+          );
+        }}
+      </SectionGate>
+    </section>
+  );
+}

@@ -11,8 +11,10 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/States';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { Badge } from '@/components/ui/Badge';
-import { RiskCard, RISK_COLOR, formatRiskValue } from '@/components/market/RiskSeven';
+import { SignalDot, SignalLegend, SignalLight, SignalTally } from '@/components/ui/Signal';
+import { RiskCard, RISK_COLOR, formatRiskValue, tallyRisk } from '@/components/market/RiskSeven';
 import { formatKstFull } from '@/lib/format';
+import { riskSignal } from '@/lib/scale';
 import {
   RISK_LEVEL_GLYPH,
   RISK_LEVEL_LABEL,
@@ -80,34 +82,35 @@ export default function RiskPage() {
               level: lv,
               items: available.filter((i) => i.level === lv),
             })).filter((g) => g.items.length > 0);
+            const tally = tallyRisk(digest);
 
             return (
               <>
                 {/* 종합 요약 */}
                 <div className="card p-3.5">
                   <div className="flex items-start gap-2">
-                    <span
-                      aria-hidden="true"
-                      className="mt-px text-base"
-                      style={{
-                        color:
-                          digest.alertCount > 0
-                            ? 'var(--danger)'
-                            : digest.watchCount > 0
-                              ? 'var(--warn)'
-                              : 'var(--ok)',
-                      }}
-                    >
-                      {digest.alertCount > 0 ? '▲' : digest.watchCount > 0 ? '△' : '○'}
-                    </span>
+                    <SignalLight
+                      signal={digest.alertCount > 0 ? 'red' : digest.watchCount > 0 ? 'yellow' : 'green'}
+                      size="lg"
+                      label="종합"
+                    />
                     <p className="min-w-0 flex-1 text-[13px] leading-relaxed break-keep text-fg">{digest.headline}</p>
                   </div>
 
-                  {/* 단계별 분포 */}
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-2.5">
+                  {/* 신호등 집계 */}
+                  <div className="mt-3 border-t border-border pt-2.5">
+                    <SignalTally items={tally.items} total={tally.total} />
+                  </div>
+
+                  {/* 단계별 분포 — 신호등을 4단계로 더 잘게 쪼갠 값 */}
+                  <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-2.5">
                     {byLevel.map((g) => (
                       <div key={g.level} className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: RISK_COLOR[g.level] }}>
+                        <div
+                          className="flex items-center gap-1.5 text-[11px] font-semibold"
+                          style={{ color: RISK_COLOR[g.level] }}
+                        >
+                          <SignalDot signal={riskSignal(g.level)} size={7} />
                           <span aria-hidden="true">{RISK_LEVEL_GLYPH[g.level]}</span>
                           {RISK_LEVEL_LABEL[g.level]} {g.items.length}
                         </div>
@@ -125,6 +128,9 @@ export default function RiskPage() {
 
                 {/* 구간 기준 안내 */}
                 <div className="mt-2.5">
+                  <SignalLegend note="빨간불은 '위험하니 팔아라'가 아니라 '이 지표가 평소보다 크게 벗어나 있다'는 뜻입니다. 초록불도 안전을 보장하지 않습니다." />
+                </div>
+                <div className="mt-2">
                   <Notice tone="neutral">
                     구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다. 각 지표 카드에 구간 경계를 그대로 표시했으니
                     직접 확인하고 판단하세요. 단계 표시는 위험의 방향을 읽는 참고이며 매매 신호가 아닙니다.
@@ -171,8 +177,9 @@ export default function RiskPage() {
                             <td>
                               <Badge
                                 size="xs"
-                                tone={i.level === 'alert' ? 'danger' : i.level === 'watch' ? 'warn' : i.level === 'calm' ? 'ok' : 'neutral'}
+                                tone={i.level === 'alert' ? 'danger' : i.level === 'watch' ? 'warn' : 'ok'}
                               >
+                                <SignalDot signal={riskSignal(i.level)} size={6} />
                                 <span aria-hidden="true">{RISK_LEVEL_GLYPH[i.level]}</span>
                                 {RISK_LEVEL_LABEL[i.level]}
                               </Badge>

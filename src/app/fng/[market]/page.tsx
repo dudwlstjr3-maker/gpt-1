@@ -112,7 +112,7 @@ export default function FngDetailPage() {
         id: 'benchmark',
         name: detail.benchmark.name,
         points: detail.benchmark.series.filter((p) => p.t >= cutoff),
-        color: 'var(--stage-neutral)',
+        color: 'var(--series-2)',
         axis: 'right',
         precision: detail.benchmark.precision,
         dashed: true,
@@ -218,7 +218,7 @@ export default function FngDetailPage() {
             </div>
           </div>
           <div className="mt-3 border-t border-border pt-2.5">
-            <StageLegend />
+            <StageLegend score={detail.score} />
           </div>
         </div>
       </section>

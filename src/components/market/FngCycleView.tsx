@@ -13,7 +13,7 @@
 import { ScoreSparkline } from '@/components/charts/Sparkline';
 import { Badge, type Tone } from '@/components/ui/Badge';
 import { formatNumber, formatSigned, NO_VALUE } from '@/lib/format';
-import { scoreColor } from '@/lib/scale';
+import { scoreColor, scoreFill } from '@/lib/scale';
 import { useChangeColor } from './useChangeColor';
 import type { CyclePhaseId, FngCycle, FngCycleHorizon } from '@/types';
 
@@ -83,18 +83,27 @@ function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) 
         </div>
       </div>
 
-      {/* 기간 내 위치 막대 */}
+      {/* 기간 내 위치 막대.
+          30% / 70% 자리에 눈금을 넣어 하단권·중간권·상단권 경계를 눈으로 확인할 수 있게 한다. */}
       {!unavailable ? (
         <div className="mt-2 flex items-center gap-2">
-          <div className="relative h-1.5 flex-1 rounded-full" style={{ background: 'var(--surface-3)' }}>
+          <div className="relative h-2.5 flex-1 rounded-full" style={{ background: 'var(--surface-3)' }}>
             <span
               aria-hidden="true"
               className="absolute inset-y-0 left-0 rounded-full"
-              style={{ width: `${h.percentile}%`, background: scoreColor(score) }}
+              style={{ width: `${h.percentile}%`, background: scoreFill(score) }}
             />
+            {[30, 70].map((t) => (
+              <span
+                key={t}
+                aria-hidden="true"
+                className="absolute inset-y-0 w-px"
+                style={{ left: `${t}%`, background: 'var(--border-strong)' }}
+              />
+            ))}
             <span
               aria-hidden="true"
-              className="absolute top-1/2 h-3 w-[2.5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+              className="absolute top-1/2 h-4 w-[2.5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
               style={{ left: `${h.percentile}%`, background: 'var(--fg-strong)', boxShadow: '0 0 0 2px var(--surface)' }}
             />
           </div>

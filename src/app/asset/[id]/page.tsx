@@ -89,7 +89,7 @@ export default function AssetPage() {
           id: 'fng',
           name: `${MARKET_LABEL[q.market]} 심리 점수`,
           points: pts,
-          color: 'var(--stage-neutral)',
+          color: 'var(--series-2)',
           axis: 'right',
           precision: 1,
           fixed0to100: true,

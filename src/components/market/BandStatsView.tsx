@@ -11,7 +11,7 @@
 import { Notice } from '@/components/ui/States';
 import { useChangeColor } from './useChangeColor';
 import { formatNumber, formatSigned, NO_VALUE } from '@/lib/format';
-import { stageColor } from '@/lib/scale';
+import { stageColor, stageFill } from '@/lib/scale';
 import type { FngBandStats } from '@/types';
 
 export function BandStatsView({ stats }: { stats: FngBandStats }) {
@@ -25,9 +25,13 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
         <h3 className="text-sm font-bold text-fg-strong">구간별 과거 통계</h3>
         <span className="tnum text-[10px] text-subtle">표본 {formatNumber(stats.totalDays, 0)}일</span>
       </div>
-      <p className="mb-3 text-[11px] leading-relaxed break-keep text-muted">
+      <p className="mb-1.5 text-[11px] leading-relaxed break-keep text-muted">
         점수가 각 구간이던 날 이후 <strong className="text-fg">{stats.forwardDays}거래일</strong> 동안{' '}
         <strong className="text-fg">{stats.benchmarkName}</strong> 이 어떻게 움직였는지 집계한 값입니다.
+      </p>
+      {/* 화면 안에 색이 두 종류 섞여 있다. 무엇이 무슨 색인지 먼저 알려 준다. */}
+      <p className="mb-3 text-[10px] leading-relaxed break-keep text-subtle">
+        왼쪽 네모는 공포↔탐욕 구간 색, 아래 막대는 오르내림 색입니다. 신호등(위험 지표)과는 다른 색 규칙입니다.
       </p>
 
       <ul className="space-y-2.5">
@@ -39,10 +43,15 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
             <li key={b.stageId}>
               <div className="mb-1 flex items-baseline justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
+                  {/* 단계 색은 공포↔탐욕 띠와 같은 색이다. 아래 막대의 색(등락)과 헷갈리지 않도록
+                      점이 아니라 띠 조각 모양으로 그려 구분한다. */}
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: stageColor(b.stageId) }}
+                    className="inline-block h-2.5 w-1.5 shrink-0 rounded-sm"
+                    style={{
+                      background: stageFill(b.stageId),
+                      boxShadow: `0 0 0 1px color-mix(in srgb, ${stageColor(b.stageId)} 45%, transparent)`,
+                    }}
                   />
                   <span className="truncate text-[11.5px] text-fg">{b.stageLabel}</span>
                   <span className="tnum shrink-0 text-[10px] text-subtle">{b.sampleDays}일</span>

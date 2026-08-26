@@ -11,9 +11,10 @@ import { SectionGate, SkeletonCard } from '@/components/ui/States';
 import { Badge, SessionBadge } from '@/components/ui/Badge';
 import { Gauge } from '@/components/charts/Gauge';
 import { useFormatter } from '@/components/market/useFormatter';
+import { SignalDot } from '@/components/ui/Signal';
 import { RISK_COLOR } from '@/components/market/RiskSeven';
 import { formatKstTime, NO_VALUE } from '@/lib/format';
-import { confidenceGlyph } from '@/lib/scale';
+import { confidenceGlyph, riskSignal } from '@/lib/scale';
 import {
   CONFIDENCE_LABEL,
   MARKET_IDS,
@@ -109,7 +110,11 @@ export default function MarketHubPage() {
                           </>
                         ) : null}
                         {worst ? (
-                          <p className="mt-1.5 flex items-center gap-1 text-[10.5px]" style={{ color: RISK_COLOR[worst.level] }}>
+                          <p
+                            className="mt-1.5 flex items-center gap-1 text-[10.5px] font-semibold"
+                            style={{ color: RISK_COLOR[worst.level] }}
+                          >
+                            <SignalDot signal={riskSignal(worst.level)} size={7} />
                             <span aria-hidden="true">{RISK_LEVEL_GLYPH[worst.level]}</span>
                             {worst.shortName} {RISK_LEVEL_LABEL[worst.level]}
                           </p>

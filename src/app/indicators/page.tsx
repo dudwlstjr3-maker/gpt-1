@@ -7,17 +7,23 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { Badge } from '@/components/ui/Badge';
+import { SignalDot, SignalLegend } from '@/components/ui/Signal';
 import { formatMacroValue } from '@/components/market/PriceCard';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
+import type { Signal } from '@/lib/scale';
 import type { MacroIndicator } from '@/types';
 
 type GroupFilter = 'all' | '미국' | '한국' | '글로벌' | '크립토';
 
-const RISK_META: Record<MacroIndicator['riskLevel'], { label: string; tone: 'ok' | 'warn' | 'danger' | 'neutral'; glyph: string }> = {
-  normal: { label: '정상', tone: 'ok', glyph: '·' },
-  watch: { label: '관찰', tone: 'warn', glyph: '△' },
-  alert: { label: '주의', tone: 'danger', glyph: '▲' },
-  unknown: { label: '정보 없음', tone: 'neutral', glyph: '—' },
+/** 위험 지표 7선의 신호등과 같은 색 규칙을 쓴다. 화면이 달라도 색의 뜻은 같아야 한다. */
+const RISK_META: Record<
+  MacroIndicator['riskLevel'],
+  { label: string; tone: 'ok' | 'warn' | 'danger' | 'neutral'; glyph: string; signal: Signal | null }
+> = {
+  normal: { label: '정상', tone: 'ok', glyph: '·', signal: 'green' },
+  watch: { label: '관찰', tone: 'warn', glyph: '△', signal: 'yellow' },
+  alert: { label: '주의', tone: 'danger', glyph: '▲', signal: 'red' },
+  unknown: { label: '정보 없음', tone: 'neutral', glyph: '—', signal: null },
 };
 
 const TREND_GLYPH: Record<MacroIndicator['trend'], string> = { up: '▲', down: '▼', flat: '―', unknown: '—' };
@@ -46,6 +52,10 @@ export default function IndicatorsPage() {
       <p className="mt-0.5 px-3 text-[11px] text-muted">
         각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다.
       </p>
+
+      <div className="mt-2 px-3">
+        <SignalLegend note="위험 지표 7선과 같은 색 규칙입니다. 색은 평소 범위에서 얼마나 벗어났는지만 나타내며 매매 신호가 아닙니다." />
+      </div>
 
       {alerts.length > 0 ? (
         <div className="mt-3 px-3">
@@ -119,6 +129,7 @@ export default function IndicatorsPage() {
                         </div>
                         <div className="mt-1.5 flex items-center gap-1.5">
                           <Badge tone={risk.tone} size="xs">
+                            {risk.signal ? <SignalDot signal={risk.signal} size={6} /> : null}
                             <span aria-hidden="true">{risk.glyph}</span>
                             {risk.label}
                           </Badge>

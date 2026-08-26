@@ -203,6 +203,9 @@ body {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 4px;
+    /* containment 이 없으면 이 컨테이너의 스크롤 폭이 문서 전체의 스크롤 폭으로
+       새어 나가, 화면이 잘리지 않는데도 document.scrollWidth 가 뷰포트보다 커진다. */
+    contain: paint;
   }
   .snap-row::-webkit-scrollbar {
     display: none;
@@ -215,6 +218,7 @@ body {
   .scroll-x {
     overflow-x: auto;
     scrollbar-width: thin;
+    contain: paint;
   }
 
   /* ----------------------------- 스켈레톤 ----------------------------- */

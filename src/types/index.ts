@@ -255,12 +255,122 @@ export interface FngScore {
   topPositive: FngDriver | null;
   topNegative: FngDriver | null;
 
+  /** 사이클 — 기간별 심리 위치와 현재 국면 */
+  cycle: FngCycle;
+
   meta: Meta;
+}
+
+/* ------------------------------------------------------------------ */
+/* 심리 사이클                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 국면은 "지금 점수가 어느 구간인가(수준)"와 "올라가는 중인가 내려가는 중인가(방향)"를
+ * 조합한 서술이다. 앞으로의 방향을 예측하지 않는다.
+ */
+export type CyclePhaseId =
+  | 'recovery'   // 공포 + 상승 → 회복 시도
+  | 'deepening'  // 공포 + 하락 → 공포 심화
+  | 'improving'  // 중립 + 상승 → 개선
+  | 'weakening'  // 중립 + 하락 → 약화
+  | 'heating'    // 탐욕 + 상승 → 과열 진행
+  | 'cooling'    // 탐욕 + 하락 → 탐욕 후퇴
+  | 'unknown';
+
+export interface CyclePhase {
+  id: CyclePhaseId;
+  label: string;
+  /** 수준 축 */
+  levelLabel: string;
+  /** 방향 축 */
+  directionLabel: string;
+  /** 한 줄 서술 (사실 기반) */
+  description: string;
+}
+
+export const CYCLE_PHASE_LABEL: Record<CyclePhaseId, string> = {
+  recovery: '회복 시도',
+  deepening: '공포 심화',
+  improving: '개선',
+  weakening: '약화',
+  heating: '과열 진행',
+  cooling: '탐욕 후퇴',
+  unknown: '판단 불가',
+};
+
+export interface FngCycleHorizon {
+  id: 'short' | 'mid' | 'long';
+  label: string;
+  windowDays: number;
+  /** 이 기간 안에서 현재 점수가 놓인 백분위 (0~100). null = 표본 부족 */
+  percentile: number | null;
+  mean: number | null;
+  min: number | null;
+  max: number | null;
+  /** 기간 시작 대비 점수 변화 */
+  change: number | null;
+  direction: 'up' | 'down' | 'flat' | 'unknown';
+  /** 이 기간 평균이 속한 단계 */
+  averageStage: FngStage | null;
+  /** 미니 차트용 (다운샘플) */
+  points: FngHistoryPoint[];
+  /** 표본이 부족할 때 사유 */
+  unavailableReason?: string;
+}
+
+export interface FngCycle {
+  market: MarketId;
+  score: number | null;
+  /** 20일 이동평균 */
+  ma20: number | null;
+  /** 최근 10일 기울기 (점/일) */
+  slope: number | null;
+  phase: CyclePhase;
+  horizons: FngCycleHorizon[];
+}
+
+/* ------------------------------------------------------------------ */
+/* 구간별 과거 통계                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * "이 점수 구간이던 날들 이후 대표 지수가 어떻게 움직였는가"를 집계한 서술 통계.
+ * 매매 신호가 아니며 미래 수익을 예측하지 않는다.
+ */
+export interface FngBandStat {
+  stageId: FngStageId;
+  stageLabel: string;
+  /** 표본 일수 */
+  sampleDays: number;
+  /** 이후 N거래일 수익률 평균(%) */
+  avgForward: number | null;
+  /** 중앙값(%) */
+  medianForward: number | null;
+  /** 플러스로 끝난 비율(%) */
+  positiveShare: number | null;
+  /** 최악/최선 */
+  worst: number | null;
+  best: number | null;
+}
+
+export interface FngBandStats {
+  /** 앞으로 몇 거래일을 봤는가 */
+  forwardDays: number;
+  /** 비교 대상 지수 이름 */
+  benchmarkName: string;
+  /** 전체 표본 일수 */
+  totalDays: number;
+  bands: FngBandStat[];
+  /** 데이터 성격에 대한 경고 (DEMO 여부 등) */
+  caveat: string;
 }
 
 export interface FngDetail extends FngScore {
   /** 1M/3M/1Y/3Y 를 모두 담는 최대 길이 히스토리 */
   history: FngHistoryPoint[];
+  /** 구간별 과거 통계 (표본이 부족하면 null) */
+  bandStats: FngBandStats | null;
   /** 대표 시장 가격 (점수와 겹쳐 보기용) */
   benchmark: {
     id: string;

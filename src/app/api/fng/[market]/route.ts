@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { swr } from '@/server/cache';
 import { getAdapter } from '@/server/adapters/registry';
 import { computeFng } from '@/server/fng/engine';
+import { buildBandStats } from '@/server/fng/cycle';
 import {
   COVERAGE_RULE_TEXT,
   FORMULA_VERSION,
@@ -60,9 +61,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mark
         });
         const benchmark = await adapter.getBenchmark(market, ctx);
 
+        // 구간별 과거 통계 — 서술 통계일 뿐이며 매매 신호가 아니다.
+        const bandStats = benchmark
+          ? buildBandStats(
+              history,
+              benchmark.series,
+              benchmark.name,
+              adapter.mode === 'DEMO'
+                ? 'DEMO 합성 데이터로 계산한 값입니다. 실제 시장 통계가 아니며 화면 동작 확인용입니다.'
+                : '과거 표본의 분포를 그대로 집계한 값입니다. 구간이 겹치는(overlapping) 표본이라 통계적 독립성이 없고, 미래 수익을 예측하지 않습니다.',
+            )
+          : null;
+
         return {
           ...latest,
           history,
+          bandStats,
           benchmark,
           methodology: {
             version: FORMULA_VERSION,

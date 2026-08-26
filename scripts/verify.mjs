@@ -186,9 +186,57 @@ async function main() {
   check('공포지수·정크본드·국채가 포함됨',
     ['vix', 'hy_oas', 'ust10'].every((id) => (risk?.indicators ?? []).some((i) => i.id === id)));
 
+  /* ---------------- 7-2. 심리 사이클 ---------------- */
+  console.log('\n[7-2] 심리 사이클');
+  const PHASES = ['recovery', 'deepening', 'improving', 'weakening', 'heating', 'cooling', 'unknown'];
+  for (const f of fng) {
+    const cy = f.cycle;
+    check(`[${f.market}] 사이클 제공`, cy !== undefined && cy !== null);
+    check(`[${f.market}] 국면이 유효한 값`, PHASES.includes(cy?.phase?.id), cy?.phase?.label);
+    check(`[${f.market}] 단기·중기·장기 3개 기간`, (cy?.horizons ?? []).length === 3, `${cy?.horizons?.length}개`);
+    for (const h of cy?.horizons ?? []) {
+      if (h.percentile !== null && (h.percentile < 0 || h.percentile > 100)) {
+        check(`[${f.market}] ${h.id} 백분위 0~100`, false, `${h.percentile}`);
+      }
+      if (h.percentile === null && typeof h.unavailableReason !== 'string') {
+        check(`[${f.market}] ${h.id} 산출 불가 사유 제공`, false, '');
+      }
+      if (h.mean !== null && (h.mean < 0 || h.mean > 100)) {
+        check(`[${f.market}] ${h.id} 평균 0~100`, false, `${h.mean}`);
+      }
+    }
+    // 국면이 실제 수준·방향과 어긋나지 않는지
+    if (cy?.score !== null && cy?.slope !== null) {
+      const lvl = cy.score < 40 ? 'fear' : cy.score < 60 ? 'neutral' : 'greed';
+      const expected = {
+        fear: ['recovery', 'deepening'],
+        neutral: ['improving', 'weakening'],
+        greed: ['heating', 'cooling'],
+      }[lvl];
+      check(`[${f.market}] 국면이 점수 수준과 일치`, expected.includes(cy.phase.id), `${cy.score}점 → ${cy.phase.id}`);
+    }
+  }
+  check('사이클 기간별 값이 모두 범위 안', true);
+
+  /* ---------------- 7-3. 구간별 과거 통계 ---------------- */
+  console.log('\n[7-3] 구간별 과거 통계');
+  for (const m of ['us', 'kr', 'crypto']) {
+    const { body } = await getJson(`/api/fng/${m}`);
+    const bs = body.detail?.bandStats;
+    check(`[${m}] 구간 통계 제공`, bs !== null && bs !== undefined, bs ? `표본 ${bs.totalDays}일` : '없음');
+    if (bs) {
+      check(`[${m}] 5개 구간 모두 집계`, bs.bands.length === 5, `${bs.bands.length}개`);
+      check(`[${m}] 표본 부족 구간은 값이 null`,
+        bs.bands.every((b) => (b.sampleDays >= 5) === (b.avgForward !== null)));
+      check(`[${m}] 데이터 한계 경고 문구 존재`, typeof bs.caveat === 'string' && bs.caveat.length > 10);
+      check(`[${m}] 플러스 비율 0~100`,
+        bs.bands.every((b) => b.positiveShare === null || (b.positiveShare >= 0 && b.positiveShare <= 100)));
+    }
+  }
+
   /* ---------------- 8. 시장별 분리 화면 ---------------- */
   console.log('\n[8] 시장별 분리 화면');
-  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk']) {
+  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk', '/fng/us']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
     check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);

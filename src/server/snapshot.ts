@@ -31,8 +31,11 @@ import type {
 } from '@/types';
 import { MARKET_IDS } from '@/types';
 
-/** 홈 화면에 필요한 최소 히스토리 길이. 상세 화면은 별도 라우트에서 길게 계산한다. */
-const HOME_HISTORY_DAYS = 45;
+/**
+ * 홈 스냅샷이 만드는 히스토리 길이.
+ * 사이클의 장기 창이 250일이라 그보다 길어야 한다. (상세 화면은 별도 라우트에서 더 길게 계산)
+ */
+const HOME_HISTORY_DAYS = 270;
 
 function nowMeta(now: Date, sources: Meta['sources'] = []): Meta {
   return {
@@ -355,6 +358,20 @@ function emptyScore(market: MarketId, meta: Meta, reason: string): FngScore {
     components: [],
     topPositive: null,
     topNegative: null,
+    cycle: {
+      market,
+      score: null,
+      ma20: null,
+      slope: null,
+      phase: {
+        id: 'unknown',
+        label: '판단 불가',
+        levelLabel: '수준 정보 없음',
+        directionLabel: '방향 정보 없음',
+        description: '점수를 산출하지 못해 국면을 판단할 수 없습니다.',
+      },
+      horizons: [],
+    },
     meta,
   };
 }

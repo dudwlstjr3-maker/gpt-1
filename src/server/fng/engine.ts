@@ -24,6 +24,7 @@ import type {
 } from '@/types';
 import { CONFIDENCE_LABEL } from '@/types';
 import { stageOf } from '@/lib/scale';
+import { buildCycle } from './cycle';
 import {
   COMPONENTS,
   FORMULA_VERSION,
@@ -348,6 +349,7 @@ export function computeFng(input: EngineInput, options: EngineOptions): EngineRe
     components,
     topPositive: toDriver(best, true),
     topNegative: toDriver(worst, false),
+    cycle: buildCycle(input.market, history, last.score),
     meta: options.meta,
   };
 

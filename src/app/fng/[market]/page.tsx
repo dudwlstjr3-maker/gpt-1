@@ -13,6 +13,8 @@ import { useSettings } from '@/components/providers/SettingsProvider';
 import { Gauge, StageLegend } from '@/components/charts/Gauge';
 import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
 import { ContributionBars } from '@/components/charts/ContributionBars';
+import { FngCycleView } from '@/components/market/FngCycleView';
+import { BandStatsView } from '@/components/market/BandStatsView';
 import { Badge, ModeBadge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, Notice, SkeletonCard } from '@/components/ui/States';
@@ -251,6 +253,26 @@ export default function FngDetailPage() {
             좌축은 0~100 심리 점수, 우축은 {detail.benchmark?.name ?? '대표 지수'} 가격입니다. 점수가 산출되지 않은 날은
             선이 이어지지 않습니다.
           </p>
+        </div>
+      </section>
+
+      {/* 사이클 · 구간 통계 */}
+      <section className="mt-4 px-3" aria-labelledby="fng-cycle-title">
+        <h2 id="fng-cycle-title" className="mb-2 text-base font-bold text-fg-strong">
+          사이클과 구간 통계
+        </h2>
+        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+          <FngCycleView cycle={detail.cycle} />
+          {detail.bandStats ? (
+            <BandStatsView stats={detail.bandStats} />
+          ) : (
+            <div className="card p-3.5">
+              <h3 className="text-sm font-bold text-fg-strong">구간별 과거 통계</h3>
+              <p className="mt-2 text-[11px] break-keep text-muted">
+                통계를 낼 만큼 히스토리가 쌓이지 않았거나 비교할 대표 지수가 없습니다.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

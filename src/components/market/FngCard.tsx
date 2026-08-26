@@ -13,6 +13,7 @@ import { ScoreSparkline } from '@/components/charts/Sparkline';
 import { formatKstTime, formatSigned, NO_VALUE } from '@/lib/format';
 import { confidenceGlyph } from '@/lib/scale';
 import { useChangeColor } from './useChangeColor';
+import { CyclePhaseBadge } from './FngCycleView';
 import { CONFIDENCE_LABEL, MARKET_LABEL, type DataMode, type FngScore } from '@/types';
 
 function DeltaChip({ label, value }: { label: string; value: number | null }) {
@@ -62,6 +63,9 @@ export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
             {MARKET_LABEL[score.market]} 투자심리
           </h3>
           <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
+          <div className="mt-1.5">
+            <CyclePhaseBadge cycle={score.cycle} />
+          </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <ModeBadge mode={mode} size="xs" />

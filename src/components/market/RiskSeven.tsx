@@ -5,7 +5,7 @@
  *
  * 각 지표를 "지금 어느 구간에 있는가"로 보여준다. 숫자만으로는 20 이 높은지 낮은지
  * 알 수 없으므로 구간 막대 위에 현재 위치를 찍고, 구간 기준을 그대로 노출한다.
- * 색상만으로 단계를 전달하지 않도록 기호(○ ◐ △ ▲)와 라벨을 항상 함께 쓴다.
+ * 색상만으로 단계를 전달하지 않도록 기호(○ ● △ ▲)와 라벨을 항상 함께 쓴다.
  */
 
 import Link from 'next/link';
@@ -26,7 +26,9 @@ import {
 /** 위험 단계 색상 — Fear→Greed 척도와 구분되는 의미 색상 */
 export const RISK_COLOR: Record<RiskLevel, string> = {
   calm: 'var(--ok)',
-  normal: 'var(--muted-fg)',
+  // '보통'은 강조하지 않되 선·막대로 그렸을 때 읽히긴 해야 한다.
+  // 배지는 별도로 muted 톤을 쓰므로 여기서 밝게 잡아도 과하게 튀지 않는다.
+  normal: 'var(--fg)',
   watch: 'var(--warn)',
   alert: 'var(--danger)',
 };

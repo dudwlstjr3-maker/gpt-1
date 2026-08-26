@@ -79,7 +79,9 @@ async function section<T>(
 
     let status: SectionStatus = 'ok';
     if (isEmpty(data)) status = 'empty';
-    else if (result.stale || ageStatus(mergedMeta, key, now) === 'stale') status = 'stale';
+    // TTL 을 막 넘겨 백그라운드 갱신 중인 값은 "오래된 데이터"가 아니다.
+    // 실제로 기준 시각이 뒤처졌거나(ageStatus), 갱신이 실패해 옛 값을 계속 쓰는 경우만 stale 로 본다.
+    else if (ageStatus(mergedMeta, key, now) === 'stale' || (result.stale && result.error)) status = 'stale';
     else if (mergedMeta.notes && mergedMeta.notes.length > 0) status = 'partial';
 
     return {

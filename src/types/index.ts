@@ -303,7 +303,86 @@ export interface MacroIndicator {
   featured: boolean;
   releaseDate: string | null;
   nextRelease: string | null;
+  /** 추이 미니 차트 (시계열이 있는 지표만) */
+  spark?: SeriesPoint[];
   meta: Meta;
+}
+
+/* ------------------------------------------------------------------ */
+/* 위험 지표 7선                                                         */
+/* ------------------------------------------------------------------ */
+
+/** 위험 단계. 색상뿐 아니라 라벨·기호로도 표기한다. */
+export type RiskLevel = 'calm' | 'normal' | 'watch' | 'alert';
+
+export const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
+  calm: '안정',
+  normal: '보통',
+  watch: '관찰',
+  alert: '주의',
+};
+
+export const RISK_LEVEL_GLYPH: Record<RiskLevel, string> = {
+  calm: '○',
+  normal: '●',
+  watch: '△',
+  alert: '▲',
+};
+
+export interface RiskBand {
+  level: RiskLevel;
+  /** 구간 시작(포함). null = 하한 없음 */
+  from: number | null;
+  /** 구간 끝(미포함). null = 상한 없음 */
+  to: number | null;
+  label: string;
+}
+
+export interface RiskIndicator {
+  id: string;
+  /** 한국어 표시명 */
+  name: string;
+  /** 짧은 이름 (타일용) */
+  shortName: string;
+  /** 어느 시장의 위험을 보는 지표인가 */
+  scope: MarketId | 'global';
+  value: number | null;
+  previous: number | null;
+  change: number | null;
+  changePct: number | null;
+  unit: Unit;
+  precision: number;
+  suffix: string;
+  /** 값이 클수록 위험한가, 작을수록 위험한가 */
+  direction: 'higher_is_riskier' | 'lower_is_riskier';
+  level: RiskLevel;
+  /** 밴드 스케일에서 현재 값의 위치 (0~100). null = 값 없음 */
+  position: number | null;
+  bands: RiskBand[];
+  /** 스케일 표시 범위 */
+  scaleMin: number;
+  scaleMax: number;
+  /** 이 지표가 왜 중요한가 (고정 설명) */
+  why: string;
+  /** 지금 수치를 어떻게 읽어야 하는가 (값에 따라 달라지는 해석) */
+  reading: string;
+  spark: SeriesPoint[];
+  /** 값이 없을 때 사유 */
+  unavailableReason?: string;
+  meta: Meta;
+}
+
+export interface RiskDigest {
+  indicators: RiskIndicator[];
+  /** 주의 단계 개수 */
+  alertCount: number;
+  /** 관찰 이상 개수 */
+  watchCount: number;
+  /** 값을 산출한 지표 수 */
+  availableCount: number;
+  /** 한 줄 종합 (사실 기반) */
+  headline: string;
+  generatedAt: string;
 }
 
 export type EventImportance = 'high' | 'medium' | 'low';
@@ -390,6 +469,7 @@ export interface SnapshotSections {
   quotes: Section<Record<MarketId, Quote[]>>;
   flows: Section<FlowSummary>;
   macro: Section<MacroIndicator[]>;
+  risk: Section<RiskDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;
   summary: Section<MarketSummary>;

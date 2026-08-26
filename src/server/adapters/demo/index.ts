@@ -573,6 +573,7 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
     risk: { level: MacroIndicator['riskLevel']; note: string },
     m: Meta,
     suffix?: string,
+    spark?: SeriesPoint[],
   ): MacroIndicator => ({
     id,
     name,
@@ -595,8 +596,19 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
     featured,
     releaseDate: m.asOf,
     nextRelease: null,
+    ...(spark && spark.length ? { spark } : {}),
     meta: m,
   });
+
+  /** 월드 시계열에서 최근 30포인트 스파크라인을 만든다. */
+  const sparkOf = (values: number[], dates: number[], scale = 1): SeriesPoint[] => {
+    const start = Math.max(0, values.length - 30);
+    const out: SeriesPoint[] = [];
+    for (let k = start; k < values.length; k += 1) out.push({ t: dates[k], v: round(values[k] * scale, 6) });
+    return out;
+  };
+  const d = world.dates;
+  const cd = world.cryptoDates;
 
   const vixNow = s.vix[i];
   const vkospiNow = s.vkospi[i];
@@ -628,25 +640,27 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
         : spread < 20
           ? { level: 'watch', note: '역전 해소 초기 구간' }
           : { level: 'normal', note: '정상 스프레드' },
-      meta),
+      meta, undefined, sparkOf(s.ust10.map((v, k) => (v - s.ust2[k]) * 100), d)),
     mk('dxy', '달러지수 DXY', '글로벌', round(s.dxy[i], 2), round(s.dxy[i - 1], 2), 'point', 2, false,
-      s.dxy[i] > 106 ? { level: 'watch', note: '강달러 — 신흥국 자금 유출 압력' } : { level: 'normal', note: '중립 범위' }, meta),
+      s.dxy[i] > 106 ? { level: 'watch', note: '강달러 — 신흥국 자금 유출 압력' } : { level: 'normal', note: '중립 범위' }, meta,
+      undefined, sparkOf(s.dxy, d)),
     mk('usdkrw', 'USD/KRW', '한국', round(usdkrwNow, 2), round(s.usdkrw[i - 1], 2), 'point', 2, true,
       usdkrwNow > 1420
         ? { level: 'alert', note: '원화 약세 심화 구간' }
         : usdkrwNow > 1380
           ? { level: 'watch', note: '원화 약세 압력' }
-          : { level: 'normal', note: '안정 범위' }, metaKr),
+          : { level: 'normal', note: '안정 범위' }, metaKr, undefined, sparkOf(s.usdkrw, d)),
     mk('hy_oas', '미국 하이일드 스프레드', '미국', round(hyNow, 2), round(s.hyOas[i - 1], 2), 'percent', 2, true,
       hyNow > 4.5
         ? { level: 'alert', note: '신용 위험 확대' }
         : hyNow > 3.8
           ? { level: 'watch', note: '스프레드 확대 추세' }
-          : { level: 'normal', note: '안정 범위' }, meta),
+          : { level: 'normal', note: '안정 범위' }, meta, undefined, sparkOf(s.hyOas, d)),
     mk('gold', '금 (온스당)', '글로벌', round(s.gold[i], 2), round(s.gold[i - 1], 2), 'currency', 2, false,
-      { level: 'normal', note: '안전자산 수요 참고' }, meta),
+      { level: 'normal', note: '안전자산 수요 참고' }, meta, undefined, sparkOf(s.gold, d)),
     mk('wti', 'WTI 원유', '글로벌', round(s.wti[i], 2), round(s.wti[i - 1], 2), 'currency', 2, false,
-      s.wti[i] > 95 ? { level: 'watch', note: '유가 상승 — 물가 압력' } : { level: 'normal', note: '중립 범위' }, meta),
+      s.wti[i] > 95 ? { level: 'watch', note: '유가 상승 — 물가 압력' } : { level: 'normal', note: '중립 범위' }, meta,
+      undefined, sparkOf(s.wti, d)),
     mk('spx_pe', 'S&P 500 예상 P/E', '미국', 21.4, 21.1, 'ratio', 1, false,
       { level: 'watch', note: '장기 평균 대비 높은 편' }, meta),
     mk('kospi_pe', 'KOSPI P/E', '한국', 11.2, 11.0, 'ratio', 1, false,
@@ -656,21 +670,22 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
     mk('kospi_div', 'KOSPI 배당수익률', '한국', 2.05, 2.08, 'percent', 2, false,
       { level: 'normal', note: '' }, metaKr),
     mk('crypto_mcap', '크립토 전체 시가총액', '크립토', round(c.totalMcap[ci] / 1e9, 1), round(c.totalMcap[ci - 1] / 1e9, 1), 'usd_bn', 1, false,
-      { level: 'normal', note: '' }, metaCr),
+      { level: 'normal', note: '' }, metaCr, undefined, sparkOf(c.totalMcap, cd, 1 / 1e9)),
     mk('btc_dom', 'BTC 도미넌스', '크립토', round(c.btcDom[ci], 2), round(c.btcDom[ci - 1], 2), 'percent', 2, false,
-      c.btcDom[ci] > 58 ? { level: 'watch', note: '알트코인 회피 성향' } : { level: 'normal', note: '' }, metaCr),
+      c.btcDom[ci] > 58 ? { level: 'watch', note: '알트코인 회피 성향' } : { level: 'normal', note: '' }, metaCr,
+      undefined, sparkOf(c.btcDom, cd)),
     mk('vix', 'VIX', '미국', round(vixNow, 2), round(s.vix[i - 1], 2), 'point', 2, true,
       vixNow > 28
         ? { level: 'alert', note: '변동성 급등 — 위험회피 강화' }
         : vixNow > 20
           ? { level: 'watch', note: '경계 구간' }
-          : { level: 'normal', note: '안정 구간' }, meta),
+          : { level: 'normal', note: '안정 구간' }, meta, undefined, sparkOf(s.vix, d)),
     mk('vkospi', 'VKOSPI', '한국', round(vkospiNow, 2), round(s.vkospi[i - 1], 2), 'point', 2, true,
       vkospiNow > 25
         ? { level: 'alert', note: '변동성 급등' }
         : vkospiNow > 19
           ? { level: 'watch', note: '경계 구간' }
-          : { level: 'normal', note: '안정 구간' }, metaKr),
+          : { level: 'normal', note: '안정 구간' }, metaKr, undefined, sparkOf(s.vkospi, d)),
   ];
 }
 

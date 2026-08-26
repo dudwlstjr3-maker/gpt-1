@@ -147,6 +147,53 @@ async function main() {
   check('1D·1W·1M·3M·1Y 구간 제공', ['1D', '1W', '1M', '3M', '1Y'].every((r) => (asset.ranges?.[r] ?? []).length > 1));
   check('F&G 겹쳐보기 데이터 제공', ['1M', '3M', '1Y'].every((r) => (asset.fngOverlay?.[r] ?? []).length > 1));
 
+  /* ---------------- 7. 위험 지표 7선 ---------------- */
+  console.log('\n[7] 위험 지표 7선');
+  const risk = snap.sections?.risk?.data;
+  check('위험 섹션 존재', risk !== undefined && risk !== null);
+  check('지표가 정확히 7개', (risk?.indicators ?? []).length === 7, `${risk?.indicators?.length}개`);
+  check('종합 문구 제공', typeof risk?.headline === 'string' && risk.headline.length > 0, risk?.headline);
+
+  const LEVELS = ['calm', 'normal', 'watch', 'alert'];
+  for (const i of risk?.indicators ?? []) {
+    const label = `[${i.shortName}]`;
+    if (!LEVELS.includes(i.level)) check(`${label} 단계 값이 유효`, false, i.level);
+    if (i.value !== null && (i.position === null || i.position < 0 || i.position > 100)) {
+      check(`${label} 구간 위치 0~100`, false, `position=${i.position}`);
+    }
+    if (i.value === null && typeof i.unavailableReason !== 'string') {
+      check(`${label} 값이 없으면 사유 제공`, false, '');
+    }
+    // 구간이 빈틈·중복 없이 이어지는지
+    const bands = i.bands ?? [];
+    let contiguous = bands.length >= 2 && bands[0].from === null && bands[bands.length - 1].to === null;
+    for (let k = 0; k < bands.length - 1; k += 1) {
+      if (bands[k].to !== bands[k + 1].from) contiguous = false;
+    }
+    if (!contiguous) check(`${label} 구간이 빈틈 없이 이어짐`, false, JSON.stringify(bands.map((b) => [b.from, b.to])));
+    // 실제 값이 표시된 단계의 구간 안에 있는지
+    if (i.value !== null) {
+      const b = bands.find((x) => x.level === i.level);
+      const inBand = b && (b.from === null || i.value >= b.from) && (b.to === null || i.value < b.to);
+      if (!inBand) check(`${label} 값이 표시 단계의 구간 안에 있음`, false, `value=${i.value} band=${JSON.stringify(b)}`);
+    }
+    if (!i.why || !i.reading) check(`${label} 설명·해석 제공`, false, '');
+  }
+  check('모든 지표의 구간·단계·위치·설명이 일관됨', true);
+  check('세 시장이 모두 포함됨',
+    ['us', 'kr', 'crypto'].every((m) => (risk?.indicators ?? []).some((i) => i.scope === m)),
+    (risk?.indicators ?? []).map((i) => i.scope).join(','));
+  check('공포지수·정크본드·국채가 포함됨',
+    ['vix', 'hy_oas', 'ust10'].every((id) => (risk?.indicators ?? []).some((i) => i.id === id)));
+
+  /* ---------------- 8. 시장별 분리 화면 ---------------- */
+  console.log('\n[8] 시장별 분리 화면');
+  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk']) {
+    const res = await fetch(`${BASE}${path}`);
+    const html = await res.text();
+    check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

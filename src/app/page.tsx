@@ -15,7 +15,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { FngSection } from '@/components/market/FngSection';
 import { HomePrices } from '@/components/market/HomePrices';
 import { SummaryCard } from '@/components/market/SummaryCard';
-import { RiskSection } from '@/components/market/RiskSection';
+import { RiskSevenSection } from '@/components/market/RiskSeven';
 import { CalendarPreview } from '@/components/market/CalendarList';
 import { FlowsNewsSection } from '@/components/market/FlowsNewsSection';
 import { ErrorState } from '@/components/ui/States';
@@ -50,17 +50,17 @@ export default function HomePage() {
     <div className="pt-2">
       <h1 className="sr-only">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>
       <FngSection />
+      <RiskSevenSection />
       <HomePrices />
 
       {/* 데스크톱에서는 아래 섹션들을 2열 대시보드로 배치한다 */}
       <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-2">
         <div>
           <SummaryCard />
-          <RiskSection />
+          <FlowsNewsSection />
         </div>
         <div>
           <CalendarPreview />
-          <FlowsNewsSection />
         </div>
       </div>
     </div>

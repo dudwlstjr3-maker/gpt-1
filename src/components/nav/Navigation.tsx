@@ -92,10 +92,37 @@ export function DesktopSidebar() {
           })}
         </ul>
       </nav>
-      <div className="mt-5 border-t border-border pt-4">
+      {/* 시장은 화면이 분리되어 있으므로 사이드바에서 바로 들어갈 수 있게 한다 */}
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="mb-1 px-2.5 text-[10px] font-semibold tracking-wide text-subtle">시장별 화면</p>
         <ul className="space-y-0.5">
           {[
-            { href: '/indicators', label: '경제·위험 지표' },
+            { href: '/market/us', label: '미국' },
+            { href: '/market/kr', label: '한국' },
+            { href: '/market/crypto', label: '크립토' },
+          ].map((m) => {
+            const active = pathname === m.href;
+            return (
+              <li key={m.href}>
+                <Link
+                  href={m.href}
+                  aria-current={active ? 'page' : undefined}
+                  className="block rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-surface-2"
+                  style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)', background: active ? 'var(--surface-2)' : undefined }}
+                >
+                  {m.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="mt-4 border-t border-border pt-3">
+        <ul className="space-y-0.5">
+          {[
+            { href: '/risk', label: '위험 지표 7선' },
+            { href: '/indicators', label: '경제·위험 지표 전체' },
             { href: '/alerts', label: '알림 설정' },
           ].map((s) => (
             <li key={s.href}>

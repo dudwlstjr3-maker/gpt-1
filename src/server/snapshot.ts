@@ -13,6 +13,7 @@ import type { AdapterContext } from './adapters/types';
 import { computeFng } from './fng/engine';
 import { FORMULA_VERSION } from './fng/definitions';
 import { buildSummary } from './summary';
+import { buildRiskDigest } from './risk';
 import { getAllSessions } from '@/lib/marketHours';
 import { kstDateKey } from '@/lib/format';
 import { ValidationCollector, sanitizeSeries, score100 } from '@/lib/validate';
@@ -272,8 +273,23 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
-  /* -------- 오늘의 시장 요약 -------- */
+  /* -------- 위험 지표 7선 -------- */
   const flatQuotes: Quote[] = quotes.data ? MARKET_IDS.flatMap((m) => quotes.data?.[m] ?? []) : [];
+  const riskData = buildRiskDigest(flatQuotes, macro.data ?? [], now, macro.meta);
+  const risk: Section<typeof riskData> = {
+    status:
+      riskData.availableCount === 0
+        ? 'empty'
+        : riskData.availableCount < riskData.indicators.length
+          ? 'partial'
+          : 'ok',
+    data: riskData,
+    // 위험 지표는 매 요청마다 현재 시세로 다시 계산한다. 원본 데이터의 기준 시각(asOf)은
+    // 그대로 물려받되, 수집 시각은 지금으로 둔다 (macro 캐시 나이를 상속하면 stale 오판이 난다).
+    meta: { ...macro.meta, fetchedAt: now.toISOString() },
+  };
+
+  /* -------- 오늘의 시장 요약 -------- */
   const summaryData = buildSummary(fng.data ?? [], flatQuotes, macro.data ?? [], now);
   const summary: Section<typeof summaryData> = {
     status: summaryData.insufficient ? 'partial' : 'ok',
@@ -281,7 +297,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, risk, calendar, news, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -352,6 +368,7 @@ function errorSections(now: Date, message: string): SnapshotSections {
     quotes: blankSection(now, 'error', message),
     flows: blankSection(now, 'error', message),
     macro: blankSection(now, 'error', message),
+    risk: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
     summary: blankSection(now, 'error', message),
@@ -365,6 +382,7 @@ function loadingSections(now: Date): SnapshotSections {
     quotes: blankSection(now, 'loading'),
     flows: blankSection(now, 'loading'),
     macro: blankSection(now, 'loading'),
+    risk: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),
     summary: blankSection(now, 'loading'),

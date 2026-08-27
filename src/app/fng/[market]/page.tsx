@@ -2,7 +2,8 @@
 
 /**
  * Fear & Greed 상세.
- * 점수 추이(1M/3M/1Y/3Y) · 대표 시장 가격과의 비교 · 구성요소 점수와 가중치 ·
+ * 점수 추이(1M/3M/1Y/3Y/10Y) · 과거 위기 시점 표식 · 대표 시장 가격과의 비교 ·
+ * 구성요소 점수와 가중치 ·
  * 기여도 · 산출 방법 · 출처와 업데이트 시각 · 결측/신뢰도 설명.
  */
 
@@ -11,15 +12,16 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { Gauge, StageLegend } from '@/components/charts/Gauge';
-import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
+import { InteractiveChart, type ChartMarker, type ChartSeries } from '@/components/charts/InteractiveChart';
 import { ContributionBars } from '@/components/charts/ContributionBars';
+import { CrisisMarkers } from '@/components/market/CrisisMarkers';
 import { FngCycleView } from '@/components/market/FngCycleView';
 import { BandStatsView } from '@/components/market/BandStatsView';
 import { Badge, ModeBadge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, Notice, SkeletonCard } from '@/components/ui/States';
 import { formatKstFull, formatNumber, formatPercentPlain, formatSigned, NO_VALUE } from '@/lib/format';
-import { confidenceGlyph, scoreColor } from '@/lib/scale';
+import { confidenceGlyph, scoreColor, scoreFill } from '@/lib/scale';
 import { useChangeColor } from '@/components/market/useChangeColor';
 import {
   CONFIDENCE_LABEL,
@@ -30,12 +32,13 @@ import {
   type MarketId,
 } from '@/types';
 
-type RangeKey = '1M' | '3M' | '1Y' | '3Y';
+type RangeKey = '1M' | '3M' | '1Y' | '3Y' | '10Y';
 const RANGE_MS: Record<RangeKey, number> = {
   '1M': 31 * 86400_000,
   '3M': 92 * 86400_000,
   '1Y': 366 * 86400_000,
   '3Y': 1096 * 86400_000,
+  '10Y': 3660 * 86400_000,
 };
 
 interface ApiResponse {
@@ -67,6 +70,8 @@ export default function FngDetailPage() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<RangeKey>('3M');
   const [expanded, setExpanded] = useState<string | null>(null);
+  /** 위기 목록에서 고른 시점 — 차트에서 강조한다 */
+  const [focusT, setFocusT] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,21 +95,38 @@ export default function FngDetailPage() {
 
   const detail = data?.detail ?? null;
 
+  /** 긴 구간에서만 쓰는 평활 — 하루치 점수는 진폭이 커서 10년을 그리면 형태가 안 보인다. */
+  const SMOOTH_DAYS = 20;
+  const smoothed = (pts: { t: number; v: number }[]) => {
+    if (pts.length < SMOOTH_DAYS) return pts;
+    const out: { t: number; v: number }[] = [];
+    let sum = 0;
+    for (let i = 0; i < pts.length; i += 1) {
+      sum += pts[i].v;
+      if (i >= SMOOTH_DAYS) sum -= pts[i - SMOOTH_DAYS].v;
+      if (i >= SMOOTH_DAYS - 1) out.push({ t: pts[i].t, v: sum / SMOOTH_DAYS });
+    }
+    return out;
+  };
+
   const chartSeries = useMemo<ChartSeries[]>(() => {
     if (!detail) return [];
     const cutoff = Date.now() - RANGE_MS[range];
     const scorePoints = detail.history
       .filter((p) => p.t >= cutoff && p.v !== null)
       .map((p) => ({ t: p.t, v: p.v as number }));
+    // 3년·10년은 하루 단위로 그리면 세로줄 뭉치가 되어 흐름이 보이지 않는다
+    const smooth = range === '3Y' || range === '10Y';
     const series: ChartSeries[] = [
       {
         id: 'score',
-        name: '심리 점수',
-        points: scorePoints,
+        name: smooth ? `심리 점수 (${SMOOTH_DAYS}일 평균)` : '심리 점수',
+        points: smooth ? smoothed(scorePoints) : scorePoints,
         color: 'var(--accent)',
         axis: 'left',
         precision: 1,
-        area: true,
+        // 긴 구간에서 면을 채우면 급락 구간이 통짜 막대처럼 보여 선의 형태가 묻힌다
+        area: !smooth,
       },
     ];
     if (detail.benchmark) {
@@ -119,6 +141,22 @@ export default function FngDetailPage() {
       });
     }
     return series;
+  }, [detail, range]);
+
+  /** 보고 있는 기간 안에 들어오는 사건만 차트에 찍는다 */
+  const chartMarkers = useMemo<ChartMarker[]>(() => {
+    if (!detail) return [];
+    const cutoff = Date.now() - RANGE_MS[range];
+    return detail.events.markers
+      .map((m, i) => ({ m, index: i + 1 }))
+      .filter(({ m }) => m.t >= cutoff)
+      .map(({ m, index }) => ({
+        id: m.id,
+        t: m.t,
+        index,
+        label: m.label,
+        color: scoreFill(m.score),
+      }));
   }, [detail, range]);
 
   if (loading && !detail) {
@@ -239,6 +277,7 @@ export default function FngDetailPage() {
               { value: '3M', label: '3개월' },
               { value: '1Y', label: '1년' },
               { value: '3Y', label: '3년' },
+              { value: '10Y', label: '10년' },
             ]}
           />
         </div>
@@ -248,11 +287,33 @@ export default function FngDetailPage() {
             height={240}
             label={`${MARKET_LABEL[market]} 심리 점수와 ${detail.benchmark?.name ?? '대표 지수'} 비교 (${range})`}
             emptyMessage="해당 기간에 산출된 점수가 없습니다."
+            markers={chartMarkers}
+            focusT={focusT}
           />
           <p className="mt-2 text-[10px] break-keep text-subtle">
             좌축은 0~100 심리 점수, 우축은 {detail.benchmark?.name ?? '대표 지수'} 가격입니다. 점수가 산출되지 않은 날은
             선이 이어지지 않습니다.
+            {chartMarkers.length > 0
+              ? ` 세로 점선은 과거 사건 ${chartMarkers.length}건이며, 번호는 아래 목록과 같습니다.`
+              : ' 기간을 10년으로 바꾸면 과거 위기 시점이 표시됩니다.'}
+            {range === '3Y' || range === '10Y'
+              ? ` 이 구간의 선은 하루치 점수를 ${SMOOTH_DAYS}일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.`
+              : ''}
           </p>
+        </div>
+
+        {/* 과거 위기 표식 */}
+        <div className="mt-2.5">
+          <CrisisMarkers
+            events={detail.events}
+            selected={focusT}
+            currentScore={detail.score}
+            onSelect={(t) => {
+              setFocusT(t);
+              // 고른 시점이 지금 기간 밖이면 10년으로 넓혀 준다
+              if (t !== null && t < Date.now() - RANGE_MS[range]) setRange('10Y');
+            }}
+          />
         </div>
       </section>
 

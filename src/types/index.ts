@@ -366,9 +366,67 @@ export interface FngBandStats {
   caveat: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* 과거 사건 표식                                                        */
+/* ------------------------------------------------------------------ */
+
+export type MarketEventCategory = 'crisis' | 'shock' | 'policy';
+
+export const MARKET_EVENT_CATEGORY_LABEL: Record<MarketEventCategory, string> = {
+  crisis: '위기',
+  shock: '급락',
+  policy: '정책·긴축',
+};
+
+/** 실제로 있었던 사건. 날짜와 이름은 사실이며 이 앱이 만들어 낸 값이 아니다. */
+export interface MarketEvent {
+  id: string;
+  /** 사건 기준일 (YYYY-MM-DD) */
+  date: string;
+  label: string;
+  /** 무슨 일이었는지 한 줄 */
+  note: string;
+  category: MarketEventCategory;
+  /** 이 사건을 표시할 시장 */
+  markets: MarketId[];
+}
+
+/** 사건 + 그 시점에 이 앱이 산출한 점수 */
+export interface EventMarker {
+  id: string;
+  date: string;
+  label: string;
+  note: string;
+  category: MarketEventCategory;
+  /** 히스토리에서 실제로 매칭된 시점 (epoch ms) */
+  t: number;
+  /** 매칭된 시점이 사건일에서 며칠 떨어져 있는가 */
+  offsetDays: number;
+  score: number | null;
+  stageId: FngStageId | null;
+  stageLabel: string | null;
+  /** 점수를 붙이지 못한 사유 */
+  unavailableReason?: string;
+  /**
+   * DEMO 합성 데이터에서 뽑은 값인가.
+   * true 면 "그날 실제로 이 값이었다"가 아니라 "합성 세계에서 계산된 값"이다.
+   */
+  synthetic: boolean;
+}
+
+export interface FngEvents {
+  markers: EventMarker[];
+  /** 사건 목록의 범위를 벗어나 표시하지 못한 개수 */
+  outOfRange: number;
+  /** 화면에 그대로 노출할 한계 문구 */
+  caveat: string;
+}
+
 export interface FngDetail extends FngScore {
-  /** 1M/3M/1Y/3Y 를 모두 담는 최대 길이 히스토리 */
+  /** 1M/3M/1Y/3Y/10Y 를 모두 담는 최대 길이 히스토리 */
   history: FngHistoryPoint[];
+  /** 과거 위기 시점 표식 */
+  events: FngEvents;
   /** 구간별 과거 통계 (표본이 부족하면 null) */
   bandStats: FngBandStats | null;
   /** 대표 시장 가격 (점수와 겹쳐 보기용) */

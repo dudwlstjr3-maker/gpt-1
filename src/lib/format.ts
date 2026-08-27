@@ -201,6 +201,28 @@ export function formatKstDate(iso: string | number | Date | null | undefined): s
   return dtf({ month: '2-digit', day: '2-digit' }).format(d).replace(/\.$/, '');
 }
 
+/**
+ * 연도까지 붙인 날짜 (예: 20.03).
+ * 몇 년에 걸친 차트에서 월·일만 쓰면 "08. 19 / 08. 23 / 08. 27" 처럼 며칠짜리 구간으로 읽힌다.
+ */
+export function formatKstYearMonth(iso: string | number | Date | null | undefined): string {
+  if (iso === null || iso === undefined) return NO_VALUE;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return NO_VALUE;
+  return dtf({ year: '2-digit', month: '2-digit' }).format(d).replace(/\.$/, '');
+}
+
+/**
+ * 연·월·일 (예: 20. 03. 16).
+ * 표와 대체 텍스트처럼 "몇 년도인지"가 분명해야 하는 곳에 쓴다.
+ */
+export function formatKstYmd(iso: string | number | Date | null | undefined): string {
+  if (iso === null || iso === undefined) return NO_VALUE;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return NO_VALUE;
+  return dtf({ year: '2-digit', month: '2-digit', day: '2-digit' }).format(d).replace(/\.$/, '');
+}
+
 export function formatKstDateTime(iso: string | number | Date | null | undefined): string {
   if (iso === null || iso === undefined) return NO_VALUE;
   const d = new Date(iso);

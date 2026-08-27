@@ -118,6 +118,123 @@ export function distributionScore(
   return clamp(round(score, 1), 0, 100);
 }
 
+/* ------------------------------------------------------------------ */
+/* 롤링 백분위                                                          */
+/* ------------------------------------------------------------------ */
+
+/** 정렬된 배열에서 x 보다 작은 값의 개수 */
+function lowerBound(sorted: readonly number[], x: number): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] < x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** 정렬된 배열에서 x 이하인 값의 개수 */
+function upperBound(sorted: readonly number[], x: number): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function insertSorted(sorted: number[], x: number): void {
+  sorted.splice(lowerBound(sorted, x), 0, x);
+}
+
+function removeSorted(sorted: number[], x: number): void {
+  const i = lowerBound(sorted, x);
+  if (i < sorted.length && sorted[i] === x) sorted.splice(i, 1);
+}
+
+/**
+ * 정렬된 창에서 곧바로 distributionScore 를 구한다.
+ *
+ * winsorize 는 값의 순서를 바꾸지 않고 양 끝만 경계로 눌러 붙이는 연산이다.
+ * 그래서 배열을 실제로 만들지 않고도 정렬된 원본에서 개수만 세면 결과가 같다.
+ *   - 대상값이 하단 경계면 : 그보다 작은 값은 없고, 경계 이하가 전부 동점이 된다
+ *   - 대상값이 상단 경계면 : 경계 미만이 전부 아래, 경계 이상이 전부 동점이 된다
+ *   - 그 사이면            : 원본 그대로 세면 된다
+ */
+function scoreFromSortedWindow(
+  sorted: readonly number[],
+  value: number,
+  invert: boolean,
+  tail: number,
+): number | null {
+  const m = sorted.length;
+  if (m < 30) return null;
+  const lo = quantileSorted(sorted, tail);
+  const hi = quantileSorted(sorted, 1 - tail);
+  if (lo === null || hi === null || hi === lo) return null;
+
+  const target = clamp(value, lo, hi);
+  let below: number;
+  let equal: number;
+  if (target <= lo) {
+    below = 0;
+    equal = upperBound(sorted, lo);
+  } else if (target >= hi) {
+    below = lowerBound(sorted, hi);
+    equal = m - below;
+  } else {
+    below = lowerBound(sorted, target);
+    equal = upperBound(sorted, target) - below;
+  }
+
+  const p = clamp(((below + equal / 2) / m) * 100, 0, 100);
+  const score = invert ? 100 - p : p;
+  return clamp(round(score, 1), 0, 100);
+}
+
+/**
+ * distributionScore 를 시계열 전체에 대해 한 번에 구한다.
+ *
+ * 날마다 창을 새로 복사해 정렬하면 10년치에서 초 단위로 느려진다.
+ * 정렬 상태를 유지한 채 한 칸씩 넣고 빼는 방식이라 결과는 같고 훨씬 빠르다.
+ */
+export function rollingDistributionScores(
+  values: readonly (number | null)[],
+  invert: boolean,
+  lookback: number,
+  fromIndex: number,
+  tail = 0.025,
+): (number | null)[] {
+  const n = values.length;
+  const out: (number | null)[] = new Array(n).fill(null);
+  if (n === 0 || fromIndex >= n) return out;
+
+  const win: number[] = [];
+  let windowStart = Math.max(0, fromIndex - lookback + 1);
+  for (let j = windowStart; j < fromIndex; j += 1) {
+    const v = values[j];
+    if (isFiniteNumber(v)) insertSorted(win, v);
+  }
+
+  for (let i = Math.max(0, fromIndex); i < n; i += 1) {
+    const start = Math.max(0, i - lookback + 1);
+    for (let j = windowStart; j < start; j += 1) {
+      const v = values[j];
+      if (isFiniteNumber(v)) removeSorted(win, v);
+    }
+    windowStart = start;
+
+    const v = values[i];
+    if (!isFiniteNumber(v)) continue;
+    insertSorted(win, v);
+    out[i] = scoreFromSortedWindow(win, v, invert, tail);
+  }
+  return out;
+}
+
 export function round(v: number, digits = 2): number {
   const f = 10 ** digits;
   return Math.round(v * f) / f;

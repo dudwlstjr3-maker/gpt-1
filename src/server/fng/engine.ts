@@ -10,7 +10,7 @@
  *  - 점수는 항상 0~100 범위 안에 있다.
  */
 
-import { clamp, distributionScore, round } from '@/lib/stats';
+import { clamp, rollingDistributionScores, round } from '@/lib/stats';
 import type {
   ComponentResult,
   Confidence,
@@ -63,26 +63,20 @@ export interface ComputedDay {
 
 /* ------------------------------------------------------------------ */
 
-/** metricId 별 백분위 점수 시계열을 만든다. */
+/**
+ * metricId 별 백분위 점수 시계열을 만든다.
+ *
+ * 날마다 창을 새로 복사해 정렬하던 것을, 정렬 상태를 유지하며 한 칸씩 밀고 가는
+ * 방식으로 바꿨다. 10년치(약 2,650 거래일)에서 상세 응답이 3~5초 걸리던 게 원인이었다.
+ * 산식은 그대로이고 결과값도 동일하다.
+ */
 function scoreMetricSeries(
   values: RawSeries,
   invert: boolean,
   lookback: number,
   fromIndex: number,
 ): (number | null)[] {
-  const out: (number | null)[] = new Array(values.length).fill(null);
-  for (let i = fromIndex; i < values.length; i += 1) {
-    const v = values[i];
-    if (v === null || !Number.isFinite(v)) continue;
-    const start = Math.max(0, i - lookback + 1);
-    const window: number[] = [];
-    for (let j = start; j <= i; j += 1) {
-      const w = values[j];
-      if (w !== null && Number.isFinite(w)) window.push(w);
-    }
-    out[i] = distributionScore(window, v, invert, WINSOR_TAIL);
-  }
-  return out;
+  return rollingDistributionScores(values, invert, lookback, fromIndex, WINSOR_TAIL);
 }
 
 interface ComponentSeries {

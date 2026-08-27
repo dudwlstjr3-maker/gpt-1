@@ -234,6 +234,48 @@ async function main() {
     }
   }
 
+  /* ---------------- 7-4. 10년 히스토리와 과거 위기 표식 ---------------- */
+  console.log('\n[7-4] 10년 히스토리 · 과거 위기 표식');
+  for (const m of ['us', 'kr', 'crypto']) {
+    const { body } = await getJson(`/api/fng/${m}`);
+    const d = body.detail;
+    const hist = d?.history ?? [];
+    const spanYears = hist.length >= 2 ? (hist[hist.length - 1].t - hist[0].t) / (365.25 * 86400000) : 0;
+    check(`[${m}] 히스토리가 9년 이상`, spanYears >= 9, `${spanYears.toFixed(1)}년 · ${hist.length}일`);
+    check(`[${m}] 히스토리가 시간 오름차순`, hist.every((p, i) => i === 0 || p.t > hist[i - 1].t));
+
+    const bm = d?.benchmark?.series ?? [];
+    const bmYears = bm.length >= 2 ? (bm[bm.length - 1].t - bm[0].t) / (365.25 * 86400000) : 0;
+    check(`[${m}] 비교 가격도 9년 이상`, bmYears >= 9, `${bmYears.toFixed(1)}년`);
+
+    const ev = d?.events;
+    check(`[${m}] 사건 표식 제공`, !!ev && Array.isArray(ev.markers), `${ev?.markers?.length ?? 0}건`);
+    if (ev) {
+      check(`[${m}] 표식이 히스토리 범위 안에 있음`,
+        ev.markers.every((x) => x.t >= hist[0].t && x.t <= hist[hist.length - 1].t));
+      check(`[${m}] 표식이 사건일에서 7일 이내로 붙음`, ev.markers.every((x) => x.offsetDays <= 7));
+      check(`[${m}] 점수 없는 표식은 사유를 남김`,
+        ev.markers.every((x) => x.score !== null || typeof x.unavailableReason === 'string'));
+      check(`[${m}] 표식 점수는 0~100`,
+        ev.markers.every((x) => x.score === null || (x.score >= 0 && x.score <= 100)));
+      check(`[${m}] 단계 라벨이 점수와 함께 채워짐`,
+        ev.markers.every((x) => (x.score === null) === (x.stageLabel === null)));
+      // DEMO 에서는 합성 표시가 반드시 켜져 있어야 한다
+      check(`[${m}] DEMO 표식은 합성 표시가 켜져 있음`,
+        body.mode !== 'DEMO' || ev.markers.every((x) => x.synthetic === true));
+      check(`[${m}] 사건 한계 문구 존재`, typeof ev.caveat === 'string' && ev.caveat.length > 20);
+      check(`[${m}] 표식 시점이 오름차순`, ev.markers.every((x, i) => i === 0 || x.t > ev.markers[i - 1].t));
+      // 위기 시점이 실제로 낮게 나오는지 — 표식 점수 중앙값이 전체 중앙값보다 낮아야 한다
+      const scored = ev.markers.map((x) => x.score).filter((v) => v !== null).sort((a, b) => a - b);
+      const all = hist.map((x) => x.v).filter((v) => v !== null).sort((a, b) => a - b);
+      if (scored.length >= 3 && all.length > 0) {
+        const med = (arr) => arr[Math.floor(arr.length / 2)];
+        check(`[${m}] 위기 표식이 평상시보다 낮은 점수`, med(scored) < med(all),
+          `표식 중앙 ${med(scored)} vs 전체 중앙 ${med(all)}`);
+      }
+    }
+  }
+
   /* ---------------- 8. 시장별 분리 화면 ---------------- */
   console.log('\n[8] 시장별 분리 화면');
   for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk', '/fng/us']) {

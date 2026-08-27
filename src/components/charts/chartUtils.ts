@@ -112,3 +112,42 @@ export function downsample(points: SeriesPoint[], n: number): SeriesPoint[] {
   for (let i = 0; i < n; i += 1) out.push(points[Math.round(i * step)]);
   return out;
 }
+
+/**
+ * 구간별 최저·최고만 남기는 방식으로 점 개수를 줄인다.
+ *
+ * 10년치를 화면 폭에 그리면 픽셀 하나에 거래일 아홉 개가 겹친다.
+ * 이때 n 개마다 하나씩 골라 쓰면(downsample) 하필 고른 날에 따라 봉우리와 골이
+ * 사라졌다 나타났다 한다 — 위기 때의 저점이 통째로 빠질 수도 있다.
+ *
+ * 그래서 구간마다 실제 관측치 중 최저·최고 두 개를 시간 순서대로 남긴다.
+ * 없는 값을 지어내지 않으면서 봉우리와 골은 그대로 보존된다.
+ */
+export function decimateMinMax(points: SeriesPoint[], n: number): SeriesPoint[] {
+  if (points.length <= n) return points;
+  const buckets = Math.max(2, Math.floor(n / 2));
+  const size = points.length / buckets;
+  const out: SeriesPoint[] = [];
+
+  for (let b = 0; b < buckets; b += 1) {
+    const start = Math.floor(b * size);
+    const end = Math.min(points.length, Math.floor((b + 1) * size));
+    if (end <= start) continue;
+    let lo = points[start];
+    let hi = points[start];
+    for (let i = start + 1; i < end; i += 1) {
+      if (points[i].v < lo.v) lo = points[i];
+      if (points[i].v > hi.v) hi = points[i];
+    }
+    if (lo === hi) out.push(lo);
+    else if (lo.t <= hi.t) out.push(lo, hi);
+    else out.push(hi, lo);
+  }
+
+  // 양 끝은 반드시 실제 첫·마지막 관측치여야 한다
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (out.length === 0 || out[0].t !== first.t) out.unshift(first);
+  if (out[out.length - 1].t !== last.t) out.push(last);
+  return out;
+}

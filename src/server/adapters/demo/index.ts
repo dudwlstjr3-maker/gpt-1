@@ -765,7 +765,9 @@ export class DemoAdapter implements MarketAdapter {
       crypto: { id: 'btc', name: 'BTC', values: world.c.btc, dates: world.cryptoDates, precision: 0 },
     };
     const m = map[market];
-    const take = Math.min(m.values.length, 1100);
+    // 10년 차트에서 점수와 가격을 같이 보려면 비교 가격도 같은 길이여야 한다.
+    // 크립토는 달력일이라 같은 10년이라도 필요한 일수가 더 많다.
+    const take = Math.min(m.values.length, market === 'crypto' ? 3700 : 2700);
     const values = m.values.slice(-take);
     const dates = m.dates.slice(-take);
     return {

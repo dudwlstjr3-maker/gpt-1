@@ -1,5 +1,5 @@
 /**
- * Fear & Greed 상세 — 긴 히스토리(최대 3년), 구성요소 전체, 산출 방법.
+ * Fear & Greed 상세 — 긴 히스토리(최대 10년), 과거 위기 표식, 구성요소 전체, 산출 방법.
  * 홈 스냅샷보다 계산량이 크므로 별도 캐시(TTL 10분)를 쓴다.
  */
 
@@ -8,6 +8,7 @@ import { swr } from '@/server/cache';
 import { getAdapter } from '@/server/adapters/registry';
 import { computeFng } from '@/server/fng/engine';
 import { buildBandStats } from '@/server/fng/cycle';
+import { buildEventMarkers } from '@/server/fng/events';
 import {
   COVERAGE_RULE_TEXT,
   FORMULA_VERSION,
@@ -21,7 +22,18 @@ import { DEMO_SCENARIOS, MARKET_IDS, type DemoScenario, type FngDetail, type Mar
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const DETAIL_HISTORY_DAYS = 1150;
+/**
+ * 10년 차트와 과거 위기 표식을 담기 위한 길이.
+ *
+ * 주식은 거래일(주 5일), 크립토는 달력일(주 7일)이라 같은 10년이라도 일수가 다르다.
+ * 하나로 묶으면 크립토만 7년치가 되어 10년 차트가 절반만 채워진다.
+ * 어댑터가 그보다 짧은 히스토리를 주면 있는 만큼만 쓴다.
+ */
+const DETAIL_HISTORY_DAYS: Record<MarketId, number> = {
+  us: 2640,
+  kr: 2640,
+  crypto: 3660,
+};
 const VALID_SCENARIO = new Set<string>(DEMO_SCENARIOS.map((s) => s.id));
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ market: string }> }) {
@@ -55,7 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mark
           sources: Object.values(input.sources)[0] ?? [],
         };
         const { latest, history } = computeFng(input, {
-          historyDays: DETAIL_HISTORY_DAYS,
+          historyDays: DETAIL_HISTORY_DAYS[market],
           meta,
           computedAt: now.toISOString(),
         });
@@ -73,9 +85,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mark
             )
           : null;
 
+        // 과거 위기 표식 — 날짜와 이름은 사실, 점수는 이 앱의 자체 산출값이다.
+        const events = buildEventMarkers(market, history, adapter.mode === 'DEMO');
+
         return {
           ...latest,
           history,
+          events,
           bandStats,
           benchmark,
           methodology: {

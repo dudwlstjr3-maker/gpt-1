@@ -23,13 +23,14 @@ import {
   sma,
 } from '@/lib/stats';
 import { kstDateKey } from '@/lib/format';
+import { eventsForMarket, eventTimestamp } from '@/server/fng/events';
 import type { MarketId, SeriesPoint } from '@/types';
 
-const SEED = 20260826;
-/** 주식 거래일 수 (약 4.5년) */
-const TRADING_DAYS = 1160;
-/** 크립토 일수 (약 4.1년) */
-const CRYPTO_DAYS = 1500;
+const SEED = 20261111;
+/** 주식 거래일 수 (약 10.6년 — 10년 차트와 과거 위기 표식을 담기 위한 길이) */
+const TRADING_DAYS = 2680;
+/** 크립토 일수 (약 10.7년) */
+const CRYPTO_DAYS = 3900;
 
 export interface DemoWorld {
   /** 주식 거래일 (epoch ms, 오름차순) */
@@ -115,6 +116,74 @@ function ratioSeries(a: readonly number[], b: readonly number[]): (number | null
 }
 
 /* ------------------------------------------------------------------ */
+/* 사건 충격                                                            */
+/* ------------------------------------------------------------------ */
+
+/** 사건별 충격 세기. 클수록 더 깊게 떨어지고 오래 간다. */
+const EVENT_SEVERITY: Record<string, number> = {
+  brexit_2016: 0.55,
+  volmageddon_2018: 0.6,
+  q4_2018: 0.7,
+  covid_2020: 1,
+  china_mining_2021: 0.7,
+  terra_2022: 0.75,
+  inflation_2022: 0.8,
+  ftx_2022: 0.7,
+  svb_2023: 0.6,
+  yen_carry_2024: 0.65,
+};
+
+/**
+ * 실제 위기가 있었던 날짜에 합성 세계에서도 충격을 넣는다.
+ *
+ * 이렇게 하지 않으면 "코로나19 팬데믹" 표식이 합성 세계의 평온한 구간에 찍혀
+ * 극단적 탐욕으로 표시되는 일이 생긴다. 기능 확인용 데이터로 쓸모가 없다.
+ * DEMO 는 어차피 합성이고 화면 어디에나 DEMO 배지가 붙으므로,
+ * 사건 날짜에 맞춰 충격을 재현해 두는 편이 정직하고 유용하다.
+ *
+ * 반환값은 인덱스별 (추가 수익률, 추가 변동성) 두 배열이다.
+ */
+function eventShocks(dates: readonly number[], market: MarketId): { drag: number[]; vol: number[] } {
+  const n = dates.length;
+  const drag = new Array<number>(n).fill(0);
+  const vol = new Array<number>(n).fill(0);
+  if (n === 0) return { drag, vol };
+
+  for (const e of eventsForMarket(market)) {
+    const severity = EVENT_SEVERITY[e.id] ?? 0.5;
+    const target = eventTimestamp(e.date);
+    if (target < dates[0] || target > dates[n - 1]) continue;
+
+    // 사건일과 가장 가까운 인덱스
+    let idx = 0;
+    let gap = Infinity;
+    for (let i = 0; i < n; i += 1) {
+      const d = Math.abs(dates[i] - target);
+      if (d < gap) { gap = d; idx = i; }
+      else if (dates[i] > target) break;
+    }
+
+    /*
+     * 사건일은 보통 '공포가 가장 심했던 날'로 기억된다 (2020-03-16 처럼).
+     * 그래서 하락은 사건일 **이전**에 대부분 끝나도록 종 모양의 중심을 앞으로 당기고,
+     * 변동성은 사건일 부근에서 최고가 되게 한다. 그래야 표식이 찍히는 그 날의 점수가
+     * 실제로 가장 낮게 나온다.
+     *
+     * 세기는 낙폭에 대략 맞췄다 — severity 1(코로나19)이 주식 기준 -30% 언저리다.
+     */
+    for (let j = -26; j <= 70; j += 1) {
+      const i = idx + j;
+      if (i < 0 || i >= n) continue;
+      const fall = Math.exp(-(((j + 7) / 8) ** 2));
+      const rebound = j > 2 ? 0.34 * Math.exp(-(((j - 26) / 16) ** 2)) : 0;
+      drag[i] += severity * (-0.026 * fall + 0.026 * rebound);
+      vol[i] += severity * 2.6 * Math.exp(-Math.abs(j + 1) / 14);
+    }
+  }
+  return { drag, vol };
+}
+
+/* ------------------------------------------------------------------ */
 /* 세계 생성                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -126,19 +195,25 @@ function generate(todayKey: string): DemoWorld {
   const cryptoDates = buildDailyDates(todayKey, CRYPTO_DAYS);
   const n = dates.length;
 
-  /* ---------- 공통 위험 요인 (AR(1) + 간헐적 충격) ---------- */
+  /* ---------- 공통 위험 요인 (AR(1) + 간헐적 충격 + 실제 사건 충격) ---------- */
+  // 미국·한국은 같은 거래일 축을 쓰므로 두 시장의 사건을 합쳐 하나의 위험요인에 얹는다.
+  const usShock = eventShocks(dates, 'us');
+  const krShock = eventShocks(dates, 'kr');
+
   const riskRet: number[] = new Array(n);
   const volState: number[] = new Array(n);
   let vs = 1;
   let prevShock = 0;
   for (let i = 0; i < n; i += 1) {
-    // 변동성 상태: 평균회귀 + 가끔 급등
-    const jump = rand() < 0.012 ? 0.9 + rand() * 1.6 : 0;
-    vs = clamp(vs + 0.06 * (1 - vs) + 0.09 * g() + jump, 0.45, 4.2);
+    // 변동성 상태: 평균회귀 + 가끔 급등 + 사건 구간의 변동성 상승.
+    // 무작위 급등 빈도는 낮게 잡는다 — 실제 위기 날짜에 충격을 따로 넣기 때문에,
+    // 여기서 자주 튀게 두면 10년 차트가 구분 안 되는 급락 30여 개로 뒤덮인다.
+    const jump = rand() < 0.0035 ? 0.9 + rand() * 1.6 : 0;
+    vs = clamp(vs + 0.06 * (1 - vs) + 0.09 * g() + jump + usShock.vol[i] * 0.14, 0.45, 5.4);
     volState[i] = vs;
     const shock = g();
     // 약한 자기상관으로 추세 구간을 만든다
-    const r = 0.0004 + vs * 0.0072 * (0.82 * shock + 0.18 * prevShock);
+    const r = 0.0004 + vs * 0.0072 * (0.82 * shock + 0.18 * prevShock) + usShock.drag[i];
     prevShock = shock;
     riskRet[i] = r;
   }
@@ -188,7 +263,8 @@ function generate(todayKey: string): DemoWorld {
   const pcr = ouSeries(n, g, { start: 0.62, mean: 0.63, kappa: 0.09, sigma: 0.045, min: 0.3, max: 1.5 }, (i) => -9 * riskRet[i]);
 
   /* ---------- 한국 ---------- */
-  const krRisk = riskRet.map((r, i) => 0.72 * (i > 0 ? riskRet[i - 1] : r) + 0.28 * r);
+  // 한국은 미국을 하루 늦게 따라가되, 국내 사건 충격을 따로 얹는다.
+  const krRisk = riskRet.map((r, i) => 0.72 * (i > 0 ? riskRet[i - 1] : r) + 0.28 * r + krShock.drag[i] * 0.45);
   const buildKr = (start: number, beta: number, idio: number, drift = 0): number[] => {
     const out: number[] = new Array(n);
     let p = start;
@@ -230,14 +306,16 @@ function generate(todayKey: string): DemoWorld {
   const cn = cryptoDates.length;
   const crand = mulberry32(SEED ^ 0x9e3779b9);
   const cg = gaussianFrom(crand);
+  const cShock = eventShocks(cryptoDates, 'crypto');
   const cRiskRet: number[] = new Array(cn);
   const cVol: number[] = new Array(cn);
   let cv = 1;
   for (let i = 0; i < cn; i += 1) {
-    const jump = crand() < 0.014 ? 1.1 + crand() * 2.1 : 0;
-    cv = clamp(cv + 0.05 * (1 - cv) + 0.11 * cg() + jump, 0.5, 5);
+    const jump = crand() < 0.005 ? 1.1 + crand() * 2.1 : 0;
+    cv = clamp(cv + 0.05 * (1 - cv) + 0.11 * cg() + jump + cShock.vol[i] * 0.16, 0.5, 6.2);
     cVol[i] = cv;
-    cRiskRet[i] = 0.0009 + cv * 0.019 * cg();
+    // 크립토는 같은 사건에도 주식보다 크게 흔들린다
+    cRiskRet[i] = 0.0009 + cv * 0.019 * cg() + cShock.drag[i] * 2.4;
   }
   const buildC = (start: number, beta: number, idio: number, drift = 0): number[] => {
     const out: number[] = new Array(cn);

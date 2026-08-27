@@ -10,10 +10,18 @@
 
 import { useCallback, useId, useMemo, useState } from 'react';
 import type { SeriesPoint } from '@/types';
-import { formatCompactEn, formatKoreanCompact, formatKstDate, formatKstDateTime, formatNumber } from '@/lib/format';
+import {
+  formatCompactEn,
+  formatKoreanCompact,
+  formatKstDate,
+  formatKstDateTime,
+  formatKstYearMonth,
+  formatKstYmd,
+  formatNumber,
+} from '@/lib/format';
 import {
   areaPath,
-  downsample,
+  decimateMinMax,
   linePath,
   linearScale,
   nearestIndex,
@@ -36,7 +44,23 @@ export interface ChartSeries {
   dashed?: boolean;
 }
 
+/**
+ * 차트 위에 세로선으로 찍는 시점 표식.
+ * 과거 위기처럼 "이때 무슨 일이 있었나"를 그래프 위에서 바로 짚기 위한 것이다.
+ */
+export interface ChartMarker {
+  id: string;
+  /** 표식 위치 (epoch ms) */
+  t: number;
+  /** 목록과 짝을 맞추는 번호 (①②③…) */
+  index: number;
+  label: string;
+  color: string;
+}
+
 const MARGIN = { top: 10, right: 46, bottom: 22, left: 50 };
+/** 표식 번호 배지가 들어갈 위쪽 여백 */
+const MARKER_TOP = 15;
 
 /**
  * 축 눈금 라벨.
@@ -56,12 +80,18 @@ export function InteractiveChart({
   label,
   emptyMessage = '차트를 그릴 데이터가 부족합니다.',
   maxPoints = 320,
+  markers = [],
+  focusT = null,
 }: {
   series: ChartSeries[];
   height?: number;
   label: string;
   emptyMessage?: string;
   maxPoints?: number;
+  /** 세로선으로 표시할 시점들 */
+  markers?: ChartMarker[];
+  /** 바깥에서 지정한 강조 시점 (목록에서 항목을 고른 경우) */
+  focusT?: number | null;
 }) {
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const [cursor, setCursor] = useState<number | null>(null);
@@ -71,10 +101,17 @@ export function InteractiveChart({
   const prepared = useMemo(
     () =>
       series
-        .map((s) => ({ ...s, points: downsample(s.points.filter((p) => Number.isFinite(p.v)), maxPoints) }))
+        .map((s) => ({ ...s, points: decimateMinMax(s.points.filter((p) => Number.isFinite(p.v)), maxPoints) }))
         .filter((s) => s.points.length >= 2),
     [series, maxPoints],
   );
+
+  /** 몇 년에 걸친 구간이면 축 라벨에 연도를 넣는다 */
+  const longSpan = useMemo(() => {
+    const all = prepared.flatMap((s) => [s.points[0]?.t, s.points[s.points.length - 1]?.t]).filter(Boolean) as number[];
+    if (all.length < 2) return false;
+    return Math.max(...all) - Math.min(...all) > 400 * 86400_000;
+  }, [prepared]);
 
   const base = prepared[0];
 
@@ -82,7 +119,9 @@ export function InteractiveChart({
     if (!base || size.w === 0) return null;
     const w = size.w;
     const innerW = Math.max(10, w - MARGIN.left - MARGIN.right);
-    const innerH = Math.max(10, height - MARGIN.top - MARGIN.bottom);
+    // 표식이 있으면 번호 배지가 앉을 자리를 위에 비워 둔다
+    const top = MARGIN.top + (markers.length > 0 ? MARKER_TOP : 0);
+    const innerH = Math.max(10, height - top - MARGIN.bottom);
 
     const allT = prepared.flatMap((s) => [s.points[0].t, s.points[s.points.length - 1].t]);
     const tDomain: [number, number] = [Math.min(...allT), Math.max(...allT)];
@@ -92,15 +131,15 @@ export function InteractiveChart({
     const rightSeries = prepared.filter((s) => s.axis === 'right');
     const rightVals = rightSeries.flatMap((s) => s.points.map((p) => p.v));
 
-    const yLeft = linearScale(paddedExtent(leftVals), [MARGIN.top + innerH, MARGIN.top]);
+    const yLeft = linearScale(paddedExtent(leftVals), [top + innerH, top]);
     const rightFixed = rightSeries.some((s) => s.fixed0to100);
     const yRight = linearScale(
       rightFixed ? [0, 100] : paddedExtent(rightVals),
-      [MARGIN.top + innerH, MARGIN.top],
+      [top + innerH, top],
     );
 
-    return { w, innerW, innerH, x, yLeft, yRight, hasRight: rightSeries.length > 0 };
-  }, [base, prepared, size.w, height]);
+    return { w, innerW, innerH, top, x, yLeft, yRight, hasRight: rightSeries.length > 0 };
+  }, [base, prepared, size.w, height, markers.length]);
 
   const setCursorFromX = useCallback(
     (px: number) => {
@@ -145,6 +184,14 @@ export function InteractiveChart({
   const textSummary = series
     .map((s) => summarizeSeries(s.name, s.points, s.precision, s.suffix ?? ''))
     .join(' ');
+
+  // 표식은 그림으로만 전달되면 안 되므로 대체 텍스트에도 담는다
+  const markerSummary =
+    markers.length > 0
+      ? ` 표시된 시점 ${markers.length}건: ${markers
+          .map((m) => `${m.index}번 ${formatKstYmd(m.t)} ${m.label}`)
+          .join(', ')}.`
+      : '';
 
   if (!base) {
     return (
@@ -217,7 +264,7 @@ export function InteractiveChart({
               height={height}
               viewBox={`0 0 ${geometry.w} ${height}`}
               role="img"
-              aria-label={`${label}. ${textSummary}`}
+              aria-label={`${label}. ${textSummary}${markerSummary}`}
               tabIndex={0}
               onKeyDown={onKeyDown}
               onMouseMove={(e) => setCursorFromX(e.nativeEvent.offsetX)}
@@ -234,7 +281,7 @@ export function InteractiveChart({
             >
               {/* 가로 그리드 + 좌축 라벨 */}
               {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-                const y = MARGIN.top + geometry.innerH * f;
+                const y = geometry.top + geometry.innerH * f;
                 const domain = geometry.yLeft.domain;
                 const v = domain[1] - (domain[1] - domain[0]) * f;
                 return (
@@ -282,7 +329,7 @@ export function InteractiveChart({
                     fontSize={9}
                     fill="var(--subtle-fg)"
                   >
-                    {formatKstDate(t)}
+                    {longSpan ? formatKstYearMonth(t) : formatKstDate(t)}
                   </text>
                 );
               })}
@@ -294,7 +341,7 @@ export function InteractiveChart({
                 return (
                   <g key={s.id}>
                     {s.area ? (
-                      <path d={areaPath(pts, MARGIN.top + geometry.innerH)} fill={s.color} opacity={0.12} />
+                      <path d={areaPath(pts, geometry.top + geometry.innerH)} fill={s.color} opacity={0.12} />
                     ) : null}
                     <path
                       d={linePath(pts)}
@@ -309,14 +356,46 @@ export function InteractiveChart({
                 );
               })}
 
+              {/* 시점 표식 — 세로 점선 + 번호 배지. 아래 목록의 번호와 짝을 이룬다. */}
+              {markers.map((m) => {
+                const mx = geometry.x(m.t);
+                if (mx < MARGIN.left - 1 || mx > MARGIN.left + geometry.innerW + 1) return null;
+                const active = focusT !== null && Math.abs(focusT - m.t) < 86400000;
+                return (
+                  <g key={m.id} opacity={focusT === null || active ? 1 : 0.4}>
+                    <line
+                      x1={mx}
+                      y1={geometry.top}
+                      x2={mx}
+                      y2={geometry.top + geometry.innerH}
+                      stroke={m.color}
+                      strokeWidth={active ? 1.6 : 1}
+                      strokeDasharray="3 3"
+                      opacity={active ? 0.95 : 0.6}
+                    />
+                    <circle cx={mx} cy={geometry.top - 8} r={active ? 8 : 7} fill={m.color} />
+                    <text
+                      x={mx}
+                      y={geometry.top - 8 + 3.2}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fontWeight={700}
+                      fill="var(--bg)"
+                    >
+                      {m.index}
+                    </text>
+                  </g>
+                );
+              })}
+
               {/* 크로스헤어 */}
               {cursorPoint ? (
                 <g>
                   <line
                     x1={geometry.x(cursorPoint.t)}
-                    y1={MARGIN.top}
+                    y1={geometry.top}
                     x2={geometry.x(cursorPoint.t)}
-                    y2={MARGIN.top + geometry.innerH}
+                    y2={geometry.top + geometry.innerH}
                     stroke="var(--fg)"
                     strokeWidth={1}
                     opacity={0.45}
@@ -342,7 +421,9 @@ export function InteractiveChart({
                 width: 150,
               }}
             >
-              <div className="mb-0.5 text-[10px] text-subtle">{formatKstDateTime(cursorPoint.t)}</div>
+              <div className="mb-0.5 text-[10px] text-subtle">
+                {longSpan ? formatKstYmd(cursorPoint.t) : formatKstDateTime(cursorPoint.t)}
+              </div>
               {prepared.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1 truncate text-muted">

@@ -5,7 +5,7 @@
  * 모든 차트는 이 표(또는 텍스트 요약)를 반드시 함께 제공한다.
  */
 
-import { formatKstDateTime, formatNumber } from '@/lib/format';
+import { formatKstDateTime, formatKstYmd, formatNumber } from '@/lib/format';
 import type { SeriesPoint } from '@/types';
 import { downsample } from './chartUtils';
 
@@ -32,6 +32,8 @@ export function SeriesTable({
   }
 
   const rows = downsample(base.points, maxRows);
+  const span = base.points[base.points.length - 1].t - base.points[0].t;
+  const longSpan = span > 400 * 86400_000;
   const valueAt = (s: TableSeries, t: number): number | null => {
     let best: SeriesPoint | null = null;
     let bestDist = Infinity;
@@ -63,7 +65,8 @@ export function SeriesTable({
           {rows.map((r) => (
             <tr key={r.t}>
               <th scope="row" className="font-normal text-muted">
-                {formatKstDateTime(r.t)}
+                {/* 10년 표에서는 연도가 없으면 어느 해인지 알 수 없다 */}
+                {longSpan ? formatKstYmd(r.t) : formatKstDateTime(r.t)}
               </th>
               {series.map((s) => (
                 <td key={s.id} className="tnum">
@@ -99,8 +102,8 @@ export function summarizeSeries(name: string, points: SeriesPoint[], precision: 
     precision,
   )}${suffix}, ${formatNumber(Math.abs(change), precision)}${suffix} ${dir}${
     pct === null ? '' : ` (${formatNumber(pct, 2)}%)`
-  }. 기간 최저 ${formatNumber(min.v, precision)}${suffix} (${formatKstDateTime(min.t)}), 최고 ${formatNumber(
+  }. 기간 최저 ${formatNumber(min.v, precision)}${suffix} (${formatKstYmd(min.t)}), 최고 ${formatNumber(
     max.v,
     precision,
-  )}${suffix} (${formatKstDateTime(max.t)}).`;
+  )}${suffix} (${formatKstYmd(max.t)}).`;
 }

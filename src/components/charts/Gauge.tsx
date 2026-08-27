@@ -228,7 +228,7 @@ export function StageLegend({ score }: { score?: number | null }) {
 
       <p className="mt-2 text-[10px] leading-relaxed break-keep text-subtle">
         이 띠의 색은 <strong className="text-muted">위험도가 아니라 심리</strong>입니다. 빨강은 공포가 심한 쪽,
-        초록은 탐욕이 강한 쪽이라는 뜻이며 어느 쪽이 좋다·나쁘다는 뜻이 아닙니다. 위험 지표 7선의 신호등(빨=경계)과는
+        초록은 탐욕이 강한 쪽이라는 뜻이며 어느 쪽이 좋다·나쁘다는 뜻이 아닙니다. 시장 위험 신호등(빨=경계)과는
         다른 의미이니 함께 볼 때 주의하세요.
       </p>
     </div>

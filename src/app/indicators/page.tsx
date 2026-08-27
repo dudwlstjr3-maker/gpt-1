@@ -12,9 +12,20 @@ import { formatMacroValue } from '@/components/market/PriceCard';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
 import { guideFor } from '@/lib/indicatorGuide';
 import type { Signal } from '@/lib/scale';
-import type { MacroIndicator } from '@/types';
+import { MARKET_LABEL, type MacroIndicator, type MarketId } from '@/types';
 
-type GroupFilter = 'all' | '미국' | '한국' | '글로벌' | '크립토';
+/**
+ * 시장은 항상 하나만 고른다.
+ * 미국 CPI 와 BTC 도미넌스를 한 목록에 섞으면 무엇을 보고 있는지가 흐려진다.
+ * 달러지수·금·유가처럼 어느 한 시장에 묶이지 않는 지표는 어느 시장을 골라도 함께 보여준다.
+ */
+type GroupFilter = MarketId;
+
+const GROUP_OF: Record<GroupFilter, MacroIndicator['group']> = {
+  us: '미국',
+  kr: '한국',
+  crypto: '크립토',
+};
 
 /** 시장 위험 신호등과 같은 색 규칙을 쓴다. 화면이 달라도 색의 뜻은 같아야 한다. */
 const RISK_META: Record<
@@ -75,21 +86,24 @@ function GuidePanel({ id }: { id: string }) {
 
 export default function IndicatorsPage() {
   const { snapshot, refresh } = useData();
-  const [group, setGroup] = useState<GroupFilter>('all');
+  const [group, setGroup] = useState<GroupFilter>('us');
   const section = snapshot?.sections.macro ?? null;
 
   const list = useMemo(() => {
     const items = section?.data ?? [];
-    return group === 'all' ? items : items.filter((m) => m.group === group);
+    const g = GROUP_OF[group];
+    return items.filter((m) => m.group === g || m.group === '글로벌');
   }, [section, group]);
 
-  const alerts = (section?.data ?? []).filter((m) => m.riskLevel === 'alert');
+  // 주의 단계 요약도 고른 시장만 센다
+  const alerts = list.filter((m) => m.riskLevel === 'alert');
 
   return (
     <div className="pt-2 pb-4">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
-      <p className="mt-0.5 px-3 text-[11px] text-muted">
-        각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다.
+      <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
+        고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐
+        아니라 기호·텍스트로도 표시됩니다.
       </p>
 
       <div className="mt-2 px-3">
@@ -122,11 +136,9 @@ export default function IndicatorsPage() {
           value={group}
           onChange={setGroup}
           options={[
-            { value: 'all', label: '전체' },
-            { value: '미국', label: '미국' },
-            { value: '한국', label: '한국' },
-            { value: '글로벌', label: '글로벌' },
-            { value: '크립토', label: '크립토' },
+            { value: 'us', label: MARKET_LABEL.us },
+            { value: 'kr', label: MARKET_LABEL.kr },
+            { value: 'crypto', label: MARKET_LABEL.crypto },
           ]}
         />
       </div>
@@ -140,7 +152,7 @@ export default function IndicatorsPage() {
         >
           {() =>
             list.length === 0 ? (
-              <EmptyState title="해당 그룹의 지표가 없습니다" />
+              <EmptyState title="해당 시장의 지표가 없습니다" />
             ) : (
               <div className="card overflow-hidden">
                 <ul className="divide-y divide-[var(--border)]">

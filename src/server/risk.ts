@@ -12,6 +12,7 @@
  */
 
 import { clamp, round } from '@/lib/stats';
+import { buildRiskHeadline } from '@/lib/riskHeadline';
 import type {
   MacroIndicator,
   MarketId,
@@ -361,21 +362,8 @@ export function buildRiskDigest(
   const alertCount = available.filter((i) => i.level === 'alert').length;
   const watchCount = available.filter((i) => i.level === 'watch' || i.level === 'alert').length;
 
-  let headline: string;
-  if (available.length === 0) {
-    headline = '위험 지표를 산출할 데이터가 없습니다.';
-  } else if (alertCount > 0) {
-    const names = available.filter((i) => i.level === 'alert').map((i) => i.shortName);
-    headline = `7개 중 ${alertCount}개가 주의 단계입니다 (${names.join(' · ')}).`;
-  } else if (watchCount > 0) {
-    const names = available.filter((i) => i.level === 'watch').map((i) => i.shortName);
-    headline = `주의 단계는 없고, ${watchCount}개가 관찰 단계입니다 (${names.join(' · ')}).`;
-  } else {
-    headline = `산출된 ${available.length}개 지표가 모두 안정·보통 구간에 있습니다.`;
-  }
-  if (available.length < indicators.length) {
-    headline += ` ${indicators.length - available.length}개는 값이 없어 제외했습니다.`;
-  }
+  // 문장 규칙은 화면(고른 시장만 요약)과 공유한다
+  const headline = buildRiskHeadline(indicators);
 
   return {
     indicators,

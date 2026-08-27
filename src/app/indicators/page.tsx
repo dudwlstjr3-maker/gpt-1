@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { SignalDot, SignalLegend } from '@/components/ui/Signal';
 import { formatMacroValue } from '@/components/market/PriceCard';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
+import { guideFor } from '@/lib/indicatorGuide';
 import type { Signal } from '@/lib/scale';
 import type { MacroIndicator } from '@/types';
 
@@ -33,6 +34,44 @@ const TREND_LABEL: Record<MacroIndicator['trend'], string> = {
   flat: '보합',
   unknown: '알 수 없음',
 };
+
+/**
+ * "이게 뭔가 / 오르면 · 내리면 무슨 일이 생기나".
+ *
+ * 목록을 스캔하는 데 방해되지 않도록 접어 두고, 누른 지표만 펼친다.
+ * 화살표는 값의 방향일 뿐 좋고 나쁨이 아니므로 등락 색을 쓰지 않는다.
+ */
+function GuidePanel({ id }: { id: string }) {
+  const g = guideFor(id);
+  if (!g) return null;
+  return (
+    <details className="mt-1.5">
+      <summary className="cursor-pointer list-none text-[11px] font-semibold text-accent hover:underline">
+        이게 무슨 지표인가요? ▾
+      </summary>
+      <div className="mt-1.5 rounded-lg bg-surface-2 px-2.5 py-2">
+        <p className="text-[11.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
+        <dl className="mt-2 space-y-1.5 border-t border-border pt-2">
+          {[
+            { glyph: '▲', label: '오르면', text: g.whenUp },
+            { glyph: '▼', label: '내리면', text: g.whenDown },
+          ].map((row) => (
+            <div key={row.label} className="flex items-start gap-1.5">
+              <span aria-hidden="true" className="mt-px shrink-0 text-[10px] text-muted">
+                {row.glyph}
+              </span>
+              <dt className="sr-only">값이 {row.label}</dt>
+              <dd className="min-w-0 text-[11px] leading-relaxed break-keep text-muted">
+                <span className="font-semibold text-fg">{row.label} · </span>
+                {row.text}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </details>
+  );
+}
 
 export default function IndicatorsPage() {
   const { snapshot, refresh } = useData();
@@ -135,6 +174,8 @@ export default function IndicatorsPage() {
                           </Badge>
                           {m.riskNote ? <span className="text-[11px] break-keep text-muted">{m.riskNote}</span> : null}
                         </div>
+
+                        <GuidePanel id={m.id} />
                       </li>
                     );
                   })}

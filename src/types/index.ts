@@ -375,7 +375,7 @@ export type MarketEventCategory = 'crisis' | 'shock' | 'policy';
 export const MARKET_EVENT_CATEGORY_LABEL: Record<MarketEventCategory, string> = {
   crisis: '위기',
   shock: '급락',
-  policy: '정책·긴축',
+  policy: '정책',
 };
 
 /** 실제로 있었던 사건. 날짜와 이름은 사실이며 이 앱이 만들어 낸 값이 아니다. */
@@ -532,6 +532,10 @@ export interface RiskIndicator {
   scaleMax: number;
   /** 이 지표가 왜 중요한가 (고정 설명) */
   why: string;
+  /** 값이 오르면 무슨 일이 벌어지는가 (초보자용 고정 설명) */
+  whenUp: string;
+  /** 값이 내리면 무슨 일이 벌어지는가 */
+  whenDown: string;
   /** 지금 수치를 어떻게 읽어야 하는가 (값에 따라 달라지는 해석) */
   reading: string;
   spark: SeriesPoint[];
@@ -580,6 +584,12 @@ export interface CalendarEvent {
   id: string;
   title: string;
   country: 'US' | 'KR' | 'GLOBAL';
+  /**
+   * 이 일정이 어느 시장을 움직이는가.
+   * country 와 다를 수 있다 — 크립토 일정은 특정 국가에 묶이지 않는다.
+   * 화면의 미국·한국·크립토 구분은 country 가 아니라 이 값을 따른다.
+   */
+  market: MarketId | 'global';
   category: EventCategory;
   importance: EventImportance;
   /** KST 기준 시각 (ISO8601 with +09:00) */

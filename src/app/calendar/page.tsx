@@ -1,6 +1,6 @@
 'use client';
 
-/** 경제 캘린더 — 국가·중요도·카테고리 필터, 날짜별 그룹. */
+/** 경제 캘린더 — 미국·한국·크립토 시장별 + 중요도·카테고리 필터, 날짜별 그룹. */
 
 import { useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
@@ -9,15 +9,27 @@ import { SegmentedControl } from '@/components/ui/Controls';
 import { EventRow } from '@/components/market/CalendarList';
 import { useNow } from '@/lib/useNow';
 import { formatKstDate } from '@/lib/format';
-import { EVENT_CATEGORY_LABEL, type CalendarEvent, type EventCategory } from '@/types';
+import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventCategory, type MarketId } from '@/types';
 
-type CountryFilter = 'all' | 'US' | 'KR' | 'GLOBAL';
+/**
+ * 시장 구분은 앱의 다른 화면(홈·시장·심리)과 같은 축을 쓴다.
+ * '글로벌'은 어느 한 시장에 묶이지 않는 일정이며, 시장을 고르면 함께 보여준다 —
+ * 미국 탭에서 글로벌 일정이 사라지면 놓치는 일정이 생기기 때문이다.
+ */
+type MarketFilter = 'all' | MarketId;
 type ImportanceFilter = 'all' | 'high' | 'medium';
+
+const MARKET_OPTIONS: { value: MarketFilter; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'us', label: MARKET_LABEL.us },
+  { value: 'kr', label: MARKET_LABEL.kr },
+  { value: 'crypto', label: MARKET_LABEL.crypto },
+];
 
 export default function CalendarPage() {
   const { snapshot, refresh } = useData();
   const now = useNow(30_000);
-  const [country, setCountry] = useState<CountryFilter>('all');
+  const [market, setMarket] = useState<MarketFilter>('all');
   const [importance, setImportance] = useState<ImportanceFilter>('all');
   const [category, setCategory] = useState<EventCategory | 'all'>('all');
 
@@ -26,7 +38,7 @@ export default function CalendarPage() {
   const grouped = useMemo(() => {
     const events = section?.data ?? [];
     const filtered = events.filter((e) => {
-      if (country !== 'all' && e.country !== country) return false;
+      if (market !== 'all' && e.market !== market && e.market !== 'global') return false;
       if (importance === 'high' && e.importance !== 'high') return false;
       if (importance === 'medium' && e.importance === 'low') return false;
       if (category !== 'all' && e.category !== category) return false;
@@ -40,28 +52,25 @@ export default function CalendarPage() {
       map.set(key, arr);
     }
     return [...map.entries()];
-  }, [section, country, importance, category]);
+  }, [section, market, importance, category]);
 
   const categories: (EventCategory | 'all')[] = ['all', ...(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[])];
 
   return (
     <div className="pt-2">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
-      <p className="mt-0.5 px-3 text-[11px] text-muted">모든 시각은 KST 기준입니다.</p>
+      <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
+        모든 시각은 KST 기준입니다. 시장을 고르면 그 시장 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.
+      </p>
 
       <div className="mt-3 space-y-2 px-3">
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl
-            label="국가"
+            label="시장"
             size="xs"
-            value={country}
-            onChange={setCountry}
-            options={[
-              { value: 'all', label: '전체' },
-              { value: 'US', label: '미국' },
-              { value: 'KR', label: '한국' },
-              { value: 'GLOBAL', label: '글로벌' },
-            ]}
+            value={market}
+            onChange={setMarket}
+            options={MARKET_OPTIONS}
           />
           <SegmentedControl
             label="중요도"

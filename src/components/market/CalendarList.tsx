@@ -8,9 +8,15 @@ import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { useNow } from '@/lib/useNow';
 import { formatCountdown, formatKstDate, formatKstTime, NO_VALUE } from '@/lib/format';
-import { EVENT_CATEGORY_LABEL, type CalendarEvent, type EventImportance } from '@/types';
+import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventImportance } from '@/types';
 
-const COUNTRY_LABEL: Record<CalendarEvent['country'], string> = { US: '미국', KR: '한국', GLOBAL: '글로벌' };
+/** 배지는 국가가 아니라 '어느 시장 일정인가'를 보여준다 (크립토는 국가가 없다) */
+const MARKET_BADGE: Record<CalendarEvent['market'], string> = {
+  us: MARKET_LABEL.us,
+  kr: MARKET_LABEL.kr,
+  crypto: MARKET_LABEL.crypto,
+  global: '글로벌',
+};
 
 const IMPORTANCE: Record<EventImportance, { label: string; glyph: string; tone: 'danger' | 'warn' | 'neutral' }> = {
   high: { label: '높음', glyph: '●●●', tone: 'danger' },
@@ -29,13 +35,16 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge tone="neutral" size="xs">
-              {COUNTRY_LABEL[event.country]}
+              {MARKET_BADGE[event.market]}
             </Badge>
             <Badge tone={imp.tone} size="xs" title={`중요도 ${imp.label}`}>
               <span aria-hidden="true">{imp.glyph}</span>
               {imp.label}
             </Badge>
-            <span className="text-[10px] text-subtle">{EVENT_CATEGORY_LABEL[event.category]}</span>
+            {/* 크립토 일정은 배지와 분류명이 같아 두 번 적히므로 하나만 남긴다 */}
+            {EVENT_CATEGORY_LABEL[event.category] !== MARKET_BADGE[event.market] ? (
+              <span className="text-[10px] text-subtle">{EVENT_CATEGORY_LABEL[event.category]}</span>
+            ) : null}
           </div>
           <p className="mt-1 text-[13px] leading-snug font-semibold break-keep text-fg">{event.title}</p>
           {event.note ? <p className="mt-0.5 text-[10px] text-subtle">{event.note}</p> : null}

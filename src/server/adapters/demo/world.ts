@@ -131,6 +131,7 @@ const EVENT_SEVERITY: Record<string, number> = {
   ftx_2022: 0.7,
   svb_2023: 0.6,
   yen_carry_2024: 0.65,
+  tariff_2025: 0.8,
 };
 
 /**

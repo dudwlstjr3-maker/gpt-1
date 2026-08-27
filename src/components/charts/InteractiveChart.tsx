@@ -14,9 +14,9 @@ import {
   formatCompactEn,
   formatKoreanCompact,
   formatKstDate,
-  formatKstDateTime,
   formatKstYearMonth,
   formatKstYmd,
+  formatKstYmdTime,
   formatNumber,
 } from '@/lib/format';
 import {
@@ -217,7 +217,7 @@ export function InteractiveChart({
   };
 
   const liveText = cursorPoint
-    ? `${formatKstDateTime(cursorPoint.t)}, ${prepared
+    ? `${formatKstYmdTime(cursorPoint.t)}, ${prepared
         .map((s) => `${s.name} ${formatNumber(valueAt(s, cursorPoint.t), s.precision)}${s.suffix ?? ''}`)
         .join(', ')}`
     : '';
@@ -422,7 +422,8 @@ export function InteractiveChart({
               }}
             >
               <div className="mb-0.5 text-[10px] text-subtle">
-                {longSpan ? formatKstYmd(cursorPoint.t) : formatKstDateTime(cursorPoint.t)}
+                {/* 툴팁은 어느 구간을 보고 있든 연도를 함께 보여 준다 */}
+                {longSpan ? formatKstYmd(cursorPoint.t) : formatKstYmdTime(cursorPoint.t)}
               </div>
               {prepared.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2">

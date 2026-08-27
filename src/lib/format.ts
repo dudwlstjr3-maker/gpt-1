@@ -230,6 +230,17 @@ export function formatKstDateTime(iso: string | number | Date | null | undefined
   return `${formatKstDate(d)} ${formatKstTime(d)}`;
 }
 
+/**
+ * 연도까지 붙인 날짜 + 시각 (예: 25. 04. 08 15:00).
+ * 차트 툴팁처럼 "언제의 값인가"를 짚어 주는 곳에서는 항상 연도를 보여 준다.
+ */
+export function formatKstYmdTime(iso: string | number | Date | null | undefined): string {
+  if (iso === null || iso === undefined) return NO_VALUE;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return NO_VALUE;
+  return `${formatKstYmd(d)} ${formatKstTime(d)}`;
+}
+
 export function formatKstFull(iso: string | number | Date | null | undefined): string {
   if (iso === null || iso === undefined) return NO_VALUE;
   const d = new Date(iso);

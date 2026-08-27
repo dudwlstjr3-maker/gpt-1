@@ -98,6 +98,15 @@ export const MARKET_EVENTS: MarketEvent[] = [
     category: 'shock',
     markets: ['us', 'kr', 'crypto'],
   },
+  {
+    // 4월 2일 발표 → 3~8일 급락 → 9일 유예 발표로 반등. 공포가 가장 심했던 날로 8일을 잡았다.
+    id: 'tariff_2025',
+    date: '2025-04-08',
+    label: '미국 상호관세 발표 · 글로벌 급락',
+    note: '전면적인 상호관세 발표 뒤 며칠 만에 전 세계 증시가 급락했고, 변동성지수는 2020년 이후 가장 높은 수준까지 뛰었습니다. 4월 9일 유예 발표로 반등했습니다.',
+    category: 'policy',
+    markets: ['us', 'kr', 'crypto'],
+  },
 ];
 
 /** UTC 자정 기준 타임스탬프 */

@@ -431,7 +431,71 @@ const TEMPLATES: EventTemplate[] = [
     note: '유통량 증가에 따른 변동성 가능',
     when: () => ({ d: 15, hh: 9, mm: 0 }),
   },
+  {
+    key: 'cme_expiry',
+    title: 'CME 비트코인 선물·옵션 만기',
+    country: 'GLOBAL',
+    category: 'crypto',
+    importance: 'medium',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '만기 전후로 미결제약정이 정리되며 변동성이 커질 수 있음',
+    when: (y, m) => ({ d: lastFridayOf(y, m), hh: 0, mm: 0 }),
+  },
+  {
+    key: 'etf_flow',
+    title: '비트코인 현물 ETF 주간 순유입 집계',
+    country: 'GLOBAL',
+    category: 'crypto',
+    importance: 'medium',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '기관 자금의 방향을 읽는 참고 지표',
+    when: (y, m) => ({ d: firstMondayOf(y, m), hh: 9, mm: 0 }),
+  },
+  {
+    key: 'stablecoin_supply',
+    title: '스테이블코인 총 발행량 월간 점검',
+    country: 'GLOBAL',
+    category: 'crypto',
+    importance: 'low',
+    forecast: null,
+    previous: null,
+    unit: null,
+    note: '늘면 대기 매수 여력이 늘었다는 뜻으로 읽는 경우가 많음',
+    when: () => ({ d: 1, hh: 9, mm: 0 }),
+  },
 ];
+
+/** 그 달의 마지막 금요일 (CME 만기 관행) */
+function lastFridayOf(y: number, m: number): number {
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  for (let d = last; d > last - 7; d -= 1) {
+    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 5) return d;
+  }
+  return last;
+}
+
+/** 그 달의 첫 월요일 */
+function firstMondayOf(y: number, m: number): number {
+  for (let d = 1; d <= 7; d += 1) {
+    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 1) return d;
+  }
+  return 1;
+}
+
+/**
+ * 일정을 시장으로 접는다.
+ * 크립토는 특정 국가에 묶이지 않으므로 country 가 아니라 category 로 판별한다.
+ */
+function marketOfEvent(country: 'US' | 'KR' | 'GLOBAL', category: EventCategory): MarketId | 'global' {
+  if (category === 'crypto') return 'crypto';
+  if (country === 'US') return 'us';
+  if (country === 'KR') return 'kr';
+  return 'global';
+}
 
 function buildCalendar(ctx: AdapterContext): CalendarEvent[] {
   const now = ctx.now.getTime();
@@ -457,6 +521,7 @@ function buildCalendar(ctx: AdapterContext): CalendarEvent[] {
         id: `${t.key}-${y}${String(m).padStart(2, '0')}`,
         title: t.title,
         country: t.country,
+        market: marketOfEvent(t.country, t.category),
         category: t.category,
         importance: t.importance,
         scheduledAt: iso,

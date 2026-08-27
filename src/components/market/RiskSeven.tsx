@@ -161,6 +161,35 @@ export function RiskBandBar({
   );
 }
 
+/**
+ * "오르면 / 내리면 무슨 일이 벌어지는가".
+ *
+ * 지표 이름과 숫자만 봐서는 처음 보는 사람이 방향의 의미를 알 수 없다.
+ * 화살표는 값의 방향일 뿐 좋고 나쁨이 아니므로, 등락 색(빨강·파랑)을 쓰지 않고
+ * 중립적인 회색 계열로 그린다.
+ */
+function UpDownExplainer({ whenUp, whenDown }: { whenUp: string; whenDown: string }) {
+  return (
+    <dl className="mt-2.5 space-y-1.5 rounded-lg bg-surface-2 px-2.5 py-2">
+      {[
+        { glyph: '▲', label: '값이 오르면', text: whenUp },
+        { glyph: '▼', label: '값이 내리면', text: whenDown },
+      ].map((row) => (
+        <div key={row.label} className="flex items-start gap-1.5">
+          <span aria-hidden="true" className="mt-px shrink-0 text-[10px] text-muted">
+            {row.glyph}
+          </span>
+          <dt className="sr-only">{row.label}</dt>
+          <dd className="min-w-0 text-[11px] leading-relaxed break-keep text-muted">
+            <span className="font-semibold text-fg">{row.label} · </span>
+            {row.text}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** 구간 기준을 그대로 펼쳐 보여주는 목록. 어디까지가 초록이고 어디부터 빨강인지 숨기지 않는다. */
 function RiskZoneList({ indicator }: { indicator: RiskIndicator }) {
   return (
@@ -310,6 +339,9 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
           {indicator.reading}
         </p>
       </div>
+
+      {/* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */}
+      <UpDownExplainer whenUp={indicator.whenUp} whenDown={indicator.whenDown} />
 
       <p className="mt-2 text-[10px] text-subtle">
         기준 {formatKstTime(indicator.meta.asOf)} · 출처 {indicator.meta.sources[0]?.name ?? '알 수 없음'}

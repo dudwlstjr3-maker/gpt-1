@@ -278,7 +278,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
-  /* -------- 위험 지표 7선 -------- */
+  /* -------- 시장 위험 신호등 -------- */
   const flatQuotes: Quote[] = quotes.data ? MARKET_IDS.flatMap((m) => quotes.data?.[m] ?? []) : [];
   const riskData = buildRiskDigest(flatQuotes, macro.data ?? [], now, macro.meta);
   const risk: Section<typeof riskData> = {

@@ -216,7 +216,7 @@ export default function MorePage() {
       <Section title="바로가기">
         <ul className="divide-y divide-[var(--border)]">
           {[
-            { href: '/risk', label: '위험 지표 7선', desc: '공포지수·정크본드·국채·환율·펀딩비 구간과 해설' },
+            { href: '/risk', label: '시장 위험 신호등', desc: '공포지수·정크본드·국채·환율·펀딩비 구간과 해설' },
             { href: '/market/us', label: '미국 시장', desc: 'S&P 500 · 나스닥 · 국채 · 빅테크' },
             { href: '/market/kr', label: '한국 시장', desc: 'KOSPI · KOSDAQ · 환율 · 투자자 수급' },
             { href: '/market/crypto', label: '크립토 시장', desc: 'BTC · ETH · 도미넌스 · 파생' },

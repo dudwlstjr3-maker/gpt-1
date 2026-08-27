@@ -16,7 +16,7 @@ import type { MacroIndicator } from '@/types';
 
 type GroupFilter = 'all' | '미국' | '한국' | '글로벌' | '크립토';
 
-/** 위험 지표 7선의 신호등과 같은 색 규칙을 쓴다. 화면이 달라도 색의 뜻은 같아야 한다. */
+/** 시장 위험 신호등과 같은 색 규칙을 쓴다. 화면이 달라도 색의 뜻은 같아야 한다. */
 const RISK_META: Record<
   MacroIndicator['riskLevel'],
   { label: string; tone: 'ok' | 'warn' | 'danger' | 'neutral'; glyph: string; signal: Signal | null }
@@ -93,7 +93,7 @@ export default function IndicatorsPage() {
       </p>
 
       <div className="mt-2 px-3">
-        <SignalLegend note="위험 지표 7선과 같은 색 규칙입니다. 색은 평소 범위에서 얼마나 벗어났는지만 나타내며 매매 신호가 아닙니다." />
+        <SignalLegend note="시장 위험 신호등과 같은 색 규칙입니다. 색은 평소 범위에서 얼마나 벗어났는지만 나타내며 매매 신호가 아닙니다." />
       </div>
 
       {alerts.length > 0 ? (

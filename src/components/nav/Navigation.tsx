@@ -121,7 +121,7 @@ export function DesktopSidebar() {
       <div className="mt-4 border-t border-border pt-3">
         <ul className="space-y-0.5">
           {[
-            { href: '/risk', label: '위험 지표 7선' },
+            { href: '/risk', label: '시장 위험 신호등' },
             { href: '/indicators', label: '경제·위험 지표 전체' },
             { href: '/alerts', label: '알림 설정' },
           ].map((s) => (

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 위험 지표 7선.
+ * 시장 위험 신호등.
  *
  * 각 지표를 "지금 어느 구간에 있는가"로 보여준다. 숫자만으로는 20 이 높은지 낮은지
  * 알 수 없으므로 신호등 구간 막대 위에 현재 위치를 찍고, 구간 기준을 그대로 노출한다.
@@ -362,7 +362,7 @@ export function RiskSevenSection() {
     <section aria-labelledby="risk-seven-title" className="mt-5 px-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 id="risk-seven-title" className="text-base font-bold text-fg-strong">
-          위험 지표 7선
+          시장 위험 신호등
         </h2>
         <Link href="/risk" className="text-[11px] font-semibold text-accent hover:underline">
           기준과 해설 →
@@ -438,7 +438,7 @@ export function RiskForMarket({ market }: { market: 'us' | 'kr' | 'crypto' }) {
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-bold text-fg-strong">{MARKET_LABEL[market]} 관련 위험 지표</h2>
               <Link href="/risk" className="text-[11px] font-semibold text-accent hover:underline">
-                7선 전체 →
+                신호등 전체 →
               </Link>
             </div>
             <ul className="space-y-2.5">

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 위험 지표 7선 — 전체 화면.
+ * 시장 위험 신호등 — 전체 화면.
  * 구간 기준·현재 위치·해석을 모두 펼쳐 보여주고, 시장별로 묶어 읽을 수 있게 한다.
  */
 
@@ -48,9 +48,9 @@ export default function RiskPage() {
     <div className="pt-2 pb-4">
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <div className="min-w-0">
-          <h1 className="text-lg font-bold text-fg-strong">위험 지표 7선</h1>
+          <h1 className="text-lg font-bold text-fg-strong">시장 위험 신호등</h1>
           <p className="mt-0.5 text-[11px] break-keep text-muted">
-            공포지수 · 정크본드 · 국채 금리를 포함한 핵심 위험 게이지 7개입니다. 구간 기준을 그대로 공개합니다.
+            미국·한국·크립토를 아우르는 핵심 위험 게이지 7개입니다. 구간 기준을 그대로 공개합니다.
           </p>
         </div>
         <Link href="/indicators" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
@@ -126,6 +126,18 @@ export default function RiskPage() {
                   </p>
                 </div>
 
+                {/* 헷갈리기 쉬운 지점 — 이름이 비슷한 다른 화면과 구분해 준다 */}
+                <div className="mt-2.5">
+                  <Notice tone="neutral">
+                    이 7개는 <strong>투자심리 점수의 구성요소가 아닙니다.</strong> 미국·한국·크립토의 위험을 한 판에
+                    모아 본 것이라 VKOSPI·원/달러·펀딩비가 함께 들어 있습니다. 심리 점수를 무엇으로 계산하는지는{' '}
+                    <Link href="/fng/us" className="font-semibold text-accent hover:underline">
+                      투자심리 상세
+                    </Link>{' '}
+                    화면의 구성요소에서 볼 수 있습니다.
+                  </Notice>
+                </div>
+
                 {/* 구간 기준 안내 */}
                 <div className="mt-2.5">
                   <SignalLegend note="빨간불은 '위험하니 팔아라'가 아니라 '이 지표가 평소보다 크게 벗어나 있다'는 뜻입니다. 초록불도 안전을 보장하지 않습니다." />
@@ -155,7 +167,7 @@ export default function RiskPage() {
                   <h2 className="mb-1.5 text-[12px] font-bold text-muted">표로 보기</h2>
                   <div className="scroll-x card">
                     <table className="data-table">
-                      <caption className="sr-only">위험 지표 7선 요약</caption>
+                      <caption className="sr-only">시장 위험 신호등 요약</caption>
                       <thead>
                         <tr>
                           <th scope="col">지표</th>

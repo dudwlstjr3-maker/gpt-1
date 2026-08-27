@@ -109,6 +109,27 @@ async function main() {
   const kr = pf.find((f) => f.market === 'kr');
   check('미국: 일부 결측이어도 70% 이상이면 재조정 후 산출', us?.score !== null, `coverage=${us?.coverage}, score=${us?.score}`);
   check('미국: 결측 구성요소의 적용 가중치 0', (us?.components ?? []).every((c) => c.available || c.effectiveWeight === 0));
+  /* 미국 구성은 널리 알려진 7축과 같은 항목을 쓴다 — 항목이 빠지거나 늘면 알아채야 한다 */
+  const US_AXES = [
+    ['us_momentum', '시장 모멘텀'],
+    ['us_strength', '주가 강도'],
+    ['us_breadth', '주가 폭'],
+    ['us_putcall', '풋/콜 옵션'],
+    ['us_vix', '시장 변동성'],
+    ['us_safe_haven', '안전자산 선호'],
+    ['us_junk', '정크본드 수요'],
+  ];
+  const usIds = (us?.components ?? []).map((c) => c.id);
+  check('미국 구성요소 7축', usIds.length === 7, `${usIds.length}개`);
+  for (const [id, label] of US_AXES) {
+    const c = (us?.components ?? []).find((x) => x.id === id);
+    check(`미국 구성요소 · ${label}`, !!c, c ? `가중치 ${c.weight}%` : '없음');
+  }
+  // 동일 가중(정수 합 100 을 맞추느라 14~15% 사이)
+  check('미국 구성요소가 사실상 동일 가중',
+    (us?.components ?? []).every((c) => c.weight >= 14 && c.weight <= 15),
+    (us?.components ?? []).map((c) => c.weight).join('/'));
+
   check('미국: 재조정된 적용 가중치 합계 100', Math.abs((us?.components ?? []).reduce((a, c) => a + c.effectiveWeight, 0) - 100) < 0.5,
     `${(us?.components ?? []).reduce((a, c) => a + c.effectiveWeight, 0).toFixed(2)}%`);
   check('한국: 70% 미만이면 산출 불가', kr?.score === null && typeof kr?.unavailableReason === 'string',
@@ -147,8 +168,8 @@ async function main() {
   check('1D·1W·1M·3M·1Y 구간 제공', ['1D', '1W', '1M', '3M', '1Y'].every((r) => (asset.ranges?.[r] ?? []).length > 1));
   check('F&G 겹쳐보기 데이터 제공', ['1M', '3M', '1Y'].every((r) => (asset.fngOverlay?.[r] ?? []).length > 1));
 
-  /* ---------------- 7. 위험 지표 7선 ---------------- */
-  console.log('\n[7] 위험 지표 7선');
+  /* ---------------- 7. 시장 위험 신호등 ---------------- */
+  console.log('\n[7] 시장 위험 신호등');
   const risk = snap.sections?.risk?.data;
   check('위험 섹션 존재', risk !== undefined && risk !== null);
   check('지표가 정확히 7개', (risk?.indicators ?? []).length === 7, `${risk?.indicators?.length}개`);

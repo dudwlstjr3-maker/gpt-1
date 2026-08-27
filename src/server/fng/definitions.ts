@@ -8,7 +8,7 @@
 
 import type { DataSource, MarketId } from '@/types';
 
-export const FORMULA_VERSION = 'v1.0.0';
+export const FORMULA_VERSION = 'v2.0.0';
 
 /** 미국·한국은 252거래일, 크립토는 365일(연중무휴) 분포를 쓴다. */
 export const LOOKBACK: Record<MarketId, number> = {
@@ -68,74 +68,87 @@ const S = {
 /* ------------------------------------------------------------------ */
 /* 미국                                                                 */
 /* ------------------------------------------------------------------ */
+/* 미국                                                                 */
+/*                                                                     */
+/* 구성 항목은 CNN Fear & Greed Index 가 공개한 7가지 축과 같은 것을 쓴다.  */
+/* 다만 점수는 그쪽 값을 가져오는 게 아니라, 같은 성격의 데이터를 받아       */
+/* 우리 산식(역사적 분포 백분위 → 가중평균)으로 직접 계산한다.              */
+/* 따라서 같은 날 두 숫자가 다를 수 있고, 그게 정상이다.                    */
+/*                                                                     */
+/* CNN 은 7축을 동일 가중으로 합친다. 여기서도 동일 가중을 따르되            */
+/* 정수 가중치 합을 100 으로 맞추기 위해 두 항목만 15% 로 둔다(사실상 균등). */
+/* ------------------------------------------------------------------ */
 
 const US_COMPONENTS: ComponentDef[] = [
   {
     id: 'us_momentum',
-    label: 'S&P 500 모멘텀 및 이동평균 이격도',
-    weight: 20,
-    description: 'S&P 500 종가가 125일 이동평균 대비 얼마나 위/아래에 있는지, 그리고 최근 20거래일 수익률을 본다.',
+    label: '시장 모멘텀',
+    weight: 15,
+    description: 'S&P 500 종가가 125일 이동평균보다 얼마나 위/아래에 있는지를 본다. 평균 위로 멀어질수록 탐욕 쪽이다.',
     subMetrics: [
-      { id: 'spx_ma125_gap', label: 'S&P 500 125일 이격도', weight: 60, invert: false, precision: 2, suffix: '%', hint: '종가 / 125일 이동평균 - 1' },
-      { id: 'spx_ret_20d', label: 'S&P 500 20일 수익률', weight: 40, invert: false, precision: 2, suffix: '%', hint: '최근 20거래일 누적 수익률' },
+      { id: 'spx_ma125_gap', label: 'S&P 500 125일 이격도', weight: 100, invert: false, precision: 2, suffix: '%', hint: '종가 / 125일 이동평균 - 1' },
     ],
     plannedSources: [S.stooq],
   },
   {
-    id: 'us_vix',
-    label: 'VIX 수준·변화·기간구조',
-    weight: 20,
-    description: 'VIX 절대 수준, 최근 5일 변화, VIX3M/VIX 기간구조를 함께 본다. 백워데이션은 공포 신호다.',
+    id: 'us_strength',
+    label: '주가 강도',
+    weight: 15,
+    description: '52주 신고가를 새로 쓴 종목이 신저가 종목보다 얼마나 많은지를 본다. 신고가가 많을수록 탐욕 쪽이다.',
     subMetrics: [
-      { id: 'vix_level', label: 'VIX 수준', weight: 45, invert: true, precision: 2, suffix: '', hint: 'VIX 종가' },
-      { id: 'vix_chg_5d', label: 'VIX 5일 변화', weight: 25, invert: true, precision: 2, suffix: 'p', hint: '5거래일 전 대비 절대 변화' },
-      { id: 'vix_term', label: 'VIX 기간구조 (VIX3M/VIX)', weight: 30, invert: false, precision: 3, suffix: '배', hint: '1보다 크면 콘탱고(안정)' },
+      { id: 'us_new_high_low', label: '52주 신고가 비중', weight: 100, invert: false, precision: 1, suffix: '%', hint: '신고가 / (신고가 + 신저가)' },
     ],
-    plannedSources: [S.stooq, S.cboe],
+    plannedSources: [S.stooq],
   },
   {
     id: 'us_breadth',
-    label: '상승/하락 종목과 이동평균 상회 비율',
-    weight: 15,
-    description: '시장 폭. 10일 등락비율과 50·200일 이동평균을 상회하는 종목 비율을 사용한다.',
+    label: '주가 폭',
+    weight: 14,
+    description: '오른 종목과 내린 종목의 거래량 차이를 누적해서 본다. 오르는 종목에 거래가 몰릴수록 탐욕 쪽이다.',
     subMetrics: [
-      { id: 'us_adv_dec_10d', label: '10일 등락 종목 비율', weight: 35, invert: false, precision: 2, suffix: '배', hint: '상승 종목 수 / 하락 종목 수 (10일 누적)' },
-      { id: 'us_above_ma50', label: '50일선 상회 비율', weight: 35, invert: false, precision: 1, suffix: '%', hint: 'S&P 500 구성종목 기준' },
-      { id: 'us_above_ma200', label: '200일선 상회 비율', weight: 30, invert: false, precision: 1, suffix: '%', hint: 'S&P 500 구성종목 기준' },
+      { id: 'us_volume_breadth', label: '거래량 기준 등락 누적', weight: 100, invert: false, precision: 1, suffix: '', hint: '상승 종목 거래량 - 하락 종목 거래량 (누적·평활)' },
     ],
     plannedSources: [S.stooq],
   },
   {
     id: 'us_putcall',
-    label: '풋/콜 비율',
-    weight: 15,
-    description: '주식 옵션 풋/콜 비율의 5일 평균. 높을수록 하방 헤지 수요가 많다는 뜻으로 공포에 해당한다.',
+    label: '풋/콜 옵션',
+    weight: 14,
+    description: '주식 옵션의 풋/콜 비율 5일 평균. 풋(하락 대비)이 많을수록 공포 쪽이다.',
     subMetrics: [
       { id: 'us_equity_pcr_5d', label: '주식 풋/콜 비율 (5일 평균)', weight: 100, invert: true, precision: 3, suffix: '', hint: 'Cboe equity put/call ratio' },
     ],
     plannedSources: [S.cboe],
   },
   {
-    id: 'us_credit',
-    label: '하이일드 신용스프레드와 안전자산 선호',
-    weight: 15,
-    description: '하이일드 OAS 와, 주식 대비 국채의 상대 성과(안전자산 선호)를 함께 본다.',
+    id: 'us_vix',
+    label: '시장 변동성',
+    weight: 14,
+    description: 'VIX 가 자기 50일 평균보다 얼마나 높은지를 본다. 평균 위로 튈수록 공포 쪽이다.',
     subMetrics: [
-      { id: 'us_hy_oas', label: '하이일드 OAS', weight: 55, invert: true, precision: 2, suffix: '%', hint: 'ICE BofA High Yield OAS' },
-      { id: 'us_safe_haven', label: '주식-국채 20일 상대성과', weight: 45, invert: false, precision: 2, suffix: '%p', hint: 'S&P 500 20일 수익률 - 미 국채 20일 수익률' },
+      { id: 'vix_ma50_gap', label: 'VIX 50일 이격도', weight: 100, invert: true, precision: 2, suffix: '%', hint: 'VIX / 50일 이동평균 - 1' },
     ],
-    plannedSources: [S.fred],
+    plannedSources: [S.stooq, S.cboe],
   },
   {
-    id: 'us_smallcap',
-    label: 'Russell 2000 및 경기민감주 상대 강도',
-    weight: 15,
-    description: '중소형주와 경기민감 섹터가 대형주·방어주 대비 얼마나 강한지 본다. 위험선호의 대리 지표다.',
+    id: 'us_safe_haven',
+    label: '안전자산 선호',
+    weight: 14,
+    description: '최근 20거래일 동안 주식이 국채보다 얼마나 더 벌었는지를 본다. 국채가 앞서면 공포 쪽이다.',
     subMetrics: [
-      { id: 'us_rut_rel_spx_60d', label: 'Russell 2000 상대강도 (60일)', weight: 55, invert: false, precision: 2, suffix: '%p', hint: 'Russell 2000 - S&P 500 60일 수익률' },
-      { id: 'us_cyc_rel_def_60d', label: '경기민감/방어주 상대강도 (60일)', weight: 45, invert: false, precision: 2, suffix: '%p', hint: '경기민감 섹터 - 방어 섹터 60일 수익률' },
+      { id: 'us_safe_haven', label: '주식-국채 20일 상대성과', weight: 100, invert: false, precision: 2, suffix: '%p', hint: 'S&P 500 20일 수익률 - 미 국채 20일 수익률' },
     ],
-    plannedSources: [S.stooq],
+    plannedSources: [S.fred, S.stooq],
+  },
+  {
+    id: 'us_junk',
+    label: '정크본드 수요',
+    weight: 14,
+    description: '신용등급 낮은 회사채가 국채보다 더 물어야 하는 금리(스프레드)를 본다. 벌어질수록 공포 쪽이다.',
+    subMetrics: [
+      { id: 'us_hy_oas', label: '하이일드 OAS', weight: 100, invert: true, precision: 2, suffix: '%', hint: 'ICE BofA High Yield OAS' },
+    ],
+    plannedSources: [S.fred],
   },
 ];
 

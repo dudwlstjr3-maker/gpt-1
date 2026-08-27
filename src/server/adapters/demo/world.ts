@@ -107,14 +107,6 @@ function diffSeries(values: readonly number[], lag: number): (number | null)[] {
   return values.map((v, i) => (i < lag ? null : v - values[i - lag]));
 }
 
-function ratioSeries(a: readonly number[], b: readonly number[]): (number | null)[] {
-  return a.map((v, i) => {
-    const d = b[i];
-    if (!Number.isFinite(d) || d === 0) return null;
-    return v / d;
-  });
-}
-
 /* ------------------------------------------------------------------ */
 /* 사건 충격                                                            */
 /* ------------------------------------------------------------------ */
@@ -350,33 +342,61 @@ function generate(todayKey: string): DemoWorld {
   /* 파생 지표                                                            */
   /* ------------------------------------------------------------------ */
 
-  const spxMa50 = sma(spx, 50);
-  const spxMa200 = sma(spx, 200);
   const kospiMa50 = sma(kospi, 50);
   const btcMa50 = sma(btc, 50);
 
-  const ret10 = pctChangeSeries(spx, 10);
   const krRet10 = pctChangeSeries(kospi, 10);
 
+  /*
+   * 미국 구성요소는 CNN Fear & Greed 가 공개한 7가지 축과 같은 항목을 쓴다.
+   * 여기서는 그 7가지에 대응하는 원시 지표를 합성으로 만든다.
+   */
+
+  /** 52주 신고가 비중 — 지수가 1년 범위의 어디쯤인지에서 끌어낸다 */
+  const newHighShare: (number | null)[] = spx.map((p, i) => {
+    if (i < 252) return null;
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - 251; j <= i; j += 1) {
+      if (spx[j] > hi) hi = spx[j];
+      if (spx[j] < lo) lo = spx[j];
+    }
+    if (!(hi > lo)) return null;
+    // 1년 범위 안 위치를 신고가 비중으로 옮기고, 종목별 편차를 잡음으로 얹는다
+    const pos = ((p - lo) / (hi - lo)) * 100;
+    return clamp(pos + 6 * g(), 1, 99);
+  });
+
+  /**
+   * 거래량 기준 등락 누적 (McClellan 계열).
+   * 상승 종목 거래량 - 하락 종목 거래량을 누적한 뒤 빠른·느린 평활의 차이를 본다.
+   */
+  const advDeclVolume = riskRet.map((r, i) => clamp(r * 9000 + volState[i] * 40 * g(), -4000, 4000));
+  const volumeBreadth: number[] = new Array(n);
+  {
+    let fast = 0;
+    let slow = 0;
+    let cum = 0;
+    for (let i = 0; i < n; i += 1) {
+      cum += advDeclVolume[i];
+      fast += (cum - fast) * (2 / 20);
+      slow += (cum - slow) * (2 / 40);
+      volumeBreadth[i] = (fast - slow) / 100;
+    }
+  }
+
   const usMetrics: Record<string, (number | null)[]> = {
+    // 1. 시장 모멘텀
     spx_ma125_gap: maGapSeries(spx, 125),
-    spx_ret_20d: pctChangeSeries(spx, 20),
-    vix_level: vix,
-    vix_chg_5d: diffSeries(vix, 5),
-    vix_term: ratioSeries(vix3m, vix),
-    us_adv_dec_10d: ret10.map((r, i) => (r === null ? null : clamp(1 + 0.11 * r + 0.06 * g(), 0.15, 4.5))),
-    us_above_ma50: spx.map((p, i) => {
-      const m = spxMa50[i];
-      if (m === null) return null;
-      return clamp(logistic(((p - m) / m) * 100, 2.4) + 4 * g(), 1, 99);
-    }),
-    us_above_ma200: spx.map((p, i) => {
-      const m = spxMa200[i];
-      if (m === null) return null;
-      return clamp(logistic(((p - m) / m) * 100, 5.5) + 4 * g(), 1, 99);
-    }),
+    // 2. 주가 강도
+    us_new_high_low: newHighShare,
+    // 3. 주가 폭
+    us_volume_breadth: volumeBreadth,
+    // 4. 풋/콜 옵션
     us_equity_pcr_5d: rollingMean(pcr, 5),
-    us_hy_oas: hyOas,
+    // 5. 시장 변동성 — CNN 과 같이 VIX 자체가 아니라 50일 평균 대비를 본다
+    vix_ma50_gap: maGapSeries(vix, 50),
+    // 6. 안전자산 선호
     us_safe_haven: (() => {
       const spxRet20 = pctChangeSeries(spx, 20);
       const y10Diff = diffSeries(ust10, 20);
@@ -388,8 +408,8 @@ function generate(todayKey: string): DemoWorld {
         return a - -8.2 * b;
       });
     })(),
-    us_rut_rel_spx_60d: relativeStrengthSeries(rut, spx, 60),
-    us_cyc_rel_def_60d: relativeStrengthSeries(cyc, def, 60),
+    // 7. 정크본드 수요
+    us_hy_oas: hyOas,
   };
 
   const krMetrics: Record<string, (number | null)[]> = {

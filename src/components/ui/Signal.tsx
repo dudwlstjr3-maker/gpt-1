@@ -101,7 +101,7 @@ export interface SignalTallyItem {
  */
 export function SignalTally({ items, total }: { items: SignalTallyItem[]; total: number }) {
   return (
-    <ul className="grid grid-cols-3 gap-1.5" aria-label={`전체 ${total}개 지표의 신호등 분포`}>
+    <ul className="grid grid-cols-3 gap-1.5" aria-label={`산출된 ${total}개 지표의 신호등 분포`}>
       {SIGNAL_ORDER.slice()
         .reverse()
         .map((s) => {

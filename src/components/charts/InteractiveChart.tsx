@@ -2,13 +2,14 @@
 
 /**
  * 상세 화면용 라인 차트.
+ *  - 끌어서 이동, 휠·핀치로 확대·축소 (트레이딩뷰식). 확대하면 가려져 있던 날짜가 드러난다.
  *  - 마우스/터치 크로스헤어 + 툴팁
- *  - 키보드(←/→, Home/End)로 데이터 포인트 이동, aria-live 로 값 안내
+ *  - 키보드(←/→ 시점 이동, Shift+←/→ 화면 이동, +/- 확대·축소, 0 전체)
  *  - "표로 보기" 로 동일 내용을 표와 텍스트 요약으로 제공
  *  - 좌/우 두 개의 축을 지원해 가격과 0~100 점수를 겹쳐 볼 수 있다
  */
 
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import type { SeriesPoint } from '@/types';
 import {
   formatCompactEn,
@@ -29,6 +30,7 @@ import {
   useSize,
 } from './chartUtils';
 import { SeriesTable, summarizeSeries, type TableSeries } from './SeriesTable';
+import { useChartViewport } from './useChartViewport';
 
 export interface ChartSeries {
   id: string;
@@ -74,6 +76,32 @@ function axisLabel(v: number, precision: number, koreanUnit: boolean): string {
   return formatNumber(v, Math.min(precision, 2));
 }
 
+/** 차트 위 작은 조작 버튼 — 터치 목표 크기를 지키려 최소 28px 로 잡는다 */
+function ChartButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="flex h-[26px] min-w-[28px] items-center justify-center rounded px-1 text-[13px] leading-none font-semibold text-muted hover:bg-surface-3 hover:text-fg disabled:opacity-35 disabled:hover:bg-transparent"
+    >
+      <span aria-hidden="true">{children}</span>
+    </button>
+  );
+}
+
 export function InteractiveChart({
   series,
   height = 220,
@@ -94,24 +122,65 @@ export function InteractiveChart({
   focusT?: number | null;
 }) {
   const [wrapRef, size] = useSize<HTMLDivElement>();
-  const [cursor, setCursor] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  /**
+   * 커서는 인덱스가 아니라 '시각'으로 들고 있는다.
+   * 확대·이동하면 화면에 남는 점의 개수가 바뀌므로 인덱스는 금방 다른 날을 가리키게 된다.
+   */
+  const [cursorT, setCursorT] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const liveId = useId();
 
-  const prepared = useMemo(
-    () =>
-      series
-        .map((s) => ({ ...s, points: decimateMinMax(s.points.filter((p) => Number.isFinite(p.v)), maxPoints) }))
-        .filter((s) => s.points.length >= 2),
-    [series, maxPoints],
+  /** 결측을 걸러낸 원본 (뷰포트 계산의 기준) */
+  const cleaned = useMemo(
+    () => series.map((s) => ({ ...s, points: s.points.filter((p) => Number.isFinite(p.v)) })).filter((s) => s.points.length >= 2),
+    [series],
   );
 
-  /** 몇 년에 걸친 구간이면 축 라벨에 연도를 넣는다 */
-  const longSpan = useMemo(() => {
-    const all = prepared.flatMap((s) => [s.points[0]?.t, s.points[s.points.length - 1]?.t]).filter(Boolean) as number[];
-    if (all.length < 2) return false;
-    return Math.max(...all) - Math.min(...all) > 400 * 86400_000;
-  }, [prepared]);
+  const fullExtent = useMemo(() => {
+    if (cleaned.length === 0) return null;
+    const ts = cleaned.flatMap((s) => [s.points[0].t, s.points[s.points.length - 1].t]);
+    const t0 = Math.min(...ts);
+    const t1 = Math.max(...ts);
+    return t1 > t0 ? { t0, t1 } : null;
+  }, [cleaned]);
+
+  const innerWNow = Math.max(10, size.w - MARGIN.left - MARGIN.right);
+  /** 짚기만 했을 때 크로스헤어를 세우는 콜백 — geometry 가 만들어진 뒤 채워진다 */
+  const tapRef = useRef<(px: number) => void>(() => {});
+  const vp = useChartViewport({
+    ref: svgRef,
+    full: fullExtent,
+    plotLeft: MARGIN.left,
+    plotWidth: innerWNow,
+    enabled: !showTable && size.w > 0,
+    onTap: (px) => tapRef.current(px),
+  });
+
+  /**
+   * 보이는 구간만 잘라서 그린다. 확대할수록 같은 폭에 더 적은 날이 들어가므로
+   * 솎아내기에서 살아남는 점이 늘고, 가려져 있던 굴곡이 드러난다.
+   */
+  const prepared = useMemo(() => {
+    const { t0, t1 } = vp.view;
+    // 선이 화면 가장자리에서 끊기지 않도록 창 밖 한 점씩 더 가져온다
+    return cleaned
+      .map((s) => {
+        const pts = s.points;
+        let lo = 0;
+        let hi = pts.length - 1;
+        while (lo < pts.length && pts[lo].t < t0) lo += 1;
+        while (hi >= 0 && pts[hi].t > t1) hi -= 1;
+        const from = Math.max(0, lo - 1);
+        const to = Math.min(pts.length - 1, hi + 1);
+        const win = from <= to ? pts.slice(from, to + 1) : [];
+        return { ...s, points: decimateMinMax(win, maxPoints) };
+      })
+      .filter((s) => s.points.length >= 2);
+  }, [cleaned, vp.view, maxPoints]);
+
+  /** 몇 년에 걸친 구간이면 축 라벨에 연도를 넣는다 (보이는 구간 기준) */
+  const longSpan = vp.view.t1 - vp.view.t0 > 400 * 86400_000;
 
   const base = prepared[0];
 
@@ -123,9 +192,8 @@ export function InteractiveChart({
     const top = MARGIN.top + (markers.length > 0 ? MARKER_TOP : 0);
     const innerH = Math.max(10, height - top - MARGIN.bottom);
 
-    const allT = prepared.flatMap((s) => [s.points[0].t, s.points[s.points.length - 1].t]);
-    const tDomain: [number, number] = [Math.min(...allT), Math.max(...allT)];
-    const x = linearScale(tDomain, [MARGIN.left, MARGIN.left + innerW]);
+    // 축은 데이터 끝이 아니라 '보고 있는 구간'에 맞춘다. 데이터에 맞추면 끌 때마다 화면이 튄다.
+    const x = linearScale([vp.view.t0, vp.view.t1], [MARGIN.left, MARGIN.left + innerW]);
 
     const leftVals = prepared.filter((s) => s.axis === 'left').flatMap((s) => s.points.map((p) => p.v));
     const rightSeries = prepared.filter((s) => s.axis === 'right');
@@ -139,39 +207,69 @@ export function InteractiveChart({
     );
 
     return { w, innerW, innerH, top, x, yLeft, yRight, hasRight: rightSeries.length > 0 };
-  }, [base, prepared, size.w, height, markers.length]);
+  }, [base, prepared, size.w, height, markers.length, vp.view]);
 
   const setCursorFromX = useCallback(
     (px: number) => {
       if (!geometry || !base) return;
       const i = nearestIndex(base.points, geometry.x, px);
-      setCursor(i >= 0 ? i : null);
+      setCursorT(i >= 0 ? base.points[i].t : null);
     },
     [geometry, base],
+  );
+
+  /** 커서를 보이는 점 기준으로 한 칸 옮긴다 */
+  const stepCursor = useCallback(
+    (dir: 1 | -1) => {
+      if (!base) return;
+      const pts = base.points;
+      setCursorT((t) => {
+        if (t === null) return pts[dir === 1 ? 0 : pts.length - 1].t;
+        let i = 0;
+        let best = Infinity;
+        for (let k = 0; k < pts.length; k += 1) {
+          const d = Math.abs(pts[k].t - t);
+          if (d < best) { best = d; i = k; }
+        }
+        return pts[Math.max(0, Math.min(pts.length - 1, i + dir))].t;
+      });
+    },
+    [base],
   );
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!base) return;
-      const n = base.points.length;
+      const pts = base.points;
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        setCursor((c) => {
-          const next = (c ?? n - 1) + (e.key === 'ArrowRight' ? 1 : -1);
-          return Math.max(0, Math.min(n - 1, next));
-        });
+        const dir = e.key === 'ArrowRight' ? 1 : -1;
+        // Shift 를 누르면 커서가 아니라 화면 자체를 민다
+        if (e.shiftKey) vp.panByRatio(dir * 0.25);
+        else stepCursor(dir);
       } else if (e.key === 'Home') {
         e.preventDefault();
-        setCursor(0);
+        setCursorT(pts[0].t);
       } else if (e.key === 'End') {
         e.preventDefault();
-        setCursor(n - 1);
+        setCursorT(pts[pts.length - 1].t);
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        vp.zoomBy(1 / 1.4);
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        vp.zoomBy(1.4);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        vp.reset();
       } else if (e.key === 'Escape') {
-        setCursor(null);
+        setCursorT(null);
       }
     },
-    [base],
+    [base, stepCursor, vp],
   );
+
+  tapRef.current = setCursorFromX;
 
   const tableSeries: TableSeries[] = series.map((s) => ({
     id: s.id,
@@ -201,7 +299,18 @@ export function InteractiveChart({
     );
   }
 
-  const cursorPoint = cursor !== null ? base.points[cursor] : null;
+  /** 끄는 중에는 크로스헤어를 감춘다 — 손가락 밑에서 값이 계속 바뀌면 읽을 수가 없다 */
+  const cursorPoint = (() => {
+    if (cursorT === null || vp.dragging) return null;
+    if (cursorT < vp.view.t0 || cursorT > vp.view.t1) return null;
+    let best: SeriesPoint | null = null;
+    let dist = Infinity;
+    for (const p of base.points) {
+      const d = Math.abs(p.t - cursorT);
+      if (d < dist) { dist = d; best = p; }
+    }
+    return best;
+  })();
 
   const valueAt = (s: ChartSeries, t: number): number | null => {
     let best: SeriesPoint | null = null;
@@ -241,14 +350,29 @@ export function InteractiveChart({
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          onClick={() => setShowTable((v) => !v)}
-          aria-expanded={showTable}
-          className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
-        >
-          {showTable ? '차트로 보기' : '표로 보기'}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {!showTable ? (
+            <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5" role="group" aria-label="차트 확대·축소">
+              <ChartButton label="축소" onClick={() => vp.zoomBy(1.4)}>
+                −
+              </ChartButton>
+              <ChartButton label="확대" onClick={() => vp.zoomBy(1 / 1.4)}>
+                ＋
+              </ChartButton>
+              <ChartButton label="전체 구간 보기" onClick={vp.reset} disabled={!vp.zoomed}>
+                ⤢
+              </ChartButton>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setShowTable((v) => !v)}
+            aria-expanded={showTable}
+            className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+          >
+            {showTable ? '차트로 보기' : '표로 보기'}
+          </button>
+        </div>
       </div>
 
       {showTable ? (
@@ -260,6 +384,7 @@ export function InteractiveChart({
         <div ref={wrapRef} className="relative w-full" style={{ height }}>
           {geometry ? (
             <svg
+              ref={svgRef}
               width={geometry.w}
               height={height}
               viewBox={`0 0 ${geometry.w} ${height}`}
@@ -267,17 +392,15 @@ export function InteractiveChart({
               aria-label={`${label}. ${textSummary}${markerSummary}`}
               tabIndex={0}
               onKeyDown={onKeyDown}
-              onMouseMove={(e) => setCursorFromX(e.nativeEvent.offsetX)}
-              onMouseLeave={() => setCursor(null)}
-              onTouchStart={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setCursorFromX(e.touches[0].clientX - rect.left);
+              onMouseMove={(e) => {
+                // 끄는 중에는 이동이 우선이라 크로스헤어를 갱신하지 않는다
+                if (!vp.dragging) setCursorFromX(e.nativeEvent.offsetX);
               }}
-              onTouchMove={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setCursorFromX(e.touches[0].clientX - rect.left);
-              }}
-              className="touch-pan-y"
+              onMouseLeave={() => setCursorT(null)}
+              onDoubleClick={() => vp.reset()}
+              className="rounded-md outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
+              /* 세로 스크롤은 브라우저에 넘기고, 가로 끌기·핀치는 우리가 처리한다 */
+              style={{ touchAction: 'pan-y', cursor: vp.dragging ? 'grabbing' : 'grab' }}
             >
               {/* 가로 그리드 + 좌축 라벨 */}
               {[0, 0.25, 0.5, 0.75, 1].map((f) => {
@@ -417,8 +540,8 @@ export function InteractiveChart({
               className="pointer-events-none absolute top-1 rounded-lg border border-border px-2 py-1.5 text-[11px] shadow-lg"
               style={{
                 background: 'var(--bg-elevated)',
-                left: Math.max(0, Math.min(geometry.w - 150, geometry.x(cursorPoint.t) - 75)),
-                width: 150,
+                left: Math.max(0, Math.min(geometry.w - 172, geometry.x(cursorPoint.t) - 86)),
+                width: 172,
               }}
             >
               <div className="mb-0.5 text-[10px] text-subtle">
@@ -427,9 +550,9 @@ export function InteractiveChart({
               </div>
               {prepared.map((s) => (
                 <div key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 truncate text-muted">
-                    <span aria-hidden="true" className="inline-block h-0.5 w-2.5 rounded" style={{ background: s.color }} />
-                    {s.name}
+                  <span className="flex min-w-0 items-center gap-1 text-muted">
+                    <span aria-hidden="true" className="inline-block h-0.5 w-2.5 shrink-0 rounded" style={{ background: s.color }} />
+                    <span className="truncate text-[10px]">{s.name}</span>
                   </span>
                   <span className="tnum font-semibold text-fg">
                     {formatNumber(valueAt(s, cursorPoint.t), s.precision)}
@@ -446,8 +569,16 @@ export function InteractiveChart({
         {liveText}
       </p>
       {!showTable ? (
-        <p className="mt-1 text-[10px] text-subtle">
-          차트에 포커스한 뒤 ← → 키로 시점을 이동할 수 있습니다. 같은 내용을 표로도 볼 수 있습니다.
+        <p className="mt-1 text-[10px] leading-relaxed break-keep text-subtle">
+          끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다.
+          키보드는 ← → 시점 이동, Shift+← → 화면 이동, ＋/− 확대·축소, 0 전체입니다. 같은 내용을 표로도 볼 수 있습니다.
+          {vp.zoomed ? (
+            <>
+              {' '}
+              지금은 <strong className="text-muted">{formatKstYmd(vp.view.t0)} ~ {formatKstYmd(vp.view.t1)}</strong> 구간만
+              보고 있습니다.
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>

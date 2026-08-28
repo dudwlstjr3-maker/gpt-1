@@ -10,6 +10,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
+  /** 같은 탭에 속한 다른 주소 (보기만 다른 경우) */
+  also?: string[];
 }
 
 const I = ({ d }: { d: string }) => (
@@ -27,21 +29,26 @@ const I = ({ d }: { d: string }) => (
  * 물건이 아니라 시장의 온도계라서 — 홈의 가격 목록에 섞여 있으면 잘 안 보였다.
  * 세 시장의 지수를 모아 둔 화면이 시장별 화면으로 들어가는 입구도 겸한다.
  *
+ * 그 탭은 두 보기를 갖는다 — 시장 지수(/indices)와 생활 경제 지수(/basics).
+ * 빅맥지수·1인당 GDP 같은 값도 지수라서 한 탭에 두었다. 칸을 하나 더 늘리지
+ * 않은 것은 320px 에서 일곱 칸이면 글자가 뭉개지기 때문이다.
+ *
  * '지수' 와 '지표' 는 한 글자 차이라 10px 로 나란히 놓으면 구분되지 않는다.
  * 그래서 지표 쪽 이름을 '경제지표' 로 늘렸다.
  */
 const NAV: NavItem[] = [
   { href: '/', label: '홈', icon: <I d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
-  { href: '/indices', label: '지수', icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
+  { href: '/indices', label: '지수', also: ['/basics'], icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
   { href: '/indicators', label: '경제지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
   { href: '/calendar', label: '캘린더', icon: <I d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4" /> },
   { href: '/watchlist', label: '관심목록', icon: <I d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6L12 16.9 7 19.5l1-5.6-4-3.9 5.5-.8z" /> },
   { href: '/more', label: '더보기', icon: <I d="M4 7h16M4 12h16M4 17h10" /> },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, item: NavItem): boolean {
+  if (item.href === '/') return pathname === '/';
+  const hit = (h: string) => pathname === h || pathname.startsWith(`${h}/`);
+  return hit(item.href) || (item.also ?? []).some(hit);
 }
 
 export function BottomTabs() {
@@ -54,7 +61,7 @@ export function BottomTabs() {
     >
       <ul className="mx-auto flex max-w-lg">
         {NAV.map((item) => {
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item);
           return (
             <li key={item.href} className="flex-1">
               <Link
@@ -85,7 +92,7 @@ export function DesktopSidebar() {
       <nav aria-label="주요 메뉴">
         <ul className="space-y-0.5">
           {NAV.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = isActive(pathname, item);
             return (
               <li key={item.href}>
                 <Link
@@ -135,7 +142,6 @@ export function DesktopSidebar() {
         <ul className="space-y-0.5">
           {[
             { href: '/indicators', label: '경제 · 위험 지표' },
-            { href: '/basics', label: '생활 속 경제 이야기' },
             { href: '/alerts', label: '알림 설정' },
           ].map((s) => (
             <li key={s.href}>

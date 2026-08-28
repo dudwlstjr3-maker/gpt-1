@@ -129,9 +129,9 @@ export default function IndicatorsPage() {
         고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐
         아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 이야기는{' '}
         <Link href="/basics" className="font-semibold text-accent hover:underline">
-          생활 속 경제 이야기
+          지수 탭 → 생활 경제 지수
         </Link>{' '}
-        화면에 따로 모았습니다.
+        에 따로 모았습니다.
       </p>
 
       {view === 'all' ? (

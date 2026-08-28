@@ -74,8 +74,8 @@ export function DailyBasicCard() {
               </div>
 
               <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
-                하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 생활 속 경제 이야기 화면에
-                있습니다.
+                하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 지수 탭의 생활 경제 지수
+                보기에 있습니다.
               </p>
             </div>
           );

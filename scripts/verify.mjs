@@ -6,6 +6,8 @@
  *   npm run verify
  */
 
+import { readFile } from 'node:fs/promises';
+
 const BASE = process.env.VERIFY_BASE_URL ?? 'http://localhost:3000';
 
 let pass = 0;
@@ -691,6 +693,9 @@ async function main() {
     check('지표 탭 이름이 경제지표로 구분됨', idx.includes('>경제지표<'));
     check('지수와 지표 이름이 서로 다름', !idx.match(/>지표</));
 
+    // 지수 탭은 두 보기를 갖는다 — 시장 지수 / 생활 경제 지수
+    check('지수 화면에 보기 전환이 있음', idx.includes('>시장 지수<') && idx.includes('>생활 경제 지수<'));
+
     // 세 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다)
     for (const label of ['미국', '한국', '크립토']) {
       check(`지수 화면에 ${label} 묶음이 있음`, idx.includes(`>${label}</span>`));
@@ -725,6 +730,57 @@ async function main() {
     // 시장별 화면으로 들어가는 입구를 겸한다
     for (const m of ['us', 'kr', 'crypto']) {
       check(`지수 화면에서 ${m} 시장 화면으로 갈 수 있음`, idx.includes(`/market/${m}`));
+    }
+  }
+
+  /* ---------------- 8-5. 생활 경제 지수 (지수 탭의 두 번째 보기) ---------------- */
+  console.log('\n[8-5] 생활 경제 지수');
+  {
+    const life = await (await fetch(`${BASE}/basics`)).text();
+
+    // 같은 껍데기, 다른 보기. 머리와 전환은 그대로 있어야 한다.
+    check('생활 경제 지수도 지수 탭 껍데기를 씀',
+      life.includes('>시장 지수<') && life.includes('>생활 경제 지수<'));
+    check('생활 경제 지수 머리가 바뀜', life.includes('생활 속 경제 이야기'));
+    // 시장 지수 본문이 같이 그려지면 한 화면에 두 목록이 겹친다
+    check('시장 지수 본문은 그리지 않음', !life.includes('지수 숫자를 읽는 법'));
+
+    const basics = snap.sections?.basics?.data ?? [];
+    check('생활 경제 지수가 아홉 가지', basics.length === 9, `${basics.length}개`);
+    // 이름은 API 가 내려주므로 서버가 그린 HTML 에는 없다. 데이터에서 확인한다.
+    const names = basics.map((b) => b.name);
+    for (const name of ['빅맥지수', '1인당 GDP', '엥겔계수', '지니계수']) {
+      check(`생활 경제 지수에 ${name} 있음`, names.includes(name), names.join(', ').slice(0, 60));
+    }
+    // 아홉 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
+    // 있으면 화면에서 "그 밖의 지표" 로 밀려나므로 원본에서 확인한다.
+    const lib = await readFile('src/lib/economyBasics.ts', 'utf8');
+    const grouped = [...lib.matchAll(/ids:\s*\[([^\]]*)\]/g)]
+      .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]));
+    for (const g of ['나라 살림과 소득', '물가로 견주는 지수', '경기를 앞서 읽는 지수']) {
+      check(`묶음 "${g}" 있음`, lib.includes(g));
+    }
+    const ungrouped = basics.map((b) => b.id).filter((id) => !grouped.includes(id));
+    check('묶음에서 빠진 항목이 없음', ungrouped.length === 0, ungrouped.join(', ') || '없음');
+    // 시세가 아니라 형편을 재는 값이라, 점수 구성요소가 아님을 밝혀야 한다
+    check('투자심리 구성요소가 아님을 밝힘', life.includes('투자심리 점수의 구성요소가 아닙니다'));
+    // 공식 지표만 담는다 — 발표 기관이 없는 개념은 넣지 않는다
+    check('전부 공식 지표임을 밝힘', life.includes('통계기관이 발표하는 공식 지표'));
+    for (const b of basics) {
+      check(`[${b.id}] 발표 기관이 있음`, Boolean(b.meta?.sources?.[0]?.name), b.meta?.sources?.[0]?.name ?? '없음');
+      check(`[${b.id}] 네 나라 비교가 있음`, (b.comparisons ?? []).length === 4, `${(b.comparisons ?? []).length}개국`);
+    }
+  }
+
+  /* ---------------- 8-6. 공포·탐욕 구성요소 개수 ---------------- */
+  console.log('\n[8-6] 공포·탐욕 구성요소');
+  {
+    // 미국·한국은 CNN 방식과 같은 7개. 크립토는 검색 관심도·뉴스 심리를 더해 8개다.
+    // 개수가 말없이 바뀌면 화면의 설명과 어긋나므로 못 박아 둔다.
+    const EXPECT = { us: 7, kr: 7, crypto: 8 };
+    for (const f of snap.sections?.fng?.data ?? []) {
+      check(`[${f.market}] 구성요소 ${EXPECT[f.market]}개`, f.components.length === EXPECT[f.market],
+        `${f.components.length}개`);
     }
   }
 

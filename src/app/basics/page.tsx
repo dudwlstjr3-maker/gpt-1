@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * 생활 경제 상식 — 시세가 아니라 "형편"을 재는 숫자들.
+ * 생활 속 경제 이야기 — 시세가 아니라 "형편"을 재는 숫자들.
  *
- * 뉴스에 나오는 1인당 GDP·빅맥지수 같은 말을 알아듣기 위한 배경 지식이다.
+ * 뉴스에 나오는 1인당 GDP·빅맥지수 같은 말이 무슨 뜻인지 편하게 읽어 보는 화면이다.
  * 투자심리 점수의 구성요소가 아니고, 매매 판단에 쓰라고 둔 화면도 아니다.
  * 그래서 시장 화면과 섞지 않고 따로 뒀다.
  */
@@ -250,10 +250,10 @@ export default function BasicsPage() {
     <div className="pt-2 pb-4">
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <div className="min-w-0">
-          <h1 className="text-lg font-bold text-fg-strong">생활 경제 상식</h1>
+          <h1 className="text-lg font-bold text-fg-strong">생활 속 경제 이야기</h1>
           <p className="mt-0.5 text-[11px] break-keep text-muted">
             시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 지표마다 <strong>한국·중국·일본·미국</strong> 네 나라를
-            나란히 놓아, 우리 형편이 어느 쯤인지 바로 견줄 수 있게 했습니다.
+            나란히 놓았으니, 우리 형편이 어느 쯤인지 편하게 견줘 보세요.
           </p>
         </div>
         <Link href="/indicators" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">

@@ -122,7 +122,7 @@ export class LiveAdapter implements MarketAdapter {
     throw new NotWiredError('거시·위험 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getMacro');
   }
 
-  /* ------------------------ 생활 경제 상식 지표 ------------------------ */
+  /* ------------------------ 생활 속 경제 이야기 ------------------------ */
   /**
    * TODO(연결지점 5-2): 1인당 GDP, 빅맥지수, PPP 환율, 엥겔계수, 소비자심리지수.
    *
@@ -137,7 +137,7 @@ export class LiveAdapter implements MarketAdapter {
    * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다.
    */
   async getBasics(_ctx: AdapterContext): Promise<EconomyBasic[]> {
-    throw new NotWiredError('생활 경제 상식 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');
+    throw new NotWiredError('생활 속 경제 이야기', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');
   }
 
   /* --------------------------- 예측시장 --------------------------- */

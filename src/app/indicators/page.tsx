@@ -104,14 +104,14 @@ export default function IndicatorsPage() {
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
         <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
-          생활 경제 상식 →
+          생활 속 경제 이야기 →
         </Link>
       </div>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
         고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐
-        아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는{' '}
+        아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 이야기는{' '}
         <Link href="/basics" className="font-semibold text-accent hover:underline">
-          생활 경제 상식
+          생활 속 경제 이야기
         </Link>{' '}
         화면에 따로 모았습니다.
       </p>

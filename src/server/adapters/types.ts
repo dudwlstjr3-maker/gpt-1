@@ -54,7 +54,7 @@ export interface MarketAdapter {
   /** 거시·위험 지표 */
   getMacro(ctx: AdapterContext): Promise<MacroIndicator[]>;
 
-  /** 생활 경제 상식 지표 (1인당 GDP, 빅맥지수 등) */
+  /** 생활 속 경제 이야기 (1인당 GDP, 빅맥지수 등) */
   getBasics(ctx: AdapterContext): Promise<EconomyBasic[]>;
 
   /** 예측시장에서 화제인 질문 (폴리마켓 등) */

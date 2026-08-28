@@ -412,8 +412,8 @@ async function main() {
     }
   }
 
-  /* ---------------- 9. 생활 경제 상식 지표 ---------------- */
-  console.log('\n[9] 생활 경제 상식 지표');
+  /* ---------------- 9. 생활 속 경제 이야기 ---------------- */
+  console.log('\n[9] 생활 속 경제 이야기');
   {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
@@ -583,12 +583,12 @@ async function main() {
     check('빈값 시나리오에서 basics 가 empty', eb.sections?.basics?.status === 'empty', eb.sections?.basics?.status);
   }
 
-  /* ---------------- 9-3. 오늘의 경제 상식 ---------------- */
-  console.log('\n[9-3] 오늘의 경제 상식 (하루 한 가지)');
+  /* ---------------- 9-3. 오늘의 경제 이야기 ---------------- */
+  console.log('\n[9-3] 오늘의 경제 이야기 (하루 한 가지)');
   {
     const res = await fetch(`${BASE}/`);
     const html = await res.text();
-    check('홈에 오늘의 경제 상식 칸이 있음', html.includes('오늘의 경제 상식'), `status=${res.status}`);
+    check('홈에 오늘의 경제 이야기 칸이 있음', html.includes('오늘의 경제 이야기'), `status=${res.status}`);
 
     // 날짜로 정해지므로 지표 수만큼의 날이면 전부 한 번씩 돌아야 한다
     const ids = (snap.sections?.basics?.data ?? []).map((b) => b.id);

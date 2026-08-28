@@ -221,7 +221,7 @@ export default function MorePage() {
             { href: '/market/kr', label: '한국 시장', desc: 'KOSPI · KOSDAQ · 환율 · 투자자 수급' },
             { href: '/market/crypto', label: '크립토 시장', desc: 'BTC · ETH · 도미넌스 · 파생' },
             { href: '/indicators', label: '경제·위험 지표 전체', desc: '기준금리·물가·고용·PMI·스프레드·밸류에이션' },
-            { href: '/basics', label: '생활 경제 상식', desc: '1인당 GDP·빅맥지수·라떼지수·PPP 환율·엥겔계수·소비자심리' },
+            { href: '/basics', label: '생활 속 경제 이야기', desc: '1인당 GDP·빅맥지수·라떼지수·PPP 환율·엥겔계수·소비자심리' },
             { href: '/alerts', label: '알림 설정', desc: '단계 변경·점수 돌파·목표가·급등락·지표 발표 전' },
             { href: '/calendar', label: '경제 캘린더', desc: 'FOMC·금통위·CPI·고용보고서·만기·실적' },
           ].map((l) => (

@@ -254,7 +254,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
-  /* -------- 생활 경제 상식 지표 -------- */
+  /* -------- 생활 속 경제 이야기 -------- */
   const basics = await section(
     'basics',
     `${ns}:basics`,

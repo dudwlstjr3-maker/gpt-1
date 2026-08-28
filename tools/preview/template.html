@@ -1941,7 +1941,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   }
 
   /* ------------------------------------------------------------------ *
-   * 오늘의 경제 상식 — 하루 한 가지                                       *
+   * 오늘의 경제 이야기 — 하루 한 가지                                       *
    * 날짜로 정해지므로 같은 날엔 늘 같고, 하루 지나면 다음 항목으로 넘어간다. *
    * ------------------------------------------------------------------ */
 
@@ -1976,7 +1976,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const g = BASIC_GUIDE[item.id];
     const grp = groupOfBasic(item.id);
     return (
-      '<section class="block"><div class="block-head"><h2>오늘의 경제 상식</h2>' +
+      '<section class="block"><div class="block-head"><h2>오늘의 경제 이야기</h2>' +
       '<button type="button" class="linkbtn" data-go="basics">전체 보기 →</button></div>' +
       '<div class="card" style="padding:14px">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
@@ -1989,7 +1989,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       (item.value === null ? NO : esc(fmtNum(item.value, item.precision)) + esc(item.suffix || '')) + '</div>' +
       '<button type="button" class="linkbtn" data-go="basics">읽는 법 보기 →</button></div>' +
       '<p style="margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
-      '하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 ' + list.length + '가지는 생활 경제 상식 화면에 있습니다.</p>' +
+      '하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 ' + list.length + '가지는 생활 속 경제 이야기 화면에 있습니다.</p>' +
       '</div></section>'
     );
   }
@@ -2390,8 +2390,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     return (
       '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
       '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 · 위험 지표</h1>' +
-      '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 경제 상식 →</button></div>' +
-      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 아래 “생활 경제 상식” 화면에 따로 모았습니다.</p></div>' +
+      '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 속 경제 이야기 →</button></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 아래 “생활 속 경제 이야기” 화면에 따로 모았습니다.</p></div>' +
       '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
       [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
@@ -2610,7 +2610,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
   const icon = (d) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
   /* ------------------------------------------------------------------ *
-   * 생활 경제 상식 — 시세가 아니라 "형편"을 재는 숫자들                    *
+   * 생활 속 경제 이야기 — 시세가 아니라 "형편"을 재는 숫자들                    *
    * ------------------------------------------------------------------ */
 
   const basicShow = (v, p, sfx) => (v === null || v === undefined ? NO : fmtNum(v, p) + (sfx || ''));
@@ -2699,9 +2699,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const list = all;
     return (
       '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
-      '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">생활 경제 상식</h1>' +
+      '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">생활 속 경제 이야기</h1>' +
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">시장 지표 →</button></div>' +
-      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 지표마다 <b>한국·중국·일본·미국</b> 네 나라를 나란히 놓아, 우리 형편이 어느 쯤인지 바로 견줄 수 있게 했습니다.</p></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 지표마다 <b>한국·중국·일본·미국</b> 네 나라를 나란히 놓았으니, 우리 형편이 어느 쯤인지 편하게 견줘 보세요.</p></div>' +
       '<div style="padding:10px 12px 0"><p class="notice n-neutral" style="margin:0"><b>여기 숫자는 투자심리 점수의 구성요소가 아닙니다.</b> 대부분 1년에 한두 번 바뀌는 값이라 그날의 시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요. <b>전부 통계기관이 발표하는 공식 지표</b>만 담았습니다 — 발표 기관이 없는 개념은 넣지 않습니다.</p></div>' +
       (list.length === 0
         ? '<div style="padding:12px"><p class="notice n-warn" style="margin:0">표시할 지표가 없습니다.</p></div>'
@@ -2746,7 +2746,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     { id: 'risk', label: '위험 신호등', icon: icon('M12 3 2.5 20h19zM12 9v5M12 17h.01') },
     { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
     { id: 'indicators', label: '지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
-    { id: 'basics', label: '경제 상식', icon: icon('M4 19V5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1zM8 9h6M8 13h8M8 17h5') },
+    { id: 'basics', label: '경제 이야기', icon: icon('M4 19V5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1zM8 9h6M8 13h8M8 17h5') },
     { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
   ];
 

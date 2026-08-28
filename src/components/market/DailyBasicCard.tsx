@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 오늘의 경제 상식 — 홈에 하루 한 가지씩.
+ * 오늘의 경제 이야기 — 홈에 하루 한 가지씩.
  *
  * 열세 개를 한 번에 읽으라고 하면 아무도 안 읽는다. 날짜로 하나를 정해
  * 그날치만 보여주고, 더 보고 싶으면 전체 목록으로 넘긴다.
@@ -26,7 +26,7 @@ export function DailyBasicCard() {
     <section aria-labelledby="daily-basic-title" className="mt-5 px-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 id="daily-basic-title" className="text-base font-bold text-fg-strong">
-          오늘의 경제 상식
+          오늘의 경제 이야기
         </h2>
         <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
           전체 보기 →
@@ -74,7 +74,7 @@ export function DailyBasicCard() {
               </div>
 
               <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
-                하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 생활 경제 상식 화면에
+                하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 생활 속 경제 이야기 화면에
                 있습니다.
               </p>
             </div>

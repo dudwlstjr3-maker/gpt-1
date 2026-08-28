@@ -617,6 +617,25 @@ const NEWS_TEMPLATES: NewsTemplate[] = [
 /* 거시 지표                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 발표 주기가 길어 시계열로 만들지 않는 값들.
+ *
+ * 거시 지표 화면과 생활 경제 상식(미저리 지수 등)이 같은 숫자를 봐야 하므로
+ * 양쪽에서 따로 적지 않고 여기 한 곳에 둔다.
+ */
+const FIXED_MACRO = {
+  usCpi: 2.9,
+  usCpiPrev: 3.0,
+  krCpi: 2.1,
+  krCpiPrev: 2.2,
+  usUnemployment: 4.4,
+  usUnemploymentPrev: 4.3,
+  krUnemployment: 2.9,
+  krUnemploymentPrev: 3.0,
+  jpCpi: 2.8,
+  jpUnemployment: 2.5,
+} as const;
+
 function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
   const i = world.dates.length - 1;
   const ci = world.cryptoDates.length - 1;
@@ -688,14 +707,16 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
       { level: 'watch', note: '인하 사이클 진행 중 — 발표 일정 확인' }, meta),
     mk('kr_policy_rate', '한국 기준금리', '한국', 2.5, 2.75, 'percent', 2, true,
       { level: 'normal', note: '완화 기조 유지' }, metaKr),
-    mk('us_cpi', '미국 CPI (전년비)', '미국', 2.9, 3.0, 'percent', 1, true,
+    mk('us_cpi', '미국 CPI (전년비)', '미국', FIXED_MACRO.usCpi, FIXED_MACRO.usCpiPrev, 'percent', 1, true,
       { level: 'watch', note: '목표치 2% 상회' }, meta),
-    mk('kr_cpi', '한국 CPI (전년비)', '한국', 2.1, 2.2, 'percent', 1, false,
+    mk('kr_cpi', '한국 CPI (전년비)', '한국', FIXED_MACRO.krCpi, FIXED_MACRO.krCpiPrev, 'percent', 1, false,
       { level: 'normal', note: '목표 부근' }, metaKr),
     mk('us_core_pce', '미국 근원 PCE (전년비)', '미국', 2.7, 2.8, 'percent', 1, false,
       { level: 'watch', note: '연준이 가장 중시하는 물가 지표' }, meta),
-    mk('us_unemployment', '미국 실업률', '미국', 4.4, 4.3, 'percent', 1, true,
+    mk('us_unemployment', '미국 실업률', '미국', FIXED_MACRO.usUnemployment, FIXED_MACRO.usUnemploymentPrev, 'percent', 1, true,
       { level: 'watch', note: '완만한 상승 추세' }, meta),
+    mk('kr_unemployment', '한국 실업률', '한국', FIXED_MACRO.krUnemployment, FIXED_MACRO.krUnemploymentPrev, 'percent', 1, false,
+      { level: 'normal', note: '낮은 수준 유지' }, metaKr),
     mk('us_nfp', '미국 비농업 고용 (천 명)', '미국', 73, 105, 'count', 0, false,
       { level: 'watch', note: '고용 증가 속도 둔화' }, meta),
     mk('us_pmi', '미국 ISM 제조업 PMI', '미국', 48.7, 49.1, 'point', 1, false,
@@ -778,6 +799,18 @@ const BASIC_PRICES = {
   bigmacUsd: 5.79,
   latteKrw: 5000,
   latteUsd: 4.95,
+  /** 처분가능소득 기준 지니계수 (0=완전 평등, 1=완전 불평등) */
+  giniKr: 0.323,
+  giniKrPrev: 0.324,
+  giniUs: 0.395,
+  giniJp: 0.334,
+  giniOecd: 0.315,
+  /** 소득 대비 주택가격 배수 */
+  pirSeoul: 15.2,
+  pirSeoulPrev: 15.8,
+  pirKorea: 6.3,
+  pirNewYork: 7.1,
+  pirTokyo: 10.4,
   /** OECD 가 계산하는 한국 구매력평가 환율 수준대 */
   pppKrwPerUsd: 891,
   /** 1인당 명목 GDP (원). 달러 환산은 그날 환율로 한다 */
@@ -788,7 +821,7 @@ const BASIC_PRICES = {
 } as const;
 
 /** partial 시나리오에서 값이 비는 항목 — 공식 발표 기관이 없는 것부터 빠진다 */
-const PARTIAL_BROKEN_BASICS = new Set(['latte', 'pentagon_pizza']);
+const PARTIAL_BROKEN_BASICS = new Set(['latte', 'pentagon_pizza', 'lipstick']);
 
 function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const s = world.s;
@@ -797,6 +830,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const at = (backDays: number) => Math.max(0, i - backDays);
   const fx = (k: number) => s.usdkrw[k];
 
+  const B = BASIC_PRICES;
   const meta = makeMeta(ctx, 'kr');
   const broken = ctx.scenario === 'partial';
 
@@ -853,6 +887,22 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const latteNow = undervalued(latteRate, i);
   const pppNow = undervalued(BASIC_PRICES.pppKrwPerUsd, i);
 
+  /* ---------- 미저리 지수 ---------- */
+  /* 지표 화면에 나오는 CPI·실업률을 그대로 더한다. 두 화면의 숫자가 어긋나면 안 된다. */
+  const miseryKr = FIXED_MACRO.krCpi + FIXED_MACRO.krUnemployment;
+  const miseryKrPrev = FIXED_MACRO.krCpiPrev + FIXED_MACRO.krUnemploymentPrev;
+  const miseryUs = FIXED_MACRO.usCpi + FIXED_MACRO.usUnemployment;
+  const miseryJp = FIXED_MACRO.jpCpi + FIXED_MACRO.jpUnemployment;
+
+  /* ---------- 립스틱 지수 ---------- */
+  /* 속설대로라면 경기가 나쁠 때 작은 사치가 상대적으로 잘 팔린다.
+     DEMO 에서는 KOSPI 60일 수익률의 반대 방향으로 움직이게 뒀다. */
+  const lipstickAt = (k: number) => {
+    const base = s.kospi[Math.max(0, k - 60)];
+    const ret60 = base > 0 ? (s.kospi[k] / base - 1) * 100 : 0;
+    return clamp(1.4 - ret60 * 0.24, -7, 12);
+  };
+
   /* ---------- 펜타곤 피자 지수 ---------- */
   /* 공식 데이터가 없는 개념이라 DEMO 에서는 지정학 긴장의 대리 지표(금·유가)로 움직이게 둔다.
      실제 붐빔 정도가 아니라 "이 앱 안에서 앞뒤가 맞는 합성값"이라는 뜻이다. */
@@ -890,6 +940,46 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
         { label: 'OECD 평균', value: BASIC_PRICES.oecdGdpPerCapitaUsd, precision: 0, suffix: '달러' },
       ],
       '연 1회 발표 · 직전 값은 1년 전',
+      true,
+    ),
+
+    mk(
+      'gini',
+      '지니계수',
+      'Gini coefficient',
+      B.giniKr,
+      B.giniKrPrev,
+      3,
+      '',
+      `한국은 ${B.giniKr} 입니다. 0에 가까울수록 소득이 고르게 나뉘어 있다는 뜻이고, 0.3 아래면 고른 편으로 봅니다. 바로 위 1인당 GDP 가 "평균 얼마"라면 이 숫자는 "얼마나 고르게 나뉘었나"입니다.`,
+      [
+        { label: '한국', value: B.giniKr, precision: 3, suffix: '', primary: true },
+        { label: '미국', value: B.giniUs, precision: 3, suffix: '' },
+        { label: '일본', value: B.giniJp, precision: 3, suffix: '' },
+        { label: 'OECD 평균', value: B.giniOecd, precision: 3, suffix: '' },
+      ],
+      '연 1회 발표 · 처분가능소득 기준',
+      true,
+    ),
+
+    mk(
+      'misery',
+      '미저리 지수',
+      'Misery Index',
+      round(miseryKr, 1),
+      round(miseryKrPrev, 1),
+      1,
+      '',
+      `한국은 물가상승률 ${FIXED_MACRO.krCpi}% 와 실업률 ${FIXED_MACRO.krUnemployment}% 를 더해 ${round(
+        miseryKr,
+        1,
+      )} 입니다. 절대 기준이 있는 숫자가 아니라 예년이나 다른 나라와 견줄 때 씁니다.`,
+      [
+        { label: '한국', value: round(miseryKr, 1), precision: 1, suffix: '', primary: true },
+        { label: '미국', value: round(miseryUs, 1), precision: 1, suffix: '' },
+        { label: '일본', value: round(miseryJp, 1), precision: 1, suffix: '' },
+      ],
+      '매월 갱신 · 물가상승률 + 실업률',
       true,
     ),
 
@@ -975,6 +1065,27 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     ),
 
     mk(
+      'pir',
+      '소득 대비 주택가격 (PIR)',
+      'Price to Income Ratio',
+      B.pirSeoul,
+      B.pirSeoulPrev,
+      1,
+      '배',
+      `서울은 ${B.pirSeoul}배입니다. 소득을 한 푼도 안 쓰고 ${Math.round(
+        B.pirSeoul,
+      )}년을 모아야 집 한 채 값이 된다는 뜻입니다. 전국은 ${B.pirKorea}배로 두 배 넘게 차이 납니다.`,
+      [
+        { label: '서울', value: B.pirSeoul, precision: 1, suffix: '배', primary: true },
+        { label: '전국', value: B.pirKorea, precision: 1, suffix: '배' },
+        { label: '도쿄', value: B.pirTokyo, precision: 1, suffix: '배' },
+        { label: '뉴욕', value: B.pirNewYork, precision: 1, suffix: '배' },
+      ],
+      '분기 갱신 · 아파트 중위가격 ÷ 가구 중위소득',
+      true,
+    ),
+
+    mk(
       'ccsi',
       '소비자심리지수',
       'CCSI',
@@ -992,6 +1103,26 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       ],
       '매월 발표 · 직전 값은 한 달 전',
       true,
+    ),
+
+    mk(
+      'lipstick',
+      '립스틱 지수',
+      'Lipstick Index',
+      round(lipstickAt(i), 1),
+      round(lipstickAt(at(20)), 1),
+      1,
+      '%p',
+      lipstickAt(i) > 0
+        ? `색조화장품 매출이 전체 소매판매보다 ${round(lipstickAt(i), 1)}%p 더 늘었습니다. 속설대로라면 큰 지출을 미루고 작은 사치로 옮겨간 국면이지만, 신제품이나 유행이 이유인 경우가 훨씬 많습니다.`
+        : `색조화장품 매출이 전체 소매판매보다 ${round(Math.abs(lipstickAt(i)), 1)}%p 덜 늘었습니다. 속설이 말하는 방향과는 반대입니다.`,
+      [
+        { label: '차이', value: round(lipstickAt(i), 1), precision: 1, suffix: '%p', primary: true },
+        { label: '20일 전', value: round(lipstickAt(at(20)), 1), precision: 1, suffix: '%p' },
+      ],
+      '정기 발표 없음 · 매출 통계를 직접 조합해야 함',
+      false,
+      '어느 기관도 이런 이름으로 발표하지 않습니다. 검증된 규칙성이 아니며 반대로 움직인 시기도 있습니다. 이 값은 DEMO 합성값입니다.',
     ),
 
     mk(

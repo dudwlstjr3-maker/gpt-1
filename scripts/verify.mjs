@@ -337,9 +337,9 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 7개', list.length === 7, `${list.map((b) => b.id).join(', ')}`);
+    check('지표 11개', list.length === 11, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'bigmac', 'latte', 'ppp_gap', 'engel', 'ccsi', 'pentagon_pizza'];
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'latte', 'ppp_gap', 'engel', 'pir', 'ccsi', 'lipstick', 'pentagon_pizza'];
     for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
 
     for (const b of list) {
@@ -353,6 +353,21 @@ async function main() {
       check(`[${b.id}] 비교값 제공`, Array.isArray(b.comparisons) && b.comparisons.length >= 2);
       if (b.official === false) {
         check(`[${b.id}] 비공식 개념이면 그 사실을 적음`, typeof b.officialNote === 'string' && b.officialNote.length > 10);
+      }
+    }
+
+    // 미저리 지수는 지표 화면의 CPI·실업률을 그대로 더한 값이어야 한다.
+    // 두 화면이 다른 숫자를 보여주면 어느 쪽을 믿어야 할지 알 수 없다.
+    {
+      const macro = snap.sections?.macro?.data ?? [];
+      const pick = (id) => macro.find((m) => m.id === id)?.value ?? null;
+      const cpi = pick('kr_cpi');
+      const un = pick('kr_unemployment');
+      const misery = list.find((b) => b.id === 'misery')?.value ?? null;
+      check('한국 실업률이 지표 목록에 있음', un !== null, `${un}`);
+      if (cpi !== null && un !== null && misery !== null) {
+        check('미저리 지수 = 물가상승률 + 실업률', Math.abs(misery - (cpi + un)) < 0.05,
+          `${misery} vs ${cpi} + ${un} = ${(cpi + un).toFixed(1)}`);
       }
     }
 

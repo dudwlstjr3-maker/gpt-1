@@ -14,7 +14,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
-import { basicGuideFor, BASIC_ORDER } from '@/lib/economyBasics';
+import { basicGuideFor, BASIC_GROUPS } from '@/lib/economyBasics';
 import type { BasicComparison, EconomyBasic } from '@/types';
 
 /** 값 + 단위. 값이 없으면 임의로 채우지 않고 그대로 비운다. */
@@ -144,7 +144,7 @@ function BasicCard({ item }: { item: EconomyBasic }) {
     <li className="card p-3.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-bold text-fg-strong">{item.name}</h2>
+          <h3 className="text-[14px] font-bold text-fg-strong">{item.name}</h3>
           <p className="mt-0.5 text-[10px] text-subtle">{item.englishName}</p>
         </div>
         <Badge tone={item.official ? 'neutral' : 'warn'} size="xs">
@@ -192,13 +192,33 @@ function BasicCard({ item }: { item: EconomyBasic }) {
 
 /* ------------------------------------------------------------------ */
 
-/** 정의된 순서대로 정렬한다. 어댑터가 순서를 바꿔도 화면 순서는 유지된다. */
-function sortByOrder(list: EconomyBasic[]): EconomyBasic[] {
-  const rank = (id: string) => {
-    const k = BASIC_ORDER.indexOf(id);
-    return k === -1 ? BASIC_ORDER.length : k;
-  };
-  return [...list].sort((a, b) => rank(a.id) - rank(b.id));
+/**
+ * 묶음별로 나눈다.
+ *
+ * 열 개가 넘으면 한 줄로 늘어놓는 것만으로는 읽히지 않는다.
+ * 묶음에 없는 지표는 버리지 않고 마지막에 "그 밖의 지표"로 모아 둔다 —
+ * 어댑터가 새 항목을 내려보내도 화면에서 조용히 사라지지 않게 하기 위해서다.
+ */
+function groupList(list: EconomyBasic[]): { id: string; label: string; note: string; items: EconomyBasic[] }[] {
+  const byId = new Map(list.map((b) => [b.id, b]));
+  const used = new Set<string>();
+
+  const groups = BASIC_GROUPS.map((g) => {
+    const items = g.ids
+      .map((id) => {
+        const found = byId.get(id);
+        if (found) used.add(id);
+        return found;
+      })
+      .filter((b): b is EconomyBasic => b !== undefined);
+    return { id: g.id, label: g.label, note: g.note, items };
+  }).filter((g) => g.items.length > 0);
+
+  const rest = list.filter((b) => !used.has(b.id));
+  if (rest.length > 0) {
+    groups.push({ id: 'rest', label: '그 밖의 지표', note: '', items: rest });
+  }
+  return groups;
 }
 
 export default function BasicsPage() {
@@ -224,6 +244,7 @@ export default function BasicsPage() {
         <Notice tone="neutral">
           여기 숫자는 <strong>투자심리 점수의 구성요소가 아닙니다.</strong> 대부분 1년에 한두 번 바뀌는 값이라 그날의
           시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요.
+          공식 통계와 속설이 섞여 있으니 각 카드의 <strong>공식 통계 / 비공식 개념</strong> 배지를 함께 보세요.
         </Notice>
       </div>
 
@@ -244,11 +265,26 @@ export default function BasicsPage() {
             list.length === 0 ? (
               <EmptyState title="표시할 지표가 없습니다" />
             ) : (
-              <ul className="space-y-2.5">
-                {sortByOrder(list).map((item) => (
-                  <BasicCard key={item.id} item={item} />
+              <div className="space-y-5">
+                {groupList(list).map((g) => (
+                  <section key={g.id} aria-labelledby={`basics-${g.id}`}>
+                    <div className="mb-1.5">
+                      <h2 id={`basics-${g.id}`} className="text-[12px] font-bold text-muted">
+                        {g.label}
+                        <span className="tnum ml-1.5 font-normal text-subtle">{g.items.length}</span>
+                      </h2>
+                      {g.note ? (
+                        <p className="mt-0.5 text-[10.5px] leading-relaxed break-keep text-subtle">{g.note}</p>
+                      ) : null}
+                    </div>
+                    <ul className="space-y-2.5">
+                      {g.items.map((item) => (
+                        <BasicCard key={item.id} item={item} />
+                      ))}
+                    </ul>
+                  </section>
                 ))}
-              </ul>
+              </div>
             )
           }
         </SectionGate>

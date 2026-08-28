@@ -29,6 +29,14 @@ import {
 const LEVEL_ORDER: RiskLevel[] = ['alert', 'watch', 'normal', 'calm'];
 
 /** 고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 본다. */
+/** 4단계가 각각 무슨 뜻인지. 이름을 늘어놓는 대신 단계의 뜻을 적는다. */
+const RISK_LEVEL_NOTE: Record<RiskLevel, string> = {
+  calm: '평소보다도 조용한 구간',
+  normal: '평소 범위 안',
+  watch: '평소보다 벗어난 구간',
+  alert: '과거 불안했던 구간',
+};
+
 export function RiskBoard({ market }: { market: MarketId }) {
   const { snapshot, refresh } = useData();
   const section = snapshot?.sections.risk ?? null;
@@ -59,7 +67,8 @@ export function RiskBoard({ market }: { market: MarketId }) {
             const tally = tallyRisk({ ...digest, indicators: items });
             const alertCount = available.filter((i) => i.level === 'alert').length;
             const watchCount = available.filter((i) => i.level === 'watch').length;
-            const headline = buildRiskHeadline(items);
+            // 이름은 바로 아래 단계별 분포가 댄다. 문장에서 또 대면 한 카드에 세 번이 된다.
+            const headline = buildRiskHeadline(items, false);
 
             return (
               <>
@@ -79,7 +88,9 @@ export function RiskBoard({ market }: { market: MarketId }) {
                     <SignalTally items={tally.items} total={tally.total} />
                   </div>
 
-                  {/* 단계별 분포 — 신호등을 4단계로 더 잘게 쪼갠 값 */}
+                  {/* 단계별 분포 — 신호등을 4단계로 더 잘게 쪼갠 개수.
+                      어느 지표인지는 바로 위 신호등 집계가 이름으로 대므로 여기서는 세지만 한다.
+                      같은 카드에서 같은 이름을 두 번 늘어놓으면 어느 쪽을 읽어야 할지 알 수 없다. */}
                   <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-2.5">
                     {byLevel.map((g) => (
                       <div key={g.level} className="min-w-0">
@@ -91,9 +102,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
                           <span aria-hidden="true">{RISK_LEVEL_GLYPH[g.level]}</span>
                           {RISK_LEVEL_LABEL[g.level]} {g.items.length}
                         </div>
-                        <p className="mt-0.5 text-[10px] break-keep text-subtle">
-                          {g.items.map((i) => i.shortName).join(' · ')}
-                        </p>
+                        <p className="mt-0.5 text-[10px] break-keep text-subtle">{RISK_LEVEL_NOTE[g.level]}</p>
                       </div>
                     ))}
                   </div>

@@ -111,9 +111,11 @@ function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) 
         </div>
       ) : null}
 
+      {/* 세 줄이 같은 설명을 되풀이하지 않는다. 무엇을 재는 값인지는 목록 위에 한 번 적혀 있다. */}
       {!unavailable ? (
         <p className="tnum mt-1 text-[10px] text-subtle">
-          기간 내 위치 {formatNumber(h.percentile, 0)}% — {h.windowDays}일 중 현재 점수보다 낮았던 날의 비율입니다.
+          기간 내 위치 {formatNumber(h.percentile, 0)}%
+          <span className="sr-only"> — {h.windowDays}일 중 현재 점수보다 낮았던 날의 비율</span>
         </p>
       ) : null}
     </li>
@@ -163,8 +165,9 @@ export function FngCycleView({ cycle }: { cycle: FngCycle }) {
       {/* 기간별 위치 */}
       <div className="mt-3 border-t border-border pt-2.5">
         <h4 className="mb-1 text-[11px] font-bold text-muted">기간별 심리 위치</h4>
-        <p className="mb-1 text-[10px] break-keep text-subtle">
-          같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다.
+        <p className="mb-1 text-[10px] leading-relaxed break-keep text-subtle">
+          같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다. <strong>기간 내 위치</strong>는 그
+          기간의 날 가운데 지금보다 점수가 낮았던 날의 비율입니다.
         </p>
         {cycle.horizons.length === 0 ? (
           <p className="py-2 text-[11px]" style={{ color: 'var(--warn)' }}>

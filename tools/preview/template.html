@@ -1394,7 +1394,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
-  function fngCard(f) {
+  function fngCard(f, standalone) {
     const un = f.score === null;
     const driver = (kind, d) =>
       '<div class="driver"><span class="g" style="color:' + dirColor(kind === 'up' ? 1 : -1) + '">' + (kind === 'up' ? '▲' : '▼') + '</span>' +
@@ -1403,7 +1403,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
     return (
       '<article class="card fngcard">' +
-      '<header><div><h3><span aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;background:' + mkColor(f.market) + '"></span>' + MARKET_LABEL[f.market] + ' 투자심리</h3><div class="sub">자체 산출 지수 · ' + esc(f.formulaVersion) + '</div></div>' +
+      '<header><div><h3><span aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;background:' + mkColor(f.market) + '"></span>' + MARKET_LABEL[f.market] + (standalone === false ? '' : ' 투자심리') + '</h3>' +
+      (standalone === false ? '' : '<div class="sub">자체 산출 지수 · ' + esc(f.formulaVersion) + '</div>') + '</div>' +
       '<div class="fng-right">' + modeBadge() + confBadge(f.confidence, f.confidenceReason) + '</div></header>' +
       '<div style="display:flex;justify-content:center">' + gauge(f.score, 168) + '</div>' +
       (un
@@ -1671,18 +1672,29 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   }
 
   /** 고른 시장만 세는 한 줄 요약 — 앱의 lib/riskHeadline.ts 와 같은 문장 규칙 */
-  function buildRiskHeadline(indicators) {
+  /* withNames: 문장만 홀로 서는 자리(홈)에서는 이름을 대고, 바로 아래에 단계별
+     분포가 같은 이름을 늘어놓는 자리(지표 화면)에서는 뺀다. */
+  function buildRiskHeadline(indicators, withNames) {
+    const names = (list) => (withNames === false ? '' : ' (' + list.map((i) => i.shortName).join(' · ') + ')');
     const avail = indicators.filter((i) => i.value !== null);
     const alerts = avail.filter((i) => i.level === 'alert');
     const watches = avail.filter((i) => i.level === 'watch');
     let h;
     if (!avail.length) h = '위험 지표를 산출할 데이터가 없습니다.';
-    else if (alerts.length) h = indicators.length + '개 중 ' + alerts.length + '개가 주의 단계입니다 (' + alerts.map((i) => i.shortName).join(' · ') + ').';
-    else if (watches.length) h = '주의 단계는 없고, ' + watches.length + '개가 관찰 단계입니다 (' + watches.map((i) => i.shortName).join(' · ') + ').';
+    else if (alerts.length) h = indicators.length + '개 중 ' + alerts.length + '개가 주의 단계입니다' + names(alerts) + '.';
+    else if (watches.length) h = '주의 단계는 없고, ' + watches.length + '개가 관찰 단계입니다' + names(watches) + '.';
     else h = '산출된 ' + avail.length + '개 지표가 모두 안정·보통 구간에 있습니다.';
     if (avail.length < indicators.length) h += ' ' + (indicators.length - avail.length) + '개는 값이 없어 제외했습니다.';
     return h;
   }
+
+  /** 4단계가 각각 무슨 뜻인지. 이름을 늘어놓는 대신 단계의 뜻을 적는다. */
+  const RISK_LEVEL_NOTE = {
+    calm: '평소보다도 조용한 구간',
+    normal: '평소 범위 안',
+    watch: '평소보다 벗어난 구간',
+    alert: '과거 불안했던 구간',
+  };
 
   function riskHeadline(d) {
     const sig = d.alertCount > 0 ? 'red' : d.watchCount > 0 ? 'yellow' : 'green';
@@ -1772,7 +1784,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         ? '<p style="margin:8px 0 0;font-size:10px;word-break:keep-all;color:var(--subtle)">히스토리 범위보다 앞선 사건 ' + ev.outOfRange + '건은 점수를 산출할 수 없어 표시하지 않았습니다.</p>'
         : '') +
       '<p class="notice n-warn" style="margin-top:10px"><span>ⓘ</span><span>' + esc(ev.caveat) +
-      ' 과거에 이랬다는 기록일 뿐, 앞으로를 예측하거나 매매를 권하지 않습니다.</span></p>' +
+      ' 과거에 이랬다는 기록일 뿐입니다.</span></p>' +
       '</div>'
     );
   }
@@ -1821,7 +1833,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '<span style="position:absolute;top:50%;left:' + h.percentile + '%;width:2.5px;height:12px;transform:translate(-50%,-50%);border-radius:999px;background:var(--fg-strong);box-shadow:0 0 0 2px var(--surface)"></span>' +
           '</div>' + scoreSpark(h.points, 64, 20) + '</div>' +
           '<p class="tnum" style="margin:4px 0 0;font-size:10px;color:var(--subtle)">기간 내 위치 ' + esc(fmtNum(h.percentile, 0)) +
-          '% — ' + h.windowDays + '일 중 현재 점수보다 낮았던 날의 비율입니다.</p>') +
+          '%</p>') +
         '</li>'
       );
     };
@@ -1845,7 +1857,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
       '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' +
       '<h4 style="margin:0 0 4px;font-size:11px;font-weight:700;color:var(--muted)">기간별 심리 위치</h4>' +
-      '<p style="margin:0 0 4px;font-size:10px;color:var(--subtle);word-break:keep-all">같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다.</p>' +
+      '<p style="margin:0 0 4px;font-size:10px;line-height:1.7;color:var(--subtle);word-break:keep-all">같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다. <b>기간 내 위치</b>는 그 기간의 날 가운데 지금보다 점수가 낮았던 날의 비율입니다.</p>' +
       '<ul style="list-style:none;margin:0;padding:0">' + cy.horizons.map(horizon).join('') + '</ul></div>' +
 
       '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
@@ -1898,7 +1910,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       }).join('') + '</ul>' +
 
       '<p class="notice n-warn" style="margin-top:12px"><span>ⓘ</span><span>' + esc(bs.caveat) +
-      ' 이 표는 과거에 무슨 일이 있었는지를 보여줄 뿐이며, 앞으로의 수익을 예측하거나 매매를 권하지 않습니다.</span></p>' +
+      ' 지나간 분포일 뿐이라, 다음에도 같으리라는 보장은 없습니다.</span></p>' +
       '</div>'
     );
   }
@@ -2065,8 +2077,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<h1 class="sr">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
 
       '<section class="block" style="padding-inline:0">' +
-      '<div class="block-head" style="padding-inline:12px"><h2>시장별 투자심리</h2><span class="hint">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
-      '<div class="fng-scroll">' + fng.map(fngCard).join('') + '</div>' +
+      '<div class="block-head" style="padding-inline:12px"><div style="min-width:0"><h2>시장별 투자심리</h2>' +
+      // 카드마다 되풀이하던 줄. 셋이 같은 값이라 머리에 한 번만 적는다.
+      '<div class="sub" style="margin-top:2px">자체 산출 지수 · ' + esc((fng[0] || {}).formulaVersion || '') + '</div></div>' +
+      '<span class="hint" style="flex-shrink:0">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
+      '<div class="fng-scroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
       '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 모두 0~100 척도지만 구성 지표와 가중치가 서로 다릅니다. 같은 숫자라도 의미가 동일하지 않으므로 시장 간 직접 비교는 피해 주세요.</span></p></div>' +
       '</section>' +
 
@@ -2358,7 +2373,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const groups = order.map((lv) => ({ lv, items: available.filter((i) => i.level === lv) })).filter((g) => g.items.length);
     const alertN = available.filter((i) => i.level === 'alert').length;
     const watchN = available.filter((i) => i.level === 'watch').length;
-    const headline = buildRiskHeadline(items);
+    // 이름은 바로 아래 단계별 분포가 댄다. 문장에서 또 대면 한 카드에 세 번이 된다.
+    const headline = buildRiskHeadline(items, false);
 
     return (
       '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
@@ -2383,7 +2399,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         '<div style="min-width:0"><div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:' + RISK_COLOR[g.lv] + '">' +
         sigDot(riskSignal(g.lv), 7) +
         '<span aria-hidden="true">' + RISK_GLYPH[g.lv] + '</span>' + RISK_LABEL[g.lv] + ' ' + g.items.length + '</div>' +
-        '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle);word-break:keep-all">' + esc(g.items.map((i) => i.shortName).join(' · ')) + '</p></div>').join('') +
+        '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle);word-break:keep-all">' + esc(RISK_LEVEL_NOTE[g.level] || '') + '</p></div>').join('') +
       '</div>' +
       '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">산출 ' +
       esc(kFull(d.generatedAt)) + ' · ' + MARKET_LABEL[state.riskScope] + ' 관련 ' + items.length + '개 중 ' + available.length + '개 값 확보</p></div>' +
@@ -2530,7 +2546,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     });
     return (
       '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
-      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다. 달력에서 날짜를 누르면 그날 일정만 아래에 나옵니다.</p></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.</p></div>' +
       '<div style="padding:10px 12px 0;display:flex;flex-wrap:wrap;gap:8px"><div class="seg lg" role="group" aria-label="시장">' +
       [['all', '전체'], ['us', '미국'], ['kr', '한국'], ['crypto', '크립토']].map(([v, l]) =>
         '<button type="button" data-cal="' + v + '" aria-pressed="' + (state.calMarket === v) + '">' + l + '</button>').join('') +

@@ -33,7 +33,9 @@ export function buildSummary(
     const tail = unavailable.length ? ` · ${unavailable.join('·')}는 산출 불가` : '';
     lines.push({
       kind: 'fact',
-      text: `자체 산출 심리 지수: ${parts.join(' · ')}${tail}.`,
+      // 같은 화면 위쪽의 머리와 아래쪽 고지가 이미 "자체 산출" 이라고 말한다.
+      // 이 줄의 일은 세 숫자를 늘어놓는 것이다.
+      text: `심리 점수: ${parts.join(' · ')}${tail}.`,
       evidence: scored.map((f) => `fng:${f.market}`),
     });
   }
@@ -69,7 +71,9 @@ export function buildSummary(
       const dir = (lead.deltaDay as number) > 0 ? '상승' : '하락';
       lines.push({
         kind: 'interpretation',
-        text: `${MARKET_LABEL[lead.market]} 점수 ${dir}(${formatSigned(lead.deltaDay, 1)}점)에는 '${driver.label}' 구성요소가 가장 크게 기여했습니다(${formatSigned(driver.contribution, 2)}점). 이는 구성요소 기여도를 근거로 한 해석입니다.`,
+        // 문장 끝에 "이는 …한 해석입니다" 를 붙이지 않는다. 줄 앞의 '해석' 배지가
+        // 이미 그렇게 말하고 있고, 근거(구성요소 기여도)는 문장 안에 이미 있다.
+        text: `${MARKET_LABEL[lead.market]} 점수 ${dir}(${formatSigned(lead.deltaDay, 1)}점)에는 '${driver.label}' 구성요소가 가장 크게 기여했습니다(${formatSigned(driver.contribution, 2)}점).`,
         evidence: [`fng:${lead.market}:${driver.componentId}`],
       });
     }
@@ -100,10 +104,11 @@ export function buildSummary(
   }
 
   // 심리 변화의 원인을 설명할 근거가 없으면, 원인을 만들어내지 않고 명시한다.
+  // 같은 말을 두 번 하지 않는다 — 왜 부족한지만 적고, 부족하다는 사실은 배지가 진다.
   if (!lines.some((l) => l.kind === 'interpretation')) {
     lines.push({
       kind: 'insufficient',
-      text: `심리 변화 폭이 작거나 기여도 데이터가 충분하지 않습니다. ${INSUFFICIENT_TEXT}`,
+      text: '심리 변화 폭이 작거나 기여도 데이터가 충분하지 않아 원인을 짚지 않았습니다.',
       evidence: [],
     });
   }

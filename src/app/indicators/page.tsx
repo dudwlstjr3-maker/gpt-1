@@ -186,7 +186,10 @@ export default function IndicatorsPage() {
 
       {view === 'risk' ? <RiskBoard market={group} /> : null}
 
-      <div className="mt-3 px-3" hidden={view !== 'all'}>
+      {/* 고르지 않은 보기는 감추지 말고 아예 그리지 않는다. 홈 탭·지수 탭과 같은 규칙이다 —
+          감춰만 두면 같은 지표 해설이 문서에 두 벌로 남는다. */}
+      {view === 'all' ? (
+      <div className="mt-3 px-3">
         <SectionGate
           section={section}
           onRetry={refresh}
@@ -240,6 +243,7 @@ export default function IndicatorsPage() {
           }
         </SectionGate>
       </div>
+      ) : null}
     </div>
   );
 }

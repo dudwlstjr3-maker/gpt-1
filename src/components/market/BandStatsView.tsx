@@ -119,8 +119,7 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
 
       <div className="mt-3">
         <Notice tone="warn">
-          {stats.caveat} 이 표는 과거에 무슨 일이 있었는지를 보여줄 뿐이며, 앞으로의 수익을 예측하거나 매매를 권하지
-          않습니다.
+          {stats.caveat} 지나간 분포일 뿐이라, 다음에도 같으리라는 보장은 없습니다.
         </Notice>
       </div>
     </div>

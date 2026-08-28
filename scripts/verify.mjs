@@ -795,6 +795,44 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-7. 같은 말을 두 번 하지 않기 ---------------- */
+  console.log('\n[8-7] 문구 중복');
+  {
+    // 요약 줄: 앞의 배지가 이미 '해석'·'근거 부족' 이라고 말한다. 문장이 또 말하면 두 번이 된다.
+    const lines = snap.sections?.summary?.data?.lines ?? [];
+    check('요약 줄이 있음', lines.length > 0, `${lines.length}줄`);
+    for (const l of lines) {
+      if (l.kind === 'interpretation') {
+        check('해석 줄이 스스로 "해석" 이라 말하지 않음', !l.text.includes('해석'), l.text.slice(-40));
+      }
+      if (l.kind === 'insufficient') {
+        // "…충분하지 않습니다. 데이터가 부족합니다." 처럼 같은 말을 이어 붙이지 않는다
+        const twice = /부족합니다[\s\S]*부족합니다|않습니다[\s\S]*부족합니다/.test(l.text);
+        check('근거 부족 줄이 같은 말을 두 번 하지 않음', !twice, l.text);
+      }
+    }
+    // 머리와 고지가 이미 말하는 것을 줄마다 되풀이하지 않는다
+    check('요약 줄이 "자체 산출" 을 되풀이하지 않음', !lines.some((l) => l.text.includes('자체 산출')));
+
+    // 지표 해설은 한 곳에서만 기른다 — risk.ts 가 제 몫을 따로 들고 있으면 어긋난다
+    const riskSrc = (await readFile('src/server/risk.ts', 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    check('위험 지표가 해설을 따로 들고 있지 않음', !/when(Up|Down):\s*'/.test(riskSrc));
+
+    // 그래도 일곱 지표 모두 해설이 붙어야 한다 (한 곳에서 읽어 오므로)
+    for (const i of snap.sections?.risk?.data?.indicators ?? []) {
+      check(`[${i.id}] 오르면·내리면 설명이 있음`,
+        typeof i.whenUp === 'string' && i.whenUp.length > 10 &&
+        typeof i.whenDown === 'string' && i.whenDown.length > 10,
+        `${(i.whenUp ?? '').length}자 / ${(i.whenDown ?? '').length}자`);
+      // 같은 카드 안에서 "무슨 지표인가" 와 "내리면" 이 같은 문장을 갖지 않게
+      const shared = (i.why ?? '').match(/[가-힣 ,·]{14,}/g) ?? [];
+      const dup = shared.find((f) => (i.whenDown ?? '').includes(f) || (i.whenUp ?? '').includes(f));
+      check(`[${i.id}] 설명끼리 같은 문장을 나눠 갖지 않음`, !dup, dup ?? '없음');
+    }
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

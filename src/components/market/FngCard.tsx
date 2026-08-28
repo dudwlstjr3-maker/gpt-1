@@ -49,7 +49,16 @@ function DriverRow({ kind, label, detail }: { kind: 'up' | 'down'; label: string
   );
 }
 
-export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
+export function FngCard({
+  score,
+  mode,
+  /** 이 카드 하나만 서 있는가. 홈처럼 머리 아래 셋이 나란히 설 때는 false. */
+  standalone = true,
+}: {
+  score: FngScore;
+  mode: DataMode;
+  standalone?: boolean;
+}) {
   const unavailable = score.score === null;
 
   return (
@@ -69,9 +78,14 @@ export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
               className="block h-2 w-2 shrink-0 rounded-full"
               style={{ background: marketColor(score.market) }}
             />
-            {MARKET_LABEL[score.market]} 투자심리
+            {MARKET_LABEL[score.market]}
+            {/* 홈처럼 "시장별 투자심리" 머리 아래 셋이 나란히 설 때는 카드마다 되풀이하지 않는다.
+                시장 화면에서는 이 카드 하나뿐이라 무엇을 재는 값인지 카드가 직접 말해야 한다. */}
+            {standalone ? ' 투자심리' : null}
           </h3>
-          <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
+          {standalone ? (
+            <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
+          ) : null}
         </div>
         <ModeBadge mode={mode} size="xs" />
       </div>

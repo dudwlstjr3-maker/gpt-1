@@ -12,6 +12,7 @@
  */
 
 import { clamp, round } from '@/lib/stats';
+import { guideFor } from '@/lib/indicatorGuide';
 import { buildRiskHeadline } from '@/lib/riskHeadline';
 import type {
   MacroIndicator,
@@ -48,10 +49,12 @@ interface RiskDef {
   scaleNote: string;
   bands: RiskBand[];
   why: string;
-  /** 이 지표가 오르면 시장에서 무슨 일이 벌어지는가 (초보자용) */
-  whenUp: string;
-  /** 내리면 무슨 일이 벌어지는가 */
-  whenDown: string;
+  /**
+   * "오르면 / 내리면 무슨 일이 벌어지는가" 는 여기 적지 않는다.
+   * 같은 지표의 같은 설명이 indicatorGuide 에도 있어 두 벌이 되고, 실제로
+   * 문구가 조금씩 어긋나 있었다 ("거라고 보는" / "거라 보는"). 해설은 한 곳에서만
+   * 기른다 — src/lib/indicatorGuide.ts. 여기는 눈금·구간처럼 신호등에만 있는 것만 든다.
+   */
   /** 구간별 해석 문구 */
   readings: Record<RiskLevel, string>;
 }
@@ -89,8 +92,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 28, null, '28 이상'),
     ],
     why: 'S&P 500 옵션 가격에서 뽑아낸 향후 30일 예상 변동성입니다. 시장이 앞으로 얼마나 흔들릴 것으로 보는지를 나타냅니다.',
-    whenUp: '앞으로 크게 흔들릴 거라 보는 사람이 늘었다는 뜻입니다. 보험(풋옵션)을 사려는 수요가 몰릴 때 오릅니다. 주가가 급하게 빠지는 날 같이 뜁니다.',
-    whenDown: '큰 사건이 없을 거라고 보는 쪽이 많다는 뜻입니다. 대체로 주가가 완만하게 오르는 구간에서 낮게 유지됩니다. 다만 너무 낮으면 방심 신호로 보는 시각도 있습니다.',
     readings: {
       calm: '변동성 기대가 낮은 구간입니다. 과거 이 구간에서는 주가 흐름이 비교적 완만했습니다.',
       normal: '장기 평균 부근입니다. 특별한 변동성 신호는 나타나지 않았습니다.',
@@ -119,8 +120,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 25, null, '25 이상'),
     ],
     why: 'KOSPI200 옵션에서 계산한 한국판 변동성지수입니다. 국내 증시의 불안 정도를 봅니다.',
-    whenUp: '국내 증시가 앞으로 크게 출렁일 거라 보는 사람이 늘었다는 뜻입니다. 코스피가 급락하는 날 같이 뜁니다.',
-    whenDown: '국내 시장이 잠잠할 거라 보는 쪽이 많다는 뜻입니다. 외국인 자금이 안정적으로 들어올 때 낮게 유지되는 편입니다.',
     readings: {
       calm: '국내 변동성 기대가 낮은 구간입니다.',
       normal: '평상시 범위 안에 있습니다.',
@@ -149,8 +148,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 4.5, null, '4.5%p 이상'),
     ],
     why: '신용등급이 낮은 기업(정크본드)이 국채보다 얼마나 높은 금리를 물어야 하는지입니다. 벌어질수록 기업 자금 조달이 어려워졌다는 뜻입니다.',
-    whenUp: '신용등급 낮은 기업이 돈을 빌리기 어려워졌다는 뜻입니다. 부도 걱정이 커질 때 벌어집니다. 주식보다 먼저 움직이는 경우가 있어 눈여겨봅니다.',
-    whenDown: '위험한 기업에도 돈이 잘 돌고 있다는 뜻입니다. 투자자들이 위험을 감수할 의향이 있는 상태입니다.',
     readings: {
       calm: '기업 신용 여건이 넉넉한 구간입니다. 위험자산 선호가 강한 상태로 읽힙니다.',
       normal: '장기 평균 부근입니다. 신용 시장에서 특별한 경고는 나오지 않았습니다.',
@@ -178,9 +175,9 @@ export const RISK_SEVEN: RiskDef[] = [
       band('normal', 20, 100, '20~100bp'),
       band('calm', 100, null, '100bp 이상'),
     ],
-    why: '10년물 금리에서 2년물 금리를 뺀 값입니다. 장기금리가 단기금리보다 낮아지는 역전은 과거 경기침체에 앞서 나타난 신호였습니다.',
-    whenUp: '장기금리가 단기금리보다 높아진 정상 상태로 돌아가는 중입니다. 보통 경기가 나아질 거라 보거나 금리 인하 기대가 있을 때 벌어집니다.',
-    whenDown: '장기금리가 단기금리보다 낮은 \'역전\'입니다. 은행이 돈을 빌려주기 어려워지고, 과거 경기침체에 앞서 나타난 적이 많아 경고로 읽습니다.',
+    // '역전이 침체에 앞선 신호였다' 는 이야기는 바로 아래 '값이 내리면' 이 한다.
+    // 한 카드 안에서 같은 말을 두 번 하지 않는다.
+    why: '10년물 금리에서 2년물 금리를 뺀 값입니다. 은행이 짧게 빌려 길게 빌려주며 이익을 내는 구조와 맞닿아 있습니다.',
     readings: {
       calm: '정상적인 우상향 곡선입니다. 장기 성장 기대가 살아 있는 형태입니다.',
       normal: '정상 범위입니다. 곡선이 완만하게 우상향하고 있습니다.',
@@ -209,8 +206,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 5.0, null, '5.0% 이상'),
     ],
     why: '전 세계 자산 가격을 매길 때 기준이 되는 금리입니다. 이 금리가 오르면 주식·부동산의 밸류에이션 부담이 커집니다.',
-    whenUp: '안전한 국채만 사도 이자를 더 받는다는 뜻이라, 주식·부동산이 상대적으로 덜 매력적으로 보입니다. 대출 금리도 따라 오릅니다.',
-    whenDown: '국채 이자가 줄어 위험자산으로 돈이 옮겨가기 쉬워집니다. 다만 경기 침체 걱정으로 돈이 국채로 몰려서 내려가는 경우도 있어, 왜 내렸는지를 같이 봐야 합니다.',
     readings: {
       calm: '금리 부담이 크지 않은 구간입니다.',
       normal: '최근 몇 년의 통상 범위 안에 있습니다.',
@@ -239,8 +234,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 1420, null, '1,420원 이상'),
     ],
     why: '원화가 약해지면 외국인 자금이 빠져나가기 쉽고 수입물가도 함께 오릅니다. 한국 시장에서는 심리와 직결되는 지표입니다.',
-    whenUp: '원화가 약해졌다는 뜻입니다. 수입 물가가 오르고, 외국인 투자자는 환차손 탓에 한국 주식을 팔기 쉬워집니다.',
-    whenDown: '원화가 강해졌다는 뜻입니다. 수입 물가 부담이 줄고 외국인 자금이 들어오기 좋은 환경이 됩니다.',
     readings: {
       calm: '원화가 견조한 구간입니다. 외국인 수급에 우호적인 환경으로 읽힙니다.',
       normal: '최근 등락 범위 안에 있습니다.',
@@ -269,8 +262,6 @@ export const RISK_SEVEN: RiskDef[] = [
       band('alert', 0.025, null, '0.025% 이상'),
     ],
     why: '무기한 선물에서 롱 포지션이 숏에게 지불하는 수수료입니다. 지나치게 높으면 레버리지가 한쪽으로 쏠렸다는 뜻이라 청산이 연쇄될 위험이 커집니다.',
-    whenUp: '가격 상승에 베팅한 사람(롱)이 훨씬 많아 수수료를 물어가며 버티는 상태입니다. 한쪽으로 쏠릴수록 조금만 빠져도 강제 청산이 줄줄이 터질 수 있습니다.',
-    whenDown: '하락에 베팅한 사람(숏)이 더 많다는 뜻입니다. 반대로 가격이 조금만 올라도 숏이 청산되며 급등이 나오기도 합니다.',
     readings: {
       calm: '롱·숏이 비교적 균형을 이룬 구간입니다.',
       normal: '롱이 약간 우위이지만 통상 범위입니다.',
@@ -379,8 +370,9 @@ export function buildRiskDigest(
       offScale: value === null ? null : offScaleOf(def, value),
       scaleNote: def.scaleNote,
       why: def.why,
-      whenUp: def.whenUp,
-      whenDown: def.whenDown,
+      // 해설은 지표 해설 한 곳에서 온다. 없으면 지어내지 않고 빈 줄로 둔다.
+      whenUp: guideFor(def.id)?.whenUp ?? '',
+      whenDown: guideFor(def.id)?.whenDown ?? '',
       reading: value === null ? '값이 없어 해석할 수 없습니다.' : def.readings[level],
       spark,
       ...(unavailableReason ? { unavailableReason } : {}),

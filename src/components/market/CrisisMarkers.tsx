@@ -189,7 +189,7 @@ export function CrisisMarkers({
 
       <div className="mt-2.5">
         <Notice tone="warn">
-          {events.caveat} 과거에 이랬다는 기록일 뿐, 앞으로를 예측하거나 매매를 권하지 않습니다.
+          {events.caveat} 과거에 이랬다는 기록일 뿐입니다.
         </Notice>
       </div>
     </div>

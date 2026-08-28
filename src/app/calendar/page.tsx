@@ -88,7 +88,8 @@ export default function CalendarPage() {
     <div className="pt-2">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
-        모든 시각은 KST 기준입니다. 전체를 고르면 세 시장을 한 번에, 시장을 고르면 그 시장과 글로벌 일정을 봅니다. 어느 시장 일정인지는 색과 배지로 표시하며, 달력에서 날짜를 누르면 그날 일정만 아래에 나옵니다.
+        모든 시각은 KST 기준입니다. 전체를 고르면 세 시장을 한 번에, 시장을 고르면 그 시장과 글로벌 일정을 봅니다.
+        어느 시장 일정인지는 색과 배지로 표시합니다.
       </p>
 
       <div className="mt-3 space-y-2 px-3">

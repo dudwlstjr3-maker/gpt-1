@@ -57,27 +57,29 @@ export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
       className="card flex h-full flex-col p-3.5"
       aria-labelledby={`fng-${score.market}-title`}
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
+      {/* 제목 줄에는 데이터 모드만 둔다. 국면·신뢰도 배지까지 오른쪽에 쌓으면
+          왼쪽 글자 아래로 배지 하나가 혼자 떨어져 머리 부분이 들쭉날쭉해진다. */}
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 id={`fng-${score.market}-title`} className="text-sm font-bold text-fg-strong">
             {MARKET_LABEL[score.market]} 투자심리
           </h3>
           <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
-          <div className="mt-1.5">
-            <CyclePhaseBadge cycle={score.cycle} />
-          </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <ModeBadge mode={mode} size="xs" />
-          <Badge
-            tone={score.confidence === 'high' ? 'ok' : score.confidence === 'medium' ? 'neutral' : 'warn'}
-            size="xs"
-            title={score.confidenceReason}
-          >
-            <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
-            신뢰도 {CONFIDENCE_LABEL[score.confidence]}
-          </Badge>
-        </div>
+        <ModeBadge mode={mode} size="xs" />
+      </div>
+
+      {/* 국면과 신뢰도는 한 줄로 묶어 제목 아래에 깐다. 좁으면 자연스럽게 넘어간다. */}
+      <div className="mt-1.5 mb-2 flex flex-wrap items-center gap-1">
+        <CyclePhaseBadge cycle={score.cycle} />
+        <Badge
+          tone={score.confidence === 'high' ? 'ok' : score.confidence === 'medium' ? 'neutral' : 'warn'}
+          size="xs"
+          title={score.confidenceReason}
+        >
+          <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
+          신뢰도 {CONFIDENCE_LABEL[score.confidence]}
+        </Badge>
       </div>
 
       <div className="flex flex-col items-center">

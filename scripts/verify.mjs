@@ -73,6 +73,87 @@ async function main() {
   }
 
   /* ---------------- 2. 가격 ---------------- */
+  /* ---------------- 1-1. 점수가 실제로 그 가중치의 가중평균인가 ---------------- */
+  /*
+   * 가중치를 화면에 적어 두는 것만으로는 부족하다. 적어 둔 가중치와 실제 산식이
+   * 어긋나면 화면 전체가 거짓말이 된다. 그래서 응답만 보고 점수를 다시 계산해 맞춰본다.
+   *
+   * 반올림 때문에 완전히 같을 수는 없다.
+   *  - 하위·구성요소 점수는 소수 둘째 자리, 최종 점수는 소수 첫째 자리에서 반올림된다.
+   *  - 그래서 구성요소는 0.011, 최종 점수는 0.06 까지를 반올림 오차로 본다.
+   * 재조정은 화면에 표시된 적용가중치(effectiveWeight)가 아니라 선언 가중치로 한다.
+   * 엔진이 그렇게 계산하고, 적용가중치는 표시용으로 한 번 더 반올림된 값이기 때문이다.
+   */
+  console.log('\n[1-1] 점수 = 선언한 가중치의 가중평균인가');
+  const MIN_COVERAGE = 0.7;
+
+  async function checkWeighting(label, detail) {
+    const comps = detail.components ?? [];
+
+    // (1) 구성요소 점수 = 하위 지표 가중평균 (결측은 빼고 나머지끼리 재조정)
+    for (const c of comps) {
+      let wsum = 0;
+      let acc = 0;
+      for (const sm of c.subMetrics) {
+        if (sm.score === null) continue;
+        wsum += sm.weight;
+        acc += sm.score * sm.weight;
+      }
+      // 하위 가중치가 절반도 안 남으면 구성요소를 통째로 결측 처리하는 것이 규칙이다
+      if (wsum < 50) {
+        check(`${label} ${c.id} 하위 절반 미만이면 구성요소 결측`, c.score === null,
+          `남은 하위 가중치 ${wsum}, score=${c.score}`);
+        continue;
+      }
+      const expected = acc / wsum;
+      check(`${label} ${c.id} 점수 = 하위 가중평균`,
+        c.score !== null && Math.abs(c.score - expected) <= 0.011,
+        `보고 ${c.score} vs 계산 ${expected.toFixed(3)}`);
+    }
+
+    // (2) 충족률 = 값이 나온 구성요소의 선언 가중치 합 ÷ 100
+    const availableWeight = comps.filter((c) => c.score !== null).reduce((a, c) => a + c.weight, 0);
+    check(`${label} 충족률 = 산출된 구성요소 가중치 합`,
+      Math.abs(detail.coverage - availableWeight / 100) < 1e-9,
+      `보고 ${detail.coverage} vs 계산 ${availableWeight / 100}`);
+
+    // (3) 적용가중치 = 선언가중치 ÷ 사용가능가중치 × 100, 결측은 0, 합계 100
+    let effSum = 0;
+    for (const c of comps) {
+      const expected = c.score === null || availableWeight === 0 ? 0 : (c.weight / availableWeight) * 100;
+      check(`${label} ${c.id} 적용가중치 재조정`, Math.abs(c.effectiveWeight - expected) <= 0.011,
+        `보고 ${c.effectiveWeight} vs 계산 ${expected.toFixed(2)}`);
+      effSum += c.effectiveWeight;
+    }
+    if (availableWeight > 0) {
+      check(`${label} 적용가중치 합계 100`, Math.abs(effSum - 100) < 0.05, `합계 ${effSum.toFixed(2)}`);
+    }
+
+    // (4) 최종 점수 = 사용 가능한 구성요소의 선언 가중치 가중평균
+    if (detail.coverage >= MIN_COVERAGE && availableWeight > 0) {
+      const expected =
+        comps.filter((c) => c.score !== null).reduce((a, c) => a + c.score * c.weight, 0) / availableWeight;
+      check(`${label} 최종 점수 = 구성요소 가중평균`,
+        detail.score !== null && Math.abs(detail.score - expected) <= 0.06,
+        `보고 ${detail.score} vs 계산 ${expected.toFixed(4)}`);
+    } else {
+      // (5) 충족률이 기준 미만이면 점수를 만들지 않고 사유를 남긴다
+      check(`${label} 충족률 미달이면 산출 불가`, detail.score === null, `score=${detail.score}`);
+      check(`${label} 산출 불가 사유를 남김`,
+        typeof detail.unavailableReason === 'string' && detail.unavailableReason.length > 0);
+    }
+  }
+
+  for (const m of ['us', 'kr', 'crypto']) {
+    const { body } = await getJson(`/api/fng/${m}`);
+    await checkWeighting(`[${m}]`, body.detail);
+  }
+  // 결측이 생겨 재조정이 실제로 일어나는 경로도 같은 잣대로 확인한다
+  for (const m of ['us', 'kr', 'crypto']) {
+    const { body } = await getJson(`/api/fng/${m}?scenario=partial`);
+    await checkWeighting(`[${m}/부분실패]`, body.detail);
+  }
+
   console.log('\n[2] 가격 카드');
   const quotes = snap.sections?.quotes?.data ?? {};
   const flat = ['us', 'kr', 'crypto'].flatMap((m) => quotes[m] ?? []);

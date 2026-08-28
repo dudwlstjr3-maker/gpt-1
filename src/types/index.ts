@@ -443,6 +443,8 @@ export interface FngDetail extends FngScore {
     winsorization: string;
     coverageRule: string;
     scaleWarning: string;
+    /** 다른 공포·탐욕 지수를 훑어보고 무엇을 넣고 뺐는지 */
+    compositionNote: string;
   };
 }
 
@@ -473,6 +475,49 @@ export interface MacroIndicator {
   nextRelease: string | null;
   /** 추이 미니 차트 (시계열이 있는 지표만) */
   spark?: SeriesPoint[];
+  meta: Meta;
+}
+
+/* ------------------------------------------------------------------ */
+/* 생활 경제 상식 지표                                                    */
+/*                                                                     */
+/* 시세와 달리 1년에 한두 번 바뀌는, "우리 형편이 어느 정도인가"를 재는     */
+/* 숫자들이다. 매매 판단용이 아니라 뉴스에 나오는 말을 알아듣기 위한        */
+/* 배경 지식으로 따로 둔다.                                              */
+/* ------------------------------------------------------------------ */
+
+/** 나란히 놓고 비교하는 값 하나 (예: 한국 / 미국 / OECD 평균) */
+export interface BasicComparison {
+  label: string;
+  value: number | null;
+  precision: number;
+  suffix: string;
+  /** 비교의 중심이 되는 항목 — 화면에서 강조한다 */
+  primary?: boolean;
+}
+
+export interface EconomyBasic {
+  id: string;
+  /** 한국어 이름 (예: 빅맥지수) */
+  name: string;
+  /** 원어 이름 (예: Big Mac Index) */
+  englishName: string;
+  /** 대표 숫자. 값이 없으면 null — 0 으로 채우지 않는다 */
+  value: number | null;
+  /** 직전 발표치 */
+  previous: number | null;
+  precision: number;
+  suffix: string;
+  /** 대표 숫자를 한 문장으로 읽어 준 것 */
+  reading: string;
+  /** 나란히 놓고 보는 값들 */
+  comparisons: BasicComparison[];
+  /** 기준 시점 표기 (예: "2025년", "2025년 7월") */
+  asOfLabel: string;
+  /** 통계기관이 공식 발표하는 지표인지 */
+  official: boolean;
+  /** 공식 지표가 아닐 때 그 사실을 알리는 한 줄 */
+  officialNote?: string;
   meta: Meta;
 }
 
@@ -647,6 +692,7 @@ export interface SnapshotSections {
   quotes: Section<Record<MarketId, Quote[]>>;
   flows: Section<FlowSummary>;
   macro: Section<MacroIndicator[]>;
+  basics: Section<EconomyBasic[]>;
   risk: Section<RiskDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;

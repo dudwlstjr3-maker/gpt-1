@@ -123,6 +123,7 @@ export function DesktopSidebar() {
           {[
             { href: '/risk', label: '시장 위험 신호등' },
             { href: '/indicators', label: '경제·위험 지표 전체' },
+            { href: '/basics', label: '생활 경제 상식' },
             { href: '/alerts', label: '알림 설정' },
           ].map((s) => (
             <li key={s.href}>

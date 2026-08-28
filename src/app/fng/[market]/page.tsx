@@ -380,16 +380,15 @@ export default function FngDetailPage() {
             합계 {formatNumber(detail.components.reduce((a, c) => a + c.weight, 0), 0)}%
           </span>
         </div>
-        {/* 미국은 널리 알려진 7축과 같은 항목을 쓴다. 값을 가져오는 게 아니라는 점을 분명히 적는다. */}
-        {market === 'us' ? (
-          <div className="mb-2">
-            <Notice tone="neutral">
-              구성 항목 7가지는 CNN Fear &amp; Greed Index 가 공개한 축과 같은 것을 씁니다. 다만 점수는 그쪽 값을
-              가져오는 게 아니라 같은 성격의 데이터를 받아 이 앱이 직접 계산합니다(역사적 분포 백분위 → 가중평균).
-              그래서 같은 날 두 숫자가 다를 수 있고, 그게 정상입니다. 여기 숫자는 공식 지수가 아닙니다.
-            </Notice>
-          </div>
-        ) : null}
+        {/* 다른 공포·탐욕 지수를 참고해 무엇을 넣고 뺐는지 시장마다 적어 둔다.
+            어느 지수의 값도 가져오지 않는다는 점을 같이 밝힌다. */}
+        <div className="mb-2">
+          <Notice tone="neutral">
+            <strong className="font-semibold">이 목록은 이렇게 정했습니다.</strong> {detail.methodology.compositionNote}{' '}
+            점수는 다른 서비스의 값을 가져오는 게 아니라 같은 성격의 데이터를 받아 이 앱이 직접 계산합니다(역사적 분포
+            백분위 → 가중평균). 그래서 같은 날 두 숫자가 다를 수 있고, 그게 정상입니다.
+          </Notice>
+        </div>
 
         <div className="card overflow-hidden">
           <ul className="divide-y divide-[var(--border)]">

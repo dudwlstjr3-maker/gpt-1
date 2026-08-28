@@ -254,6 +254,18 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
+  /* -------- 생활 경제 상식 지표 -------- */
+  const basics = await section(
+    'basics',
+    `${ns}:basics`,
+    async () => {
+      const list = await adapter.getBasics(ctx);
+      return { data: list, meta: list[0]?.meta ?? nowMeta(now) };
+    },
+    now,
+    (d) => d.length === 0,
+  );
+
   /* -------- 캘린더 -------- */
   const calendar = await section(
     'calendar',
@@ -302,7 +314,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, risk, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, risk, calendar, news, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -387,6 +399,7 @@ function errorSections(now: Date, message: string): SnapshotSections {
     quotes: blankSection(now, 'error', message),
     flows: blankSection(now, 'error', message),
     macro: blankSection(now, 'error', message),
+    basics: blankSection(now, 'error', message),
     risk: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
@@ -401,6 +414,7 @@ function loadingSections(now: Date): SnapshotSections {
     quotes: blankSection(now, 'loading'),
     flows: blankSection(now, 'loading'),
     macro: blankSection(now, 'loading'),
+    basics: blankSection(now, 'loading'),
     risk: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),

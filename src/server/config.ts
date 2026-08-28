@@ -80,6 +80,7 @@ export const SECTION_TTL: Record<SectionKey, number> = {
   flows: 120_000,
   fng: 300_000,
   macro: 6 * 3600_000,
+  basics: 12 * 3600_000,
   risk: 120_000,
   calendar: 900_000,
   news: 300_000,
@@ -93,6 +94,8 @@ export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
   flows: 900_000,
   fng: 3 * 3600_000,
   macro: 48 * 3600_000,
+  // 연 단위로 발표되는 값이 섞여 있어 오래됐다고 판정하는 기준을 길게 둔다
+  basics: 30 * 24 * 3600_000,
   risk: 900_000,
   calendar: 6 * 3600_000,
   news: 3 * 3600_000,

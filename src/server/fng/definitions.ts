@@ -8,7 +8,7 @@
 
 import type { DataSource, MarketId } from '@/types';
 
-export const FORMULA_VERSION = 'v2.0.0';
+export const FORMULA_VERSION = 'v2.1.0';
 
 /** 미국·한국은 252거래일, 크립토는 365일(연중무휴) 분포를 쓴다. */
 export const LOOKBACK: Record<MarketId, number> = {
@@ -62,6 +62,7 @@ const S = {
   coingecko: src('CoinGecko API', 'https://www.coingecko.com/en/api', 5, '무료 티어 rate limit 준수, 출처 표기'),
   binance: src('Binance 공개 API', 'https://binance-docs.github.io', 1, '공개 마켓 데이터 엔드포인트'),
   coinglass: src('파생상품 집계 API', 'https://www.coinglass.com', 15, '제공사 약관에 따른 사용'),
+  trends: src('검색 관심도 공개 API', 'https://trends.google.com', 1440, '공개 지수 이용약관 준수, 원시 데이터 재배포 금지'),
   news: src('뉴스 RSS/공개 API', '', 30, '헤드라인·링크만 사용, 전문 재배포 금지'),
 };
 
@@ -224,14 +225,16 @@ const KR_COMPONENTS: ComponentDef[] = [
   },
   {
     id: 'kr_credit_kosdaq',
-    label: '신용잔고와 KOSDAQ 상대 강도',
+    label: '신용잔고 · 투자자예탁금 · KOSDAQ 상대 강도',
     weight: 10,
-    description: '신용융자잔고 증감과 KOSDAQ 의 KOSPI 대비 상대강도로 위험선호를 본다.',
+    description:
+      '빚내서 사는 돈(신용융자잔고), 증권계좌에 들어와 대기 중인 돈(투자자예탁금), 그리고 KOSDAQ 의 KOSPI 대비 상대강도로 위험선호를 본다. 투자자예탁금은 국내 시장에서 오래 쓰인 대기 매수 자금 지표라 넣었다.',
     subMetrics: [
-      { id: 'kr_margin_chg_20d', label: '신용융자잔고 20일 증감률', weight: 50, invert: false, precision: 2, suffix: '%', hint: '증가 = 위험선호' },
-      { id: 'kosdaq_rel_kospi_60d', label: 'KOSDAQ 상대강도 (60일)', weight: 50, invert: false, precision: 2, suffix: '%p', hint: 'KOSDAQ - KOSPI 60일 수익률' },
+      { id: 'kr_margin_chg_20d', label: '신용융자잔고 20일 증감률', weight: 35, invert: false, precision: 2, suffix: '%', hint: '증가 = 위험선호' },
+      { id: 'kr_deposit_chg_20d', label: '투자자예탁금 20일 증감률', weight: 35, invert: false, precision: 2, suffix: '%', hint: '증가 = 대기 매수 자금 유입' },
+      { id: 'kosdaq_rel_kospi_60d', label: 'KOSDAQ 상대강도 (60일)', weight: 30, invert: false, precision: 2, suffix: '%p', hint: 'KOSDAQ - KOSPI 60일 수익률' },
     ],
-    plannedSources: [S.krx],
+    plannedSources: [S.krx, S.ecos],
   },
 ];
 
@@ -255,7 +258,7 @@ const CRYPTO_COMPONENTS: ComponentDef[] = [
   {
     id: 'cr_volatility',
     label: '변동성·고점 대비 낙폭',
-    weight: 15,
+    weight: 18,
     description: 'BTC 30일 실현변동성과 사상 최고가 대비 낙폭.',
     subMetrics: [
       { id: 'btc_vol_30d', label: 'BTC 30일 실현변동성', weight: 50, invert: true, precision: 1, suffix: '%', hint: '연율화' },
@@ -266,7 +269,7 @@ const CRYPTO_COMPONENTS: ComponentDef[] = [
   {
     id: 'cr_ma_breadth',
     label: '주요 코인의 이동평균 상회 비율',
-    weight: 15,
+    weight: 12,
     description: '시가총액 상위 50개 코인 중 50일 이동평균을 상회하는 비율.',
     subMetrics: [
       { id: 'top50_above_ma50', label: '상위 50개 코인 50일선 상회 비율', weight: 100, invert: false, precision: 1, suffix: '%', hint: '시총 상위 50 기준' },
@@ -298,7 +301,7 @@ const CRYPTO_COMPONENTS: ComponentDef[] = [
   {
     id: 'cr_stablecoin',
     label: '스테이블코인 및 온체인 자금 흐름',
-    weight: 10,
+    weight: 8,
     description: '스테이블코인 시가총액 증감과 거래소 순유입. 거래소로 코인이 들어오면 매도 대기 물량으로 본다.',
     subMetrics: [
       { id: 'stable_mcap_chg_30d', label: '스테이블코인 시총 30일 증감률', weight: 55, invert: false, precision: 2, suffix: '%', hint: '증가 = 대기 매수 여력' },
@@ -318,16 +321,42 @@ const CRYPTO_COMPONENTS: ComponentDef[] = [
     plannedSources: [S.coingecko],
   },
   {
-    id: 'cr_news',
-    label: '출처가 명확한 뉴스·검색 심리',
-    weight: 5,
-    description: '출처가 확인된 뉴스 헤드라인의 긍/부정 비율. 근거가 부족하면 결측 처리한다.',
+    id: 'cr_attention',
+    label: '검색 관심도와 뉴스 심리',
+    weight: 7,
+    description:
+      '"비트코인"류 검색어의 관심도와, 출처가 확인된 뉴스 헤드라인의 긍/부정 비율. 관심이 몰릴수록 탐욕 쪽으로 본다. 근거가 부족하면 결측 처리한다.',
     subMetrics: [
-      { id: 'news_sentiment', label: '뉴스 심리 지수', weight: 100, invert: false, precision: 1, suffix: '', hint: '헤드라인 긍정 비율 기반' },
+      { id: 'search_trend', label: '검색 관심도', weight: 60, invert: false, precision: 1, suffix: '', hint: '주요 검색어의 상대 관심도 0~100' },
+      { id: 'news_sentiment', label: '뉴스 심리 지수', weight: 40, invert: false, precision: 1, suffix: '', hint: '헤드라인 긍정 비율 기반' },
     ],
-    plannedSources: [S.news],
+    plannedSources: [S.trends, S.news],
   },
 ];
+
+/* ------------------------------------------------------------------ */
+/* 구성 항목을 정할 때 무엇을 참고했나                                     */
+/*                                                                     */
+/* 다른 공포·탐욕 지수들이 공개한 방법론을 훑어보고, 우리 목록에 빠진 것과   */
+/* 굳이 넣을 필요가 없는 것을 정리한 결과를 그대로 적어 둔다.               */
+/* 어느 지수의 숫자도 가져오지 않는다. 참고한 것은 "무엇을 보는가"뿐이다.    */
+/* ------------------------------------------------------------------ */
+
+export const COMPOSITION_NOTES: Record<MarketId, string> = {
+  us:
+    '미국은 널리 알려진 7가지 축(모멘텀·주가 강도·주가 폭·풋/콜·변동성·안전자산 선호·정크본드 수요)을 그대로 씁니다. ' +
+    '개인투자자 설문 심리(AAII)나 운용사 노출도(NAAIM) 같은 설문 지표도 검토했지만, 재배포 조건이 명확하지 않아 넣지 않았습니다. ' +
+    '숫자는 이 앱이 직접 계산한 값이며 공식 지수가 아닙니다.',
+  kr:
+    '한국은 공표된 표준 공포·탐욕 지수가 없어, 국내에서 오래 쓰인 심리 지표들을 모았습니다. ' +
+    '수급(외국인·기관), 변동성(VKOSPI), 시장 폭, 파생 풋/콜, 환율에 더해 신용융자잔고와 투자자예탁금을 함께 봅니다. ' +
+    '예탁금은 "증권계좌에 들어와 아직 안 쓴 돈"이라 국내 대기 매수 자금을 읽는 데 오래 쓰여 온 지표입니다.',
+  crypto:
+    '크립토는 공개된 코인 공포·탐욕 지수들이 공통으로 쓰는 축(변동성, 모멘텀·거래량, 도미넌스, 검색 관심도)을 기준으로 맞췄습니다. ' +
+    '빠져 있던 검색 관심도를 새로 넣고, 다른 지수들이 가장 무겁게 두는 변동성 비중을 올렸습니다. ' +
+    '대신 파생(펀딩비·미결제약정·청산)과 스테이블코인·거래소 유출입처럼 코인 시장에서만 볼 수 있는 항목은 그대로 둡니다. ' +
+    'SNS 게시물 수를 세는 방식은 봇 계정을 걸러낼 방법이 없어 넣지 않았습니다.',
+};
 
 export const COMPONENTS: Record<MarketId, ComponentDef[]> = {
   us: US_COMPONENTS,

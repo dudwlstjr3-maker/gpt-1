@@ -12,6 +12,7 @@ import { buildEventMarkers } from '@/server/fng/events';
 import {
   COVERAGE_RULE_TEXT,
   FORMULA_VERSION,
+  COMPOSITION_NOTES,
   METHODOLOGY_STEPS,
   SCALE_WARNING,
   WINSOR_TEXT,
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mark
             winsorization: WINSOR_TEXT,
             coverageRule: COVERAGE_RULE_TEXT,
             scaleWarning: SCALE_WARNING,
+            compositionNote: COMPOSITION_NOTES[market],
           },
         };
       },

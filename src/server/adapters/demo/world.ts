@@ -293,6 +293,9 @@ function generate(todayKey: string): DemoWorld {
   const instDaily = krRisk.map((r) => Math.round(r * 190000 + g() * 1900));
   const indivDaily = foreignDaily.map((f, i) => -(f + instDaily[i]) + Math.round(g() * 700));
   const marginBalance = ouSeries(n, g, { start: 185000, mean: 190000, kappa: 0.006, sigma: 900, min: 120000, max: 280000 }, (i) => 260000 * krRisk[i]);
+  // 투자자예탁금 — 증권계좌에 들어와 아직 쓰이지 않은 대기 자금(억원).
+  // 위험선호가 살아날 때 늘고, 겁이 나면 빠져나간다. 신용잔고보다 느리게 움직인다.
+  const investorDeposit = ouSeries(n, g, { start: 512000, mean: 545000, kappa: 0.005, sigma: 2600, min: 360000, max: 820000 }, (i) => 620000 * krRisk[i]);
   const krPcr = ouSeries(n, g, { start: 0.9, mean: 0.92, kappa: 0.08, sigma: 0.055, min: 0.42, max: 1.9 }, (i) => -11 * krRisk[i]);
 
   /* ---------- 크립토 (일 단위) ---------- */
@@ -337,6 +340,17 @@ function generate(todayKey: string): DemoWorld {
   const exchangeNetflow = cRiskRet.map((r) => -r * 42000 + cg() * 1300);
   const altBreadth = cRiskRet.map((r, i) => clamp(50 + r * 1250 + cg() * 7 - (btcDom[i] - 53.5) * 1.6, 2, 98));
   const newsSent = ouSeries(cn, cg, { start: 52, mean: 51, kappa: 0.06, sigma: 5.5, min: 5, max: 95 }, (i) => 620 * cRiskRet[i]);
+  // 검색 관심도 0~100 — 급등에는 크게, 급락에는 그보다 작게 반응하는 비대칭 구조로 둔다.
+  // 사람들이 검색창을 두드리는 건 대개 값이 튀어오를 때이기 때문이다.
+  const searchTrend: number[] = new Array(cn);
+  {
+    let lv = 26;
+    for (let i = 0; i < cn; i += 1) {
+      const r = cRiskRet[i];
+      lv = clamp(lv + 0.045 * (25 - lv) + (r > 0 ? r * 880 : r * 300) + 1.7 * cg(), 2, 100);
+      searchTrend[i] = lv;
+    }
+  }
 
   /* ------------------------------------------------------------------ */
   /* 파생 지표                                                            */
@@ -429,6 +443,7 @@ function generate(todayKey: string): DemoWorld {
     usdkrw_ret_20d: pctChangeSeries(usdkrw, 20),
     usdkrw_vol_20d: realizedVolSeries(usdkrw, 20),
     kr_margin_chg_20d: pctChangeSeries(marginBalance, 20),
+    kr_deposit_chg_20d: pctChangeSeries(investorDeposit, 20),
     kosdaq_rel_kospi_60d: relativeStrengthSeries(kosdaq, kospi, 60),
   };
 
@@ -458,6 +473,7 @@ function generate(todayKey: string): DemoWorld {
     exchange_netflow_14d: rollingSum(exchangeNetflow, 14),
     btc_dom_chg_30d: diffSeries(btcDom, 30),
     alt_breadth: altBreadth,
+    search_trend: searchTrend,
     news_sentiment: newsSent,
   };
 
@@ -490,14 +506,14 @@ function generate(todayKey: string): DemoWorld {
     nvda, aapl, msft, amzn, tsla,
     kospi, kosdaq, kospi200, vkospi, usdkrw, ktb3, ktb10,
     samsung, hynix, hyundai, naver, kakao,
-    hyOas, pcr, marginBalance, krPcr,
+    hyOas, pcr, marginBalance, investorDeposit, krPcr,
     foreignDaily, instDaily, indivDaily,
     cyc, def,
   };
 
   const c: Record<string, number[]> = {
     btc, eth, xrp, sol, bnb, totalMcap, totalVol, btcDom, stableMcap,
-    funding, openInterest, liquidations, longLiqShare, altBreadth,
+    funding, openInterest, liquidations, longLiqShare, altBreadth, searchTrend,
   };
 
   for (const [id, arr] of Object.entries(s)) registerIntraday(id, arr, 8, 64);

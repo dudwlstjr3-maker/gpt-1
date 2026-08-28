@@ -297,9 +297,92 @@ async function main() {
     }
   }
 
+  /* ---------------- 7-5. 다른 지수를 참고한 구성 변경 ---------------- */
+  console.log('\n[7-5] 구성요소 검토 (다른 공포·탐욕 지수 참고)');
+  {
+    const want = {
+      us: { comps: 7, must: [], missing: [] },
+      kr: { comps: 7, must: ['kr_deposit_chg_20d'], missing: [] },
+      crypto: { comps: 8, must: ['search_trend', 'news_sentiment'], missing: [] },
+    };
+    for (const m of ['us', 'kr', 'crypto']) {
+      const { body } = await getJson(`/api/fng/${m}`);
+      const d = body.detail;
+      const comps = d?.components ?? [];
+      const subIds = comps.flatMap((c) => c.subMetrics.map((s) => s.id));
+      check(`[${m}] 구성요소 ${want[m].comps}개`, comps.length === want[m].comps, `${comps.length}개`);
+      for (const id of want[m].must) {
+        check(`[${m}] ${id} 포함`, subIds.includes(id));
+      }
+      const note = d?.methodology?.compositionNote;
+      check(`[${m}] 구성 근거 메모 제공`, typeof note === 'string' && note.length > 40, `${note?.length ?? 0}자`);
+      check(
+        `[${m}] 외부 지수를 복제한다고 말하지 않음`,
+        typeof note === 'string' && !/복제|그대로 가져|공식 지수입니다/.test(note),
+      );
+    }
+    // 크립토는 검색 관심도가 새로 들어간 자리다
+    const { body: cb } = await getJson('/api/fng/crypto');
+    const attn = (cb.detail?.components ?? []).find((c) => c.id === 'cr_attention');
+    check('[crypto] 검색 관심도 구성요소 존재', !!attn, attn ? `${attn.weight}%` : '없음');
+    if (attn) {
+      const w = attn.subMetrics.reduce((a, s) => a + s.weight, 0);
+      check('[crypto] 검색 관심도 하위 가중치 합 100', Math.abs(w - 100) < 0.001, `합계=${w}`);
+    }
+  }
+
+  /* ---------------- 9. 생활 경제 상식 지표 ---------------- */
+  console.log('\n[9] 생활 경제 상식 지표');
+  {
+    const basics = snap.sections?.basics;
+    check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
+    const list = basics?.data ?? [];
+    check('지표 6개', list.length === 6, `${list.map((b) => b.id).join(', ')}`);
+
+    const wanted = ['per_capita_gdp', 'bigmac', 'latte', 'ppp_gap', 'engel', 'ccsi'];
+    for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
+
+    for (const b of list) {
+      check(
+        `[${b.id}] 값이 유한수이거나 결측(null)`,
+        b.value === null || Number.isFinite(b.value),
+        `value=${b.value}`,
+      );
+      check(`[${b.id}] 해석 문장 제공`, typeof b.reading === 'string' && b.reading.length > 10);
+      check(`[${b.id}] 기준 시점 표기`, typeof b.asOfLabel === 'string' && b.asOfLabel.length > 0, b.asOfLabel);
+      check(`[${b.id}] 비교값 제공`, Array.isArray(b.comparisons) && b.comparisons.length >= 2);
+      if (b.official === false) {
+        check(`[${b.id}] 비공식 개념이면 그 사실을 적음`, typeof b.officialNote === 'string' && b.officialNote.length > 10);
+      }
+    }
+
+    // 투자 권유로 읽힐 표현이 섞이지 않았는지
+    const allText = JSON.stringify(list);
+    check(
+      '매수·매도·수익 보장 표현 없음',
+      !/매수하|매도하|사야|팔아야|수익을 보장|반드시 오른/.test(allText),
+    );
+  }
+
+  /* ---------------- 9-1. 결측을 0 으로 채우지 않는다 ---------------- */
+  console.log('\n[9-1] 결측 처리 (scenario=partial)');
+  {
+    const { body: pb } = await getJson('/api/snapshot?scenario=partial');
+    const list = pb.sections?.basics?.data ?? [];
+    const broken = list.filter((b) => b.value === null);
+    check('부분 실패 시 결측 항목이 생김', broken.length > 0, `${broken.map((b) => b.id).join(', ') || '없음'}`);
+    for (const b of broken) {
+      check(`[${b.id}] 결측을 0 으로 채우지 않음`, b.value === null && b.previous === null);
+      check(`[${b.id}] 비교값도 0 으로 채우지 않음`, b.comparisons.every((c) => c.value === null));
+      check(`[${b.id}] 결측 사유를 남김`, typeof b.reading === 'string' && b.reading.length > 0);
+    }
+    const { body: eb } = await getJson('/api/snapshot?scenario=empty');
+    check('빈값 시나리오에서 basics 가 empty', eb.sections?.basics?.status === 'empty', eb.sections?.basics?.status);
+  }
+
   /* ---------------- 8. 시장별 분리 화면 ---------------- */
   console.log('\n[8] 시장별 분리 화면');
-  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk', '/fng/us']) {
+  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk', '/fng/us', '/basics', '/indicators']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
     check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);

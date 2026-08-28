@@ -19,6 +19,7 @@ import type { EngineInput } from '@/server/fng/engine';
 import type {
   CalendarEvent,
   DataSource,
+  EconomyBasic,
   FlowSummary,
   MacroIndicator,
   MarketId,
@@ -117,6 +118,20 @@ export class LiveAdapter implements MarketAdapter {
   /** TODO(연결지점 5): FRED / ECOS 등 거시지표. riskLevel 판정 기준은 팀 정책에 맞게 조정. */
   async getMacro(_ctx: AdapterContext): Promise<MacroIndicator[]> {
     throw new NotWiredError('거시·위험 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getMacro');
+  }
+
+  /* ------------------------ 생활 경제 상식 지표 ------------------------ */
+  /**
+   * TODO(연결지점 5-2): 1인당 GDP, 빅맥지수, PPP 환율, 엥겔계수, 소비자심리지수.
+   *
+   * 출처 후보: World Bank / IMF WEO / OECD PPP / 통계청 가계동향 / 한국은행 ECOS.
+   * 빅맥지수 원자료는 이코노미스트가 공개하지만 재배포 조건을 반드시 확인한다.
+   * 라떼(스타벅스)지수는 공식 발표 기관이 없으므로 직접 조사한 값만 쓰고
+   * official: false 로 내려보내 화면에 "공식 지수 아님"이 뜨게 한다.
+   * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다. 없는 값은 null 이다.
+   */
+  async getBasics(_ctx: AdapterContext): Promise<EconomyBasic[]> {
+    throw new NotWiredError('생활 경제 상식 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');
   }
 
   /* ---------------------------- 캘린더 ---------------------------- */

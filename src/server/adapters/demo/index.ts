@@ -15,6 +15,7 @@ import { clamp, round } from '@/lib/stats';
 import type {
   CalendarEvent,
   DataSource,
+  EconomyBasic,
   EventCategory,
   EventImportance,
   FlowSummary,
@@ -734,6 +735,12 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
       { level: 'normal', note: '1배 부근' }, metaKr),
     mk('kospi_div', 'KOSPI 배당수익률', '한국', 2.05, 2.08, 'percent', 2, false,
       { level: 'normal', note: '' }, metaKr),
+    mk('kr_investor_deposit', '투자자예탁금', '한국',
+      round(s.investorDeposit[i] / 10000, 1), round(s.investorDeposit[i - 1] / 10000, 1), 'count', 1, false,
+      s.investorDeposit[i] < s.investorDeposit[i - 20]
+        ? { level: 'watch', note: '대기 매수 자금 감소 추세' }
+        : { level: 'normal', note: '증권계좌에 들어와 아직 쓰이지 않은 돈' }, metaKr, '조원',
+      sparkOf(s.investorDeposit, d, 1 / 10000)),
     mk('crypto_mcap', '크립토 전체 시가총액', '크립토', round(c.totalMcap[ci] / 1e9, 1), round(c.totalMcap[ci - 1] / 1e9, 1), 'usd_bn', 1, false,
       { level: 'normal', note: '' }, metaCr, undefined, sparkOf(c.totalMcap, cd, 1 / 1e9)),
     mk('btc_dom', 'BTC 도미넌스', '크립토', round(c.btcDom[ci], 2), round(c.btcDom[ci - 1], 2), 'percent', 2, false,
@@ -751,6 +758,229 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
         : vkospiNow > 19
           ? { level: 'watch', note: '경계 구간' }
           : { level: 'normal', note: '안정 구간' }, metaKr, undefined, sparkOf(s.vkospi, d)),
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/* 생활 경제 상식 지표                                                    */
+/*                                                                     */
+/* 시세가 아니라 "우리 형편이 어느 정도인가"를 재는 숫자들이다.            */
+/* 발표 주기가 제각각이라 previous 는 지표마다 다른 시점에서 가져온다.     */
+/* 환율이 걸린 값은 DEMO 월드의 USD/KRW 에서 계산해 화면 안에서 앞뒤가     */
+/* 맞도록 했다. 실제 발표치가 아니라 합성값이라는 점은 출처에 적혀 있다.   */
+/* ------------------------------------------------------------------ */
+
+/** DEMO 에서 쓰는 고정 가격표 — 실제 판매가가 아니라 계산 예시용 수치다. */
+const BASIC_PRICES = {
+  bigmacKrw: 5500,
+  bigmacUsd: 5.79,
+  latteKrw: 5000,
+  latteUsd: 4.95,
+  /** OECD 가 계산하는 한국 구매력평가 환율 수준대 */
+  pppKrwPerUsd: 891,
+  /** 1인당 명목 GDP (원). 달러 환산은 그날 환율로 한다 */
+  krGdpPerCapitaKrw: 49_200_000,
+  usGdpPerCapitaUsd: 89_100,
+  jpGdpPerCapitaUsd: 34_600,
+  oecdGdpPerCapitaUsd: 47_200,
+} as const;
+
+/** partial 시나리오에서 값이 비는 항목 — 공식 발표 기관이 없는 것부터 빠진다 */
+const PARTIAL_BROKEN_BASICS = new Set(['latte']);
+
+function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
+  const s = world.s;
+  const i = world.dates.length - 1;
+  /** 발표 주기에 맞춰 과거 시점을 고른다 (거래일 기준) */
+  const at = (backDays: number) => Math.max(0, i - backDays);
+  const fx = (k: number) => s.usdkrw[k];
+
+  const meta = makeMeta(ctx, 'kr');
+  const broken = ctx.scenario === 'partial';
+
+  /** 원화가 기준 환율보다 몇 % 싸게 거래되는가 (음수 = 저평가) */
+  const undervalued = (impliedKrwPerUsd: number, k: number) => (impliedKrwPerUsd / fx(k) - 1) * 100;
+
+  const won = (v: number) => `${Math.round(v).toLocaleString('ko-KR')}원`;
+  /** 부호를 문장으로 풀어 준다. "-28.8% 어긋나 있다"는 읽히지 않는다. */
+  const gapWords = (v: number) =>
+    v < 0
+      ? `원화가 ${round(Math.abs(v), 1)}% 싸게 거래되고 있다`
+      : `원화가 ${round(v, 1)}% 비싸게 거래되고 있다`;
+
+  const mk = (
+    id: string,
+    name: string,
+    englishName: string,
+    value: number | null,
+    previous: number | null,
+    precision: number,
+    suffix: string,
+    reading: string,
+    comparisons: EconomyBasic['comparisons'],
+    asOfLabel: string,
+    official: boolean,
+    officialNote?: string,
+  ): EconomyBasic => {
+    const missing = broken && PARTIAL_BROKEN_BASICS.has(id);
+    return {
+      id,
+      name,
+      englishName,
+      value: missing ? null : value,
+      previous: missing ? null : previous,
+      precision,
+      suffix,
+      reading: missing ? '이번 갱신에서 값을 받지 못했습니다. 빈 값을 임의로 채우지 않습니다.' : reading,
+      comparisons: missing ? comparisons.map((c) => ({ ...c, value: null })) : comparisons,
+      asOfLabel,
+      official,
+      ...(officialNote ? { officialNote } : {}),
+      meta: missing ? { ...meta, notes: [`${name} 값을 받지 못했습니다.`] } : meta,
+    };
+  };
+
+  /* ---------- 1인당 GDP ---------- */
+  const krGdpNow = BASIC_PRICES.krGdpPerCapitaKrw / fx(i);
+  const krGdpPrev = BASIC_PRICES.krGdpPerCapitaKrw / fx(at(250));
+
+  /* ---------- 빅맥 · 라떼 · PPP ---------- */
+  const bigmacRate = BASIC_PRICES.bigmacKrw / BASIC_PRICES.bigmacUsd;
+  const latteRate = BASIC_PRICES.latteKrw / BASIC_PRICES.latteUsd;
+  const bigmacNow = undervalued(bigmacRate, i);
+  const latteNow = undervalued(latteRate, i);
+  const pppNow = undervalued(BASIC_PRICES.pppKrwPerUsd, i);
+
+  /* ---------- 소비자심리지수 ---------- */
+  const ccsiAt = (k: number) => {
+    const base = s.kospi[Math.max(0, k - 60)];
+    const ret60 = base > 0 ? (s.kospi[k] / base - 1) * 100 : 0;
+    return clamp(97.5 + ret60 * 0.62 - Math.max(0, (s.usdkrw[k] - 1380) / 22), 62, 124);
+  };
+
+  return [
+    mk(
+      'per_capita_gdp',
+      '1인당 GDP',
+      'GDP per capita',
+      round(krGdpNow, 0),
+      round(krGdpPrev, 0),
+      0,
+      '달러',
+      `한국은 1인당 약 ${Math.round(krGdpNow).toLocaleString('ko-KR')}달러입니다. 미국의 ${round(
+        (krGdpNow / BASIC_PRICES.usGdpPerCapitaUsd) * 100,
+        0,
+      )}% 수준이며, 원화로는 약 ${(BASIC_PRICES.krGdpPerCapitaKrw / 10000).toLocaleString('ko-KR')}만원입니다. 달러 환산액이라 환율이 오르면 그것만으로도 줄어듭니다.`,
+      [
+        { label: '한국', value: round(krGdpNow, 0), precision: 0, suffix: '달러', primary: true },
+        { label: '미국', value: BASIC_PRICES.usGdpPerCapitaUsd, precision: 0, suffix: '달러' },
+        { label: '일본', value: BASIC_PRICES.jpGdpPerCapitaUsd, precision: 0, suffix: '달러' },
+        { label: 'OECD 평균', value: BASIC_PRICES.oecdGdpPerCapitaUsd, precision: 0, suffix: '달러' },
+      ],
+      '연 1회 발표 · 직전 값은 1년 전',
+      true,
+    ),
+
+    mk(
+      'bigmac',
+      '빅맥지수',
+      'Big Mac Index',
+      round(bigmacNow, 1),
+      round(undervalued(bigmacRate, at(120)), 1),
+      1,
+      '%',
+      `빅맥 값으로 계산한 환율은 ${won(bigmacRate)}인데 시장 환율은 ${won(
+        fx(i),
+      )}입니다. 빅맥으로 재보면 ${gapWords(bigmacNow)}는 뜻입니다. 표에 적힌 숫자가 마이너스면 그만큼 싸다는 의미입니다.`,
+      [
+        { label: '한국 빅맥', value: BASIC_PRICES.bigmacKrw, precision: 0, suffix: '원', primary: true },
+        { label: '미국 빅맥', value: BASIC_PRICES.bigmacUsd, precision: 2, suffix: '달러' },
+        { label: '빅맥 환율', value: round(bigmacRate, 0), precision: 0, suffix: '원/달러' },
+        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
+      ],
+      '연 2회 발표 · 직전 값은 약 6개월 전',
+      true,
+    ),
+
+    mk(
+      'latte',
+      '스타벅스 라떼지수',
+      'Latte Index',
+      round(latteNow, 1),
+      round(undervalued(latteRate, at(120)), 1),
+      1,
+      '%',
+      `톨 사이즈 라떼 값으로 계산한 환율은 ${won(latteRate)}입니다. 시장 환율 ${won(
+        fx(i),
+      )}과 견주면 ${gapWords(latteNow)}는 뜻입니다. 빅맥지수와 숫자가 다른 것이 정상이며, 그 차이가 품목 하나로 물가를 재는 일의 한계를 보여줍니다.`,
+      [
+        { label: '서울 라떼', value: BASIC_PRICES.latteKrw, precision: 0, suffix: '원', primary: true },
+        { label: '뉴욕 라떼', value: BASIC_PRICES.latteUsd, precision: 2, suffix: '달러' },
+        { label: '라떼 환율', value: round(latteRate, 0), precision: 0, suffix: '원/달러' },
+        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
+      ],
+      '정기 발표 없음 · 조사 시점 기준',
+      false,
+      '어느 기관도 공식 발표하지 않는 비공식 개념입니다. 매장·시점에 따라 값이 달라집니다.',
+    ),
+
+    mk(
+      'ppp_gap',
+      '구매력평가(PPP) 환율 괴리',
+      'PPP exchange rate gap',
+      round(pppNow, 1),
+      round(undervalued(BASIC_PRICES.pppKrwPerUsd, at(250)), 1),
+      1,
+      '%',
+      `물가 바구니로 계산한 적정 환율은 ${won(BASIC_PRICES.pppKrwPerUsd)}인데 시장 환율은 ${won(
+        fx(i),
+      )}입니다. 물가로 재보면 ${gapWords(pppNow)}는 뜻이며, 빅맥 하나 대신 수백 개 품목으로 계산했다는 점이 빅맥지수와 다릅니다.`,
+      [
+        { label: 'PPP 환율', value: BASIC_PRICES.pppKrwPerUsd, precision: 0, suffix: '원/달러', primary: true },
+        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
+        { label: '빅맥 환율', value: round(bigmacRate, 0), precision: 0, suffix: '원/달러' },
+      ],
+      '연 1회 갱신 · 직전 값은 1년 전',
+      true,
+    ),
+
+    mk(
+      'engel',
+      '엥겔계수',
+      'Engel coefficient',
+      12.9,
+      12.6,
+      1,
+      '%',
+      '가구가 쓰는 돈 100원 가운데 약 13원이 식료품·비주류음료에 들어갑니다. 낮을수록 먹거리 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다.',
+      [
+        { label: '한국', value: 12.9, precision: 1, suffix: '%', primary: true },
+        { label: '미국', value: 6.7, precision: 1, suffix: '%' },
+        { label: '일본', value: 26.2, precision: 1, suffix: '%' },
+      ],
+      '연 1회 발표 · 직전 값은 1년 전',
+      true,
+    ),
+
+    mk(
+      'ccsi',
+      '소비자심리지수',
+      'CCSI',
+      round(ccsiAt(i), 1),
+      round(ccsiAt(at(20)), 1),
+      1,
+      '',
+      ccsiAt(i) >= 100
+        ? `${round(ccsiAt(i), 1)}로 기준선 100을 넘습니다. 살림살이와 앞날을 과거 평균보다 낙관적으로 보는 가구가 더 많다는 뜻입니다.`
+        : `${round(ccsiAt(i), 1)}로 기준선 100을 밑돕니다. 살림살이와 앞날을 과거 평균보다 비관적으로 보는 가구가 더 많다는 뜻입니다.`,
+      [
+        { label: '이번 달', value: round(ccsiAt(i), 1), precision: 1, suffix: '', primary: true },
+        { label: '지난달', value: round(ccsiAt(at(20)), 1), precision: 1, suffix: '' },
+        { label: '기준선', value: 100, precision: 0, suffix: '' },
+      ],
+      '매월 발표 · 직전 값은 한 달 전',
+      true,
+    ),
   ];
 }
 
@@ -859,6 +1089,11 @@ export class DemoAdapter implements MarketAdapter {
   async getMacro(ctx: AdapterContext): Promise<MacroIndicator[]> {
     if (ctx.scenario === 'empty') return [];
     return buildMacro(getWorld(ctx.now), ctx);
+  }
+
+  async getBasics(ctx: AdapterContext): Promise<EconomyBasic[]> {
+    if (ctx.scenario === 'empty') return [];
+    return buildBasics(getWorld(ctx.now), ctx);
   }
 
   async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {

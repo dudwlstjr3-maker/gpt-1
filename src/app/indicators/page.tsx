@@ -2,6 +2,7 @@
 
 /** 경제·위험 지표 전체 — 홈에서 요약한 항목의 상세 화면. */
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
@@ -100,10 +101,19 @@ export default function IndicatorsPage() {
 
   return (
     <div className="pt-2 pb-4">
-      <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
+      <div className="flex items-center justify-between gap-2 px-3 pt-1">
+        <h1 className="text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
+        <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+          생활 경제 상식 →
+        </Link>
+      </div>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
         고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐
-        아니라 기호·텍스트로도 표시됩니다.
+        아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는{' '}
+        <Link href="/basics" className="font-semibold text-accent hover:underline">
+          생활 경제 상식
+        </Link>{' '}
+        화면에 따로 모았습니다.
       </p>
 
       <div className="mt-2 px-3">
@@ -169,7 +179,7 @@ export default function IndicatorsPage() {
                           </div>
                           <div className="shrink-0 text-right">
                             <p className="tnum text-[15px] font-bold text-fg-strong">
-                              {formatMacroValue(m.value, m.precision, m.unit)}
+                              {formatMacroValue(m.value, m.precision, m.unit, m.suffix)}
                             </p>
                             <p className="tnum text-[10px] text-muted">
                               <span aria-hidden="true">{TREND_GLYPH[m.trend]}</span>{' '}

@@ -156,9 +156,16 @@ export function StatTile({
   );
 }
 
-export function formatMacroValue(value: number | null, precision: number, unit: string): string {
+export function formatMacroValue(
+  value: number | null,
+  precision: number,
+  unit: string,
+  suffix?: string,
+): string {
   if (value === null) return NO_VALUE;
   const n = formatNumber(value, precision);
+  // 지표가 자기 단위를 직접 들고 오면(조원, 개, 잔 …) 그걸 그대로 쓴다.
+  if (suffix) return `${n}${suffix}`;
   if (unit === 'percent') return `${n}%`;
   if (unit === 'bp') return `${n}bp`;
   if (unit === 'usd_bn') return `$${formatNumber(value / 1000, 2)}T`;

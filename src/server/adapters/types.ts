@@ -9,6 +9,7 @@ import type {
   CalendarEvent,
   DataMode,
   DemoScenario,
+  EconomyBasic,
   FlowSummary,
   MacroIndicator,
   MarketId,
@@ -51,6 +52,9 @@ export interface MarketAdapter {
 
   /** 거시·위험 지표 */
   getMacro(ctx: AdapterContext): Promise<MacroIndicator[]>;
+
+  /** 생활 경제 상식 지표 (1인당 GDP, 빅맥지수 등) */
+  getBasics(ctx: AdapterContext): Promise<EconomyBasic[]>;
 
   /** 경제 캘린더 */
   getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]>;

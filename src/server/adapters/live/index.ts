@@ -24,6 +24,8 @@ import type {
   MacroIndicator,
   MarketId,
   NewsItem,
+  PredictionDigest,
+  PredictionMarket,
   Quote,
   RangeKey,
   SeriesPoint,
@@ -134,6 +136,57 @@ export class LiveAdapter implements MarketAdapter {
     throw new NotWiredError('생활 경제 상식 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');
   }
 
+  /* --------------------------- 예측시장 --------------------------- */
+  /**
+   * 폴리마켓 Gamma API — 거래량 상위 시장 몇 개.
+   *
+   * 다른 연결지점과 달리 **API 키가 필요 없어 실제로 구현해 뒀다.**
+   * 다만 이 저장소를 만든 환경에서는 polymarket.com 으로 나가는 통신이
+   * 막혀 있어 **응답 필드 이름을 실제 호출로 확인하지 못했다.** 문서에 적힌
+   * 모양(question / outcomes / outcomePrices / volume24hr / endDate /
+   * oneDayPriceChange)을 기준으로 썼고, 값이 예상과 다르면 조용히 추측해
+   * 채우지 않고 그 시장만 결측 처리한다. 처음 붙일 때 응답 한 건을 찍어 보고
+   * 필드명을 확인하는 것을 권한다.
+   *
+   * 엔드포인트는 POLYMARKET_API_BASE 로 바꿀 수 있다.
+   * 약관상 표시 조건이 바뀌면 delayMinutes / terms 를 함께 고친다.
+   */
+  async getPrediction(_ctx: AdapterContext): Promise<PredictionDigest> {
+    const base = envUrl('POLYMARKET_API_BASE') ?? 'https://gamma-api.polymarket.com';
+    const limit = Number(process.env.PREDICTION_MARKET_COUNT ?? 2);
+    const count = Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 6) : 2;
+
+    const url =
+      `${base}/markets?active=true&closed=false&archived=false` +
+      `&order=volume24hr&ascending=false&limit=${count}`;
+
+    const raw = await fetchJson<unknown[]>(url, { timeoutMs: 5000 });
+    const now = new Date().toISOString();
+    const list = Array.isArray(raw) ? raw : [];
+    const markets = list.slice(0, count).map((row, idx) => normalizePredictionMarket(row, idx));
+
+    return {
+      venue: 'Polymarket',
+      markets,
+      meta: {
+        asOf: now,
+        fetchedAt: now,
+        freshness: 'live',
+        sources: [
+          {
+            name: 'Polymarket (Gamma API)',
+            url: 'https://polymarket.com',
+            delayMinutes: 0,
+            terms: '공개 API. 표시 조건·재배포 범위는 제공사 약관을 확인할 것.',
+          },
+        ],
+        ...(markets.some((m) => m.unavailableReason)
+          ? { notes: ['일부 시장의 값을 읽지 못했습니다.'] }
+          : {}),
+      },
+    };
+  }
+
   /* ---------------------------- 캘린더 ---------------------------- */
   /** TODO(연결지점 6): 경제 캘린더. scheduledAt 은 반드시 KST(+09:00) 로 정규화한다. */
   async getCalendar(_ctx: AdapterContext): Promise<CalendarEvent[]> {
@@ -195,5 +248,102 @@ export const LIVE_SOURCE_EXAMPLES: DataSource[] = [
   { name: 'KRX 정보데이터시스템', url: 'http://data.krx.co.kr', delayMinutes: 20, terms: '실시간 재배포 불가 · 지연 데이터 사용' },
   { name: 'CoinGecko API', url: 'https://www.coingecko.com/en/api', delayMinutes: 5, terms: '무료 티어 rate limit 준수' },
 ];
+
+/* ------------------------------------------------------------------ */
+/* 폴리마켓 응답 정규화                                                   */
+/*                                                                     */
+/* 밖에서 온 값은 하나도 믿지 않는다. 숫자가 아니면 null 이고, 필수 항목이  */
+/* 비면 그 시장만 사유를 달아 결측 처리한다. 0 으로 채우지 않는다.          */
+/* ------------------------------------------------------------------ */
+
+/** 문자열로 온 숫자까지 받아 주되, 유한한 숫자가 아니면 null */
+function num(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** 배열이거나 JSON 문자열로 온 배열을 배열로 만든다 */
+function arr(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') {
+    try {
+      const p: unknown = JSON.parse(v);
+      return Array.isArray(p) ? p : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+}
+
+function normalizePredictionMarket(row: unknown, idx: number): PredictionMarket {
+  const r = (row ?? {}) as Record<string, unknown>;
+  const id = str(r.id) ?? str(r.conditionId) ?? str(r.slug) ?? `market-${idx}`;
+  const question = str(r.question) ?? str(r.title) ?? str(r.groupItemTitle) ?? '';
+  const slug = str(r.slug);
+  const url = slug ? `https://polymarket.com/event/${slug}` : '';
+
+  const labels = arr(r.outcomes).map(str);
+  const prices = arr(r.outcomePrices).map(num);
+
+  // 0~1 로 오는 가격을 0~100 으로 맞춘다. 이미 100 단위면 그대로 둔다.
+  const scale = prices.some((p) => p !== null && p > 1.0001) ? 1 : 100;
+
+  const outcomes: PredictionMarket['outcomes'] = labels
+    .map((label, k) => {
+      const p = prices[k];
+      return {
+        label: label ?? `선택지 ${k + 1}`,
+        labelKo: label === 'Yes' ? '예' : label === 'No' ? '아니오' : null,
+        price: p === null ? null : Math.round(p * scale * 10) / 10,
+      };
+    })
+    .sort((a, b) => (b.price ?? -1) - (a.price ?? -1))
+    .slice(0, 4);
+
+  const priced = outcomes.filter((o) => o.price !== null);
+
+  // oneDayPriceChange 는 원문 첫 선택지(대개 Yes) 기준이다.
+  // 화면은 값이 가장 높은 선택지를 크게 보여주므로, 정렬 후 그 자리가 바뀌었으면
+  // 두 선택지짜리에 한해 부호를 뒤집는다. 셋 이상이면 어디에 붙는 값인지 알 수 없어 버린다.
+  const firstLabel = labels[0];
+  const chgRaw = num(r.oneDayPriceChange);
+  const chg =
+    chgRaw === null
+      ? null
+      : outcomes.length > 2
+        ? null
+        : outcomes[0]?.label === firstLabel
+          ? chgRaw
+          : -chgRaw;
+  const closeRaw = str(r.endDate) ?? str(r.end_date_iso);
+  const closesAt = closeRaw && !Number.isNaN(Date.parse(closeRaw)) ? new Date(closeRaw).toISOString() : null;
+
+  const missing =
+    question === '' ? '질문을 읽지 못했습니다.' : priced.length === 0 ? '가격을 읽지 못했습니다.' : null;
+
+  return {
+    id,
+    question,
+    // 원문 질문은 대개 영어다. 서버에서 번역하지 않고 원문 그대로 내려보낸다.
+    questionKo: null,
+    questionOrigin: null,
+    outcomes,
+    // oneDayPriceChange 는 0~1 단위로 오므로 %p 로 맞춘다
+    changeDay: chg === null ? null : Math.round(chg * (Math.abs(chg) > 1.0001 ? 1 : 100) * 10) / 10,
+    volume24h: num(r.volume24hr) ?? num(r.volume24hrClob),
+    closesAt,
+    url,
+    ...(missing ? { unavailableReason: missing } : {}),
+  };
+}
 
 export const liveAdapter = new LiveAdapter();

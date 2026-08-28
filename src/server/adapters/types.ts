@@ -14,6 +14,7 @@ import type {
   MacroIndicator,
   MarketId,
   NewsItem,
+  PredictionDigest,
   Quote,
   RangeKey,
   SeriesPoint,
@@ -55,6 +56,9 @@ export interface MarketAdapter {
 
   /** 생활 경제 상식 지표 (1인당 GDP, 빅맥지수 등) */
   getBasics(ctx: AdapterContext): Promise<EconomyBasic[]>;
+
+  /** 예측시장에서 화제인 질문 (폴리마켓 등) */
+  getPrediction(ctx: AdapterContext): Promise<PredictionDigest>;
 
   /** 경제 캘린더 */
   getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]>;

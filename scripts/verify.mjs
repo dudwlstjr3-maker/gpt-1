@@ -337,9 +337,9 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 6개', list.length === 6, `${list.map((b) => b.id).join(', ')}`);
+    check('지표 7개', list.length === 7, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'bigmac', 'latte', 'ppp_gap', 'engel', 'ccsi'];
+    const wanted = ['per_capita_gdp', 'bigmac', 'latte', 'ppp_gap', 'engel', 'ccsi', 'pentagon_pizza'];
     for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
 
     for (const b of list) {
@@ -362,6 +362,69 @@ async function main() {
       '매수·매도·수익 보장 표현 없음',
       !/매수하|매도하|사야|팔아야|수익을 보장|반드시 오른/.test(allText),
     );
+  }
+
+  /* ---------------- 9-2. 예측시장 ---------------- */
+  console.log('\n[9-2] 예측시장 (별도 칸)');
+  {
+    const sec = snap.sections?.prediction;
+    check('prediction 섹션 존재', !!sec, `status=${sec?.status}`);
+    const d = sec?.data;
+    check('출처(venue) 표기', typeof d?.venue === 'string' && d.venue.length > 0, d?.venue);
+    const list = d?.markets ?? [];
+    check('질문 2개', list.length === 2, `${list.length}개`);
+
+    for (const m of list) {
+      check(`[${m.id}] 질문 문구 있음`, typeof m.question === 'string' && m.question.length > 0);
+      check(`[${m.id}] 선택지 2개 이상`, Array.isArray(m.outcomes) && m.outcomes.length >= 2);
+      for (const o of m.outcomes) {
+        check(
+          `[${m.id}] ${o.label} 가격이 0~100 이거나 결측`,
+          o.price === null || (o.price >= 0 && o.price <= 100),
+          `price=${o.price}`,
+        );
+      }
+      const priced = m.outcomes.filter((o) => o.price !== null);
+      if (priced.length === m.outcomes.length && priced.length >= 2) {
+        const sum = priced.reduce((a, o) => a + o.price, 0);
+        check(`[${m.id}] 선택지 가격 합이 100 부근`, Math.abs(sum - 100) < 1.5, `합계=${sum}`);
+        check(
+          `[${m.id}] 값이 큰 선택지가 먼저`,
+          priced.every((o, i) => i === 0 || o.price <= priced[i - 1].price),
+        );
+      }
+      check(
+        `[${m.id}] 거래대금이 유한수이거나 결측`,
+        m.volume24h === null || Number.isFinite(m.volume24h),
+        `${m.volume24h}`,
+      );
+      check(`[${m.id}] 마감 시각이 ISO 이거나 결측`, m.closesAt === null || !Number.isNaN(Date.parse(m.closesAt)));
+      check(`[${m.id}] url 은 문자열`, typeof m.url === 'string');
+    }
+
+    // DEMO 는 실제 예측시장을 흉내내지 않는다
+    if (snap.mode === 'DEMO') {
+      check('DEMO 는 출처에 실제 서비스가 아님을 밝힘', /DEMO/.test(d?.venue ?? ''), d?.venue);
+      check('DEMO 는 실제 예측시장 링크를 만들지 않음', list.every((m) => m.url === ''));
+      check('DEMO 질문은 샘플임을 표시', list.every((m) => /DEMO/.test(m.question)));
+    }
+
+    // 확률이라고 단정하는 표현이 없어야 한다
+    const txt = JSON.stringify(d ?? {});
+    check('가격을 확률이라고 단정하지 않음', !/확률입니다|확률 ?=|확률로 보면/.test(txt));
+
+    // 한쪽 값이 비면 0 으로 채우지 않고 사유를 남긴다
+    const { body: pp } = await getJson('/api/snapshot?scenario=partial');
+    const pl = pp.sections?.prediction?.data?.markets ?? [];
+    const brokenM = pl.filter((m) => m.unavailableReason);
+    check('부분 실패 시 결측 시장이 생김', brokenM.length > 0, `${brokenM.length}건`);
+    for (const m of brokenM) {
+      check(`[${m.id}] 결측을 0 으로 채우지 않음`, m.outcomes.every((o) => o.price === null) && m.changeDay === null);
+    }
+    check('부분 실패는 섹션 상태로도 드러남', pp.sections?.prediction?.status === 'partial', pp.sections?.prediction?.status);
+
+    const { body: ep } = await getJson('/api/snapshot?scenario=empty');
+    check('빈값 시나리오에서 prediction 이 empty', ep.sections?.prediction?.status === 'empty', ep.sections?.prediction?.status);
   }
 
   /* ---------------- 9-1. 결측을 0 으로 채우지 않는다 ---------------- */

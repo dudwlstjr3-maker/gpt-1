@@ -9,6 +9,7 @@
  *  5) 금리·환율·변동성
  *  6) 오늘의 경제 일정
  *  7) 시장별 자금 흐름과 뉴스
+ *  8) 예측시장에서 화제인 질문 (시세가 아니라 별도 칸)
  */
 
 import { useData } from '@/components/providers/DataProvider';
@@ -17,6 +18,7 @@ import { HomePrices } from '@/components/market/HomePrices';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskSevenSection } from '@/components/market/RiskSeven';
 import { CalendarPreview } from '@/components/market/CalendarList';
+import { PredictionSection } from '@/components/market/PredictionSection';
 import { FlowsNewsSection } from '@/components/market/FlowsNewsSection';
 import { ErrorState } from '@/components/ui/States';
 
@@ -61,6 +63,7 @@ export default function HomePage() {
         </div>
         <div>
           <CalendarPreview />
+          <PredictionSection />
         </div>
       </div>
     </div>

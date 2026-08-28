@@ -23,6 +23,8 @@ import type {
   MarketId,
   Meta,
   NewsItem,
+  PredictionDigest,
+  PredictionMarket,
   Quote,
   RangeKey,
   SeriesPoint,
@@ -786,7 +788,7 @@ const BASIC_PRICES = {
 } as const;
 
 /** partial 시나리오에서 값이 비는 항목 — 공식 발표 기관이 없는 것부터 빠진다 */
-const PARTIAL_BROKEN_BASICS = new Set(['latte']);
+const PARTIAL_BROKEN_BASICS = new Set(['latte', 'pentagon_pizza']);
 
 function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const s = world.s;
@@ -850,6 +852,16 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const bigmacNow = undervalued(bigmacRate, i);
   const latteNow = undervalued(latteRate, i);
   const pppNow = undervalued(BASIC_PRICES.pppKrwPerUsd, i);
+
+  /* ---------- 펜타곤 피자 지수 ---------- */
+  /* 공식 데이터가 없는 개념이라 DEMO 에서는 지정학 긴장의 대리 지표(금·유가)로 움직이게 둔다.
+     실제 붐빔 정도가 아니라 "이 앱 안에서 앞뒤가 맞는 합성값"이라는 뜻이다. */
+  const pizzaAt = (k: number) => {
+    const back = Math.max(0, k - 20);
+    const goldRet = s.gold[back] > 0 ? (s.gold[k] / s.gold[back] - 1) * 100 : 0;
+    const wtiRet = s.wti[back] > 0 ? (s.wti[k] / s.wti[back] - 1) * 100 : 0;
+    return clamp(100 + goldRet * 2.6 + wtiRet * 0.9, 62, 210);
+  };
 
   /* ---------- 소비자심리지수 ---------- */
   const ccsiAt = (k: number) => {
@@ -981,7 +993,130 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '매월 발표 · 직전 값은 한 달 전',
       true,
     ),
+
+    mk(
+      'pentagon_pizza',
+      '펜타곤 피자 지수',
+      'Pentagon Pizza Index',
+      round(pizzaAt(i), 0),
+      round(pizzaAt(at(5)), 0),
+      0,
+      '',
+      pizzaAt(i) >= 130
+        ? `평소를 100으로 봤을 때 ${round(pizzaAt(i), 0)}입니다. 청사 주변이 평소보다 붐빈다는 뜻일 뿐, 그 안에서 무슨 일이 벌어지는지는 이 숫자로 알 수 없습니다.`
+        : `평소를 100으로 봤을 때 ${round(pizzaAt(i), 0)}입니다. 평소와 크게 다르지 않습니다. 조용하다는 것도 아무것도 증명하지 않습니다.`,
+      [
+        { label: '지금', value: round(pizzaAt(i), 0), precision: 0, suffix: '', primary: true },
+        { label: '5일 전', value: round(pizzaAt(at(5)), 0), precision: 0, suffix: '' },
+        { label: '평소', value: 100, precision: 0, suffix: '' },
+      ],
+      '정기 발표 없음 · 지도 혼잡도를 직접 확인해야 함',
+      false,
+      '발표 기관이 없는 농담성 지표입니다. 근거가 되는 지도 앱 혼잡도는 공개 API 가 없어 자동으로 받아올 수 없고, 적중률이 검증된 적도 없습니다. 이 값은 DEMO 합성값입니다.',
+    ),
   ];
+}
+
+/* ------------------------------------------------------------------ */
+/* 예측시장                                                             */
+/*                                                                     */
+/* 실제 폴리마켓 질문을 베끼지 않는다. 뉴스와 같은 규칙이다 — 존재하지     */
+/* 않는 샘플 질문을 쓰고 원문 링크를 비워, 진짜 시장으로 오해할 여지를     */
+/* 남기지 않는다. 가격만 DEMO 월드에서 끌어와 화면 안에서 앞뒤가 맞게 한다. */
+/* ------------------------------------------------------------------ */
+
+function buildPrediction(world: DemoWorld, ctx: AdapterContext): PredictionDigest {
+  const s = world.s;
+  const c = world.c;
+  const i = world.dates.length - 1;
+  const ci = world.cryptoDates.length - 1;
+
+  /** 두 선택지짜리 시장을 만든다. p 는 '예' 쪽 가격(0~100). */
+  const binary = (
+    id: string,
+    question: string,
+    questionKo: string,
+    p: number,
+    pPrev: number,
+    volume: number,
+    closesInDays: number,
+  ): PredictionMarket => {
+    const yes = clamp(p, 1, 99);
+    const yesDelta = yes - clamp(pPrev, 1, 99);
+    // 화면은 값이 가장 높은 선택지를 크게 보여준다.
+    // 변화폭도 그 선택지 기준이어야 숫자 두 개가 같은 것을 가리킨다.
+    const topIsYes = yes >= 50;
+    return {
+      id,
+      question,
+      questionKo,
+      questionOrigin: 'derived' as const,
+      outcomes: ([
+        { label: 'Yes', labelKo: '예', price: round(yes, 1) },
+        { label: 'No', labelKo: '아니오', price: round(100 - yes, 1) },
+      ] as PredictionMarket['outcomes']).sort((a, b) => (b.price ?? 0) - (a.price ?? 0)),
+      changeDay: round(topIsYes ? yesDelta : -yesDelta, 1),
+      volume24h: Math.round(volume),
+      closesAt: new Date(ctx.now.getTime() + closesInDays * 86400_000).toISOString(),
+      // DEMO 샘플이라 가리킬 원문이 없다. 없는 링크를 지어내지 않는다.
+      url: '',
+    };
+  };
+
+  // 1) 금리 — 단기금리가 낮을수록 '내린다'에 값이 붙는다
+  const cutOdds = (k: number) => clamp(50 + (3.9 - s.ust2[k]) * 46, 3, 97);
+  // 2) 비트코인 — 최근 3개월 고점까지의 거리로 값을 매긴다.
+  //    DEMO 월드는 난수 행보라 절대 가격을 못 박으면 질문이 늘 한쪽으로 쏠린다.
+  const btcOdds = (k: number) => {
+    const from = Math.max(0, k - 60);
+    let hi = 0;
+    for (let x = from; x <= k; x += 1) hi = Math.max(hi, c.btc[x]);
+    return hi > 0 ? clamp(50 + (c.btc[k] / hi - 1) * 320, 3, 97) : 50;
+  };
+
+  const markets = [
+    binary(
+      'demo-rate-cut',
+      '[DEMO] Will the Fed cut rates below 3.5% this year?',
+      '[DEMO] 올해 안에 미국 기준금리가 3.5% 아래로 내려갈까?',
+      cutOdds(i),
+      cutOdds(Math.max(0, i - 1)),
+      1_850_000 + (s.vix[i] - 18) * 90_000,
+      118,
+    ),
+    binary(
+      'demo-btc-high',
+      '[DEMO] Will Bitcoin top its 3-month high this quarter?',
+      '[DEMO] 비트코인이 이번 분기 안에 최근 3개월 고점을 다시 넘을까?',
+      btcOdds(ci),
+      btcOdds(Math.max(0, ci - 1)),
+      2_400_000 + (c.totalVol[ci] / 1e9) * 6_000,
+      92,
+    ),
+  ];
+
+  // 안내는 venue 이름과 출처(DEMO_SOURCE)에 이미 적혀 있다.
+  // notes 에 넣으면 섹션이 '부분 실패'로 잡히므로 여기서는 쓰지 않는다.
+  const meta = makeMeta(ctx, 'crypto');
+
+  if (ctx.scenario === 'partial') {
+    // 한쪽만 값이 비는 상태를 재현한다. 0 으로 채우지 않는다.
+    markets[1] = {
+      ...markets[1],
+      outcomes: markets[1].outcomes.map((o) => ({ ...o, price: null })),
+      changeDay: null,
+      volume24h: null,
+      unavailableReason: '가격을 받지 못했습니다. 값을 임의로 채우지 않습니다.',
+    };
+  }
+
+  const notes = markets.filter((m) => m.unavailableReason).map((m) => `${m.questionKo ?? m.question}: 값 없음`);
+
+  return {
+    venue: 'DEMO 예측시장 (실제 폴리마켓 아님)',
+    markets,
+    meta: notes.length ? { ...meta, notes } : meta,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1094,6 +1229,14 @@ export class DemoAdapter implements MarketAdapter {
   async getBasics(ctx: AdapterContext): Promise<EconomyBasic[]> {
     if (ctx.scenario === 'empty') return [];
     return buildBasics(getWorld(ctx.now), ctx);
+  }
+
+  async getPrediction(ctx: AdapterContext): Promise<PredictionDigest> {
+    const world = getWorld(ctx.now);
+    if (ctx.scenario === 'empty') {
+      return { venue: 'DEMO 예측시장 (실제 폴리마켓 아님)', markets: [], meta: makeMeta(ctx, 'crypto') };
+    }
+    return buildPrediction(world, ctx);
   }
 
   async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {

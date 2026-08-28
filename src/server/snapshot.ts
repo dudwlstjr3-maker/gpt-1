@@ -266,6 +266,19 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
+  /* -------- 예측시장 -------- */
+  /* 계속 바뀌는 값이라 TTL 이 짧다. 여기서 실패해도 다른 섹션은 그대로 나온다. */
+  const prediction = await section(
+    'prediction',
+    `${ns}:prediction`,
+    async () => {
+      const d = await adapter.getPrediction(ctx);
+      return { data: d, meta: d.meta };
+    },
+    now,
+    (d) => d.markets.length === 0,
+  );
+
   /* -------- 캘린더 -------- */
   const calendar = await section(
     'calendar',
@@ -314,7 +327,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, risk, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, calendar, news, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -400,6 +413,7 @@ function errorSections(now: Date, message: string): SnapshotSections {
     flows: blankSection(now, 'error', message),
     macro: blankSection(now, 'error', message),
     basics: blankSection(now, 'error', message),
+    prediction: blankSection(now, 'error', message),
     risk: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
@@ -415,6 +429,7 @@ function loadingSections(now: Date): SnapshotSections {
     flows: blankSection(now, 'loading'),
     macro: blankSection(now, 'loading'),
     basics: blankSection(now, 'loading'),
+    prediction: blankSection(now, 'loading'),
     risk: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),

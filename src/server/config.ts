@@ -81,6 +81,8 @@ export const SECTION_TTL: Record<SectionKey, number> = {
   fng: 300_000,
   macro: 6 * 3600_000,
   basics: 12 * 3600_000,
+  // 예측시장은 계속 바뀐다. 다른 섹션보다 짧게 잡는다
+  prediction: 60_000,
   risk: 120_000,
   calendar: 900_000,
   news: 300_000,
@@ -96,6 +98,7 @@ export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
   macro: 48 * 3600_000,
   // 연 단위로 발표되는 값이 섞여 있어 오래됐다고 판정하는 기준을 길게 둔다
   basics: 30 * 24 * 3600_000,
+  prediction: 20 * 60_000,
   risk: 900_000,
   calendar: 6 * 3600_000,
   news: 3 * 3600_000,

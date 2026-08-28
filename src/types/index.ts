@@ -522,6 +522,52 @@ export interface EconomyBasic {
 }
 
 /* ------------------------------------------------------------------ */
+/* 예측시장 (폴리마켓 등)                                                 */
+/*                                                                     */
+/* 사람들이 어떤 사건에 얼마를 걸고 있는지를 보여주는 화제성 정보다.        */
+/* 시세가 아니고 확률도 아니다 — 값은 '가격'이고, 그 사실을 화면에 적는다.  */
+/* 계속 바뀌므로 다른 섹션보다 짧은 주기로 갱신한다.                        */
+/* ------------------------------------------------------------------ */
+
+export interface PredictionOutcome {
+  /** 선택지 이름 (원문. 예: Yes / No) */
+  label: string;
+  /** 한국어 표기. 원문을 그대로 쓸 때는 null */
+  labelKo: string | null;
+  /** 0~100 으로 환산한 가격. 확률이 아니다. 값이 없으면 null */
+  price: number | null;
+}
+
+export interface PredictionMarket {
+  id: string;
+  /** 원문 질문 (영어일 수 있다) */
+  question: string;
+  /** 한국어로 옮긴 질문. 옮기지 못했으면 null 이고 화면은 원문을 보여준다 */
+  questionKo: string | null;
+  /** 한국어 질문의 출처 — 제공사가 준 것인지 이 앱이 옮긴 것인지 */
+  questionOrigin: 'provider' | 'derived' | null;
+  /** 값이 가장 높은 선택지부터. 최대 4개까지만 화면에 쓴다 */
+  outcomes: PredictionOutcome[];
+  /** 24시간 전 대비 최상위 선택지 가격 변화(%p) */
+  changeDay: number | null;
+  /** 24시간 거래대금 (USD) */
+  volume24h: number | null;
+  /** 마감 예정 시각 (ISO). 알 수 없으면 null */
+  closesAt: string | null;
+  /** 원문 링크. DEMO 처럼 실제 링크가 없으면 빈 문자열 */
+  url: string;
+  /** 값을 받지 못했을 때의 사유 */
+  unavailableReason?: string;
+}
+
+export interface PredictionDigest {
+  /** 어느 서비스에서 왔는지 — 화면에 그대로 노출한다 */
+  venue: string;
+  markets: PredictionMarket[];
+  meta: Meta;
+}
+
+/* ------------------------------------------------------------------ */
 /* 시장 위험 신호등                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -693,6 +739,7 @@ export interface SnapshotSections {
   flows: Section<FlowSummary>;
   macro: Section<MacroIndicator[]>;
   basics: Section<EconomyBasic[]>;
+  prediction: Section<PredictionDigest>;
   risk: Section<RiskDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;

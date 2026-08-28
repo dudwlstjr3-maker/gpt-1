@@ -9,7 +9,8 @@
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/generate-icons.mjs",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "preview": "node tools/preview/build.mjs"
   },
   "dependencies": {
     "next": "15.5.24",

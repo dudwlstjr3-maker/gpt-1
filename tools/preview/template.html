@@ -1,0 +1,3086 @@
+<title>Market Mood 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+
+<style>
+/* ==========================================================================
+   Market Mood 3 — 구현물 미리보기
+   색상 토큰은 실제 앱(src/app/globals.css)의 값을 그대로 가져왔다.
+   다크가 기본이며, 라이트는 명시 선택 또는 OS 설정으로 전환된다.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0a0d14;
+  --bg-elev: #0f141e;
+  --surface: #141a26;
+  --surface-2: #1b2333;
+  --surface-3: #232d40;
+  --border: #26314a;
+  --border-strong: #35435f;
+
+  --fg: #e9eef8;
+  --fg-strong: #ffffff;
+  --muted: #98a5bd;
+  --subtle: #6f7d96;
+
+  --accent: #6ea8fe;
+  --accent-fg: #0a0d14;
+  --focus: #8ab4ff;
+
+  /* 신호등 팔레트 — 구간을 나타내는 모든 그래픽이 이 색만 쓴다.
+     --tl-*      글자용 (배경 대비 4.5:1)
+     --tl-*-fill 막대·램프용 ('노랑이 노랗게 보이는 것'이 우선) */
+  --tl-green: #4ade80;
+  --tl-lime: #b6e05a;
+  --tl-yellow: #ffd166;
+  --tl-orange: #ff9f45;
+  --tl-red: #ff6b6b;
+  --tl-green-fill: #3ecf72;
+  --tl-lime-fill: #aede45;
+  --tl-yellow-fill: #ffcc3d;
+  --tl-orange-fill: #ff9226;
+  --tl-red-fill: #f65454;
+
+  /* Fear → Greed 는 같은 램프를 5칸으로 나눈 것 */
+  --s1: var(--tl-red);
+  --s2: var(--tl-orange);
+  --s3: var(--tl-yellow);
+  --s4: var(--tl-lime);
+  --s5: var(--tl-green);
+  --s1f: var(--tl-red-fill);
+  --s2f: var(--tl-orange-fill);
+  --s3f: var(--tl-yellow-fill);
+  --s4f: var(--tl-lime-fill);
+  --s5f: var(--tl-green-fill);
+
+  /* 비교용 차트 선 — 신호등 밖의 색을 써서 '구간'으로 오해하지 않게 한다 */
+  --series-2: #c4a2f7;
+
+  --kr-up: #ff6b6b;
+  --kr-down: #6ba8ff;
+  --gl-up: #4ade80;
+  --gl-down: #ff6b6b;
+
+  --warn: var(--tl-yellow);
+  --danger: var(--tl-red);
+  --ok: var(--tl-green);
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+
+  --font-ui: 'IBM Plex Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont,
+    'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: #f4f6fa;
+    --bg-elev: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f1f4f9;
+    --surface-3: #e6ebf3;
+    --border: #dde3ec;
+    --border-strong: #c3ccdb;
+    --fg: #131a26;
+    --fg-strong: #05080f;
+    --muted: #5a6678;
+    --subtle: #77828f;
+    --accent: #1f5fd0;
+    --accent-fg: #ffffff;
+    --focus: #1f5fd0;
+    --tl-green: #15803d;
+    --tl-lime: #5e7f10;
+    --tl-yellow: #8a5a00;
+    --tl-orange: #b35309;
+    --tl-red: #c62828;
+    --tl-green-fill: #1fa14c;
+    --tl-lime-fill: #8ec420;
+    --tl-yellow-fill: #f5bf12;
+    --tl-orange-fill: #ef8b28;
+    --tl-red-fill: #e04343;
+    --series-2: #6b3fc4;
+    --s1: var(--tl-red);
+    --s2: var(--tl-orange);
+    --s3: var(--tl-yellow);
+    --s4: var(--tl-lime);
+    --s5: var(--tl-green);
+    --s1f: var(--tl-red-fill);
+    --s2f: var(--tl-orange-fill);
+    --s3f: var(--tl-yellow-fill);
+    --s4f: var(--tl-lime-fill);
+    --s5f: var(--tl-green-fill);
+    --kr-up: #c62828;
+    --kr-down: #1657c4;
+    --gl-up: #15803d;
+    --gl-down: #c62828;
+    --warn: var(--tl-yellow);
+    --danger: var(--tl-red);
+    --ok: var(--tl-green);
+    --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 20px -14px rgb(16 24 40 / 0.24);
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f6fa;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f4f9;
+  --surface-3: #e6ebf3;
+  --border: #dde3ec;
+  --border-strong: #c3ccdb;
+  --fg: #131a26;
+  --fg-strong: #05080f;
+  --muted: #5a6678;
+  --subtle: #77828f;
+  --accent: #1f5fd0;
+  --accent-fg: #ffffff;
+  --focus: #1f5fd0;
+  --tl-green: #15803d;
+  --tl-lime: #5e7f10;
+  --tl-yellow: #8a5a00;
+  --tl-orange: #b35309;
+  --tl-red: #c62828;
+  --tl-green-fill: #1fa14c;
+  --tl-lime-fill: #8ec420;
+  --tl-yellow-fill: #f5bf12;
+  --tl-orange-fill: #ef8b28;
+  --tl-red-fill: #e04343;
+  --series-2: #6b3fc4;
+  --s1: var(--tl-red);
+  --s2: var(--tl-orange);
+  --s3: var(--tl-yellow);
+  --s4: var(--tl-lime);
+  --s5: var(--tl-green);
+  --s1f: var(--tl-red-fill);
+  --s2f: var(--tl-orange-fill);
+  --s3f: var(--tl-yellow-fill);
+  --s4f: var(--tl-lime-fill);
+  --s5f: var(--tl-green-fill);
+  --kr-up: #c62828;
+  --kr-down: #1657c4;
+  --gl-up: #15803d;
+  --gl-down: #c62828;
+  --warn: var(--tl-yellow);
+  --danger: var(--tl-red);
+  --ok: var(--tl-green);
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 20px -14px rgb(16 24 40 / 0.24);
+}
+
+/* 등락 색상 — 한국식(상승 빨강) / 글로벌식(상승 초록). 테마와 무관하게 토큰만 가리킨다. */
+:root { --up: var(--kr-up); --down: var(--kr-down); }
+:root[data-cm='global'] { --up: var(--gl-up); --down: var(--gl-down); }
+
+* { box-sizing: border-box; min-width: 0; }
+
+/* 가로 스크롤은 캐러셀 같은 내부 컨테이너에서만 일어나야 한다.
+   clip 은 hidden 과 달리 프로그램적 스크롤까지 막는다. */
+html { overflow-x: hidden; overflow-x: clip; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+button { font: inherit; cursor: pointer; }
+
+/* ------------------------------- 미리보기 안내 ------------------------------- */
+
+.preview {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  padding: 14px 16px;
+}
+.preview-inner {
+  margin: 0 auto;
+  max-width: 1240px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+.preview-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--subtle);
+  max-width: 62ch;
+  line-height: 1.6;
+}
+.preview-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
+/* ---------------------------------- 앱 셸 ---------------------------------- */
+
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  display: none;
+  width: 224px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 18px 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.brand { padding: 0 10px 18px; }
+.brand strong { display: block; font-size: 16px; color: var(--fg-strong); letter-spacing: -0.01em; }
+.brand span { display: block; font-size: 11px; color: var(--subtle); margin-top: 2px; }
+
+.navlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.navbtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.navbtn:hover { background: var(--surface-2); color: var(--fg); }
+.navbtn[aria-current='page'] { background: var(--surface-2); color: var(--accent); }
+.navbtn svg { flex-shrink: 0; }
+
+.col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 84px; }
+
+/* --------------------------------- 상태바 --------------------------------- */
+
+.statusbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+.statusbar-inner { max-width: 1180px; margin: 0 auto; padding: 9px 12px; }
+.sb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sb-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.clock { font-size: 14px; font-weight: 700; color: var(--fg-strong); }
+.clock small { font-size: 10px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-top: 8px; scrollbar-width: none; contain: paint; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 9px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.chip b { color: var(--fg); font-weight: 600; }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.sb-foot { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; }
+.sb-foot p { margin: 0; font-size: 11px; color: var(--muted); order: 2; flex-basis: 100%; }
+.sb-toggles { display: flex; gap: 6px; order: 1; }
+@media (min-width: 560px) {
+  .sb-foot p { order: 1; flex-basis: auto; }
+  .sb-toggles { order: 2; }
+}
+
+/* --------------------------------- 컨트롤 --------------------------------- */
+
+.seg { display: inline-flex; border: 1px solid var(--border); background: var(--surface-2); border-radius: 9px; padding: 2px; }
+.seg button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.seg button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg-strong); }
+.seg.lg button { font-size: 12px; padding: 6px 11px; }
+
+.ghost {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: 9px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.ghost:hover { color: var(--fg); }
+
+/* ---------------------------------- 배지 ---------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.b-demo { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 20%, transparent); }
+.b-ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 42%, transparent); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.b-warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 42%, transparent); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.b-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 44%, transparent); background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.b-accent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 42%, transparent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.b-neutral { color: var(--muted); border-color: var(--border); background: var(--surface-2); }
+
+/* ---------------------------------- 카드 ---------------------------------- */
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+
+section.block { padding: 0 12px; margin-top: 22px; }
+.block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.block-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--fg-strong); letter-spacing: -0.01em; }
+.block-head .hint { font-size: 11px; color: var(--subtle); }
+.linkbtn { border: 0; background: none; color: var(--accent); font-size: 11px; font-weight: 600; padding: 0; }
+.linkbtn:hover { text-decoration: underline; }
+
+.notice {
+  display: flex;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+.notice.n-neutral { background: color-mix(in srgb, var(--muted) 10%, transparent); color: var(--muted); }
+.notice.n-warn { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+
+/* -------------------------------- F&G 카드 -------------------------------- */
+
+.fng-scroll { display: flex; gap: 12px; overflow-x: auto; padding: 0 12px 6px; scroll-snap-type: x mandatory; scrollbar-width: none;
+  /* contain 이 없으면 가로 스크롤 영역이 문서 전체의 스크롤 폭으로 새어 나간다 */
+  contain: paint; }
+.fng-scroll::-webkit-scrollbar { display: none; }
+.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: min(85vw, 340px); }
+@media (min-width: 1024px) {
+  .fng-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .fng-scroll > * { width: auto; }
+}
+
+.fngcard { display: flex; flex-direction: column; padding: 14px; height: 100%; }
+.fngcard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.fngcard h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--fg-strong); }
+.fngcard .sub { font-size: 10px; color: var(--subtle); margin-top: 2px; }
+.fng-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+
+.deltas { display: flex; gap: 6px; margin-top: 4px; }
+.delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: 9px; padding: 6px 2px; }
+.delta small { display: block; font-size: 10px; color: var(--muted); }
+.delta b { display: block; font-size: 12.5px; margin-top: 1px; }
+
+.sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.sparkrow small { font-size: 10px; color: var(--muted); }
+
+.drivers { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.driver { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; line-height: 1.45; word-break: keep-all; }
+.driver .g { font-size: 10px; font-weight: 700; margin-top: 1px; flex-shrink: 0; }
+.driver .lbl { color: var(--muted); }
+.driver .det { display: block; font-size: 10px; color: var(--subtle); }
+
+.fngfoot { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fngfoot small { font-size: 10px; color: var(--subtle); }
+
+/* --------------------------------- 가격 카드 --------------------------------- */
+
+.grid-cards { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 640px) { .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+.pcard { padding: 12px; }
+.pcard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.pcard-name { font-size: 13.5px; font-weight: 600; color: var(--fg-strong); }
+.pcard-sym { font-size: 10px; color: var(--subtle); }
+.pcard-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.pcard-price { font-size: 18px; font-weight: 700; color: var(--fg-strong); line-height: 1.2; }
+.pcard-chg { font-size: 12px; font-weight: 600; margin-top: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pcard-foot { border-top: 1px solid var(--border); margin-top: 9px; padding-top: 7px; display: flex; flex-wrap: wrap; gap: 2px 9px; font-size: 10px; color: var(--subtle); }
+.star { border: 0; background: none; font-size: 14px; line-height: 1; padding: 0 2px 0 0; color: var(--subtle); }
+.star[aria-pressed='true'] { color: var(--warn); }
+
+/* --------------------------------- 지표 타일 --------------------------------- */
+
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+.tile .t-label { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .t-val { font-size: 14.5px; font-weight: 700; margin-top: 2px; }
+.tile .t-sub { font-size: 10px; color: var(--subtle); }
+.tile .t-risk { font-size: 10px; margin-top: 5px; display: flex; gap: 4px; align-items: center; }
+
+/* ---------------------------------- 요약 ---------------------------------- */
+
+.summary li { display: flex; gap: 8px; align-items: flex-start; }
+.summary ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.summary p { margin: 0; font-size: 13px; line-height: 1.65; word-break: keep-all; }
+
+/* --------------------------------- 캘린더 --------------------------------- */
+
+.evlist { list-style: none; margin: 0; padding: 0; }
+.evlist li { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.evlist li:last-child { border-bottom: 0; }
+.ev-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.ev-title { font-size: 13px; font-weight: 600; line-height: 1.35; word-break: keep-all; margin-top: 5px; }
+.ev-note { font-size: 10px; color: var(--subtle); margin-top: 2px; }
+.ev-time { text-align: right; flex-shrink: 0; }
+.ev-time b { font-size: 12.5px; color: var(--fg-strong); }
+.ev-time small { display: block; font-size: 10px; color: var(--subtle); }
+.ev-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 10px; }
+.ev-meta span { color: var(--subtle); }
+.ev-meta b { color: var(--fg); font-weight: 600; }
+
+/* ---------------------------------- 뉴스 ---------------------------------- */
+
+.news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.news li { border-bottom: 1px solid var(--border); padding-bottom: 11px; }
+.news li:last-child { border-bottom: 0; padding-bottom: 0; }
+.news p { margin: 0; font-size: 12px; line-height: 1.65; word-break: keep-all; }
+.news .orig { font-size: 10px; color: var(--subtle); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.news .meta { font-size: 10px; color: var(--subtle); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------------------------------- 수급 ---------------------------------- */
+
+.flowrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.flowrow:last-child { border-bottom: 0; }
+.flowrow span { font-size: 12px; }
+.flowrow b { font-size: 13px; display: flex; align-items: center; gap: 5px; }
+
+/* --------------------------------- 상세 화면 --------------------------------- */
+
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 12px 0; }
+.detail-head h1 { margin: 0; font-size: 19px; font-weight: 700; color: var(--fg-strong); letter-spacing: -0.02em; }
+.backbtn { border: 0; background: none; color: var(--muted); font-size: 16px; padding: 0 4px 0 0; }
+
+.summary-grid { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+@media (min-width: 900px) { .summary-grid { flex-direction: row; align-items: center; gap: 26px; } }
+.summary-grid > .meta { flex: 1; width: 100%; max-width: 560px; }
+
+dl.kv { margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+dl.kv > div { display: flex; justify-content: space-between; gap: 10px; }
+dl.kv dt { color: var(--muted); flex-shrink: 0; }
+dl.kv dd { margin: 0; text-align: right; color: var(--fg); }
+
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 10px; color: var(--muted); list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--border); margin-top: 14px; }
+.legend li { display: flex; align-items: center; gap: 5px; }
+
+.comp { border-bottom: 1px solid var(--border); }
+.comp:last-child { border-bottom: 0; }
+.comp-btn { width: 100%; display: flex; gap: 8px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; text-align: left; color: inherit; }
+.comp-btn:hover { background: var(--surface-2); }
+.comp-main { flex: 1; min-width: 0; }
+.comp-labels { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.comp-name { font-size: 13px; font-weight: 600; word-break: keep-all; }
+.comp-score { text-align: right; flex-shrink: 0; }
+.comp-score b { font-size: 15px; }
+.comp-score small { display: block; font-size: 10px; color: var(--muted); }
+.comp-body { background: var(--surface-2); border-top: 1px solid var(--border); padding: 11px 12px; }
+.comp-desc { margin: 0 0 9px; font-size: 11.5px; color: var(--muted); line-height: 1.65; word-break: keep-all; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.data th, table.data td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data tr:last-child td, table.data tr:last-child th { border-bottom: 0; }
+table.data th:first-child, table.data td:first-child { text-align: left; white-space: normal; }
+table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
+
+.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.bar-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.bar-top span { font-size: 11px; }
+.bar-top b { font-size: 11px; flex-shrink: 0; }
+.bar-track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-3); }
+.bar-zero { position: absolute; inset-block: 0; left: 50%; width: 1px; background: var(--border-strong); }
+.bar-fill { position: absolute; inset-block: 0; border-radius: 999px; }
+
+.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.steps li { font-size: 11.5px; color: var(--muted); line-height: 1.7; word-break: keep-all; }
+
+/* ---------------------------------- 차트 ---------------------------------- */
+
+.chartbox { position: relative; width: 100%; }
+.chartbox svg { display: block; width: 100%; }
+.zoombar { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 7px; padding: 2px; }
+.zoombar button {
+  min-width: 28px; height: 26px; padding: 0 4px; border: 0; background: none; cursor: pointer;
+  border-radius: 5px; font-size: 13px; font-weight: 600; line-height: 1; color: var(--muted); font-family: inherit;
+}
+.zoombar button:hover:not(:disabled) { background: var(--surface-3); color: var(--fg); }
+.zoombar button:disabled { opacity: .35; cursor: default; }
+.chartbox svg { touch-action: pan-y; cursor: grab; border-radius: 6px; outline: none; }
+.chartbox svg.dragging { cursor: grabbing; }
+.chartbox svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-bottom: 6px; }
+.chart-legend li { list-style: none; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.swatch { width: 16px; height: 2px; border-radius: 2px; display: inline-block; }
+.tip {
+  position: absolute;
+  top: 4px;
+  pointer-events: none;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 6px 9px;
+  font-size: 11px;
+  box-shadow: var(--shadow);
+  width: 168px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tip.on { opacity: 1; }
+.tip .tt-time { font-size: 10px; color: var(--subtle); margin-bottom: 3px; }
+.tip .tt-row { display: flex; justify-content: space-between; gap: 8px; }
+.tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.tip .tt-row b { color: var(--fg); font-weight: 600; }
+
+/* --------------------------------- 하단 탭 --------------------------------- */
+
+.tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 40;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 93%, transparent);
+  backdrop-filter: blur(12px);
+}
+.tabbar ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 520px; }
+.tabbar li { flex: 1; }
+.tabbar button {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 7px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.tabbar button[aria-current='page'] { color: var(--accent); }
+@media (min-width: 1024px) {
+  .sidebar { display: block; }
+  .tabbar { display: none; }
+  main { padding-bottom: 32px; }
+}
+
+/* --------------------------------- 하단 고지 --------------------------------- */
+
+.disclaimer { border-top: 1px solid var(--border); padding: 20px 12px 26px; max-width: 1180px; margin: 32px auto 0; width: 100%; }
+.disclaimer .strong { font-size: 12.5px; font-weight: 700; color: var(--fg); margin: 8px 0 0; }
+.disclaimer .fine { font-size: 10.5px; color: var(--subtle); line-height: 1.75; margin: 6px 0 0; word-break: keep-all; max-width: 76ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+</style>
+
+<div class="preview">
+  <div class="preview-inner">
+    <div>
+      <p class="preview-title">구현물 미리보기</p>
+      <p class="preview-note">
+        <strong style="color:var(--fg)">Market Mood 3</strong> — 브랜치 <code>claude/market-mood-3-dashboard-h3j8qf</code> 에 푸시된
+        Next.js 앱의 실제 화면입니다. 아래 수치는 실행 중인 서버의 <strong style="color:var(--warn)">DEMO 스냅샷</strong>을 그대로 담았고,
+        점수는 하드코딩이 아니라 실제 산출 엔진이 계산한 값입니다. 탭·통화·색상·테마 전환과 차트 툴팁이 모두 동작합니다.
+      </p>
+      <p class="preview-note" style="margin-top:6px" id="captured"></p>
+    </div>
+    <div class="preview-controls">
+      <div class="seg" role="group" aria-label="DEMO 시나리오">
+        <button type="button" data-scenario="normal" aria-pressed="true">정상</button>
+        <button type="button" data-scenario="partial" aria-pressed="false">부분 실패</button>
+      </div>
+      <div class="seg" role="group" aria-label="테마">
+        <button type="button" data-theme-set="dark" aria-pressed="true">다크</button>
+        <button type="button" data-theme-set="light" aria-pressed="false">라이트</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <strong>Market Mood 3</strong>
+      <span>미국 · 한국 · 크립토 투자심리</span>
+    </div>
+    <nav aria-label="주요 메뉴">
+      <ul class="navlist" id="sidenav"></ul>
+    </nav>
+  </aside>
+
+  <div class="col">
+    <header class="statusbar">
+      <div class="statusbar-inner" id="statusbar"></div>
+    </header>
+    <main id="view"></main>
+    <footer class="disclaimer">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span class="badge b-demo">DEMO</span>
+        <span style="font-size:10.5px;color:var(--warn)">표시된 모든 수치는 고정 샘플 데이터이며 실제 시세가 아닙니다.</span>
+      </div>
+      <p class="strong">본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다.</p>
+      <p class="fine">
+        이 점수는 공개·라이선스 데이터로 직접 계산한 자체 산출 지수입니다. 외부 기관의 공식 지수가 아닙니다.
+        지수·시세는 제공사 사정에 따라 지연될 수 있으며, 표시된 기준 시각을 확인하고 이용해 주세요.
+        과거 수치가 미래 결과를 보장하지 않습니다. 산식 버전 v1.0.0.
+      </p>
+    </footer>
+  </div>
+</div>
+
+<nav class="tabbar" aria-label="주요 메뉴">
+  <ul id="tabnav"></ul>
+</nav>
+
+<script type="application/json" id="mm3-data">__DATA__</script>
+
+<script>
+(() => {
+  'use strict';
+
+  const DATA = JSON.parse(document.getElementById('mm3-data').textContent);
+
+  /* ====================================================================== */
+  /* 상태                                                                    */
+  /* ====================================================================== */
+
+  const state = {
+    view: 'home',
+    market: 'us',
+    fngMarket: 'us',
+    range: '3M',
+    currency: 'KRW',
+    colorMode: 'korean',
+    scenario: 'normal',
+    watch: new Set(['spx', 'kospi', 'btc', 'usdkrw', 'vix']),
+    openComp: null,
+    calMarket: 'us',
+    region: 'us',
+    riskScope: 'us',
+    macroMarket: 'us',
+    /* 위기 목록에서 고른 시점 — 차트에서 강조한다 */
+    crisisT: null,
+    sort: 'default',
+    onlyWatched: false,
+  };
+
+  const snap = () => (state.scenario === 'partial' ? DATA.partial : DATA.snapshot);
+  const MARKETS = ['us', 'kr', 'crypto'];
+  const MARKET_LABEL = { us: '미국', kr: '한국', crypto: '크립토' };
+
+  /* ====================================================================== */
+  /* 표기 유틸 (src/lib/format.ts 와 동일 규칙)                                 */
+  /* ====================================================================== */
+
+  const NO = '—';
+  const nfCache = new Map();
+  function nf(p) {
+    if (!nfCache.has(p)) nfCache.set(p, new Intl.NumberFormat('ko-KR', { minimumFractionDigits: p, maximumFractionDigits: p }));
+    return nfCache.get(p);
+  }
+  const isNum = (v) => typeof v === 'number' && isFinite(v);
+  function fmtNum(v, p = 2) { return isNum(v) ? nf(p).format(v) : NO; }
+  function fmtSigned(v, p = 2) {
+    if (!isNum(v)) return NO;
+    const s = nf(p).format(Math.abs(v));
+    return v > 0 ? '+' + s : v < 0 ? '-' + s : s;
+  }
+  function fmtPct(v, p = 2) { return isNum(v) ? fmtSigned(v, p) + '%' : NO; }
+  function fmtScore(v) { return isNum(v) ? fmtNum(v, Number.isInteger(v) ? 0 : 1) : NO; }
+  function koCompact(v, p = 1) {
+    if (!isNum(v)) return NO;
+    const a = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (a >= 1e12) return sign + nf(p).format(a / 1e12) + '조';
+    if (a >= 1e8) return sign + nf(p).format(a / 1e8) + '억';
+    if (a >= 1e4) return sign + nf(0).format(Math.round(a / 1e4)) + '만';
+    return sign + nf(0).format(a);
+  }
+  function enCompact(v, p = 2) {
+    if (!isNum(v)) return NO;
+    const a = Math.abs(v), sign = v < 0 ? '-' : '';
+    if (a >= 1e12) return sign + nf(p).format(a / 1e12) + 'T';
+    if (a >= 1e9) return sign + nf(p).format(a / 1e9) + 'B';
+    if (a >= 1e6) return sign + nf(p).format(a / 1e6) + 'M';
+    if (a >= 1e3) return sign + nf(p).format(a / 1e3) + 'K';
+    return sign + nf(p).format(a);
+  }
+  function convert(v, from, to) {
+    if (!isNum(v)) return null;
+    if (from === null || from === to) return v;
+    const rate = snap().usdKrw;
+    if (!isNum(rate) || rate <= 0) return null;
+    return from === 'USD' ? v * rate : v / rate;
+  }
+  /** 가격 1개 → 표기 문자열 */
+  function fmtValue(v, q) {
+    if (!isNum(v)) return NO;
+    switch (q.unit) {
+      case 'percent': return fmtNum(v, q.precision) + '%';
+      case 'bp': return fmtNum(v, q.precision) + 'bp';
+      case 'ratio': case 'count': case 'point': return fmtNum(v, q.precision);
+      case 'usd_bn': return '$' + enCompact(v * 1e9, 2);
+    }
+    const c = convert(v, q.currency, state.currency);
+    if (c === null) return NO;
+    if (!q.currency) return fmtNum(c, q.precision);
+    if (state.currency === 'KRW') return fmtNum(c, c >= 1000 ? 0 : q.precision) + '원';
+    return '$' + fmtNum(c, c >= 1000 ? 2 : Math.max(q.precision, 2));
+  }
+  function fmtChange(v, q) {
+    if (!isNum(v)) return NO;
+    const c = q.unit === 'currency' ? convert(v, q.currency, state.currency) : v;
+    if (c === null) return NO;
+    const p = q.unit === 'currency' && state.currency === 'KRW' && Math.abs(c) >= 1000 ? 0 : q.precision;
+    const suffix = q.unit === 'percent' ? '%p' : q.unit === 'bp' ? 'bp' : '';
+    return fmtSigned(c, p) + suffix;
+  }
+
+  const KST = 'Asia/Seoul';
+  const dtf = (o) => new Intl.DateTimeFormat('ko-KR', Object.assign({ timeZone: KST }, o));
+  const F_TIME = dtf({ hour: '2-digit', minute: '2-digit', hour12: false });
+  const F_SEC = dtf({ hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const F_DATE = dtf({ month: '2-digit', day: '2-digit' });
+  const F_FULL = dtf({ year: 'numeric', month: '2-digit', day: '2-digit' });
+  const kTime = (t) => (t == null ? NO : F_TIME.format(new Date(t)));
+  const kSec = (t) => F_SEC.format(new Date(t));
+  const kDate = (t) => (t == null ? NO : F_DATE.format(new Date(t)).replace(/\.$/, ''));
+  const kDateTime = (t) => kDate(t) + ' ' + kTime(t);
+  /* 몇 년에 걸친 차트에서 월·일만 쓰면 며칠짜리 구간처럼 읽힌다 */
+  const F_YM = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit' });
+  const F_YMD = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' });
+  const kYearMonth = (t) => (t == null ? NO : F_YM.format(new Date(t)).replace(/\.$/, ''));
+  const kYmd = (t) => (t == null ? NO : F_YMD.format(new Date(t)).replace(/\.$/, ''));
+  const kFull = (t) => (t == null ? NO : F_FULL.format(new Date(t)) + ' ' + kTime(t) + ' KST');
+
+  function relative(t, now = Date.now()) {
+    if (t == null) return NO;
+    const ms = new Date(t).getTime();
+    if (isNaN(ms)) return NO;
+    const diff = now - ms, abs = Math.abs(diff), suf = diff >= 0 ? '전' : '후';
+    if (abs < 45000) return diff >= 0 ? '방금' : '곧';
+    const m = Math.round(abs / 60000);
+    if (m < 60) return m + '분 ' + suf;
+    const h = Math.round(abs / 3600000);
+    if (h < 24) return h + '시간 ' + suf;
+    const d = Math.round(abs / 86400000);
+    if (d < 30) return d + '일 ' + suf;
+    return Math.round(d / 30) + '개월 ' + suf;
+  }
+  function countdown(ms) {
+    if (!isNum(ms)) return NO;
+    if (ms <= 0) return '발표됨';
+    const t = Math.floor(ms / 60000), d = Math.floor(t / 1440), h = Math.floor((t % 1440) / 60), m = t % 60;
+    if (d > 0) return d + '일 ' + h + '시간 후';
+    if (h > 0) return h + '시간 ' + m + '분 후';
+    return m + '분 후';
+  }
+
+  /* ====================================================================== */
+  /* 척도 · 세션                                                             */
+  /* ====================================================================== */
+
+  const STAGES = [
+    { id: 'extreme_fear', label: '극단적 공포', min: 0, max: 19, v: '--s1', glyph: '▼▼' },
+    { id: 'fear', label: '공포', min: 20, max: 39, v: '--s2', glyph: '▼' },
+    { id: 'neutral', label: '중립', min: 40, max: 59, v: '--s3', glyph: '■' },
+    { id: 'greed', label: '탐욕', min: 60, max: 79, v: '--s4', glyph: '▲' },
+    { id: 'extreme_greed', label: '극단적 탐욕', min: 80, max: 100, v: '--s5', glyph: '▲▲' },
+  ];
+  function stageOf(s) {
+    if (!isNum(s)) return null;
+    const x = Math.min(100, Math.max(0, s));
+    for (let i = 0; i < STAGES.length; i++) {
+      const next = STAGES[i + 1];
+      if (!next || x < next.min) return STAGES[i];
+    }
+    return STAGES[4];
+  }
+  const scoreColor = (s) => { const st = stageOf(s); return st ? 'var(' + st.v + ')' : 'var(--muted)'; };
+  /** 막대·띠용 (채도 유지본) */
+  const stageFillOf = (st) => (st ? 'var(' + st.v + 'f)' : 'var(--surface-3)');
+  const scoreFill = (s) => stageFillOf(stageOf(s));
+
+  /* 신호등 — 위험 4단계를 빨/노/초 3색으로 접는다 */
+  const SIGNAL_ORDER = ['red', 'yellow', 'green'];
+  const SIGNAL_NAME = { green: '초록불', yellow: '노란불', red: '빨간불' };
+  const SIGNAL_MEAN = { green: '평소 범위', yellow: '살펴볼 수준', red: '경계 수준' };
+  const sigColor = (x) => (x === 'green' ? 'var(--tl-green)' : x === 'yellow' ? 'var(--tl-yellow)' : 'var(--tl-red)');
+  const sigFill = (x) => (x === 'green' ? 'var(--tl-green-fill)' : x === 'yellow' ? 'var(--tl-yellow-fill)' : 'var(--tl-red-fill)');
+  const riskSignal = (lv) => (lv === 'alert' ? 'red' : lv === 'watch' ? 'yellow' : 'green');
+
+  /** 실제 신호등처럼 위에서부터 빨·노·초. 켜진 칸의 '자리'가 곧 정보다. */
+  function lamp(sig, size, label) {
+    const d = size === 'lg' ? 9 : size === 'sm' ? 5 : 7;
+    return (
+      '<span class="tl-lamp" role="img" aria-label="' + esc((label ? label + ' ' : '') + SIGNAL_NAME[sig] + ' — ' + SIGNAL_MEAN[sig]) + '">' +
+      SIGNAL_ORDER.map((x) => {
+        const on = x === sig;
+        return '<i style="width:' + d + 'px;height:' + d + 'px;background:' + (on ? sigFill(x) : 'var(--surface-3)') +
+          ';opacity:' + (on ? 1 : 0.55) + (on ? ';box-shadow:0 0 0 1.5px color-mix(in srgb,' + sigColor(x) + ' 40%,transparent)' : '') + '"></i>';
+      }).join('') + '</span>'
+    );
+  }
+
+  /** 좁은 자리에서 쓰는 한 칸짜리 표시 */
+  const sigDot = (sig, d) =>
+    '<span aria-hidden="true" style="display:inline-block;flex-shrink:0;width:' + d + 'px;height:' + d +
+    'px;border-radius:50%;background:' + sigFill(sig) + ';box-shadow:0 0 0 1px color-mix(in srgb,' + sigColor(sig) + ' 55%,transparent)"></span>';
+
+  /** 색깔별 개수 요약 — 숫자만 세도 전체 분위기가 잡힌다 */
+  function signalTally(d) {
+    const avail = d.indicators.filter((i) => i.value !== null);
+    return (
+      '<ul class="tl-tally" aria-label="산출된 ' + avail.length + '개 지표의 신호등 분포">' +
+      SIGNAL_ORDER.slice().reverse().map((x) => {
+        const g = avail.filter((i) => riskSignal(i.level) === x);
+        const on = g.length > 0;
+        return '<li style="border-color:' + (on ? 'color-mix(in srgb,' + sigColor(x) + ' 45%,var(--border))' : 'var(--border)') +
+          ';background:' + (on ? 'color-mix(in srgb,' + sigColor(x) + ' 10%,var(--surface))' : 'var(--surface)') + '">' +
+          '<span style="display:flex;align-items:center;justify-content:center;gap:6px">' + sigDot(x, 9) +
+          '<span style="font-size:10.5px;font-weight:600;color:' + sigColor(x) + '">' + SIGNAL_NAME[x] + '</span></span>' +
+          '<p class="tnum" style="margin:2px 0 0;font-size:19px;line-height:1;font-weight:700;color:' + sigColor(x) + '">' + g.length +
+          '<span style="margin-left:2px;font-size:10px;font-weight:400;color:var(--subtle)">개</span></p>' +
+          '<p style="margin:4px 0 0;font-size:9.5px;line-height:1.3;word-break:keep-all;color:var(--subtle)">' +
+          esc(on ? g.map((i) => i.shortName).join(' · ') : SIGNAL_MEAN[x]) + '</p></li>';
+      }).join('') + '</ul>'
+    );
+  }
+
+  /** 색이 무슨 뜻인지 한 줄로 알려 준다 */
+  const signalLegend = (note) =>
+    '<div class="tl-legend"><ul>' +
+    SIGNAL_ORDER.slice().reverse().map((x) =>
+      '<li>' + sigDot(x, 8) + '<span style="font-weight:600;color:' + sigColor(x) + '">' + SIGNAL_NAME[x] +
+      '</span><span style="color:var(--subtle)">' + SIGNAL_MEAN[x] + '</span></li>').join('') +
+    '</ul><p style="margin:6px 0 0;font-size:10px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(note) + '</p></div>';
+
+  const dirOf = (v) => (!isNum(v) ? 'none' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat');
+  const dirColor = (v) => { const d = dirOf(v); return d === 'up' ? 'var(--up)' : d === 'down' ? 'var(--down)' : d === 'flat' ? 'var(--muted)' : 'var(--subtle)'; };
+  const dirGlyph = (v) => ({ up: '▲', down: '▼', flat: '―', none: '—' })[dirOf(v)];
+  const dirLabel = (v) => ({ up: '상승', down: '하락', flat: '보합', none: '정보 없음' })[dirOf(v)];
+
+  const SESSION_LABEL = { pre: '장전', regular: '장중', post: '장후', closed: '마감', holiday: '휴장', always: '24시간 거래' };
+  const US_HOL = ['2026-09-07', '2026-11-26', '2026-12-25', '2027-01-01'];
+  const KR_HOL = ['2026-09-24', '2026-09-25', '2026-10-05', '2026-10-09', '2026-12-25', '2026-12-31'];
+
+  function parts(tz, now) {
+    const p = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, weekday: 'short',
+    }).formatToParts(now);
+    const g = (t) => (p.find((x) => x.type === t) || {}).value || '';
+    const wd = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[g('weekday')] || 0;
+    return { key: g('year') + '-' + g('month') + '-' + g('day'), wd, sec: (Number(g('hour')) % 24) * 3600 + Number(g('minute')) * 60 + Number(g('second')) };
+  }
+  /** 실제 앱의 marketHours 로직을 압축한 버전 */
+  function session(market, now) {
+    if (market === 'crypto') return { phase: 'always', hint: '24시간 거래' };
+    const tz = market === 'us' ? 'America/New_York' : KST;
+    const hol = market === 'us' ? US_HOL : KR_HOL;
+    const b = market === 'us'
+      ? [[0, 'closed'], [4 * 3600, 'pre'], [9 * 3600 + 1800, 'regular'], [16 * 3600, 'post'], [20 * 3600, 'closed']]
+      : [[0, 'closed'], [8 * 3600 + 1800, 'pre'], [9 * 3600, 'regular'], [15 * 3600 + 1800, 'post'], [18 * 3600, 'closed']];
+    const p = parts(tz, now);
+    if (p.wd === 0 || p.wd === 6) return { phase: 'closed', hint: '주말 휴장' };
+    if (hol.indexOf(p.key) >= 0) return { phase: 'holiday', hint: '휴장일' };
+    let cur = b[0], next = null;
+    for (let i = 0; i < b.length; i++) if (p.sec >= b[i][0]) { cur = b[i]; next = b[i + 1] || null; }
+    const label = { closed: '다음 장전까지', pre: '정규장 시작까지', regular: '정규장 종료까지', post: '시간외 종료까지' }[cur[1]];
+    if (!next) return { phase: 'closed', hint: '다음 거래일 대기' };
+    const mins = Math.round((next[0] - p.sec) / 60);
+    const hint = mins < 60 ? label + ' ' + mins + '분' : label + ' ' + Math.floor(mins / 60) + '시간 ' + (mins % 60) + '분';
+    return { phase: cur[1], hint };
+  }
+
+  /* ====================================================================== */
+  /* SVG 차트                                                                */
+  /* ====================================================================== */
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  function polar(cx, cy, r, deg) {
+    const a = (deg * Math.PI) / 180;
+    return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
+  }
+  function arc(cx, cy, r, a0, a1) {
+    const [x0, y0] = polar(cx, cy, r, a0), [x1, y1] = polar(cx, cy, r, a1);
+    return 'M ' + x0.toFixed(2) + ' ' + y0.toFixed(2) + ' A ' + r + ' ' + r + ' 0 0 ' + (a1 < a0 ? 1 : 0) + ' ' + x1.toFixed(2) + ' ' + y1.toFixed(2);
+  }
+
+  let uid = 0;
+  /** 0~100 반원 게이지 — 실제 앱 Gauge.tsx 이식 */
+  function gauge(score, size) {
+    const id = 'g' + ++uid;
+    const w = size, h = size * 0.7, cx = w / 2, cy = h - 20;
+    const r = Math.min(w / 2 - 12, cy - 8), th = Math.max(9, r * 0.19);
+    const st = stageOf(score);
+    const s = isNum(score) ? Math.min(100, Math.max(0, score)) : null;
+    const ang = s === null ? null : 180 - (s / 100) * 180;
+    const label = s === null ? '점수 산출 불가' : '100점 만점에 ' + fmtScore(s) + '점, ' + (st ? st.label : '') + ' 단계';
+
+    let marker = '';
+    if (ang !== null) {
+      const a = polar(cx, cy, r - th * 1.05, ang), b = polar(cx, cy, r + th * 0.55, ang);
+      const a2 = polar(cx, cy, r - th * 1.15, ang), b2 = polar(cx, cy, r + th * 0.62, ang);
+      marker =
+        '<line x1="' + a2[0] + '" y1="' + a2[1] + '" x2="' + b2[0] + '" y2="' + b2[1] + '" stroke="var(--bg)" stroke-width="5.5" stroke-linecap="round"/>' +
+        '<line x1="' + a[0] + '" y1="' + a[1] + '" x2="' + b[0] + '" y2="' + b[1] + '" stroke="var(--fg-strong)" stroke-width="3" stroke-linecap="round"/>';
+    }
+    const ticks = [20, 40, 60, 80].map((v) => {
+      const a = 180 - (v / 100) * 180;
+      const p0 = polar(cx, cy, r - th / 2, a), p1 = polar(cx, cy, r + th / 2, a);
+      return '<line x1="' + p0[0] + '" y1="' + p0[1] + '" x2="' + p1[0] + '" y2="' + p1[1] + '" stroke="var(--bg)" stroke-width="1.5" opacity=".65"/>';
+    }).join('');
+
+    return (
+      '<div style="position:relative;width:' + w + 'px;height:' + h + 'px;flex-shrink:0">' +
+      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + esc(label) + '">' +
+      '<defs><linearGradient id="' + id + '" x1="0%" x2="100%"><stop offset="0%" stop-color="var(--s1f)"/><stop offset="25%" stop-color="var(--s2f)"/>' +
+      '<stop offset="50%" stop-color="var(--s3f)"/><stop offset="75%" stop-color="var(--s4f)"/><stop offset="100%" stop-color="var(--s5f)"/></linearGradient></defs>' +
+      '<path d="' + arc(cx, cy, r, 180, 0) + '" fill="none" stroke="var(--surface-3)" stroke-width="' + th + '" stroke-linecap="round"/>' +
+      '<path d="' + arc(cx, cy, r, 180, 0) + '" fill="none" stroke="url(#' + id + ')" stroke-width="' + th + '" stroke-linecap="round" opacity="' + (s === null ? 0.22 : 0.92) + '"/>' +
+      ticks + marker +
+      '<text x="0" y="' + (h - 1) + '" font-size="9" fill="var(--subtle)">0</text>' +
+      '<text x="' + w + '" y="' + (h - 1) + '" font-size="9" fill="var(--subtle)" text-anchor="end">100</text>' +
+      '</svg>' +
+      '<div style="position:absolute;inset-inline:0;top:' + h * 0.45 + 'px;display:flex;flex-direction:column;align-items:center;pointer-events:none">' +
+      '<span class="tnum" style="font-size:' + (size > 180 ? 34 : 29) + 'px;font-weight:700;line-height:1;color:' + scoreColor(s) + '">' + (s === null ? NO : fmtScore(s)) + '</span>' +
+      '<span style="margin-top:5px;font-size:11px;font-weight:600;color:' + scoreColor(s) + '">' + (s === null ? '산출 불가' : st.glyph + ' ' + st.label) + '</span>' +
+      '</div></div>'
+    );
+  }
+
+  function extent(vals) {
+    let min = Infinity, max = -Infinity;
+    for (const v of vals) { if (!isNum(v)) continue; if (v < min) min = v; if (v > max) max = v; }
+    if (!isFinite(min) || !isFinite(max)) return [0, 1];
+    if (min === max) return [min - Math.abs(min || 1) * 0.02, max + Math.abs(max || 1) * 0.02];
+    return [min, max];
+  }
+  const scale = (d, r) => (v) => (d[1] === d[0] ? (r[0] + r[1]) / 2 : r[0] + ((v - d[0]) / (d[1] - d[0])) * (r[1] - r[0]));
+
+  /** 가격/점수 미니 차트 */
+  function sparkline(points, color, w, h, fill) {
+    const pts = points.filter((p) => isNum(p.v));
+    if (pts.length < 2) return '<span style="display:inline-block;width:' + w + 'px;font-size:10px;color:var(--subtle);text-align:center">데이터 없음</span>';
+    const id = 'sp' + ++uid, pad = 3;
+    const x = scale([pts[0].t, pts[pts.length - 1].t], [pad, w - pad]);
+    const y = scale(extent(pts.map((p) => p.v)), [h - pad, pad]);
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+    const last = pts[pts.length - 1];
+    return (
+      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="기간 추이 미니 차트">' +
+      (fill
+        ? '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity=".28"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+          '<path d="' + d + ' L ' + x(last.t).toFixed(1) + ' ' + (h - pad) + ' L ' + x(pts[0].t).toFixed(1) + ' ' + (h - pad) + ' Z" fill="url(#' + id + ')"/>'
+        : '') +
+      '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="2" fill="' + color + '"/></svg>'
+    );
+  }
+
+  /** Fear→Greed 그라데이션 점수 미니 차트 */
+  function scoreSpark(points, w, h) {
+    const pts = points.filter((p) => isNum(p.v));
+    if (pts.length < 2) return '<span style="font-size:10px;color:var(--subtle)">추이 없음</span>';
+    const id = 'ss' + ++uid, pad = 3;
+    const x = scale([pts[0].t, pts[pts.length - 1].t], [pad, w - pad]);
+    const y = scale([0, 100], [h - pad, pad]);
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+    return (
+      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="최근 30일 점수 추이">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="var(--s1f)"/><stop offset="30%" stop-color="var(--s2f)"/>' +
+      '<stop offset="50%" stop-color="var(--s3f)"/><stop offset="72%" stop-color="var(--s4f)"/><stop offset="100%" stop-color="var(--s5f)"/></linearGradient></defs>' +
+      '<line x1="0" y1="' + y(50) + '" x2="' + w + '" y2="' + y(50) + '" stroke="var(--border)" stroke-dasharray="2 3"/>' +
+      '<path d="' + d + '" fill="none" stroke="url(#' + id + ')" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(pts[pts.length - 1].t).toFixed(1) + '" cy="' + y(pts[pts.length - 1].v).toFixed(1) + '" r="2.2" fill="var(--fg-strong)"/></svg>'
+    );
+  }
+
+  /* --- 듀얼 축 라인 차트 (툴팁 + 키보드 + 표 대안) --- */
+  const CHARTS = {};
+  const M = { top: 10, right: 46, bottom: 22, left: 52 };
+
+  function axisLabel(v, precision, korean) {
+    const a = Math.abs(v);
+    if (a >= 1e8) return korean ? koCompact(v, 2) : enCompact(v, 2);
+    if (a >= 1e4) return fmtNum(v, 0);
+    return fmtNum(v, Math.min(precision, 2));
+  }
+
+  /* ---------------- 차트 뷰포트 (이동·확대) ----------------
+     확대해도 이보다 좁아지지 않는다 — 점 몇 개만 남으면 차트가 아니게 된다 */
+  const MIN_SPAN_RATIO = 1 / 400;
+  const MIN_SPAN_MS = 2 * 864e5;
+
+  function clampView(v, full) {
+    const fullSpan = full.t1 - full.t0;
+    const minSpan = Math.max(fullSpan * MIN_SPAN_RATIO, Math.min(MIN_SPAN_MS, fullSpan));
+    const span = Math.min(Math.max(v.t1 - v.t0, minSpan), fullSpan);
+    let t0 = v.t0;
+    // 데이터 바깥으로는 나가지 않는다. 빈 여백을 끌고 다니면 위치 감각이 무너진다.
+    if (t0 < full.t0) t0 = full.t0;
+    if (t0 + span > full.t1) t0 = full.t1 - span;
+    if (!isFinite(t0) || !isFinite(span)) return { t0: full.t0, t1: full.t1 };
+    return { t0: t0, t1: t0 + span };
+  }
+
+  const viewOf = (c) => c.view || c.full;
+  const isZoomed = (c) => { const v = viewOf(c); return v.t1 - v.t0 < c.full.t1 - c.full.t0 - 1; };
+
+  function setView(id, v) {
+    const c = CHARTS[id];
+    if (!c || !c.full) return;
+    const cl = clampView(v, c.full);
+    c.view = cl.t1 - cl.t0 >= c.full.t1 - c.full.t0 - 1 ? null : cl;
+    drawChart(id);
+    syncZoomButtons(id);
+  }
+
+  function zoomChart(id, factor, anchorT) {
+    const c = CHARTS[id];
+    if (!c) return;
+    const v = viewOf(c);
+    const a = anchorT == null ? (v.t0 + v.t1) / 2 : anchorT;
+    setView(id, { t0: a - (a - v.t0) * factor, t1: a + (v.t1 - a) * factor });
+  }
+
+  function panChart(id, ratio) {
+    const c = CHARTS[id];
+    if (!c) return;
+    const v = viewOf(c);
+    const d = (v.t1 - v.t0) * ratio;
+    setView(id, { t0: v.t0 + d, t1: v.t1 + d });
+  }
+
+  /** 픽셀 위치를 시각으로 */
+  function timeAtPx(c, px) {
+    const v = viewOf(c);
+    if (!c.innerW) return (v.t0 + v.t1) / 2;
+    const r = Math.min(1, Math.max(0, (px - M.left) / c.innerW));
+    return v.t0 + (v.t1 - v.t0) * r;
+  }
+
+  function syncZoomButtons(id) {
+    const wrap = document.querySelector('[data-zoom-for="' + id + '"]');
+    if (!wrap) return;
+    const c = CHARTS[id];
+    const btn = wrap.querySelector('[data-zoom="reset"]');
+    if (btn) btn.disabled = !c || !isZoomed(c);
+    const hint = document.getElementById(id + '-hint');
+    if (hint) {
+      const v = c ? viewOf(c) : null;
+      hint.textContent = c && isZoomed(c) ? ' 지금은 ' + kYmd(v.t0) + ' ~ ' + kYmd(v.t1) + ' 구간만 보고 있습니다.' : '';
+    }
+  }
+
+  function lineChart(series, height, label, markers) {
+    const id = 'c' + ++uid;
+    const clean = series.map((s) => Object.assign({}, s, { points: s.points.filter((p) => isNum(p.v)) })).filter((s) => s.points.length > 1);
+    if (!clean.length) return '<p style="font-size:12px;color:var(--muted);text-align:center;padding:24px 0">차트를 그릴 데이터가 부족합니다.</p>';
+    const allT = clean.flatMap((s) => [s.points[0].t, s.points[s.points.length - 1].t]);
+    const fullT0 = Math.min(...allT), fullT1 = Math.max(...allT);
+    CHARTS[id] = {
+      series: clean, all: clean, height, label, markers: markers || [], focusT: state.crisisT,
+      full: fullT1 > fullT0 ? { t0: fullT0, t1: fullT1 } : null,
+      view: null,
+    };
+
+    const legend = clean.map((s) =>
+      '<li><span class="swatch" style="background:' + s.color + (s.dashed ? ';opacity:.85' : '') + '"></span>' + esc(s.name) +
+      (s.axis === 'right' ? '<span style="color:var(--subtle)">(우축)</span>' : '') + '</li>').join('');
+
+    return (
+      '<div>' +
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">' +
+      '<ul class="chart-legend">' + legend + '</ul>' +
+      '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
+      '<div class="zoombar" data-zoom-for="' + id + '" role="group" aria-label="차트 확대·축소">' +
+      '<button type="button" data-zoom="out" data-zoom-id="' + id + '" aria-label="축소" title="축소">−</button>' +
+      '<button type="button" data-zoom="in" data-zoom-id="' + id + '" aria-label="확대" title="확대">＋</button>' +
+      '<button type="button" data-zoom="reset" data-zoom-id="' + id + '" aria-label="전체 구간 보기" title="전체 구간 보기" disabled>⤢</button>' +
+      '</div>' +
+      '<button type="button" class="ghost" data-table-toggle="' + id + '" aria-expanded="false">표로 보기</button></div></div>' +
+      '<div class="chartbox" id="' + id + '" data-chart="' + id + '" style="height:' + height + 'px"></div>' +
+      '<div id="' + id + '-table" hidden></div>' +
+      '<p style="margin:6px 0 0;font-size:10px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다. ' +
+      '키보드는 ← → 시점 이동, Shift+← → 화면 이동, ＋/− 확대·축소, 0 전체입니다. 같은 내용을 표로도 볼 수 있습니다.' +
+      '<b id="' + id + '-hint" style="color:var(--muted)"></b></p>' +
+      '</div>'
+    );
+  }
+
+  function drawChart(id) {
+    const box = document.getElementById(id);
+    const c = CHARTS[id];
+    if (!box || !c) return;
+    const w = box.clientWidth;
+    if (!w) return;
+    const h = c.height;
+    const innerW = Math.max(10, w - M.left - M.right);
+    /* 표식이 있으면 번호 배지가 앉을 자리를 위에 비워 둔다 */
+    const top = M.top + ((c.markers && c.markers.length) ? 15 : 0);
+    const innerH = Math.max(10, h - top - M.bottom);
+    /* 보이는 구간만 잘라서 그린다. 확대할수록 같은 폭에 더 적은 날이 들어가 굴곡이 드러난다.
+       축은 데이터 끝이 아니라 '보고 있는 구간'에 맞춘다 — 데이터에 맞추면 끌 때마다 화면이 튄다. */
+    const vw = viewOf(c);
+    c.series = c.all
+      ? c.all.map((s) => {
+          const pts = s.points;
+          let lo = 0, hi = pts.length - 1;
+          while (lo < pts.length && pts[lo].t < vw.t0) lo++;
+          while (hi >= 0 && pts[hi].t > vw.t1) hi--;
+          const from = Math.max(0, lo - 1), to = Math.min(pts.length - 1, hi + 1);
+          return Object.assign({}, s, { points: from <= to ? pts.slice(from, to + 1) : [] });
+        }).filter((s) => s.points.length > 1)
+      : c.series;
+    if (!c.series.length) return;
+    c.longSpan = vw.t1 - vw.t0 > 400 * 864e5;
+    const x = scale([vw.t0, vw.t1], [M.left, M.left + innerW]);
+
+    const leftVals = c.series.filter((s) => s.axis !== 'right').flatMap((s) => s.points.map((p) => p.v));
+    const rightSeries = c.series.filter((s) => s.axis === 'right');
+    const pad = (vals) => { const [a, b] = extent(vals); const p = (b - a) * 0.08; return [a - p, b + p]; };
+    const dl = pad(leftVals);
+    const dr = rightSeries.some((s) => s.fixed) ? [0, 100] : pad(rightSeries.flatMap((s) => s.points.map((p) => p.v)));
+    const yL = scale(dl, [top + innerH, top]), yR = scale(dr, [top + innerH, top]);
+    const base = c.series[0];
+
+    let g = '';
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+      const yy = top + innerH * f;
+      g += '<line x1="' + M.left + '" y1="' + yy + '" x2="' + (M.left + innerW) + '" y2="' + yy + '" stroke="var(--border)" opacity=".5"/>';
+      g += '<text x="' + (M.left - 6) + '" y="' + (yy + 3) + '" text-anchor="end" font-size="9" fill="var(--subtle)" class="tnum">' +
+        esc(axisLabel(dl[1] - (dl[1] - dl[0]) * f, base.precision, base.suffix === '원')) + '</text>';
+      if (rightSeries.length)
+        g += '<text x="' + (M.left + innerW + 6) + '" y="' + (yy + 3) + '" font-size="9" fill="var(--subtle)" class="tnum">' +
+          esc(axisLabel(dr[1] - (dr[1] - dr[0]) * f, 0, false)) + '</text>';
+    });
+    const t0 = vw.t0, t1 = vw.t1;
+    [0, 0.5, 1].forEach((f) => {
+      const t = t0 + (t1 - t0) * f;
+      g += '<text x="' + x(t) + '" y="' + (h - 6) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '" font-size="9" fill="var(--subtle)">' + esc(c.longSpan ? kYearMonth(t) : kDate(t)) + '</text>';
+    });
+
+    let paths = '';
+    c.series.forEach((s) => {
+      const y = s.axis === 'right' ? yR : yL;
+      const d = s.points.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+      if (s.area) paths += '<path d="' + d + ' L ' + x(s.points[s.points.length - 1].t).toFixed(1) + ' ' + (top + innerH) + ' L ' + x(s.points[0].t).toFixed(1) + ' ' + (top + innerH) + ' Z" fill="' + s.color + '" opacity=".12"/>';
+      paths += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.axis === 'right' ? 1.5 : 1.9) + '"' + (s.dashed ? ' stroke-dasharray="4 3"' : '') + ' stroke-linejoin="round" stroke-linecap="round"/>';
+    });
+
+    /* 시점 표식 — 세로 점선 + 번호 배지. 아래 목록의 번호와 짝을 이룬다. */
+    let marks = '';
+    (c.markers || []).forEach((mk) => {
+      const mx = x(mk.t);
+      if (mx < M.left - 1 || mx > M.left + innerW + 1) return;
+      const on = c.focusT != null && Math.abs(c.focusT - mk.t) < 864e5;
+      const op = c.focusT == null || on ? 1 : 0.4;
+      marks +=
+        '<g opacity="' + op + '">' +
+        '<line x1="' + mx + '" y1="' + top + '" x2="' + mx + '" y2="' + (top + innerH) + '" stroke="' + mk.color +
+        '" stroke-width="' + (on ? 1.6 : 1) + '" stroke-dasharray="3 3" opacity="' + (on ? 0.95 : 0.6) + '"/>' +
+        '<circle cx="' + mx + '" cy="' + (top - 8) + '" r="' + (on ? 8 : 7) + '" fill="' + mk.color + '"/>' +
+        '<text x="' + mx + '" y="' + (top - 8 + 3.2) + '" text-anchor="middle" font-size="9" font-weight="700" fill="var(--bg)">' + mk.index + '</text>' +
+        '</g>';
+    });
+
+    const markerAria = (c.markers || []).length
+      ? ' 표시된 시점 ' + c.markers.length + '건: ' + c.markers.map((mk) => mk.index + '번 ' + kYmd(mk.t) + ' ' + mk.label).join(', ') + '.'
+      : '';
+
+    box.innerHTML =
+      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" tabindex="0" role="img" aria-label="' + esc(c.label + markerAria) + '">' +
+      g + paths + marks + '<g class="cross"></g></svg>' +
+      '<div class="tip"></div><p class="sr" aria-live="polite"></p>';
+
+    Object.assign(c, { x, yL, yR, w, innerH, top, innerW });
+  }
+
+  function chartCursor(id, px) {
+    const c = CHARTS[id];
+    const box = document.getElementById(id);
+    if (!c || !box || !c.x) return;
+    const base = c.series[0];
+    let best = 0, bd = Infinity;
+    base.points.forEach((p, i) => { const d = Math.abs(c.x(p.t) - px); if (d < bd) { bd = d; best = i; } });
+    const pt = base.points[best];
+    const at = (s) => { let b = null, d = Infinity; for (const p of s.points) { const q = Math.abs(p.t - pt.t); if (q < d) { d = q; b = p; } } return b ? b.v : null; };
+
+    const cross = box.querySelector('.cross');
+    cross.innerHTML =
+      '<line x1="' + c.x(pt.t) + '" y1="' + c.top + '" x2="' + c.x(pt.t) + '" y2="' + (c.top + c.innerH) + '" stroke="var(--fg)" opacity=".45"/>' +
+      c.series.map((s) => {
+        const v = at(s);
+        if (v === null) return '';
+        const y = s.axis === 'right' ? c.yR : c.yL;
+        return '<circle cx="' + c.x(pt.t) + '" cy="' + y(v) + '" r="3.2" fill="' + s.color + '" stroke="var(--surface)" stroke-width="1.2"/>';
+      }).join('');
+
+    const tip = box.querySelector('.tip');
+    tip.innerHTML =
+      '<div class="tt-time">' + esc(c.longSpan ? kYmd(pt.t) : kYmd(pt.t) + ' ' + kTime(pt.t)) + '</div>' +
+      c.series.map((s) => '<div class="tt-row"><span><span class="swatch" style="background:' + s.color + '"></span>' + esc(s.name) + '</span><b class="tnum">' + esc(fmtNum(at(s), s.precision) + (s.suffix || '')) + '</b></div>').join('');
+    tip.style.left = Math.max(0, Math.min(c.w - 168, c.x(pt.t) - 84)) + 'px';
+    tip.classList.add('on');
+    box.querySelector('.sr').textContent = kYmd(pt.t) + ' ' + kTime(pt.t) + ', ' + c.series.map((s) => s.name + ' ' + fmtNum(at(s), s.precision)).join(', ');
+    c.cursor = best;
+  }
+
+  function chartTable(id) {
+    const c0 = CHARTS[id];
+    const c = c0 && c0.all ? Object.assign({}, c0, { series: c0.all }) : c0;
+    const base = c.series[0];
+    const step = (base.points.length - 1) / 23;
+    const rows = [];
+    for (let i = 0; i < 24 && base.points.length > 1; i++) rows.push(base.points[Math.round(i * step)]);
+    const at = (s, t) => { let b = null, d = Infinity; for (const p of s.points) { const q = Math.abs(p.t - t); if (q < d) { d = q; b = p; } } return b ? b.v : null; };
+    return (
+      '<div class="tablewrap" style="max-height:280px;overflow-y:auto"><table class="data"><caption class="sr">' + esc(c.label) + '</caption>' +
+      '<thead><tr><th>시각 (KST)</th>' + c.series.map((s) => '<th>' + esc(s.name) + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.map((r) => '<tr><th style="font-weight:400;color:var(--muted)">' + esc(kDateTime(r.t)) + '</th>' +
+        c.series.map((s) => '<td class="tnum">' + esc(fmtNum(at(s, r.t), s.precision) + (s.suffix || '')) + '</td>').join('') + '</tr>').join('') +
+      '</tbody></table></div>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 조각 렌더러                                                              */
+  /* ====================================================================== */
+
+  const badge = (cls, text, title, size) => '<span class="badge ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') +
+    (size === 'sm' ? ' style="font-size:11.5px;padding:3px 9px"' : '') + '>' + text + '</span>';
+  const modeBadge = () => badge('b-demo', 'DEMO', '고정 샘플 데이터입니다. 실제 시세가 아닙니다.');
+  const confBadge = (c, reason) => {
+    const cls = c === 'high' ? 'b-ok' : c === 'medium' ? 'b-neutral' : 'b-warn';
+    const glyph = c === 'high' ? '●●●' : c === 'medium' ? '●●○' : '●○○';
+    const label = { high: '높음', medium: '보통', low: '낮음' }[c];
+    return badge(cls, glyph + ' 신뢰도 ' + label, reason);
+  };
+  const freshBadge = (fresh, delay) => {
+    if (fresh === 'stale') return badge('b-warn', '오래된 데이터');
+    if (fresh === 'delayed') return badge('b-neutral', delay ? delay + '분 지연' : '지연');
+    return badge('b-ok', '실시간');
+  };
+  const sessBadge = (p) => {
+    const cls = p === 'regular' || p === 'always' ? 'b-ok' : p === 'pre' || p === 'post' ? 'b-accent' : 'b-neutral';
+    return badge(cls, SESSION_LABEL[p]);
+  };
+
+  function statusBar() {
+    const s = snap();
+    const now = new Date();
+    const sessions = MARKETS.map((m) => ({ m, ...session(m, now) }));
+    const statuses = Object.values(s.sections).map((x) => x.status);
+    const bad = statuses.filter((x) => x === 'error').length;
+    const stale = statuses.filter((x) => x === 'stale').length;
+    const partial = statuses.filter((x) => x === 'partial' || x === 'empty').length;
+
+    const statusBadge = bad ? badge('b-danger', '오류 ' + bad)
+      : stale ? badge('b-warn', '오래된 데이터 ' + stale)
+      : partial ? badge('b-warn', '일부 항목 누락 ' + partial)
+      : badge('b-ok', '정상');
+
+    return (
+      '<div class="sb-row"><div class="sb-badges">' +
+      '<span class="clock tnum" id="clock">' + kSec(now) + '<small>KST</small></span>' +
+      modeBadge() +
+      (state.scenario !== 'normal' ? badge('b-warn', '시나리오: ' + state.scenario) : '') +
+      statusBadge +
+      '</div><button type="button" class="ghost" data-noop>↻ 새로고침</button></div>' +
+
+      '<div class="chips">' + sessions.map((x) => {
+        const color = x.phase === 'regular' || x.phase === 'always' ? 'var(--ok)' : x.phase === 'pre' || x.phase === 'post' ? 'var(--accent)' : x.phase === 'holiday' ? 'var(--warn)' : 'var(--muted)';
+        return '<span class="chip" title="' + esc(x.hint) + '"><span class="dot" style="background:' + color + '"></span>' +
+          '<b>' + MARKET_LABEL[x.m] + '</b><span style="color:' + color + '">' + SESSION_LABEL[x.phase] + '</span></span>';
+      }).join('') + '</div>' +
+
+      '<div class="sb-foot"><p>마지막 전체 업데이트 <span class="tnum" style="color:var(--fg)">' + esc(relative(s.lastFullUpdate)) + '</span>' +
+      ' · 환율 <span class="tnum" style="color:var(--fg)">' + esc(fmtNum(s.usdKrw, 2)) + '원</span></p>' +
+      '<div class="sb-toggles">' +
+      '<div class="seg" role="group" aria-label="표시 통화">' +
+      '<button type="button" data-cur="KRW" aria-pressed="' + (state.currency === 'KRW') + '">₩</button>' +
+      '<button type="button" data-cur="USD" aria-pressed="' + (state.currency === 'USD') + '">$</button></div>' +
+      '<div class="seg" role="group" aria-label="등락 색상">' +
+      '<button type="button" data-cm="korean" aria-pressed="' + (state.colorMode === 'korean') + '">한국식</button>' +
+      '<button type="button" data-cm="global" aria-pressed="' + (state.colorMode === 'global') + '">글로벌</button></div>' +
+      '</div></div>'
+    );
+  }
+
+  function fngCard(f) {
+    const un = f.score === null;
+    const driver = (kind, d) =>
+      '<div class="driver"><span class="g" style="color:' + dirColor(kind === 'up' ? 1 : -1) + '">' + (kind === 'up' ? '▲' : '▼') + '</span>' +
+      '<div><span class="lbl">' + (kind === 'up' ? '상승 요인 ' : '하락 요인 ') + '</span>' + esc(d ? d.label : '판단할 데이터가 부족합니다') +
+      (d ? '<span class="det">' + esc(fmtSigned(d.contribution, 2)) + '점 기여</span>' : '') + '</div></div>';
+
+    return (
+      '<article class="card fngcard">' +
+      '<header><div><h3>' + MARKET_LABEL[f.market] + ' 투자심리</h3><div class="sub">자체 산출 지수 · ' + esc(f.formulaVersion) + '</div></div>' +
+      '<div class="fng-right">' + modeBadge() + confBadge(f.confidence, f.confidenceReason) + '</div></header>' +
+      '<div style="display:flex;justify-content:center">' + gauge(f.score, 168) + '</div>' +
+      (un
+        ? '<p class="notice n-warn" style="margin:4px 0 0">' + esc(f.unavailableReason || '데이터가 부족해 점수를 산출할 수 없습니다.') + '</p>'
+        : '<div class="deltas">' +
+          [['전일', f.deltaDay], ['1주', f.deltaWeek], ['1개월', f.deltaMonth]].map(([l, v]) =>
+            '<div class="delta"><small>' + l + '</small><b class="tnum" style="color:' + dirColor(v) + '">' + dirGlyph(v) + ' ' + esc(fmtSigned(v, 1)) +
+            '<span class="sr">' + dirLabel(v) + '</span></b></div>').join('') + '</div>') +
+      '<div class="sparkrow"><small>최근 30일</small>' + scoreSpark(f.spark, 132, 30) + '</div>' +
+      '<div class="drivers">' + driver('up', f.topPositive) + driver('down', f.topNegative) + '</div>' +
+      '<div class="fngfoot"><small>산출 ' + esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</small>' +
+      '<button type="button" class="ghost" data-go-fng="' + f.market + '">상세 보기 →</button></div>' +
+      '</article>'
+    );
+  }
+
+  function priceCard(q) {
+    const un = q.price === null;
+    const col = dirColor(q.changePct);
+    const delay = q.meta.sources[0] ? q.meta.sources[0].delayMinutes : null;
+    return (
+      '<article class="card pcard" aria-label="' + esc(q.name) + ' 시세">' +
+      '<div class="pcard-top"><div style="display:flex;gap:6px;align-items:flex-start;min-width:0">' +
+      '<button type="button" class="star" data-watch="' + q.id + '" aria-pressed="' + state.watch.has(q.id) + '" aria-label="' + esc(q.name) + ' 관심목록 전환">' +
+      (state.watch.has(q.id) ? '★' : '☆') + '</button>' +
+      '<div style="min-width:0"><div class="pcard-name">' + esc(q.name) + '</div><div class="pcard-sym">' + esc(q.symbol) + '</div></div></div>' +
+      '<div style="display:flex;gap:4px;flex-shrink:0">' + sessBadge(q.session) + freshBadge(q.meta.freshness, delay) + '</div></div>' +
+      (un
+        ? '<p class="notice n-warn" style="margin-top:8px">' + esc(q.unavailableReason || '값을 받지 못했습니다.') + '</p>'
+        : '<div class="pcard-mid"><div style="min-width:0">' +
+          '<div class="pcard-price tnum">' + esc(fmtValue(q.price, q)) + '</div>' +
+          '<div class="pcard-chg tnum" style="color:' + col + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtChange(q.change, q)) + ' (' + esc(fmtPct(q.changePct)) + ')' +
+          '<span class="sr">' + dirLabel(q.changePct) + '</span></div></div>' +
+          sparkline(q.spark, col === 'var(--subtle)' ? 'var(--accent)' : col, 84, 30, true) + '</div>') +
+      '<div class="pcard-foot">' +
+      (q.volume !== null ? '<span>거래량 ' + esc(koCompact(q.volume, 1)) + '</span>' : '') +
+      '<span>기준 ' + esc(kTime(q.meta.asOf)) + '</span>' +
+      '<span>출처 ' + esc((q.meta.sources[0] || {}).name || '알 수 없음') + '</span></div>' +
+      '</article>'
+    );
+  }
+
+  /* 지표 해설 — src/lib/indicatorGuide.ts 에서 그대로 옮겨온 값 (문구가 갈라지지 않게) */
+  const INDICATOR_GUIDE = {"us_policy_rate":{"plain":"미국 중앙은행(연준)이 정한 기준이 되는 금리입니다. 세상 모든 대출·예금 금리가 여기서 출발합니다.","whenUp":"돈을 빌리는 값이 비싸집니다. 기업은 투자를 줄이고 가계는 이자 부담이 커집니다. 보통 물가를 잡으려 할 때 올립니다.","whenDown":"돈을 빌리기 쉬워집니다. 경기를 살리려 할 때 내리는데, 그만큼 경기가 나쁘다는 뜻이기도 해서 왜 내렸는지를 같이 봅니다."},"kr_policy_rate":{"plain":"한국은행이 정한 기준금리입니다. 국내 대출·예금 금리와 원화 가치에 바로 영향을 줍니다.","whenUp":"대출 이자가 오르고 소비가 위축되기 쉽습니다. 원화는 강해지는 쪽으로 작용합니다.","whenDown":"이자 부담이 줄어 소비·투자에 숨통이 트입니다. 다만 미국 금리와 차이가 벌어지면 원화가 약해질 수 있습니다."},"us_spread":{"plain":"미국 국채 10년물 금리에서 2년물 금리를 뺀 값입니다. 은행이 돈을 굴려 이익을 내는 구조와 맞닿아 있습니다.","whenUp":"장기금리가 단기금리보다 높은 정상 상태로 돌아가는 중입니다. 경기 회복 기대나 금리 인하 기대가 있을 때 벌어집니다.","whenDown":"마이너스가 되면 장단기 금리 \"역전\"입니다. 과거 경기침체에 앞서 나타난 적이 많아 경고 신호로 읽습니다."},"us_cpi":{"plain":"미국 소비자물가가 1년 전보다 몇 % 올랐는지입니다. 장바구니 물가라고 보면 됩니다.","whenUp":"물가가 더 빨리 오르고 있다는 뜻입니다. 중앙은행이 금리를 낮추기 어려워지고, 주식에는 부담으로 작용하는 경우가 많습니다.","whenDown":"물가 상승 속도가 느려졌다는 뜻입니다. 금리를 내릴 여지가 생겨 위험자산에 우호적으로 읽히는 편입니다."},"kr_cpi":{"plain":"한국 소비자물가의 전년 대비 상승률입니다. 한국은행의 목표는 2% 부근입니다.","whenUp":"생활비 부담이 커지고 금리 인하가 늦어질 수 있습니다.","whenDown":"물가 압력이 줄었다는 뜻입니다. 다만 너무 낮으면 경기가 식고 있다는 신호로 보기도 합니다."},"us_core_pce":{"plain":"변동이 심한 식료품·에너지를 뺀 물가입니다. 연준이 금리를 결정할 때 가장 중요하게 보는 숫자입니다.","whenUp":"물가의 밑바닥 압력이 세다는 뜻이라 금리를 높게 유지할 명분이 됩니다.","whenDown":"물가가 실제로 잡히고 있다는 신호로 받아들여져 금리 인하 기대가 커집니다."},"us_unemployment":{"plain":"일할 의사가 있는데 일자리를 못 구한 사람의 비율입니다.","whenUp":"일자리가 줄고 있다는 뜻입니다. 소비가 위축되기 쉽지만, 과열된 경기를 식히는 신호로 읽혀 금리 인하 기대를 키우기도 합니다.","whenDown":"고용이 좋다는 뜻입니다. 다만 너무 좋으면 임금이 올라 물가를 자극할 수 있어 금리 인하가 늦어지기도 합니다."},"kr_unemployment":{"plain":"한국에서 일할 의사가 있는데 일자리를 못 구한 사람의 비율입니다. 통계청이 매달 발표합니다.","whenUp":"일자리 사정이 나빠지고 있다는 뜻입니다. 소비가 위축되기 쉽습니다.","whenDown":"고용이 좋아졌다는 뜻입니다. 다만 구직을 아예 포기한 사람은 실업자로 세지 않아, 숫자가 낮다고 늘 사정이 좋은 것은 아닙니다."},"us_nfp":{"plain":"농업을 뺀 분야에서 한 달 동안 늘어난 일자리 수입니다. 미국 경기의 체온계로 불립니다.","whenUp":"일자리가 많이 늘었다는 뜻으로 경기가 튼튼하다는 신호입니다. 다만 물가 자극 우려로 금리 인하가 밀릴 수 있습니다.","whenDown":"고용 증가 속도가 꺾였다는 뜻입니다. 경기 둔화 우려가 커지는 대신 금리 인하 기대가 커집니다."},"us_pmi":{"plain":"미국 제조업 구매담당자들에게 \"지난달보다 나아졌나\"를 물어 만든 지수입니다. 50이 기준선입니다.","whenUp":"공장이 바빠지고 있다는 뜻입니다. 50을 넘으면 확장 국면으로 봅니다.","whenDown":"주문과 생산이 줄고 있다는 뜻입니다. 50 아래면 위축 국면으로 봅니다."},"kr_pmi":{"plain":"한국 제조업 구매담당자 설문 지수입니다. 수출 경기를 앞서 보여주는 편입니다.","whenUp":"수주와 생산이 늘고 있다는 뜻입니다.","whenDown":"수출 주문이 줄고 있다는 뜻으로, 반도체·자동차 같은 주력 업종에 먼저 나타납니다."},"dxy":{"plain":"달러가 주요국 통화 대비 얼마나 센지를 하나의 숫자로 만든 지수입니다.","whenUp":"달러가 강해졌다는 뜻입니다. 신흥국에서 돈이 빠져나가기 쉽고, 원자재 가격에는 눌리는 힘으로 작용합니다.","whenDown":"달러가 약해졌다는 뜻입니다. 신흥국 주식과 원자재에 우호적인 환경이 됩니다."},"usdkrw":{"plain":"1달러를 사는 데 필요한 원화입니다. 숫자가 커질수록 원화가 약해진 것입니다.","whenUp":"원화 약세입니다. 수입 물가가 오르고, 외국인 투자자는 환차손 탓에 한국 주식을 팔기 쉬워집니다.","whenDown":"원화 강세입니다. 수입 물가 부담이 줄고 외국인 자금이 들어오기 좋은 환경이 됩니다."},"gold":{"plain":"금 1온스 가격입니다. 위기 때 찾는 대표적인 안전자산입니다.","whenUp":"불안이 커졌거나, 실질금리가 낮아져 이자 없는 금의 매력이 상대적으로 커졌다는 뜻입니다.","whenDown":"위험을 감수할 여유가 생겼거나 금리가 올라 이자 자산이 더 매력적이 됐다는 뜻입니다."},"wti":{"plain":"미국 서부텍사스산 원유 가격입니다. 기름값은 거의 모든 물가에 영향을 줍니다.","whenUp":"주유비·물류비가 올라 물가 압력이 커집니다. 항공·운송 업종에는 비용 부담입니다.","whenDown":"물가 부담이 줄어듭니다. 다만 경기 둔화로 수요가 줄어 내리는 경우도 있어 원인을 같이 봅니다."},"hy_oas":{"plain":"신용등급이 낮은 기업(정크본드)이 국채보다 얼마나 높은 금리를 물어야 하는지입니다. 기업의 자금 사정을 보는 창입니다.","whenUp":"위험한 기업에 돈을 빌려주기 꺼려진다는 뜻입니다. 부도 걱정이 커질 때 벌어지며, 주식보다 먼저 움직이는 경우가 있습니다.","whenDown":"위험한 기업에도 돈이 잘 돌고 있다는 뜻입니다. 투자자들이 위험을 감수할 의향이 있는 상태입니다."},"vix":{"plain":"S&P 500 옵션 가격에서 뽑아낸 \"앞으로 30일 얼마나 출렁일까\"에 대한 시장의 예상입니다. 공포지수라고 부릅니다.","whenUp":"크게 흔들릴 거라 보는 사람이 늘었다는 뜻입니다. 보험(풋옵션) 수요가 몰릴 때 오르고, 주가가 급락하는 날 같이 뜁니다.","whenDown":"큰 사건이 없을 거라 보는 쪽이 많다는 뜻입니다. 다만 너무 낮으면 방심 신호로 보는 시각도 있습니다."},"vkospi":{"plain":"KOSPI200 옵션으로 계산한 한국판 공포지수입니다.","whenUp":"국내 증시가 크게 출렁일 거라 보는 사람이 늘었다는 뜻입니다.","whenDown":"국내 시장이 잠잠할 거라 보는 쪽이 많다는 뜻입니다."},"spx_pe":{"plain":"주가를 앞으로 1년 예상 이익으로 나눈 값입니다. \"이익 1원을 사는 데 몇 원을 내고 있나\"로 읽습니다.","whenUp":"이익보다 주가가 더 빨리 올랐다는 뜻입니다. 기대가 앞서 있는 상태라 실적이 못 따라오면 조정이 나오기 쉽습니다.","whenDown":"주가가 이익 대비 싸졌다는 뜻입니다. 다만 이익 전망 자체가 나빠져서 내려가는 경우도 있습니다."},"kospi_pe":{"plain":"코스피 전체를 하나의 회사로 봤을 때의 주가수익비율입니다.","whenUp":"이익 대비 주가가 비싸졌다는 뜻입니다.","whenDown":"이익 대비 주가가 싸졌다는 뜻입니다. 이익 전망이 나빠져 내려가는 경우와 구분해 봐야 합니다."},"kospi_pb":{"plain":"주가를 회사가 가진 순자산으로 나눈 값입니다. 1배면 \"가진 재산만큼의 값\"이라는 뜻입니다.","whenUp":"자산 가치보다 주가가 더 쳐주는 쪽으로 움직였다는 뜻입니다.","whenDown":"1배 아래로 내려가면 장부상 재산보다도 싸게 거래된다는 뜻입니다. 한국 시장에서 자주 거론되는 지점입니다."},"kospi_div":{"plain":"주가 대비 배당금의 비율입니다. 은행 이자와 견주어 보는 숫자입니다.","whenUp":"배당이 늘었거나 주가가 내렸다는 뜻입니다. 두 경우의 의미가 전혀 다르므로 주가 흐름과 같이 봅니다.","whenDown":"주가가 올랐거나 배당이 줄었다는 뜻입니다."},"kr_investor_deposit":{"plain":"주식을 사려고 증권계좌에 넣어 뒀지만 아직 쓰지 않은 돈의 총액입니다. \"대기 매수 자금\"이라고 부릅니다.","whenUp":"주식을 사려고 계좌에 돈을 넣어 두는 사람이 늘었다는 뜻입니다. 위험을 감수할 여력이 커진 국면에서 늘어나는 편입니다.","whenDown":"돈을 빼서 나가거나 이미 주식을 사서 잔고가 줄었다는 뜻입니다. 두 경우의 의미가 다르므로 지수 흐름과 같이 봅니다."},"crypto_mcap":{"plain":"모든 코인의 시가총액을 더한 값입니다. 크립토 시장 전체의 덩치입니다.","whenUp":"시장 전체로 돈이 들어오고 있다는 뜻입니다.","whenDown":"자금이 빠져나가거나 가격이 내렸다는 뜻입니다."},"btc_dom":{"plain":"전체 크립토 시가총액에서 비트코인이 차지하는 비중입니다.","whenUp":"알트코인에서 비트코인으로 돈이 옮겨가고 있다는 뜻입니다. 불안할 때 나타나는 경향이 있습니다.","whenDown":"알트코인으로 돈이 퍼지고 있다는 뜻입니다. 위험을 더 감수하는 국면에서 나타나는 경향이 있습니다."}};
+
+  /**
+   * "이게 뭔가 / 오르면·내리면 무슨 일이 생기나".
+   * 목록 스캔을 방해하지 않도록 접어 두고 누른 항목만 펼친다.
+   * 화살표는 값의 방향일 뿐 좋고 나쁨이 아니므로 등락 색을 쓰지 않는다.
+   */
+  const BASIC_GUIDE = {"per_capita_gdp":{"headline":"나라가 1년에 만든 부가가치를 인구수로 나눈 값. 흔히 \"국민소득\"이라 부르는 숫자입니다.","plain":"한 나라 안에서 1년 동안 새로 만들어진 가치(GDP)를 그 나라 인구로 나눈 값입니다. \"국민 한 사람 몫으로 치면 이만큼\"이라는 계산이지, 실제로 내 통장에 들어오는 돈이 아닙니다.","howToRead":"보통 달러로 환산해 나라끼리 비교합니다. 3만 달러대면 선진국 문턱, 6만 달러 이상이면 최상위권으로 이야기합니다. 다른 나라 값과 나란히 놓고 봐야 의미가 생깁니다.","whenUp":"나라 전체가 만들어내는 가치가 늘었거나, 인구가 줄어 1인당 몫이 커졌다는 뜻입니다. 원인이 정반대일 수 있어 둘 중 무엇 때문인지 같이 봅니다.","whenDown":"경제가 실제로 쪼그라들었거나, 원화가 약해져 달러로 환산한 금액이 줄었다는 뜻입니다. 한국은 환율 때문에 달러 기준 숫자가 크게 출렁이는 편입니다.","caution":"평균이라 분배를 전혀 보여주지 못합니다. 1인당 GDP가 올라도 대부분의 가구 살림이 나아졌다는 보장은 없습니다. 물가 수준이 다른 나라끼리 단순 비교하면 실제 생활 수준 차이가 과장됩니다.","marketLink":"한 나라의 성장 속도와 통화 가치를 이야기할 때 배경 숫자로 자주 등장합니다. 달러 기준 1인당 GDP가 줄었다는 기사는 환율이 크게 움직였다는 이야기인 경우가 많습니다."},"bigmac":{"headline":"전 세계 어디서나 파는 빅맥 하나의 값을 견줘 통화가 싼지 비싼지 재보는 지수입니다.","plain":"영국 경제지 이코노미스트가 1986년부터 발표하는 지수입니다. 같은 햄버거라면 어느 나라에서나 값이 비슷해야 한다는 생각에서 출발해, 나라별 빅맥 가격을 비교해 통화가 제 값보다 싼지 비싼지를 봅니다. 어려운 환율 이론을 햄버거 하나로 설명한 것이 인기 비결입니다.","howToRead":"한국 빅맥 값을 미국 빅맥 값으로 나누면 \"빅맥 환율\"이 나옵니다. 이 빅맥 환율이 실제 시장 환율보다 낮으면 원화가 그만큼 싸게 거래되고 있다(저평가)는 뜻입니다. −30%는 \"빅맥으로 재보면 원화가 30% 싸다\"로 읽습니다.","whenUp":"0에 가까워지면 원화가 제 값을 찾아가는 중이라는 뜻입니다. 원화가 강해졌거나 국내 물가가 미국보다 더 올랐을 때 그렇게 됩니다.","whenDown":"마이너스 폭이 커지면 원화가 더 싸게 거래되고 있다는 뜻입니다. 환율이 오르거나(원화 약세) 국내 햄버거 값이 상대적으로 덜 올랐을 때 벌어집니다.","caution":"재미로 보라고 만든 지수입니다. 임대료·인건비·세금이 나라마다 달라서 원래 싼 나라가 있고, 햄버거 하나로 나라 경제 전체를 잴 수는 없습니다. \"저평가니까 환율이 곧 내려간다\"는 식으로 읽으면 안 됩니다.","marketLink":"환율이 장기적으로 어디쯤이 적정한가를 이야기할 때 가장 자주 인용되는 눈대중입니다. 뒤에 나오는 구매력평가(PPP) 환율의 쉬운 버전이라고 보면 됩니다."},"latte":{"headline":"스타벅스 라떼 한 잔 값으로 도시별 물가를 견줘 보는, 빅맥지수의 커피 버전입니다.","plain":"빅맥지수를 흉내내 만든 비교입니다. 세계 어디서나 같은 메뉴를 파는 카페라떼(톨 사이즈) 값을 도시별로 견줍니다. \"라떼지수\", \"스타벅스지수\"라고 부르며 언론이 물가를 설명할 때 자주 씁니다.","howToRead":"빅맥지수와 계산법이 같습니다. 서울 라떼 값을 뉴욕 라떼 값으로 나눈 \"라떼 환율\"을 시장 환율과 견줍니다. 빅맥지수와 값이 다르게 나오는 것이 정상이며, 그 차이 자체가 \"품목 하나로 물가를 재는 일의 한계\"를 보여줍니다.","whenUp":"0에 가까워지면 서울 커피값이 뉴욕에 견줘 비싸졌거나 원화가 강해졌다는 뜻입니다.","whenDown":"마이너스 폭이 커지면 서울 커피값이 상대적으로 싸졌거나 원화가 약해졌다는 뜻입니다.","caution":"어느 기관도 공식 발표하지 않는 비공식 개념입니다. 매장 위치·세금·프로모션에 따라 같은 도시 안에서도 값이 달라 조사 시점과 기준을 함께 봐야 합니다. 이 앱의 숫자도 특정 기관의 공식 발표가 아닙니다.","marketLink":"\"체감 물가\"와 \"통계 물가\"가 왜 다르게 느껴지는지를 설명할 때 자주 쓰입니다. 소비자물가지수(CPI)는 수백 개 품목의 평균이라, 자주 사는 물건 하나의 값과는 다르게 움직입니다."},"ppp_gap":{"headline":"같은 물건 바구니를 두 나라에서 사는 데 드는 돈으로 계산한 \"적정 환율\"과 실제 환율의 차이입니다.","plain":"구매력평가(PPP, Purchasing Power Parity) 환율은 빅맥 하나가 아니라 수백 가지 물건과 서비스를 한 바구니에 담아 계산합니다. OECD와 IMF가 정기적으로 발표하는 공식 통계로, 빅맥지수의 어른 버전이라고 보면 됩니다.","howToRead":"PPP 환율이 900원인데 시장 환율이 1,350원이라면, 시장에서는 달러를 PPP보다 50% 비싸게 사고 있다는 뜻입니다. 이 앱은 원화 쪽에서 읽어 \"원화가 PPP 대비 몇 % 싸게 거래되는가\"로 표시합니다.","whenUp":"0에 가까워지면 시장 환율이 물가로 계산한 적정 수준에 다가서고 있다는 뜻입니다.","whenDown":"마이너스 폭이 커지면 시장 환율이 물가 기준에서 더 멀어졌다는 뜻입니다.","caution":"PPP는 \"언젠가 이쯤 갈 것\"이라는 예측이 아닙니다. 실제 환율은 금리 차이, 자본 이동, 무역수지 같은 다른 힘으로 결정되며 수십 년째 PPP와 벌어져 있는 나라도 많습니다. 시점을 못 박는 근거로 쓸 수 없습니다.","marketLink":"나라 사이 소득이나 경제 규모를 비교할 때 시장 환율 대신 PPP 환율을 쓰기도 합니다. 같은 나라인데 \"1인당 GDP 순위\"가 기사마다 다른 이유가 대개 이것입니다."},"engel":{"headline":"가계가 쓰는 돈 가운데 먹거리에 들어가는 비중. 19세기 통계학자 엥겔의 이름입니다.","plain":"가구가 한 달에 쓰는 소비지출에서 식료품과 비주류음료가 차지하는 비율입니다. 소득이 늘어도 먹는 양은 그만큼 늘지 않기 때문에, 형편이 나아질수록 이 비중이 낮아진다는 관찰에서 나왔습니다. 한국은 통계청이 발표합니다.","howToRead":"보통 10%대에서 움직입니다. 낮을수록 먹는 것 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다. 나라끼리 비교할 때는 외식 문화와 식재료 물가가 달라 주의가 필요합니다.","whenUp":"먹는 데 쓰는 비중이 커졌다는 뜻입니다. 식품 물가가 크게 올랐거나, 소득이 줄어 다른 소비를 먼저 줄였을 때 올라갑니다.","whenDown":"먹거리 말고 다른 곳에 쓸 여지가 늘었다는 뜻입니다. 다만 외식을 줄이고 집밥으로 옮겨가도 숫자가 내려갈 수 있어 원인을 같이 봅니다.","caution":"가구 구성과 나이대에 따라 크게 달라집니다. 1인 가구가 늘면 평균값 자체가 움직이므로, 한 해 변화만 보고 살림살이가 나아졌다고 단정할 수 없습니다.","marketLink":"소비 여력이 어디로 향하는지를 보여줍니다. 이 비중이 오르는 국면에서는 필수 소비재가, 내리는 국면에서는 여행·의류 같은 선택적 소비가 화제에 오르는 편입니다."},"cli":{"headline":"여러 지표를 묶어 경기의 방향을 몇 달 앞서 보여준다는 공식 지수. 100이 장기 평균입니다.","plain":"OECD 경기선행지수(CLI)는 재고·주문·주가·금리차처럼 경기보다 먼저 움직이는 지표들을 묶어 하나의 숫자로 만든 것입니다. 실제 경기보다 대략 6~9개월 앞서 방향을 보여준다고 알려져 있어, 각국 정부와 중앙은행이 참고하는 대표적인 공식 선행지표입니다.","howToRead":"100이 장기 평균입니다. 수준과 방향을 같이 봅니다 — 100 위에서 오르면 확장, 100 위에서 내리면 둔화, 100 아래에서 오르면 회복, 100 아래에서 내리면 침체 국면으로 읽습니다. 100.3 처럼 소수점 한 자리의 변화도 방향이 바뀌면 의미 있게 봅니다.","whenUp":"앞으로 몇 달 뒤 경기가 나아지는 쪽으로 지표들이 움직이고 있다는 뜻입니다.","whenDown":"경기가 식는 쪽으로 지표들이 움직이고 있다는 뜻입니다. 100 위에 있어도 방향이 아래면 둔화 국면으로 봅니다.","caution":"나중에 자주 수정됩니다. 발표 당시 본 숫자와 몇 달 뒤 다시 계산된 숫자가 달라지는 일이 흔해서, 지나간 시점의 값으로 \"그때 맞았다\"고 판단하면 안 됩니다. 방향의 전환 시점을 정확히 맞히는 도구도 아닙니다.","marketLink":"경기 방향을 두고 논쟁이 붙을 때 양쪽이 모두 인용하는 숫자입니다. 다만 주가는 경기보다 더 앞서 움직이는 경우가 많아, 이 지수가 돌아설 무렵이면 시장은 이미 반응을 마친 뒤인 때가 많습니다."},"buffett":{"headline":"나라 전체 주식의 값어치가 그 나라가 1년에 버는 돈의 몇 %인지. 워런 버핏이 언급해 이름이 붙었습니다.","plain":"주식시장 전체 시가총액을 그 나라의 GDP로 나눈 비율입니다. 버핏이 2001년 인터뷰에서 \"밸류에이션을 보는 아마 최고의 단일 척도\"라고 말한 뒤 그의 이름으로 불리게 됐습니다. 시장이 실물 경제보다 얼마나 앞서갔는지를 아주 거칠게 재보는 눈대중입니다.","howToRead":"100%면 주식시장 전체의 값이 그 나라 1년 생산과 같다는 뜻입니다. 예전 미국은 70~100%가 보통이라고들 했지만 2010년대 이후 줄곧 그 위에 있어, 기준선 자체가 올라간 것 아니냐는 지적이 많습니다. 절대 수준보다 그 나라의 과거 범위와 견주는 편이 낫습니다.","whenUp":"주가가 경제 규모보다 빨리 올랐다는 뜻입니다. 이익이 함께 늘어서인지 기대만 앞선 것인지는 이 숫자로 구분할 수 없습니다.","whenDown":"주가가 내렸거나 경제 규모가 더 빨리 커졌다는 뜻입니다.","caution":"분자는 오늘 시세인데 분모는 지난 분기 GDP라 시점이 어긋납니다. 해외 매출 비중이 큰 기업이 많은 나라는 구조적으로 높게 나오고, 금리 수준이 크게 달라진 지금 예전 숫자와 같은 잣대로 읽기 어렵습니다. 고평가·저평가를 단정하거나 시점을 잡는 근거로 쓸 수 없습니다.","marketLink":"시장이 비싸다는 이야기가 나올 때 가장 자주 인용되는 숫자입니다. 다만 이 값이 높은 상태로 몇 해씩 이어진 적도 있어, 높다는 것과 곧 내린다는 것은 전혀 다른 이야기입니다."},"ccsi":{"headline":"한국은행이 매달 가계에 살림살이를 물어 만든 심리 지수. 100이 기준선입니다.","plain":"소비자심리지수(CCSI)는 한국은행이 전국 가구에 지금 형편과 앞으로의 전망을 물어 만든 지수입니다. 실제로 얼마를 벌고 썼는지가 아니라 \"어떻게 느끼는가\"를 재는 숫자라, 이 앱의 투자심리 점수와 성격이 비슷합니다.","howToRead":"100이 기준입니다. 100보다 크면 과거 평균보다 낙관적으로 보는 사람이 많다는 뜻이고, 작으면 비관적으로 보는 쪽이 많다는 뜻입니다. 절대 수준보다 방향과 폭이 더 많이 쓰입니다.","whenUp":"살림살이와 앞날을 밝게 보는 가구가 늘었다는 뜻입니다. 소비가 뒤따라 늘어나는 경우가 많습니다.","whenDown":"지갑을 닫는 쪽으로 마음이 기울었다는 뜻입니다. 금리·물가·고용 소식에 민감하게 반응합니다.","caution":"설문이라 실제 행동보다 앞서거나 어긋날 수 있습니다. 뉴스가 시끄러운 달에 크게 흔들리는 경향이 있어 한 달 값보다 몇 달의 흐름을 봅니다.","marketLink":"이 앱의 투자심리 점수가 시장 참여자의 심리라면, 소비자심리지수는 일반 가계의 심리입니다. 둘이 따로 놀 때가 있어 나란히 놓고 보면 지금 불안이 시장 안의 이야기인지 살림살이의 이야기인지 구분하는 데 도움이 됩니다."},"gini":{"headline":"한 나라의 소득이 얼마나 고르게 나뉘어 있는지를 0과 1 사이 숫자 하나로 나타낸 값입니다.","plain":"모두가 똑같이 벌면 0, 한 사람이 전부 가져가면 1입니다. 이탈리아 통계학자 지니가 만들었고, 우리나라는 통계청이 매년 발표합니다. 1인당 GDP가 \"평균 얼마\"라면 지니계수는 \"얼마나 고르게 나뉘었나\"를 봅니다. 둘을 같이 봐야 그림이 완성됩니다.","howToRead":"보통 0.2~0.5 사이에서 움직입니다. 0.3 아래면 고른 편, 0.4를 넘으면 격차가 큰 편으로 이야기합니다. 세금과 복지를 반영하기 전(시장소득)과 반영한 뒤(처분가능소득)의 값이 다르며, 보통 인용되는 것은 반영한 뒤 값입니다.","whenUp":"소득 격차가 벌어졌다는 뜻입니다. 고소득층이 더 벌었거나 저소득층이 덜 벌었거나, 둘 다일 수 있습니다.","whenDown":"격차가 좁아졌다는 뜻입니다. 다만 모두가 함께 가난해져도 숫자는 내려가므로 소득 수준과 같이 봐야 합니다.","caution":"소득만 보고 재산은 보지 않습니다. 집과 주식을 얼마나 가졌는지는 이 숫자에 안 들어가서, 자산 격차까지 재면 훨씬 커집니다. 나라마다 조사 방식이 달라 소수점 둘째 자리 차이로 순위를 매기는 것은 의미가 없습니다.","marketLink":"소비가 어디서 나오는지를 가늠할 때 인용됩니다. 격차가 큰 사회일수록 명품과 초저가로 소비가 갈리는 이른바 양극화 이야기가 나옵니다."},"misery":{"headline":"물가상승률과 실업률을 그냥 더한 값. \"살기 팍팍한 정도\"를 한 숫자로 만든 것입니다.","plain":"1970년대 미국 경제학자 아서 오쿤이 만들었습니다. 물가가 오르면 돈이 줄어드는 느낌이고 일자리가 없으면 벌이가 끊기니, 그 둘을 더해 체감 고통을 재보자는 발상입니다. 계산이 초등학교 덧셈 수준이라 뉴스에서 자주 인용됩니다.","howToRead":"두 숫자를 그냥 더한 값이라 절대 기준이 없습니다. 같은 나라의 예년과 비교하거나 나라끼리 견줄 때 씁니다. 한국은 실업률이 낮게 잡히는 편이라 다른 나라보다 낮게 나오는 경향이 있습니다.","whenUp":"물가가 더 올랐거나 일자리가 줄었다는 뜻입니다. 어느 쪽 때문인지는 두 숫자를 따로 봐야 알 수 있습니다.","whenDown":"물가 압력이 잦아들었거나 고용이 나아졌다는 뜻입니다.","caution":"성격이 다른 두 숫자를 아무 가중치 없이 더한 것입니다. 물가 1%p와 실업률 1%p가 똑같이 아프지는 않습니다. 실업률에는 구직을 포기한 사람이 안 잡히고, 집값이나 이자 부담도 들어가지 않아 체감과 어긋날 때가 많습니다.","marketLink":"중앙은행이 처한 곤란을 요약해 줍니다. 물가와 실업이 함께 높으면 금리를 올려도 내려도 한쪽이 나빠지는 상황이라, 이럴 때 정책 전망을 두고 시장이 크게 흔들립니다."},"pir":{"headline":"집값이 한 해 벌이의 몇 배인지. 한 푼도 안 쓰고 모았을 때 몇 년이 걸리는지로 읽습니다.","plain":"PIR(Price to Income Ratio)은 주택 가격을 가구의 연 소득으로 나눈 값입니다. 15배라면 소득을 한 푼도 안 쓰고 15년을 모아야 집 한 채 값이 된다는 뜻입니다. 집값 이야기에서 \"몇 배\"라는 말이 나오면 대개 이 숫자입니다.","howToRead":"어느 지역의 어떤 집을, 어느 가구의 소득으로 나눴는지가 전부입니다. 서울 아파트와 전국 주택은 두 배 넘게 차이 나고, 중위값을 쓰느냐 평균을 쓰느냐로도 달라집니다. 숫자만 보지 말고 기준을 같이 보세요.","whenUp":"집값이 소득보다 빨리 올랐다는 뜻입니다. 집을 사기까지 걸리는 시간이 길어졌습니다.","whenDown":"집값이 내렸거나 소득이 더 빨리 늘었다는 뜻입니다. 둘의 의미가 전혀 다르므로 어느 쪽인지 확인해야 합니다.","caution":"기관마다 정의가 달라 같은 도시인데도 숫자가 두세 배씩 차이 납니다. 대출 금리와 보유 기간을 전혀 반영하지 않아 실제 부담과도 다릅니다. 나라 간 비교는 특히 조심해야 합니다.","marketLink":"가계부채와 건설·은행 업종 이야기에 늘 따라붙습니다. 이 값이 높은 상태에서 금리가 오르면 상환 부담이 빠르게 커진다는 점이 자주 지적됩니다."},"lipstick":{"headline":"불황에는 값비싼 것 대신 작은 사치가 잘 팔린다는 속설. 립스틱이 그 상징입니다.","plain":"화장품 회사 에스티로더의 회장이 2001년 경기가 나빠졌는데 립스틱 매출은 늘었다고 말한 데서 퍼졌습니다. 큰 지출은 미루더라도 기분 전환용 작은 사치는 오히려 늘어난다는 이야기입니다. 이 앱은 색조화장품 매출 증가율에서 전체 소매판매 증가율을 뺀 차이로 봅니다.","howToRead":"차이가 플러스면 색조화장품이 전체 소비보다 잘 팔렸다는 뜻입니다. 속설대로라면 경기가 나쁠 때 이 차이가 커집니다. 한두 달 값보다 몇 달의 흐름을 봐야 합니다.","whenUp":"전체 소비보다 작은 사치품이 더 잘 팔리고 있다는 뜻입니다. 다만 신제품 출시나 유행이 이유인 경우가 훨씬 많습니다.","whenDown":"작은 사치품이 전체 소비만큼 팔리지 않았다는 뜻입니다.","caution":"검증된 규칙성이 아닙니다. 이후 실제 매출을 따져 보니 맞지 않는다는 반박도 많았고, 마스크가 일상이던 시기처럼 정반대로 움직인 적도 있습니다. 경기 판단의 근거로 쓰기에는 근거가 너무 약합니다.","marketLink":"소비 여력이 어디로 옮겨가는지를 이야기할 때 인용됩니다. 비슷한 말로 미니스커트 지수, 남성 속옷 지수 같은 것들이 있는데 모두 같은 수준의 속설입니다."},"pentagon_pizza":{"headline":"국방부 청사 주변 피자집이 얼마나 붐비는지로 \"오늘 밤 다들 야근인가\"를 짐작해 보는, 농담에 가까운 지표입니다.","plain":"1990년 걸프전 직전 펜타곤 주변 피자 배달이 유난히 늘었다는 이야기에서 나왔습니다. 큰일이 터지면 청사에 밤늦게까지 사람이 남고, 그러면 저녁을 시켜 먹는다는 아주 단순한 발상입니다. 요즘은 지도 앱의 \"지금 얼마나 붐비나\" 표시를 보고 SNS에서 화제가 됩니다.","howToRead":"평소 같은 요일·같은 시간대의 붐빔 정도를 100으로 두고 지금이 몇인지 봅니다. 130이면 평소보다 30% 붐빈다는 뜻입니다. 크게 벗어난 날에만 이야깃거리가 되고, 그마저도 회의·행사·근처 경기장처럼 훨씬 흔한 이유가 먼저입니다.","whenUp":"청사 주변이 평소보다 붐빈다는 뜻입니다. 그 안에서 실제로 무슨 일이 벌어지는지는 이 숫자로 알 수 없습니다.","whenDown":"평소와 같거나 한산하다는 뜻입니다. 조용하다는 것도 아무것도 증명하지 않습니다.","caution":"적중률이 검증된 적 없는 농담성 지표입니다. 맞았던 날만 기억에 남는 확증편향이 특히 크고, 국방부가 인정한 적도 없습니다. 근거가 되는 지도 혼잡도는 공개 API가 없어 자동으로 받아올 수도 없습니다. 무엇을 사고팔지 정하는 근거로 쓰지 마세요.","marketLink":"지정학 긴장이 커지면 유가·금·달러가 먼저 움직입니다. 그런 뉴스가 돌 때 사람들이 어떤 눈대중을 들고 나오는지 알아 두는 정도로만 보세요. 실제로 봐야 할 것은 이 숫자가 아니라 유가와 금값입니다."}};
+  const BASIC_GROUPS = [{"id":"income","label":"나라 살림과 소득","note":"얼마나 벌고, 얼마나 고르게 나뉘고, 얼마나 팍팍한가. 모두 공식 통계입니다.","ids":["per_capita_gdp","gini","misery"]},{"id":"prices","label":"물가로 견주는 지수","note":"같은 물건 값을 나라끼리 견줘 통화와 생활비를 재봅니다. 품목 하나로 재는 것일수록 오차가 큽니다.","ids":["bigmac","latte","ppp_gap","engel","pir"]},{"id":"ahead","label":"경기와 시장을 앞서 보는 지수","note":"지금이 어디쯤인지를 앞서 가늠해 보려는 숫자들입니다. 공식 통계와 오래된 눈대중이 섞여 있습니다.","ids":["cli","buffett"]},{"id":"mood","label":"심리와 속설로 보는 경기","note":"사람들의 기분과 행동으로 경기를 읽어 보려는 시도입니다. 뒤로 갈수록 근거가 약하니 배지를 꼭 보세요.","ids":["ccsi","lipstick","pentagon_pizza"]}];
+
+  function guidePanel(id) {
+    const g = INDICATOR_GUIDE[id];
+    if (!g) return '';
+    return (
+      '<details style="margin-top:6px"><summary style="cursor:pointer;list-style:none;font-size:11px;font-weight:600;color:var(--accent)">이게 무슨 지표인가요? ▾</summary>' +
+      '<div style="margin-top:6px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
+      '<p style="margin:0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
+      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">' +
+      [['▲', '오르면', g.whenUp], ['▼', '내리면', g.whenDown]].map(([gl, lb, tx]) =>
+        '<div style="display:flex;align-items:flex-start;gap:6px">' +
+        '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;font-size:10px;color:var(--muted)">' + gl + '</span>' +
+        '<dt class="sr">값이 ' + lb + '</dt>' +
+        '<dd style="margin:0;min-width:0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+        '<b style="color:var(--fg)">' + lb + ' · </b>' + esc(tx) + '</dd></div>').join('') +
+      '</dl></div></details>'
+    );
+  }
+
+  const macroValue = (m) => {
+    if (m.value === null) return NO;
+    const n = fmtNum(m.value, m.precision);
+    if (m.suffix) return n + m.suffix;
+    if (m.unit === 'percent') return n + '%';
+    if (m.unit === 'bp') return n + 'bp';
+    if (m.unit === 'usd_bn') return '$' + fmtNum(m.value / 1000, 2) + 'T';
+    if (m.unit === 'currency') return '$' + n;
+    if (m.unit === 'ratio') return n + '배';
+    return n;
+  };
+  const RISK = { normal: ['정상', 'var(--subtle)', '·'], watch: ['관찰', 'var(--warn)', '△'], alert: ['주의', 'var(--danger)', '▲'], unknown: ['정보 없음', 'var(--muted)', '—'] };
+
+  function tile(m) {
+    const [lbl, col, gl] = RISK[m.riskLevel];
+    const valColor = m.riskLevel === 'alert' ? 'var(--danger)' : m.riskLevel === 'watch' ? 'var(--warn)' : 'var(--fg-strong)';
+    const trend = m.trend === 'up' ? '▲ 상승' : m.trend === 'down' ? '▼ 하락' : m.trend === 'flat' ? '― 보합' : '';
+    return (
+      '<div class="tile"><div class="t-label" title="' + esc(m.name) + '">' + esc(m.name) + '</div>' +
+      '<div class="t-val tnum" style="color:' + valColor + '">' + esc(macroValue(m)) + '</div>' +
+      '<div class="t-sub tnum">' + (m.previous !== null ? '이전 ' + esc(fmtNum(m.previous, m.precision)) + ' · ' + trend : '이전값 없음') + '</div>' +
+      '<div class="t-risk" style="color:' + col + '"><span>' + gl + '</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(lbl + (m.riskNote ? ' · ' + m.riskNote : '')) + '</span></div></div>'
+    );
+  }
+
+  /* 배지는 국가가 아니라 '어느 시장 일정인가'를 보여준다 (크립토는 국가가 없다) */
+  const MARKET_BADGE = { us: '미국', kr: '한국', crypto: '크립토', global: '글로벌' };
+  const IMP = { high: ['높음', '●●●', 'b-danger'], medium: ['보통', '●●○', 'b-warn'], low: ['낮음', '●○○', 'b-neutral'] };
+  const CAT = { central_bank: '통화정책', inflation: '물가', employment: '고용', pmi: 'PMI', gdp: 'GDP', expiry: '옵션만기', earnings: '실적', crypto: '크립토' };
+
+  function eventRow(e) {
+    const t = Date.parse(e.scheduledAt), now = Date.now();
+    const [il, ig, ic] = IMP[e.importance];
+    return (
+      '<li><div class="ev-top"><div style="min-width:0;flex:1">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">' +
+      badge('b-neutral', MARKET_BADGE[e.market]) + badge(ic, ig + ' ' + il, '중요도 ' + il) +
+      /* 크립토 일정은 배지와 분류명이 같아 두 번 적히므로 하나만 남긴다 */
+      (CAT[e.category] === MARKET_BADGE[e.market] ? '' : '<span style="font-size:10px;color:var(--subtle)">' + CAT[e.category] + '</span>') + '</div>' +
+      '<div class="ev-title">' + esc(e.title) + '</div>' +
+      (e.note ? '<div class="ev-note">' + esc(e.note) + '</div>' : '') + '</div>' +
+      '<div class="ev-time"><b class="tnum">' + esc(kTime(e.scheduledAt)) + '</b><small class="tnum">' + esc(kDate(e.scheduledAt)) + ' KST</small>' +
+      '<small class="tnum" style="color:' + (t <= now ? 'var(--subtle)' : 'var(--accent)') + '">' + esc(countdown(t - now)) + '</small></div></div>' +
+      '<dl class="ev-meta" style="margin:6px 0 0">' +
+      '<div><span>예상 </span><b class="tnum">' + esc(e.forecast || NO) + '</b></div>' +
+      '<div><span>이전 </span><b class="tnum">' + esc(e.previous || NO) + '</b></div>' +
+      '<div><span>발표 </span><b class="tnum" style="color:' + (e.actual ? 'var(--accent)' : 'var(--subtle)') + '">' + esc(e.actual || '미발표') + '</b></div>' +
+      '</dl></li>'
+    );
+  }
+
+  /**
+   * 공포↔탐욕 5단계 띠.
+   * 색은 위험이 아니라 심리다. 오해하기 쉬운 부분이라 띠 아래에 그대로 적는다.
+   */
+  function stageStrip(score) {
+    const cur = stageOf(score);
+    const s = isNum(score) ? Math.min(100, Math.max(0, score)) : null;
+    const aria = '공포에서 탐욕까지 5단계 띠. ' + STAGES.map((st) => st.label + ' ' + st.min + '부터 ' + st.max).join(', ') +
+      '.' + (cur ? ' 현재는 ' + cur.label + ' 단계.' : '');
+    return (
+      '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">' +
+      '<div class="bandbar" style="height:14px" role="img" aria-label="' + esc(aria) + '">' +
+      STAGES.map((st) => '<span class="bseg" data-on="' + (!cur || cur.id === st.id ? '1' : '0') +
+        '" style="width:20%;background:var(' + st.v + 'f)"></span>').join('') +
+      (s === null ? '' : '<span class="bandmark" style="left:' + s + '%"></span>') + '</div>' +
+      '<ul class="stagestrip">' + STAGES.map((st) => {
+        const on = cur && cur.id === st.id;
+        return '<li><span style="display:block;word-break:keep-all;color:' + (on ? 'var(' + st.v + ')' : 'var(--subtle)') +
+          ';font-weight:' + (on ? 700 : 400) + '">' + st.label + '</span>' +
+          '<span class="tnum" style="display:block;color:var(--subtle)">' + st.min + '–' + st.max + '</span></li>';
+      }).join('') + '</ul>' +
+      '<p style="margin:8px 0 0;font-size:10px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '이 띠의 색은 <b style="color:var(--muted)">위험도가 아니라 심리</b>입니다. 빨강은 공포가 심한 쪽, 초록은 탐욕이 강한 쪽이라는 뜻이며 ' +
+      '어느 쪽이 좋다·나쁘다는 뜻이 아닙니다. 시장 위험 신호등(빨=경계)과는 다른 의미이니 함께 볼 때 주의하세요.</p></div>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 시장 위험 신호등                                                            */
+  /* ====================================================================== */
+
+  /* 안정·보통은 둘 다 초록불이고 진하기로만 구분한다. 관찰은 노란불, 주의는 빨간불. */
+  const RISK_COLOR = { calm: 'var(--tl-green)', normal: 'var(--tl-lime)', watch: 'var(--tl-yellow)', alert: 'var(--tl-red)' };
+  const RISK_FILL = { calm: 'var(--tl-green-fill)', normal: 'var(--tl-lime-fill)', watch: 'var(--tl-yellow-fill)', alert: 'var(--tl-red-fill)' };
+  const RISK_LABEL = { calm: '안정', normal: '보통', watch: '관찰', alert: '주의' };
+  const RISK_GLYPH = { calm: '○', normal: '●', watch: '△', alert: '▲' };
+  const RISK_BADGE = { calm: 'b-ok', normal: 'b-ok', watch: 'b-warn', alert: 'b-danger' };
+  const SCOPE_LABEL = { us: '미국', kr: '한국', crypto: '크립토', global: '글로벌' };
+
+  const riskValue = (v, i) => (isNum(v) ? fmtNum(v, i.precision) + i.suffix : NO);
+  const riskChange = (v, i) => (isNum(v) ? fmtSigned(v, i.precision) + i.suffix : NO);
+
+  /** 구간 막대 — 각 구간을 폭에 비례해 그리고 현재 값 위치에 마커를 찍는다 */
+  function bandBar(i, withScale) {
+    const span = i.scaleMax - i.scaleMin;
+    if (!(span > 0)) return '';
+    const segs = i.bands.map((b) => {
+      const from = Math.max(i.scaleMin, b.from === null ? i.scaleMin : b.from);
+      const to = Math.min(i.scaleMax, b.to === null ? i.scaleMax : b.to);
+      return '<span class="bseg" data-on="' + (b.level === i.level ? '1' : '0') + '" style="width:' +
+        Math.max(0, ((to - from) / span) * 100) + '%;background:' + RISK_FILL[b.level] + '"></span>';
+    }).join('');
+    const cur = i.bands.find((b) => b.level === i.level);
+    const mark = i.position === null ? '' : '<span class="bandmark" style="left:' + i.position + '%"></span>';
+    const p = i.precision > 2 ? 2 : i.precision;
+    const aria = i.name + ' 신호등 구간 막대. 왼쪽부터 ' +
+      i.bands.map((b) => RISK_LABEL[b.level] + ' ' + b.label).join(', ') + '. 현재는 ' + RISK_LABEL[i.level] + ' 구간.';
+    return (
+      '<div class="bandbar" role="img" aria-label="' + esc(aria) + '">' + segs + mark + '</div>' +
+      (withScale
+        ? '<div class="bandscale"><span class="tnum" style="flex-shrink:0">' + esc(fmtNum(i.scaleMin, p)) + '</span>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px;min-width:0;border-radius:999px;padding:2px 6px;font-weight:600;color:' +
+          RISK_COLOR[i.level] + ';background:color-mix(in srgb,' + RISK_COLOR[i.level] + ' 14%,transparent)">' +
+          sigDot(riskSignal(i.level), 6) +
+          '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">지금 여기 · ' + RISK_LABEL[i.level] + ' ' + esc(cur ? cur.label : '') + '</span></span>' +
+          '<span class="tnum" style="flex-shrink:0">' + esc(fmtNum(i.scaleMax, p)) + '</span></div>'
+        : '')
+    );
+  }
+
+  function riskTile(i) {
+    const un = i.value === null;
+    return (
+      '<button type="button" class="card risktile" data-go-risk style="text-align:left;border-width:1px" aria-label="' + esc(i.name + ' 상세 보기') + '">' +
+      '<div style="display:flex;align-items:flex-start;gap:6px">' + lamp(riskSignal(i.level), 'sm', i.shortName) +
+      '<div style="min-width:0;flex:1"><div style="font-size:11px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</div>' +
+      '<div style="font-size:9.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + '</div>' +
+      '<div style="margin-top:2px;font-size:10px;font-weight:700;color:' + RISK_COLOR[i.level] + '">' +
+      RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</div></div></div>' +
+      (un
+        ? '<p style="margin:6px 0 0;font-size:10px;color:var(--warn)">' + esc(i.unavailableReason || '값 없음') + '</p>'
+        : '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-top:6px">' +
+          '<span class="tnum" style="font-size:15px;font-weight:700;color:var(--fg-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(riskValue(i.value, i)) + '</span>' +
+          '<span class="tnum" style="flex-shrink:0;font-size:10px;color:' + dirColor(i.change) + '">' + dirGlyph(i.change) + ' ' + esc(riskChange(i.change, i)) + '</span></div>') +
+      '<div style="margin-top:8px">' + bandBar(i, false) + '</div>' +
+      '</button>'
+    );
+  }
+
+  function riskCard(i) {
+    const un = i.value === null;
+    return (
+      '<article class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:flex-start;gap:8px">' + lamp(riskSignal(i.level), 'lg', i.name) +
+      '<div style="min-width:0;flex:1"><h3 style="margin:0;font-size:13.5px;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(i.name) + '</h3>' +
+      '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
+      (i.direction === 'higher_is_riskier' ? '값이 클수록 위험' : '값이 작을수록 위험') + '</p></div>' +
+      badge(RISK_BADGE[i.level], RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level], '', 'sm') + '</div>' +
+
+      '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:10px">' +
+      '<div style="min-width:0">' +
+      (un
+        ? '<p style="margin:0;font-size:12px;color:var(--warn)">' + esc(i.unavailableReason || '값을 받지 못했습니다.') + '</p>'
+        : '<p class="tnum" style="margin:0;font-size:20px;font-weight:700;line-height:1.2;color:var(--fg-strong)">' + esc(riskValue(i.value, i)) + '</p>' +
+          '<p class="tnum" style="margin:2px 0 0;font-size:11.5px;font-weight:600;color:' + dirColor(i.change) + '">' +
+          dirGlyph(i.change) + ' ' + esc(riskChange(i.change, i)) +
+          '<span style="margin-left:5px;font-weight:400;color:var(--subtle)">이전 ' + esc(riskValue(i.previous, i)) + '</span></p>') +
+      '</div>' + sparkline(i.spark, RISK_COLOR[i.level], 92, 32, true) + '</div>' +
+
+      '<div style="margin-top:12px">' + bandBar(i, true) + '</div>' +
+
+      '<ul class="bandlegend">' + i.bands.map((b) => {
+        const on = b.level === i.level;
+        return '<li><span aria-hidden="true" style="flex-shrink:0;width:8px;height:' + (on ? 10 : 6) + 'px;border-radius:2px;background:' +
+          RISK_FILL[b.level] + ';box-shadow:0 0 0 1px color-mix(in srgb,' + RISK_COLOR[b.level] + ' 45%,transparent)"></span>' +
+          '<span style="color:' + (on ? RISK_COLOR[b.level] : 'var(--subtle)') + ';font-weight:' + (on ? 700 : 400) + '">' +
+          RISK_LABEL[b.level] + ' ' + esc(b.label) + '</span></li>';
+      }).join('') + '</ul>' +
+
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px">' +
+      '<p style="margin:0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
+      '<p style="margin:0;font-size:11px;line-height:1.7;word-break:keep-all;color:' + RISK_COLOR[i.level] + '"><b>지금 읽는 법 · </b>' + esc(i.reading) + '</p></div>' +
+
+      /* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */
+      '<dl style="margin:10px 0 0;border-radius:9px;background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:6px">' +
+      [['▲', '값이 오르면', i.whenUp], ['▼', '값이 내리면', i.whenDown]].map(([gl, lb, tx]) =>
+        '<div style="display:flex;align-items:flex-start;gap:6px">' +
+        '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;font-size:10px;color:var(--muted)">' + gl + '</span>' +
+        '<dt class="sr">' + lb + '</dt>' +
+        '<dd style="margin:0;min-width:0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+        '<b style="color:var(--fg)">' + lb + ' · </b>' + esc(tx || '') + '</dd></div>').join('') +
+      '</dl>' +
+
+      '<p style="margin:8px 0 0;font-size:10px;color:var(--subtle)">기준 ' + esc(kTime(i.meta.asOf)) + ' · 출처 ' + esc((i.meta.sources[0] || {}).name || '알 수 없음') + '</p>' +
+      '</article>'
+    );
+  }
+
+  /** 고른 시장만 세는 한 줄 요약 — 앱의 lib/riskHeadline.ts 와 같은 문장 규칙 */
+  function buildRiskHeadline(indicators) {
+    const avail = indicators.filter((i) => i.value !== null);
+    const alerts = avail.filter((i) => i.level === 'alert');
+    const watches = avail.filter((i) => i.level === 'watch');
+    let h;
+    if (!avail.length) h = '위험 지표를 산출할 데이터가 없습니다.';
+    else if (alerts.length) h = indicators.length + '개 중 ' + alerts.length + '개가 주의 단계입니다 (' + alerts.map((i) => i.shortName).join(' · ') + ').';
+    else if (watches.length) h = '주의 단계는 없고, ' + watches.length + '개가 관찰 단계입니다 (' + watches.map((i) => i.shortName).join(' · ') + ').';
+    else h = '산출된 ' + avail.length + '개 지표가 모두 안정·보통 구간에 있습니다.';
+    if (avail.length < indicators.length) h += ' ' + (indicators.length - avail.length) + '개는 값이 없어 제외했습니다.';
+    return h;
+  }
+
+  function riskHeadline(d) {
+    const sig = d.alertCount > 0 ? 'red' : d.watchCount > 0 ? 'yellow' : 'green';
+    return (
+      '<div class="card" style="display:flex;align-items:flex-start;gap:8px;padding:11px 13px;border-color:color-mix(in srgb,' +
+      sigColor(sig) + ' 38%,var(--border))">' + lamp(sig, 'sm', '종합') +
+      '<p style="margin:0;flex:1;min-width:0;font-size:12px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(d.headline) + '</p></div>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 과거 위기 시점 표식                                                       */
+  /* ====================================================================== */
+
+  const EVENT_CAT_LABEL = { crisis: '위기', shock: '급락', policy: '정책' };
+
+  /**
+   * 사건의 날짜와 이름은 실제로 있었던 일이고, 옆에 붙는 점수는 이 앱의 자체 산식이
+   * 그 시점 데이터로 계산한 값이다. DEMO 에서는 원본 자체가 합성이다.
+   * 그 차이를 카드 안에 그대로 적는다.
+   */
+  function crisisCard(ev, currentScore) {
+    if (!ev || !ev.markers || !ev.markers.length) {
+      return (
+        '<div class="card" style="padding:14px">' +
+        '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">과거 위기 때의 점수</h3>' +
+        '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">이 시장에서 표시할 사건이 히스토리 범위 안에 없습니다.</p></div>'
+      );
+    }
+
+    const scored = ev.markers.filter((m) => m.score !== null);
+    const lowest = scored.length ? scored.reduce((a, b) => (a.score <= b.score ? a : b)) : null;
+    const curStage = stageOf(currentScore);
+
+    const rows = ev.markers.map((m, i) => {
+      const on = state.crisisT === m.t;
+      const col = scoreColor(m.score);
+      return (
+        '<li><button type="button" data-crisis="' + m.t + '" aria-pressed="' + on + '" ' +
+        'style="width:100%;text-align:left;border-radius:9px;padding:8px 10px;cursor:pointer;border:1px solid ' +
+        (on ? 'color-mix(in srgb,' + col + ' 45%,var(--border))' : 'var(--border)') + ';background:' +
+        (on ? 'color-mix(in srgb,' + col + ' 8%,var(--surface))' : 'var(--surface)') + '">' +
+        '<div style="display:flex;align-items:flex-start;gap:8px">' +
+        '<span aria-hidden="true" style="display:inline-flex;flex-shrink:0;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;font-size:10px;font-weight:700;background:' +
+        scoreFill(m.score) + ';color:var(--bg)">' + (i + 1) + '</span>' +
+        '<div style="min-width:0;flex:1">' +
+        '<p style="margin:0;font-size:12px;font-weight:600;line-height:1.3;word-break:keep-all;color:var(--fg)">' + esc(m.label) + '</p>' +
+        '<p class="tnum" style="margin:2px 0 0;font-size:10px;color:var(--subtle)">' + esc(kYmd(m.t)) +
+        '<span style="margin-left:6px">' + (EVENT_CAT_LABEL[m.category] || '') + '</span></p></div>' +
+        '<div style="flex-shrink:0;text-align:right">' +
+        '<p class="tnum" style="margin:0;font-size:16px;line-height:1;font-weight:700;color:' + col + '">' +
+        (m.score === null ? NO : esc(fmtNum(m.score, 1))) + '</p>' +
+        '<p style="margin:4px 0 0;font-size:10px;font-weight:600;color:' + col + '">' + esc(m.stageLabel || '산출 불가') + '</p>' +
+        '</div></div>' +
+        (on
+          ? '<p style="margin:6px 0 0;border-top:1px solid var(--border);padding-top:6px;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(m.note) + '</p>'
+          : '') +
+        '</button></li>'
+      );
+    }).join('');
+
+    return (
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">' +
+      '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">과거 위기 때의 점수</h3>' +
+      '<span class="tnum" style="font-size:10px;color:var(--subtle)">' + ev.markers.length + '건</span></div>' +
+      '<p style="margin:4px 0 10px;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.</p>' +
+      (lowest && currentScore !== null
+        ? '<p style="margin:0 0 10px;border-radius:9px;background:var(--surface-2);padding:8px 10px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' +
+          '표시된 사건 중 가장 낮았던 때는 <b style="color:' + scoreColor(lowest.score) + '">' + esc(lowest.label) + '</b> 의 ' +
+          '<b class="tnum" style="color:' + scoreColor(lowest.score) + '">' + esc(fmtNum(lowest.score, 1)) + '점</b>입니다. 지금은 ' +
+          '<b class="tnum" style="color:' + scoreColor(currentScore) + '">' + esc(fmtNum(currentScore, 1)) + '점</b>' +
+          (curStage ? ' (' + curStage.label + ')' : '') + ' 입니다.</p>'
+        : '') +
+      '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">' + rows + '</ul>' +
+      '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:11px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
+      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px">' +
+      '<table class="data-table"><caption class="sr">과거 위기 시점의 자체 산출 심리 점수</caption>' +
+      '<thead><tr><th scope="col">시점</th><th scope="col">사건</th><th scope="col">점수</th><th scope="col">단계</th></tr></thead><tbody>' +
+      ev.markers.map((m) =>
+        '<tr><td class="tnum" style="white-space:nowrap">' + esc(kYmd(m.t)) + '</td>' +
+        '<th scope="row" style="font-weight:400;word-break:keep-all">' + esc(m.label) + '</th>' +
+        '<td class="tnum">' + (m.score === null ? NO : esc(fmtNum(m.score, 1))) + '</td>' +
+        '<td style="white-space:nowrap">' + esc(m.stageLabel || NO) + '</td></tr>').join('') +
+      '</tbody></table></div></details>' +
+      (ev.outOfRange > 0
+        ? '<p style="margin:8px 0 0;font-size:10px;word-break:keep-all;color:var(--subtle)">히스토리 범위보다 앞선 사건 ' + ev.outOfRange + '건은 점수를 산출할 수 없어 표시하지 않았습니다.</p>'
+        : '') +
+      '<p class="notice n-warn" style="margin-top:10px"><span>ⓘ</span><span>' + esc(ev.caveat) +
+      ' 과거에 이랬다는 기록일 뿐, 앞으로를 예측하거나 매매를 권하지 않습니다.</span></p>' +
+      '</div>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 심리 사이클 · 구간별 과거 통계                                             */
+  /* ====================================================================== */
+
+  const PHASE_BADGE = {
+    recovery: 'b-ok', deepening: 'b-danger', improving: 'b-ok',
+    weakening: 'b-warn', heating: 'b-warn', cooling: 'b-accent', unknown: 'b-neutral',
+  };
+  const PHASE_GLYPH = {
+    recovery: '↗', deepening: '↘', improving: '↗',
+    weakening: '↘', heating: '↗', cooling: '↘', unknown: '—',
+  };
+
+  /** 백분위를 말로 옮긴다. 숫자만으로는 8% 가 높은지 낮은지 헷갈린다. */
+  const positionLabel = (p) => (p >= 70 ? '기간 상단권' : p <= 30 ? '기간 하단권' : '기간 중간권');
+
+  const phaseBadge = (cy, size) =>
+    badge(PHASE_BADGE[cy.phase.id] || 'b-neutral', (PHASE_GLYPH[cy.phase.id] || '—') + ' ' + esc(cy.phase.label), cy.phase.description, size);
+
+  function cycleCard(cy) {
+    const horizon = (h) => {
+      const un = h.percentile === null;
+      return (
+        '<li style="border-bottom:1px solid var(--border);padding:10px 0">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
+        '<div style="min-width:0"><p style="margin:0;font-size:12.5px;font-weight:600;color:var(--fg)">' + esc(h.label) + '</p>' +
+        (un
+          ? '<p style="margin:2px 0 0;font-size:10px;color:var(--warn)">' + esc(h.unavailableReason || '표본 부족') + '</p>'
+          : '<p class="tnum" style="margin:2px 0 0;font-size:10px;color:var(--subtle)">평균 ' + esc(fmtNum(h.mean, 1)) +
+            ' · 범위 ' + esc(fmtNum(h.min, 0)) + '~' + esc(fmtNum(h.max, 0)) + '</p>') + '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+        '<p style="margin:0;font-size:12.5px;font-weight:700;color:var(--fg-strong)">' +
+        (un ? NO : positionLabel(h.percentile)) + '</p>' +
+        '<p class="tnum" style="margin:0;font-size:10px;color:' + dirColor(h.change) + '">' +
+        dirGlyph(h.change) + ' ' + (h.change === null ? NO : esc(fmtSigned(h.change, 1)) + '점') + '</p></div></div>' +
+        (un ? '' :
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+          '<div style="position:relative;flex:1;height:10px;border-radius:999px;background:var(--surface-3)">' +
+          '<span style="position:absolute;inset-block:0;left:0;width:' + h.percentile + '%;border-radius:999px;background:' + scoreFill(cy.score) + '"></span>' +
+          '<span style="position:absolute;inset-block:0;left:30%;width:1px;background:var(--border-strong)"></span>' +
+          '<span style="position:absolute;inset-block:0;left:70%;width:1px;background:var(--border-strong)"></span>' +
+          '<span style="position:absolute;top:50%;left:' + h.percentile + '%;width:2.5px;height:12px;transform:translate(-50%,-50%);border-radius:999px;background:var(--fg-strong);box-shadow:0 0 0 2px var(--surface)"></span>' +
+          '</div>' + scoreSpark(h.points, 64, 20) + '</div>' +
+          '<p class="tnum" style="margin:4px 0 0;font-size:10px;color:var(--subtle)">기간 내 위치 ' + esc(fmtNum(h.percentile, 0)) +
+          '% — ' + h.windowDays + '일 중 현재 점수보다 낮았던 날의 비율입니다.</p>') +
+        '</li>'
+      );
+    };
+
+    return (
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
+      '<div style="min-width:0"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">현재 국면</h3>' +
+      '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle)">' + esc(cy.phase.levelLabel) + ' × ' + esc(cy.phase.directionLabel) + '</p></div>' +
+      phaseBadge(cy, 'sm') + '</div>' +
+      '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(cy.phase.description) + '</p>' +
+
+      '<div style="display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      [['현재 점수', cy.score === null ? NO : fmtNum(cy.score, 1), scoreColor(cy.score)],
+       ['20일 평균', cy.ma20 === null ? NO : fmtNum(cy.ma20, 1), 'var(--fg)'],
+       ['10일 기울기', cy.slope === null ? NO : fmtSigned(cy.slope, 2), dirColor(cy.slope)]].map(([l, v, col]) =>
+        '<div style="flex:1;background:var(--surface-2);border-radius:9px;padding:8px 6px;text-align:center">' +
+        '<div style="font-size:10px;color:var(--muted)">' + l + '</div>' +
+        '<div class="tnum" style="font-size:13px;font-weight:700;margin-top:2px;color:' + col + '">' + esc(v) + '</div></div>').join('') +
+      '</div>' +
+
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<h4 style="margin:0 0 4px;font-size:11px;font-weight:700;color:var(--muted)">기간별 심리 위치</h4>' +
+      '<p style="margin:0 0 4px;font-size:10px;color:var(--subtle);word-break:keep-all">같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다.</p>' +
+      '<ul style="list-style:none;margin:0;padding:0">' + cy.horizons.map(horizon).join('') + '</ul></div>' +
+
+      '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '국면은 현재 수준과 최근 방향을 조합해 이름 붙인 서술입니다. 앞으로의 방향을 예측하지 않으며 매매 신호가 아닙니다.</p>' +
+      '</div>'
+    );
+  }
+
+  function bandStatsCard(bs) {
+    if (!bs) {
+      return '<div class="card" style="padding:14px"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">구간별 과거 통계</h3>' +
+        '<p style="margin:8px 0 0;font-size:11px;color:var(--muted)">통계를 낼 만큼 히스토리가 쌓이지 않았거나 비교할 대표 지수가 없습니다.</p></div>';
+    }
+    const withV = bs.bands.filter((b) => b.avgForward !== null);
+    const maxAbs = Math.max(0.01, ...withV.map((b) => Math.abs(b.avgForward)));
+    const STAGE_VAR = { extreme_fear: '--s1', fear: '--s2', neutral: '--s3', greed: '--s4', extreme_greed: '--s5' };
+
+    return (
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
+      '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">구간별 과거 통계</h3>' +
+      '<span class="tnum" style="font-size:10px;color:var(--subtle)">표본 ' + esc(fmtNum(bs.totalDays, 0)) + '일</span></div>' +
+      '<p style="margin:0 0 12px;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+      '점수가 각 구간이던 날 이후 <b style="color:var(--fg)">' + bs.forwardDays + '거래일</b> 동안 ' +
+      '<b style="color:var(--fg)">' + esc(bs.benchmarkName) + '</b> 이 어떻게 움직였는지 집계한 값입니다.</p>' +
+
+      '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">' +
+      bs.bands.map((b) => {
+        const v = b.avgForward;
+        const pct = v === null ? 0 : (Math.abs(v) / maxAbs) * 50;
+        const pos = (v || 0) > 0;
+        return '<li>' +
+          '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
+          '<span style="display:flex;align-items:center;gap:6px;min-width:0">' +
+          '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(' + STAGE_VAR[b.stageId] + ')"></span>' +
+          '<span style="font-size:11.5px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.stageLabel) + '</span>' +
+          '<span class="tnum" style="font-size:10px;color:var(--subtle);flex-shrink:0">' + b.sampleDays + '일</span></span>' +
+          '<span class="tnum" style="font-size:11.5px;font-weight:600;flex-shrink:0;color:' + dirColor(v) + '">' +
+          (v === null ? '표본 부족' : '평균 ' + esc(fmtSigned(v, 2)) + '%') + '</span></div>' +
+          (v === null ? '' :
+            '<div style="position:relative;height:8px;border-radius:999px;background:var(--surface-3)">' +
+            '<span style="position:absolute;inset-block:0;left:50%;width:1px;background:var(--border-strong)"></span>' +
+            '<span style="position:absolute;inset-block:0;border-radius:999px;background:' + dirColor(v) +
+            ';left:' + (pos ? 50 : 50 - pct) + '%;width:' + pct + '%"></span></div>' +
+            '<p class="tnum" style="margin:4px 0 0;display:flex;flex-wrap:wrap;gap:2px 12px;font-size:10px;color:var(--subtle)">' +
+            '<span>중앙값 ' + esc(fmtSigned(b.medianForward, 2)) + '%</span>' +
+            '<span>플러스 비율 ' + esc(fmtNum(b.positiveShare, 0)) + '%</span>' +
+            '<span>최저 ' + esc(fmtSigned(b.worst, 1)) + '% · 최고 ' + esc(fmtSigned(b.best, 1)) + '%</span></p>') +
+          '</li>';
+      }).join('') + '</ul>' +
+
+      '<p class="notice n-warn" style="margin-top:12px"><span>ⓘ</span><span>' + esc(bs.caveat) +
+      ' 이 표는 과거에 무슨 일이 있었는지를 보여줄 뿐이며, 앞으로의 수익을 예측하거나 매매를 권하지 않습니다.</span></p>' +
+      '</div>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 화면                                                                    */
+  /* ====================================================================== */
+
+  /* ------------------------------------------------------------------ *
+   * 예측시장에서 화제인 질문 — 홈의 별도 칸                              *
+   * 시세도 확률도 아니고 '가격'이라는 점을 카드 안에 계속 적는다.          *
+   * ------------------------------------------------------------------ */
+
+  function predictionBlock() {
+    const sec = snap().sections.prediction || {};
+    const d = sec.data;
+    if (!d) {
+      return '<section class="block"><div class="block-head"><h2>예측시장에서 화제인 질문</h2></div>' +
+        '<p class="notice n-warn">' + esc(sec.error || '예측시장 정보를 불러오지 못했습니다.') + '</p></section>';
+    }
+    const daysLeft = (iso) => {
+      if (!iso) return null;
+      const t = Date.parse(iso);
+      if (Number.isNaN(t)) return null;
+      const x = Math.ceil((t - Date.now()) / 864e5);
+      return x >= 0 ? x : null;
+    };
+    return (
+      '<section class="block"><div class="block-head"><h2>예측시장에서 화제인 질문</h2>' +
+      '<span class="hint">계속 바뀝니다</span></div>' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+      badge('b-neutral', '◈ ' + d.venue) +
+      '<span class="tnum" style="font-size:10px;color:var(--subtle)">' + esc(kTime(d.meta.fetchedAt)) + ' 기준</span></div>' +
+      (d.markets.length === 0
+        ? '<p class="notice n-warn">가져온 질문이 없습니다.</p>'
+        : '<div style="display:flex;flex-direction:column;gap:8px">' + d.markets.map(function (m) {
+            const priced = m.outcomes.filter(function (o) { return o.price !== null; });
+            const top = priced[0] || null;
+            const left = daysLeft(m.closesAt);
+            const title = m.questionKo || m.question;
+            return (
+              '<div class="card" style="padding:12px">' +
+              '<p style="margin:0;font-size:12.5px;line-height:1.7;font-weight:600;word-break:keep-all;color:var(--fg)">' + esc(title || NO) + '</p>' +
+              (m.questionKo === null && m.question
+                ? '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle)">원문 그대로 표시 (번역하지 않음)</p>'
+                : m.questionOrigin === 'derived'
+                  ? '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle)">원문 “' + esc(m.question) + '” · 한국어는 이 앱이 옮긴 것입니다</p>'
+                  : '') +
+              (m.unavailableReason
+                ? '<p style="margin:8px 0 0;font-size:11px;word-break:keep-all;color:var(--warn)">△ ' + esc(m.unavailableReason) + '</p>'
+                : '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px">' +
+                  '<div style="min-width:0">' +
+                  '<div class="tnum" style="font-size:24px;line-height:1;font-weight:700;color:var(--fg-strong)">' +
+                  (top ? esc(fmtNum(top.price, 0)) + '¢' : NO) + '</div>' +
+                  '<div style="margin-top:4px;font-size:10.5px;color:var(--muted);word-break:keep-all">‘' +
+                  esc(top ? (top.labelKo || top.label) : '—') + '’ 쪽에 매겨진 값 (1달러 = 100¢)</div></div>' +
+                  '<div style="flex-shrink:0;text-align:right;font-size:11px;color:var(--muted)">' +
+                  '<div style="font-size:9.5px;color:var(--subtle)">같은 쪽 24시간</div>' +
+                  '<div class="tnum">' + (m.changeDay === null ? NO : esc(fmtSigned(m.changeDay, 1)) + '¢') + '</div></div></div>' +
+                  '<ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px">' +
+                  priced.map(function (o, i) {
+                    return '<li style="display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:8px">' +
+                      '<span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+                      (i === 0 ? 'font-weight:600;color:var(--fg)' : 'color:var(--muted)') + '">' + esc(o.labelKo || o.label) + '</span>' +
+                      '<span aria-hidden="true" style="display:block;height:8px;border-radius:99px;background:var(--surface-3)">' +
+                      '<span style="display:block;height:8px;border-radius:99px;width:' + Math.max(2, o.price) + '%;background:' +
+                      (i === 0 ? 'var(--accent)' : 'color-mix(in srgb,var(--muted) 45%,transparent)') + '"></span></span>' +
+                      '<span class="tnum" style="flex-shrink:0;text-align:right;font-size:12px;' +
+                      (i === 0 ? 'font-weight:700;color:var(--fg-strong)' : 'color:var(--muted)') + '">' + esc(fmtNum(o.price, 0)) + '¢</span></li>';
+                  }).join('') + '</ul>') +
+              '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle);display:flex;flex-wrap:wrap;gap:4px 12px">' +
+              '<span class="tnum">24시간 거래 ' + (m.volume24h === null ? NO : '$' + esc(enCompact(m.volume24h, 1))) + '</span>' +
+              '<span>마감 ' + (m.closesAt ? esc(kYmd(m.closesAt)) : NO) + (left !== null ? ' (' + left + '일 남음)' : '') + '</span>' +
+              '<span>' + (m.url ? '원문 링크' : 'DEMO 샘플이라 원문 링크가 없습니다') + '</span></p></div>'
+            );
+          }).join('') + '</div>') +
+      '<p class="notice n-neutral" style="margin-top:8px"><span>ⓘ</span><span>' +
+      '<b>여기 숫자는 확률이 아니라 가격입니다.</b> 68¢ 는 “그 일이 일어난다”에 사람들이 1달러 중 68센트를 내고 있다는 뜻일 뿐, ' +
+      '실제로 그렇게 될 확률이 68%라는 보장이 아닙니다. 소수의 큰 주문이나 거래가 적은 질문에서는 값이 크게 튑니다.</span></p>' +
+      '<p class="notice n-warn" style="margin-top:8px"><span>ⓘ</span><span>' +
+      '예측시장은 투자상품이 아니며 이 앱은 거래를 중개하지 않습니다. 국내에서는 이용이 제한될 수 있으니 참여 전에 직접 확인하세요. ' +
+      '이 칸은 화제가 되는 질문을 보여줄 뿐 참여를 권하지 않습니다.</span></p>' +
+      '</section>'
+    );
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 오늘의 경제 상식 — 하루 한 가지                                       *
+   * 날짜로 정해지므로 같은 날엔 늘 같고, 하루 지나면 다음 항목으로 넘어간다. *
+   * ------------------------------------------------------------------ */
+
+  const BASIC_ORDER_FLAT = BASIC_GROUPS.reduce(function (a, g) { return a.concat(g.ids); }, []);
+
+  function dailyBasicId(key, ids) {
+    const list = ids && ids.length ? ids : BASIC_ORDER_FLAT;
+    if (!list.length) return '';
+    const t = Date.parse(key + 'T00:00:00Z');
+    if (Number.isNaN(t)) return list[0];
+    const d = Math.floor(t / 864e5);
+    return list[((d % list.length) + list.length) % list.length];
+  }
+
+  function groupOfBasic(id) {
+    for (let i = 0; i < BASIC_GROUPS.length; i += 1) {
+      if (BASIC_GROUPS[i].ids.indexOf(id) !== -1) return BASIC_GROUPS[i];
+    }
+    return null;
+  }
+
+  function dailyBasicBlock() {
+    const sec = snap().sections.basics || {};
+    const list = sec.data || [];
+    if (!list.length) return '';
+    const ids = list.map(function (b) { return b.id; });
+    const key = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+    const todayId = dailyBasicId(key, ids);
+    let item = null;
+    for (let i = 0; i < list.length; i += 1) if (list[i].id === todayId) item = list[i];
+    if (!item) item = list[0];
+    const g = BASIC_GUIDE[item.id];
+    const grp = groupOfBasic(item.id);
+    return (
+      '<section class="block"><div class="block-head"><h2>오늘의 경제 상식</h2>' +
+      '<button type="button" class="linkbtn" data-go="basics">전체 보기 →</button></div>' +
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+      '<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--fg-strong)">' + esc(item.name) + '</div>' +
+      '<div style="margin-top:2px;font-size:10px;color:var(--subtle)">' + esc(item.englishName) + (grp ? ' · ' + esc(grp.label) : '') + '</div></div>' +
+      badge(item.official ? 'b-neutral' : 'b-warn', item.official ? '◎ 공식 통계' : '△ 비공식 개념') + '</div>' +
+      (g ? '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.headline) + '</p>' : '') +
+      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+      '<div class="tnum" style="font-size:20px;line-height:1;font-weight:700;color:var(--fg-strong)">' +
+      (item.value === null ? NO : esc(fmtNum(item.value, item.precision)) + esc(item.suffix || '')) + '</div>' +
+      '<button type="button" class="linkbtn" data-go="basics">읽는 법 보기 →</button></div>' +
+      '<p style="margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 ' + list.length + '가지는 생활 경제 상식 화면에 있습니다.</p>' +
+      '</div></section>'
+    );
+  }
+
+  function viewHome() {
+    const s = snap();
+    const fng = s.sections.fng.data || [];
+    const quotes = s.sections.quotes.data || {};
+    const all = new Map();
+    MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => all.set(q.id, q)));
+    const homeIds = ['spx', 'ndx', 'vix', 'ust10', 'us_spread_10_2', 'nvda', 'kospi', 'kosdaq', 'vkospi', 'usdkrw', 'samsung', 'btc', 'eth', 'total_mcap', 'btc_dom'];
+    const ordered = [];
+    state.watch.forEach((id) => { if (all.has(id)) ordered.push(all.get(id)); });
+    homeIds.forEach((id) => { if (all.has(id) && ordered.indexOf(all.get(id)) < 0) ordered.push(all.get(id)); });
+
+    const macro = s.sections.macro.data || [];
+    const byId = new Map(macro.map((m) => [m.id, m]));
+    const featured = ['vix', 'vkospi', 'usdkrw', 'us_spread', 'hy_oas', 'us_policy_rate', 'kr_policy_rate', 'us_cpi'].map((id) => byId.get(id)).filter(Boolean);
+
+    const now = Date.now();
+    const upcoming = (s.sections.calendar.data || []).filter((e) => Date.parse(e.scheduledAt) >= now - 6 * 3600000).slice(0, 4);
+    const flows = s.sections.flows.data;
+    const news = (s.sections.news.data || []).slice(0, 5);
+    const summary = s.sections.summary.data;
+    const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
+
+    return (
+      '<h1 class="sr">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+
+      '<section class="block" style="padding-inline:0">' +
+      '<div class="block-head" style="padding-inline:12px"><h2>시장별 투자심리</h2><span class="hint">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
+      '<div class="fng-scroll">' + fng.map(fngCard).join('') + '</div>' +
+      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 모두 0~100 척도지만 구성 지표와 가중치가 서로 다릅니다. 같은 숫자라도 의미가 동일하지 않으므로 시장 간 직접 비교는 피해 주세요.</span></p></div>' +
+      '</section>' +
+
+      '<section class="block"><div class="block-head"><h2>시장 위험 신호등</h2>' +
+      '<button type="button" class="linkbtn" data-go="risk">기준과 해설 →</button></div>' +
+      (s.sections.risk && s.sections.risk.data
+        ? '<div style="margin-bottom:8px">' + signalTally(s.sections.risk.data) + '</div>' +
+          riskHeadline(s.sections.risk.data) +
+          '<div class="riskgrid" style="margin-top:8px">' + s.sections.risk.data.indicators.map(riskTile).join('') + '</div>' +
+          '<div style="margin-top:8px">' + signalLegend("초록·노랑·빨강은 지표가 평소 범위에서 얼마나 벗어났는지만 나타냅니다. 사라·팔라는 신호가 아닙니다.") + '</div>'
+        : '<p style="font-size:12px;color:var(--muted)">위험 지표를 산출할 데이터가 없습니다.</p>') +
+      '</section>' +
+
+      '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +
+      '<button type="button" class="linkbtn" data-go="market">시장 전체 보기 →</button></div>' +
+      '<div class="grid-cards">' + ordered.slice(0, 9).map(priceCard).join('') + '</div></section>' +
+
+      '<div class="dash">' +
+      '<section class="block"><div class="block-head"><h2>오늘의 시장 요약</h2></div>' +
+      '<div class="card summary" style="padding:14px"><ul>' +
+      summary.lines.map((l) => {
+        const [lb, cls, gl] = SUM[l.kind];
+        return '<li>' + badge(cls, gl + ' ' + lb) + '<p>' + esc(l.text) + '</p></li>';
+      }).join('') +
+      '</ul><p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">생성 ' +
+      esc(kTime(summary.generatedAt)) + ' · 실제 가격·지표 값에 근거해 규칙 기반으로 작성되며, 근거가 없으면 원인을 추정하지 않습니다.</p></div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>오늘의 경제 일정</h2>' +
+      '<button type="button" class="linkbtn" data-go="calendar">전체 캘린더 →</button></div>' +
+      '<div class="card" style="overflow:hidden"><ul class="evlist">' + upcoming.map(eventRow).join('') + '</ul></div></section>' +
+
+      predictionBlock() +
+
+      dailyBasicBlock() +
+
+      '<section class="block"><div class="block-head"><h2>자금 흐름과 뉴스</h2></div>' +
+      '<div style="display:grid;gap:10px;grid-template-columns:1fr" class="grid-flows">' +
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">' +
+      '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">한국 투자자별 당일 순매수</h3>' + badge('b-neutral', 'KOSPI') + '</div>' +
+      (flows && (flows.foreign !== null || flows.institution !== null)
+        ? [['외국인', flows.foreign], ['기관', flows.institution], ['개인', flows.individual]].map(([l, v]) =>
+            '<div class="flowrow"><span>' + l + '</span><b class="tnum" style="color:' + dirColor(v) + '">' + dirGlyph(v) + ' ' +
+            (v === null ? NO : esc(koCompact(Math.abs(v) * 1e8, 1)) + '원') + '<span class="sr">' + (v > 0 ? '순매수' : '순매도') + '</span></b></div>').join('')
+        : '<p class="notice n-warn">' + esc((flows && flows.meta.notes && flows.meta.notes[0]) || '투자자별 매매동향 데이터를 받지 못했습니다.') + ' 값을 0으로 표시하지 않습니다.</p>') +
+      (flows ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:7px;font-size:10px;color:var(--subtle)">기준 ' +
+        esc(relative(flows.meta.asOf)) + ' · 출처 ' + esc((flows.meta.sources[0] || {}).name || '알 수 없음') + '</p>' : '') + '</div>' +
+
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">' +
+      '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">주요 뉴스</h3>' + badge('b-demo', 'DEMO 샘플') + '</div>' +
+      '<p style="margin:0 0 8px;font-size:10px;color:var(--subtle)">DEMO 모드에서는 실제 기사가 아닌 가상의 샘플 매체·헤드라인을 보여줍니다.</p>' +
+      '<ul class="news">' + news.map((n) =>
+        '<li><p>' + esc(n.summaryKo) + '</p><div class="orig" title="' + esc(n.titleOriginal) + '">' + esc(n.titleOriginal) + '</div>' +
+        '<div class="meta"><span>' + esc(n.outlet) + '</span><span>' + esc(relative(n.publishedAt)) + '</span>' +
+        n.markets.map((m) => '<span style="color:var(--muted)">#' + MARKET_LABEL[m] + '</span>').join('') +
+        '<span>원문 링크 없음</span></div></li>').join('') +
+      '</ul></div></div></section>' +
+      '</div>'
+    );
+  }
+
+  /** 시장 허브 — 세 시장을 각각의 화면으로 들어가는 입구 */
+  function viewMarketHub() {
+    const sn = snap();
+    const quotes = sn.sections.quotes.data || {};
+    const fngList = sn.sections.fng.data || [];
+    const risk = sn.sections.risk && sn.sections.risk.data;
+    const now = new Date();
+    const HEAD = { us: ['spx', 'ndx', 'vix'], kr: ['kospi', 'kosdaq', 'usdkrw'], crypto: ['btc', 'eth', 'btc_dom'] };
+    const BLURB = {
+      us: 'S&P 500 · 나스닥 · 국채 금리 · 빅테크',
+      kr: 'KOSPI · KOSDAQ · 환율 · 투자자 수급',
+      crypto: 'BTC · ETH · 도미넌스 · 파생 · 24시간',
+    };
+    const rank = { alert: 3, watch: 2, normal: 1, calm: 0 };
+
+    return (
+      '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">시장</h1>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted)">시장별로 화면이 나뉘어 있습니다. 들어갈 시장을 고르세요.</p></div>' +
+      '<div style="padding:12px"><div class="hubgrid">' +
+      MARKETS.map((m) => {
+        const f = fngList.find((x) => x.market === m) || null;
+        const list = quotes[m] || [];
+        const byId = new Map(list.map((q) => [q.id, q]));
+        const head = HEAD[m].map((id) => byId.get(id)).filter(Boolean);
+        const mr = ((risk && risk.indicators) || []).filter((i) => i.scope === m);
+        let worst = null;
+        for (const i of mr) if (!worst || rank[i.level] > rank[worst.level]) worst = i;
+        const sess = session(m, now);
+
+        return (
+          '<button type="button" class="card" data-go-region="' + m + '" style="display:block;text-align:left;padding:16px;border-width:1px">' +
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
+          '<div style="min-width:0"><h2 style="margin:0;font-size:16px;font-weight:700;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 시장</h2>' +
+          '<p style="margin:2px 0 0;font-size:10.5px;color:var(--subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + BLURB[m] + '</p></div>' +
+          sessBadge(sess.phase) + '</div>' +
+
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:8px">' + gauge(f ? f.score : null, 116) +
+          '<div style="min-width:0;flex:1">' +
+          (f
+            ? '<p style="margin:0;font-size:11px;color:var(--muted)">' +
+              (f.score === null ? '점수 산출 불가' : esc((f.stage ? f.stage.label : '') + ' 구간')) + '</p>' +
+              '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle)">신뢰도 ' +
+              ({ high: '높음', medium: '보통', low: '낮음' })[f.confidence] + ' · 산출 ' + esc(kTime(f.computedAt)) + '</p>'
+            : '') +
+          (worst
+            ? '<p style="margin:6px 0 0;font-size:10.5px;color:' + RISK_COLOR[worst.level] + '">' +
+              RISK_GLYPH[worst.level] + ' ' + esc(worst.shortName) + ' ' + RISK_LABEL[worst.level] + '</p>'
+            : '') +
+          '</div></div>' +
+
+          '<ul style="list-style:none;margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:4px">' +
+          head.map((q) => {
+            const dir = f2dir(q);
+            return '<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px">' +
+              '<span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(q.name) + '</span>' +
+              '<span style="display:flex;gap:8px;flex-shrink:0"><span class="tnum" style="font-weight:600;color:var(--fg-strong)">' +
+              esc(q.price === null ? NO : fmtValue(q.price, q)) + '</span>' +
+              '<span class="tnum" style="color:' + dirColor(q.changePct) + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtPct(q.changePct)) + '</span></span></li>';
+          }).join('') + '</ul>' +
+
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">' +
+          badge('b-neutral', '종목 ' + list.length + '개') +
+          '<span style="font-size:11px;font-weight:600;color:var(--accent)">' + MARKET_LABEL[m] + ' 시장 열기 →</span></div>' +
+          '</button>'
+        );
+      }).join('') +
+      '</div></div>'
+    );
+  }
+
+  const f2dir = (q) => dirOf(q.changePct);
+
+  /** 시장 전용 화면 */
+  function viewMarketRegion() {
+    const m = state.region;
+    const sn = snap();
+    const all = (sn.sections.quotes.data || {})[m] || [];
+    const f = (sn.sections.fng.data || []).find((x) => x.market === m);
+    const flows = sn.sections.flows.data;
+    const risk = sn.sections.risk && sn.sections.risk.data;
+    const sess = session(m, new Date());
+
+    const SUBTITLE = {
+      us: '뉴욕 증시 · 국채 · 원자재 · 빅테크',
+      kr: '유가증권 · 코스닥 · 환율 · 투자자 수급',
+      crypto: '24시간 거래 · 도미넌스 · 파생 · 온체인',
+    };
+    const SPECIAL = {
+      us: ['ust2', 'ust10', 'us_spread_10_2', 'dxy', 'gold', 'wti'],
+      kr: ['kospi200', 'ktb3', 'ktb10'],
+      crypto: ['total_mcap', 'total_vol', 'btc_dom', 'stable_mcap', 'funding', 'open_interest', 'liquidations'],
+    };
+    const SPECIAL_TITLE = { us: '금리 · 달러 · 원자재', kr: '지수 · 국고채', crypto: '시장 규모 · 파생' };
+
+    const byId = new Map(all.map((q) => [q.id, q]));
+    const special = SPECIAL[m].map((id) => byId.get(id)).filter(Boolean);
+    const list = sortQuotes(state.onlyWatched ? all.filter((q) => state.watch.has(q.id)) : all, state.sort);
+    const marketRisk = ((risk && risk.indicators) || []).filter((i) => i.scope === m || i.scope === 'global');
+    const news = (sn.sections.news.data || []).filter((n) => n.markets.indexOf(m) >= 0).slice(0, 4);
+    const country = m === 'us' ? 'US' : m === 'kr' ? 'KR' : 'GLOBAL';
+    const nowMs = Date.now();
+    const events = (sn.sections.calendar.data || [])
+      .filter((e) => e.country === country && Date.parse(e.scheduledAt) >= nowMs - 6 * 3600000).slice(0, 3);
+
+    return (
+      '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
+      '<div style="display:flex;align-items:flex-start;gap:8px;min-width:0">' +
+      '<button type="button" class="backbtn" data-go="market" aria-label="시장 목록으로">←</button>' +
+      '<div style="min-width:0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 시장</h1>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + SUBTITLE[m] + '</p></div></div>' +
+      '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' + sessBadge(sess.phase) +
+      '<span style="font-size:10px;color:var(--subtle)">' + esc(sess.hint) + '</span></div></div>' +
+
+      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 전환">' +
+      MARKETS.map((x) => '<button type="button" style="flex:1" data-region="' + x + '" aria-pressed="' + (m === x) + '">' + MARKET_LABEL[x] + '</button>').join('') +
+      '</div></div>' +
+
+      '<div style="padding:12px"><div class="mktgrid">' +
+
+      // 좌측
+      '<div style="display:flex;flex-direction:column;gap:10px">' +
+      (f ? fngCard(f) : '') +
+      (marketRisk.length
+        ? '<div class="card" style="padding:12px">' +
+          '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px">' +
+          '<h2 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 관련 위험 지표</h2>' +
+          '<button type="button" class="linkbtn" data-go="risk">신호등 전체 →</button></div>' +
+          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">' +
+          marketRisk.map((i) =>
+            '<li><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
+            '<span style="font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</span>' +
+            '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+            '<span class="tnum" style="font-size:12px;font-weight:700;color:var(--fg-strong)">' + esc(riskValue(i.value, i)) + '</span>' +
+            '<span style="font-size:10px;color:' + RISK_COLOR[i.level] + '">' + RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</span></span></div>' +
+            bandBar(i, false) + '</li>').join('') +
+          '</ul></div>'
+        : '') +
+      (m === 'kr' && flows
+        ? '<div class="card" style="padding:12px"><h2 style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--fg-strong)">투자자별 당일 순매수</h2>' +
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
+          [['외국인', flows.foreign], ['기관', flows.institution], ['개인', flows.individual]].map(([l, v]) =>
+            '<div style="background:var(--surface-2);border-radius:9px;padding:8px;text-align:center">' +
+            '<div style="font-size:10px;color:var(--muted)">' + l + '</div>' +
+            '<div class="tnum" style="font-size:13px;font-weight:700;margin-top:2px;color:' + dirColor(v) + '">' +
+            (v === null ? NO : (v > 0 ? '+' : '-') + esc(koCompact(Math.abs(v) * 1e8, 1)) + '원') + '</div></div>').join('') +
+          '</div><p style="margin:8px 0 0;font-size:10px;color:var(--subtle);word-break:keep-all">기준 ' + esc(relative(flows.meta.asOf)) +
+          ' · 외국인 순매수는 원화 강세·지수 방어와 함께 나타나는 경우가 많습니다.</p></div>'
+        : '') +
+      (special.length
+        ? '<div class="card" style="padding:12px"><h2 style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--fg-strong)">' + SPECIAL_TITLE[m] + '</h2>' +
+          '<ul style="list-style:none;margin:0;padding:0">' +
+          special.map((q) =>
+            '<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+            '<span style="font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(q.name) + '</span>' +
+            '<span style="display:flex;gap:8px;flex-shrink:0"><span class="tnum" style="font-size:12px;font-weight:600;color:var(--fg-strong)">' +
+            esc(q.price === null ? NO : fmtValue(q.price, q)) + '</span>' +
+            '<span class="tnum" style="font-size:11px;color:' + dirColor(q.changePct) + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtPct(q.changePct)) + '</span></span></li>').join('') +
+          '</ul></div>'
+        : '') +
+      '</div>' +
+
+      // 우측
+      '<div>' +
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px">' +
+      '<div class="seg" role="group" aria-label="정렬">' +
+      [['default','기본'],['gain','상승순'],['loss','하락순'],['name','이름순']].map(([v,l]) =>
+        '<button type="button" data-sort="' + v + '" aria-pressed="' + (state.sort === v) + '">' + l + '</button>').join('') + '</div>' +
+      '<button type="button" class="ghost" data-onlywatch aria-pressed="' + state.onlyWatched + '" style="' +
+      (state.onlyWatched ? 'background:var(--surface-3);color:var(--accent)' : '') + '">' +
+      (state.onlyWatched ? '★ 관심만 보는 중' : '☆ 관심만 보기') + '</button></div>' +
+
+      '<div class="grid-cards" style="margin-top:8px">' +
+      (list.length ? list.map(priceCard).join('') : '<p style="font-size:13px;color:var(--muted)">표시할 항목이 없습니다.</p>') + '</div>' +
+
+      (events.length
+        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+          '<h2 style="margin:0;font-size:12px;font-weight:700;color:var(--muted)">' + MARKET_LABEL[m] + ' 관련 일정</h2>' +
+          '<button type="button" class="linkbtn" data-go="calendar">전체 캘린더 →</button></div>' +
+          '<div class="card" style="overflow:hidden"><ul class="evlist">' + events.map(eventRow).join('') + '</ul></div></section>'
+        : '') +
+
+      (news.length
+        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+          '<h2 style="margin:0;font-size:12px;font-weight:700;color:var(--muted)">' + MARKET_LABEL[m] + ' 관련 뉴스</h2>' +
+          badge('b-demo', 'DEMO 샘플') + '</div>' +
+          '<div class="card" style="padding:14px"><ul class="news">' +
+          news.map((n) =>
+            '<li><p>' + esc(n.summaryKo) + '</p><div class="orig">' + esc(n.titleOriginal) + '</div>' +
+            '<div class="meta"><span>' + esc(n.outlet) + '</span><span>' + esc(relative(n.publishedAt)) + '</span><span>원문 링크 없음</span></div></li>').join('') +
+          '</ul></div></section>'
+        : '') +
+
+      '</div></div></div>'
+    );
+  }
+
+  function sortQuotes(list, key) {
+    const copy = list.slice();
+    if (key === 'name') return copy.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    if (key === 'gain') return copy.sort((a, b) => (b.changePct == null ? -Infinity : b.changePct) - (a.changePct == null ? -Infinity : a.changePct));
+    if (key === 'loss') return copy.sort((a, b) => (a.changePct == null ? Infinity : a.changePct) - (b.changePct == null ? Infinity : b.changePct));
+    return copy;
+  }
+
+  function viewRisk() {
+    const sec = snap().sections.risk;
+    const d = sec && sec.data;
+    if (!d) return '<p style="padding:20px;font-size:13px;color:var(--muted)">위험 지표를 산출할 데이터가 없습니다.</p>';
+
+    /* 요약도 고른 시장만 센다. 아래 카드는 크립토인데 위 숫자가 전체면 읽을 수가 없다. */
+    const items = d.indicators.filter((i) => i.scope === state.riskScope || i.scope === 'global');
+    const available = items.filter((i) => i.value !== null);
+    const order = ['alert', 'watch', 'normal', 'calm'];
+    const groups = order.map((lv) => ({ lv, items: available.filter((i) => i.level === lv) })).filter((g) => g.items.length);
+    const alertN = available.filter((i) => i.level === 'alert').length;
+    const watchN = available.filter((i) => i.level === 'watch').length;
+    const headline = buildRiskHeadline(items);
+
+    return (
+      '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
+      '<div style="min-width:0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">시장 위험 신호등</h1>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">시장별 핵심 위험 게이지입니다. 고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 봅니다. 구간 기준은 그대로 공개합니다.</p></div>' +
+      '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">전체 지표 →</button></div>' +
+
+      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
+      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+        '<button type="button" style="flex:1" data-riskscope="' + v + '" aria-pressed="' + (state.riskScope === v) + '">' + l + '</button>').join('') +
+      '</div></div>' +
+
+      '<div style="padding:12px">' +
+      // 종합
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:flex-start;gap:8px">' +
+      lamp(alertN > 0 ? 'red' : watchN > 0 ? 'yellow' : 'green', 'lg', MARKET_LABEL[state.riskScope] + ' 종합') +
+      '<p style="margin:0;flex:1;min-width:0;font-size:13px;line-height:1.7;word-break:keep-all">' + esc(headline) + '</p></div>' +
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' + signalTally({ indicators: items }) + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      groups.map((g) =>
+        '<div style="min-width:0"><div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:' + RISK_COLOR[g.lv] + '">' +
+        sigDot(riskSignal(g.lv), 7) +
+        '<span aria-hidden="true">' + RISK_GLYPH[g.lv] + '</span>' + RISK_LABEL[g.lv] + ' ' + g.items.length + '</div>' +
+        '<p style="margin:2px 0 0;font-size:10px;color:var(--subtle);word-break:keep-all">' + esc(g.items.map((i) => i.shortName).join(' · ')) + '</p></div>').join('') +
+      '</div>' +
+      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">산출 ' +
+      esc(kFull(d.generatedAt)) + ' · ' + MARKET_LABEL[state.riskScope] + ' 관련 ' + items.length + '개 중 ' + available.length + '개 값 확보</p></div>' +
+
+      '<div style="margin-top:10px">' + signalLegend("빨간불은 '위험하니 팔아라'가 아니라 '이 지표가 평소보다 크게 벗어나 있다'는 뜻입니다. 초록불도 안전을 보장하지 않습니다.") + '</div>' +
+      '<p class="notice n-neutral" style="margin-top:10px"><span>ⓘ</span><span>이 지표들은 <b>투자심리 점수의 구성요소가 아닙니다.</b> ' +
+      '시장이 지금 얼마나 불안한지를 보는 별도의 게이지입니다. ' +
+      '심리 점수를 무엇으로 계산하는지는 심리 상세 화면의 구성요소에서 볼 수 있습니다.</span></p>' +
+      '<p class="notice n-neutral" style="margin-top:8px"><span>ⓘ</span><span>구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다. 각 지표 카드에 구간 경계를 그대로 표시했으니 직접 확인하고 판단하세요. 단계 표시는 위험의 방향을 읽는 참고이며 매매 신호가 아닙니다.</span></p>' +
+
+      '<div class="riskcards" style="margin-top:10px">' + items.map(riskCard).join('') + '</div>' +
+
+      // 표 대안
+      '<h2 style="margin:16px 0 6px;font-size:12px;font-weight:700;color:var(--muted)">표로 보기</h2>' +
+      '<div class="tablewrap"><table class="data"><caption class="sr">시장 위험 신호등 요약</caption>' +
+      '<thead><tr><th>지표</th><th>시장</th><th>현재</th><th>이전</th><th>단계</th></tr></thead><tbody>' +
+      d.indicators.map((i) =>
+        '<tr><th style="font-weight:400">' + esc(i.name) + '</th><td>' + SCOPE_LABEL[i.scope] + '</td>' +
+        '<td class="tnum">' + esc(riskValue(i.value, i)) + '</td><td class="tnum">' + esc(riskValue(i.previous, i)) + '</td>' +
+        '<td>' + badge(RISK_BADGE[i.level], RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level]) + '</td></tr>').join('') +
+      '</tbody></table></div>' +
+      '</div>'
+    );
+  }
+
+  function viewCalendar() {
+    const s = snap();
+    /* 시장을 고르면 그 시장 일정 + 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여준다 */
+    const events = (s.sections.calendar.data || []).filter(
+      (e) => e.market === state.calMarket || e.market === 'global',
+    );
+    const groups = new Map();
+    events.forEach((e) => {
+      const k = kDate(e.scheduledAt);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(e);
+    });
+    return (
+      '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.</p></div>' +
+      '<div style="padding:10px 12px 0"><div class="seg lg" role="group" aria-label="시장">' +
+      [['us', '미국'], ['kr', '한국'], ['crypto', '크립토']].map(([v, l]) =>
+        '<button type="button" data-cal="' + v + '" aria-pressed="' + (state.calMarket === v) + '">' + l + '</button>').join('') +
+      '</div></div>' +
+      '<div style="padding:12px;display:flex;flex-direction:column;gap:16px">' +
+      (groups.size === 0 ? '<p style="font-size:13px;color:var(--muted)">조건에 맞는 일정이 없습니다.</p>' :
+        [...groups].map(([d, list]) =>
+          '<section><h2 style="margin:0 0 6px;font-size:12px;font-weight:700;color:var(--muted)">' + esc(d) + '</h2>' +
+          '<div class="card" style="overflow:hidden"><ul class="evlist">' + list.map(eventRow).join('') + '</ul></div></section>').join('')) +
+      '</div>'
+    );
+  }
+
+  function viewIndicators() {
+    const s = snap();
+    const macro = s.sections.macro.data || [];
+    /* 시장은 하나만 고른다. 글로벌 지표는 어느 시장을 골라도 함께 보여준다. */
+    const GROUP_OF = { us: '미국', kr: '한국', crypto: '크립토' };
+    const list = macro.filter((m) => m.group === GROUP_OF[state.macroMarket] || m.group === '글로벌');
+    const alerts = list.filter((m) => m.riskLevel === 'alert' && m.value !== null);
+    const groups = [GROUP_OF[state.macroMarket], '글로벌'];
+    return (
+      '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 · 위험 지표</h1>' +
+      '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 경제 상식 →</button></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 아래 “생활 경제 상식” 화면에 따로 모았습니다.</p></div>' +
+      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
+      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+        '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
+      '</div></div>' +
+      (alerts.length
+        ? '<div style="padding:12px 12px 0"><div class="card" style="padding:12px;border-color:color-mix(in srgb,var(--danger) 40%,var(--border))">' +
+          '<p style="margin:0 0 6px;font-size:12px;font-weight:700;color:var(--danger)">▲ 주의 단계 지표 ' + alerts.length + '건</p>' +
+          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px">' +
+          alerts.map((m) => '<li style="display:flex;justify-content:space-between;gap:8px;font-size:12px"><span>' + esc(m.name) + '</span>' +
+            '<span style="font-size:11px;color:var(--muted);text-align:right;word-break:keep-all">' + esc(m.riskNote) + '</span></li>').join('') +
+          '</ul></div></div>'
+        : '') +
+      '<div style="padding:12px;display:flex;flex-direction:column;gap:16px">' +
+      groups.map((g) => {
+        const items = list.filter((m) => m.group === g);
+        if (!items.length) return '';
+        return '<section><h2 style="margin:0 0 6px;font-size:12px;font-weight:700;color:var(--muted)">' + g + '</h2>' +
+          '<div class="card" style="overflow:hidden"><ul style="list-style:none;margin:0;padding:0">' +
+          items.map((m) => {
+            const [lbl, col, gl] = RISK[m.riskLevel];
+            return '<li style="padding:10px 12px;border-bottom:1px solid var(--border)">' +
+              '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">' +
+              '<div style="min-width:0"><div style="font-size:13px;font-weight:600">' + esc(m.name) + '</div>' +
+              '<div style="font-size:10px;color:var(--subtle);margin-top:2px">기준 ' + esc(relative(m.meta.asOf)) + ' · 출처 ' + esc((m.meta.sources[0] || {}).name || '알 수 없음') + '</div></div>' +
+              '<div style="text-align:right;flex-shrink:0"><div class="tnum" style="font-size:15px;font-weight:700;color:var(--fg-strong)">' + esc(macroValue(m)) + '</div>' +
+              '<div class="tnum" style="font-size:10px;color:var(--muted)">' + (m.trend === 'up' ? '▲' : m.trend === 'down' ? '▼' : '―') + ' 이전 ' +
+              esc(m.previous === null ? NO : fmtNum(m.previous, m.precision)) + '</div></div></div>' +
+              '<div style="margin-top:6px;display:flex;gap:6px;align-items:center">' + badge(m.riskLevel === 'alert' ? 'b-danger' : m.riskLevel === 'watch' ? 'b-warn' : 'b-ok', gl + ' ' + lbl) +
+              (m.riskNote ? '<span style="font-size:11px;color:var(--muted);word-break:keep-all">' + esc(m.riskNote) + '</span>' : '') + '</div>' +
+              guidePanel(m.id) + '</li>';
+          }).join('') +
+          '</ul></div></section>';
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  const RANGE_MS = { '1M': 31 * 864e5, '3M': 92 * 864e5, '1Y': 366 * 864e5, '3Y': 1096 * 864e5, '10Y': 3660 * 864e5 };
+  /* 긴 구간에서만 쓰는 평활 — 하루치 점수는 진폭이 커서 10년을 그리면 형태가 안 보인다 */
+  const SMOOTH_DAYS = 20;
+  function smoothPts(pts) {
+    if (pts.length < SMOOTH_DAYS) return pts;
+    const out = [];
+    let sum = 0;
+    for (let i = 0; i < pts.length; i += 1) {
+      sum += pts[i].v;
+      if (i >= SMOOTH_DAYS) sum -= pts[i - SMOOTH_DAYS].v;
+      if (i >= SMOOTH_DAYS - 1) out.push({ t: pts[i].t, v: sum / SMOOTH_DAYS });
+    }
+    return out;
+  }
+
+  function viewFng() {
+    const s = snap();
+    const m = state.fngMarket;
+    const f = (s.sections.fng.data || []).find((x) => x.market === m);
+    const d = DATA.details[m];
+    if (!f) return '<p style="padding:20px">데이터가 없습니다.</p>';
+
+    const cutoff = Date.now() - RANGE_MS[state.range];
+    const scorePts = d.history.filter((p) => p.t >= cutoff && p.v !== null);
+    /* 3년·10년은 하루 단위로 그리면 세로줄 뭉치가 되어 흐름이 보이지 않는다 */
+    const smooth = state.range === '3Y' || state.range === '10Y';
+    const series = [{
+      id: 'score',
+      name: smooth ? '심리 점수 (' + SMOOTH_DAYS + '일 평균)' : '심리 점수',
+      points: smooth ? smoothPts(scorePts) : scorePts,
+      color: 'var(--accent)', axis: 'left', precision: 1,
+      area: !smooth,
+    }];
+    if (d.benchmark) series.push({ id: 'bm', name: d.benchmark.name, points: d.benchmark.series.filter((p) => p.t >= cutoff), color: 'var(--series-2)', axis: 'right', precision: d.benchmark.precision, dashed: true });
+
+    /* 보고 있는 기간 안에 들어오는 사건만 차트에 찍는다 */
+    const evs = (d.events && d.events.markers) || [];
+    const chartMarks = evs
+      .map((mk, i) => ({ mk: mk, index: i + 1 }))
+      .filter((o) => o.mk.t >= cutoff)
+      .map((o) => ({ id: o.mk.id, t: o.mk.t, index: o.index, label: o.mk.label, color: scoreFill(o.mk.score) }));
+
+    const contribs = f.components.map((c) => c.contributionDay).filter((v) => v !== null && v !== 0);
+    const maxAbs = Math.max(0.01, ...contribs.map(Math.abs));
+
+    return (
+      '<div class="detail-head"><div style="display:flex;align-items:center;gap:6px;min-width:0">' +
+      '<button type="button" class="backbtn" data-go="home" aria-label="뒤로">←</button>' +
+      '<h1>' + MARKET_LABEL[m] + ' 투자심리 상세</h1></div>' + modeBadge() + '</div>' +
+
+      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 선택">' +
+      MARKETS.map((x) => '<button type="button" style="flex:1" data-fngm="' + x + '" aria-pressed="' + (m === x) + '">' + MARKET_LABEL[x] + '</button>').join('') +
+      '</div></div>' +
+
+      '<section class="block"><div class="card" style="padding:16px">' +
+      '<div class="summary-grid">' + gauge(f.score, 200) +
+      '<div class="meta">' +
+      (f.score === null
+        ? '<p class="notice n-warn">' + esc(f.unavailableReason) + '</p>'
+        : '<div class="deltas">' + [['전일 대비', f.deltaDay], ['1주 대비', f.deltaWeek], ['1개월 대비', f.deltaMonth]].map(([l, v]) =>
+            '<div class="delta"><small>' + l + '</small><b class="tnum" style="color:' + dirColor(v) + '">' + dirGlyph(v) + ' ' + esc(fmtSigned(v, 1)) + '</b></div>').join('') + '</div>') +
+      '<dl class="kv">' +
+      '<div><dt>신뢰도</dt><dd>' + (f.confidence === 'high' ? '●●● 높음' : f.confidence === 'medium' ? '●●○ 보통' : '●○○ 낮음') + '</dd></div>' +
+      '<div><dt>데이터 충족률</dt><dd class="tnum">' + Math.round(f.coverage * 100) + '%</dd></div>' +
+      '<div><dt>신선도</dt><dd class="tnum">' + Math.round(d.freshnessScore * 100) + '%</dd></div>' +
+      '<div><dt>역사적 분포</dt><dd class="tnum">최근 ' + d.lookbackDays + '일</dd></div>' +
+      '<div><dt>산식 버전</dt><dd class="tnum">' + esc(f.formulaVersion) + '</dd></div>' +
+      '<div><dt>산출 시각</dt><dd class="tnum">' + esc(kFull(f.computedAt)) + '</dd></div>' +
+      '</dl><p style="margin:8px 0 0;font-size:11px;color:var(--subtle);word-break:keep-all">' + esc(f.confidenceReason) + '</p>' +
+      '</div></div>' +
+      stageStrip(f.score) +
+      '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>점수 추이</h2>' +
+      '<div class="seg" role="group" aria-label="기간">' +
+      ['1M', '3M', '1Y', '3Y', '10Y'].map((r) => '<button type="button" data-range="' + r + '" aria-pressed="' + (state.range === r) + '">' +
+        ({ '1M': '1개월', '3M': '3개월', '1Y': '1년', '3Y': '3년', '10Y': '10년' })[r] + '</button>').join('') + '</div></div>' +
+      '<div class="card" style="padding:12px">' + lineChart(series, 240, MARKET_LABEL[m] + ' 심리 점수와 ' + (d.benchmark ? d.benchmark.name : '대표 지수') + ' 비교', chartMarks) +
+      '<p style="margin:8px 0 0;font-size:10px;color:var(--subtle);word-break:keep-all">좌축은 0~100 심리 점수, 우축은 ' +
+      esc(d.benchmark ? d.benchmark.name : '대표 지수') + ' 가격입니다. 점수가 산출되지 않은 날은 선이 이어지지 않습니다.' +
+      (chartMarks.length
+        ? ' 세로 점선은 과거 사건 ' + chartMarks.length + '건이며, 번호는 아래 목록과 같습니다.'
+        : ' 기간을 10년으로 바꾸면 과거 위기 시점이 표시됩니다.') +
+      (smooth
+        ? ' 이 구간의 선은 하루치 점수를 ' + SMOOTH_DAYS + '일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.'
+        : '') +
+      '</p></div>' +
+      '<div style="margin-top:10px">' + crisisCard(d.events, f.score) + '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>사이클과 구간 통계</h2></div>' +
+      '<div class="riskcards">' + cycleCard(f.cycle) + bandStatsCard(d.bandStats) + '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>점수 상승·하락 기여도</h2></div>' +
+      '<div class="card" style="padding:14px">' +
+      '<p style="margin:0 0 8px;font-size:11px;color:var(--muted)">전일 대비 점수 변화 기여도 (점)</p>' +
+      '<ul class="bars">' + f.components.map((c) => {
+        const v = c.contributionDay;
+        const pct = v === null ? 0 : (Math.abs(v) / maxAbs) * 50;
+        return '<li><div class="bar-top"><span>' + esc(c.label) + '</span><b class="tnum" style="color:' + dirColor(v) + '">' +
+          (v === null ? '결측' : esc(fmtSigned(v, 2))) + '</b></div>' +
+          '<div class="bar-track"><span class="bar-zero"></span>' +
+          (v === null ? '' : '<span class="bar-fill" style="background:' + dirColor(v) + ';left:' + (v > 0 ? 50 : 50 - pct) + '%;width:' + pct + '%"></span>') +
+          '</div></li>';
+      }).join('') + '</ul>' +
+      '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:10px" class="drivers-grid">' +
+      [['가장 큰 상승 요인', f.topPositive], ['가장 큰 하락 요인', f.topNegative]].map(([l, dr]) =>
+        '<div style="background:var(--surface-2);border-radius:9px;padding:10px">' +
+        '<div style="font-size:10px;color:var(--muted)">' + l + '</div>' +
+        '<div style="font-size:12px;font-weight:600;margin-top:2px;word-break:keep-all">' + esc(dr ? dr.label : '해당 없음') + '</div>' +
+        (dr ? '<div style="font-size:10px;color:var(--subtle)">' + esc(dr.detail) + '</div>' : '') + '</div>').join('') +
+      '</div></div></section>' +
+
+      (d.methodology && d.methodology.compositionNote
+        ? '<section class="block"><p class="notice n-neutral"><span>ⓘ</span><span>' +
+          '<b>이 목록은 이렇게 정했습니다.</b> ' + esc(d.methodology.compositionNote) + ' ' +
+          '점수는 다른 서비스의 값을 가져오는 게 아니라 같은 성격의 데이터를 받아 이 앱이 직접 계산합니다(역사적 분포 백분위 → 가중평균). ' +
+          '그래서 같은 날 두 숫자가 다를 수 있고, 그게 정상입니다.' +
+          '</span></p></section>'
+        : '') +
+      '<section class="block"><div class="block-head"><h2>구성요소와 가중치</h2>' +
+      '<span class="hint tnum">합계 ' + f.components.reduce((a, c) => a + c.weight, 0) + '%</span></div>' +
+      '<div class="card" style="overflow:hidden">' + f.components.map((c) => {
+        const open = state.openComp === c.id;
+        return '<div class="comp">' +
+          '<button type="button" class="comp-btn" data-comp="' + c.id + '" aria-expanded="' + open + '">' +
+          '<div class="comp-main"><div class="comp-labels"><span class="comp-name">' + esc(c.label) + '</span>' +
+          badge('b-neutral', '가중치 ' + c.weight + '%') +
+          (c.available && c.effectiveWeight !== c.weight ? badge('b-accent', '적용 ' + fmtNum(c.effectiveWeight, 1) + '%', '결측 재조정 후 실제 적용된 가중치') : '') +
+          (!c.available ? badge('b-warn', '결측') : '') + '</div>' +
+          (!c.available && c.missingReason ? '<div style="margin-top:3px;font-size:10px;color:var(--warn);word-break:keep-all">' + esc(c.missingReason) + '</div>' : '') +
+          '</div>' +
+          '<div class="comp-score"><b class="tnum" style="color:' + scoreColor(c.score) + '">' + esc(c.score === null ? NO : fmtNum(c.score, 1)) + '</b>' +
+          '<small class="tnum">전일 ' + esc(c.deltaDay === null ? NO : fmtSigned(c.deltaDay, 1)) + '</small></div>' +
+          '<span aria-hidden="true" style="color:var(--muted);margin-top:2px">' + (open ? '▾' : '▸') + '</span></button>' +
+          (open
+            ? '<div class="comp-body"><p class="comp-desc">' + esc(c.description) + '</p>' +
+              '<div class="tablewrap"><table class="data"><caption class="sr">' + esc(c.label) + ' 하위 지표</caption>' +
+              '<thead><tr><th>하위 지표</th><th>내부 가중치</th><th>원시값</th><th>점수</th></tr></thead><tbody>' +
+              c.subMetrics.map((sm) =>
+                '<tr><th style="font-weight:400">' + esc(sm.label) +
+                (sm.inverted ? '<span style="margin-left:4px;font-size:10px;color:var(--subtle)" title="값이 클수록 공포 → 점수 반전">(반전)</span>' : '') +
+                (sm.missingReason ? '<span style="display:block;font-size:10px;color:var(--warn)">' + esc(sm.missingReason) + '</span>' : '') + '</th>' +
+                '<td class="tnum">' + sm.weight + '%</td>' +
+                '<td class="tnum">' + esc(sm.raw === null ? NO : fmtNum(sm.raw, 3)) + '</td>' +
+                '<td class="tnum" style="font-weight:600;color:' + scoreColor(sm.score) + '">' + esc(sm.score === null ? NO : fmtNum(sm.score, 1)) + '</td></tr>').join('') +
+              '</tbody></table></div>' +
+              '<p style="margin:8px 0 0;font-size:10px;color:var(--subtle)">출처: ' + esc(c.sources.map((x) => x.name).join(', ') || '알 수 없음') +
+              (c.asOf ? ' · 기준 ' + esc(kFull(c.asOf)) : '') + '</p></div>'
+            : '') +
+          '</div>';
+      }).join('') + '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>산출 방법</h2></div>' +
+      '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">' +
+      '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all">' + esc(d.methodology.summary) + '</p>' +
+      '<ol class="steps">' + d.methodology.steps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
+      '<div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px">' +
+      '<p style="margin:0;font-size:11.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">극단치 처리 · </b>' + esc(d.methodology.winsorization) + '</p>' +
+      '<p style="margin:0;font-size:11.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">결측 처리 · </b>' + esc(d.methodology.coverageRule) + '</p></div>' +
+      '<p class="notice n-neutral"><span>ⓘ</span><span>' + esc(d.methodology.scaleWarning) + '</span></p>' +
+      '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>데이터 출처와 업데이트</h2></div>' +
+      '<div class="card" style="padding:14px">' +
+      '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' +
+      f.meta.sources.map((x) =>
+        '<li><div style="font-size:12px;font-weight:600">' + esc(x.name) + '</div>' +
+        '<div style="font-size:10px;color:var(--subtle);word-break:keep-all">' +
+        (x.delayMinutes === null ? '지연 정보 없음' : x.delayMinutes === 0 ? '실시간' : x.delayMinutes + '분 지연') +
+        (x.terms ? ' · ' + esc(x.terms) : '') + '</div></li>').join('') +
+      '</ul><p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">데이터 기준 시각 ' +
+      esc(kFull(f.meta.asOf)) + ' · 수집 ' + esc(kFull(f.meta.fetchedAt)) + '</p></div></section>'
+    );
+  }
+
+  /* ====================================================================== */
+  /* 내비게이션 · 렌더                                                        */
+  /* ====================================================================== */
+
+  const icon = (d) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+  /* ------------------------------------------------------------------ *
+   * 생활 경제 상식 — 시세가 아니라 "형편"을 재는 숫자들                    *
+   * ------------------------------------------------------------------ */
+
+  const basicShow = (v, p, sfx) => (v === null || v === undefined ? NO : fmtNum(v, p) + (sfx || ''));
+
+  /** 단위가 같고 값 차이가 뚜렷할 때만 막대를 그린다. 아니면 숫자만 남긴다. */
+  function basicComparisons(items) {
+    const vals = items.map((c) => c.value).filter((v) => v !== null && v !== undefined);
+    const sameUnit = items.length > 1 && items.every((c) => c.suffix === items[0].suffix);
+    const max = vals.length ? Math.max.apply(null, vals) : 0;
+    const min = vals.length ? Math.min.apply(null, vals) : 0;
+    const bars = sameUnit && vals.length > 0 && vals.every((v) => v > 0) && max > 0 && min / max <= 0.7;
+    return (
+      '<dl style="margin:8px 0 0;display:flex;flex-direction:column;gap:6px">' +
+      items.map((c) => {
+        const w = c.value === null || c.value === undefined ? 0 : Math.max(2, (c.value / max) * 100);
+        return (
+          '<div style="display:grid;grid-template-columns:68px 1fr auto;align-items:center;gap:8px">' +
+          '<dt style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+          (c.primary ? 'font-weight:600;color:var(--fg)' : 'color:var(--muted)') + '">' + esc(c.label) + '</dt>' +
+          '<dd style="margin:0;min-width:0">' +
+          (bars
+            ? '<span aria-hidden="true" style="display:block;height:8px;border-radius:99px;background:var(--surface-3)">' +
+              '<span style="display:block;height:8px;border-radius:99px;width:' + w + '%;background:' +
+              (c.primary ? 'var(--accent)' : 'color-mix(in srgb,var(--muted) 45%,transparent)') + '"></span></span>'
+            : '') +
+          '</dd>' +
+          '<dd class="tnum" style="margin:0;flex-shrink:0;text-align:right;font-size:12px;' +
+          (c.primary ? 'font-weight:700;color:var(--fg-strong)' : 'color:var(--muted)') + '">' +
+          esc(basicShow(c.value, c.precision, c.suffix)) + '</dd></div>'
+        );
+      }).join('') +
+      '</dl>'
+    );
+  }
+
+  function basicGuidePanel(id) {
+    const g = BASIC_GUIDE[id];
+    if (!g) return '';
+    const rows = [
+      ['?', '어떻게 읽나요', g.howToRead],
+      ['▲', '오르면', g.whenUp],
+      ['▼', '내리면', g.whenDown],
+      ['!', '조심할 점', g.caution],
+      ['↔', '시장 이야기와의 연결', g.marketLink],
+    ];
+    return (
+      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<details><summary style="cursor:pointer;list-style:none;font-size:11px;font-weight:600;color:var(--accent)">이게 무슨 숫자인가요? ▾</summary>' +
+      '<div style="margin-top:8px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
+      '<p style="margin:0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
+      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">' +
+      rows.map(function (r) {
+        return '<div style="display:flex;align-items:flex-start;gap:6px">' +
+          '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;width:12px;text-align:center;font-size:10px;color:var(--muted)">' + r[0] + '</span>' +
+          '<dt class="sr">' + esc(r[1]) + '</dt>' +
+          '<dd style="margin:0;min-width:0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+          '<b style="color:var(--fg)">' + esc(r[1]) + ' · </b>' + esc(r[2]) + '</dd></div>';
+      }).join('') +
+      '</dl></div></details></div>'
+    );
+  }
+
+  function viewBasics() {
+    const s = snap();
+    const sec = s.sections.basics || {};
+    const all = sec.data || [];
+    /* 열 개가 넘으면 한 줄로 늘어놓는 것만으로는 읽히지 않는다. 무엇을 재는 숫자인지로 묶는다.
+       묶음에 없는 항목은 버리지 않고 마지막에 모아 화면에서 조용히 사라지지 않게 한다. */
+    const byId = {};
+    all.forEach(function (b) { byId[b.id] = b; });
+    const used = {};
+    const groups = BASIC_GROUPS.map(function (g) {
+      const items = g.ids.map(function (id) { if (byId[id]) used[id] = 1; return byId[id]; }).filter(Boolean);
+      return { id: g.id, label: g.label, note: g.note, items: items };
+    }).filter(function (g) { return g.items.length > 0; });
+    const rest = all.filter(function (b) { return !used[b.id]; });
+    if (rest.length) groups.push({ id: 'rest', label: '그 밖의 지표', note: '', items: rest });
+    const list = all;
+    return (
+      '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">생활 경제 상식</h1>' +
+      '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">시장 지표 →</button></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 뉴스에 나오는 말을 알아듣기 위한 배경 지식으로 모았습니다.</p></div>' +
+      '<div style="padding:10px 12px 0"><p class="notice n-neutral" style="margin:0"><b>여기 숫자는 투자심리 점수의 구성요소가 아닙니다.</b> 대부분 1년에 한두 번 바뀌는 값이라 그날의 시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요. 공식 통계와 속설이 섞여 있으니 각 카드의 <b>공식 통계 / 비공식 개념</b> 배지를 함께 보세요.</p></div>' +
+      (list.length === 0
+        ? '<div style="padding:12px"><p class="notice n-warn" style="margin:0">표시할 지표가 없습니다.</p></div>'
+        : '<div style="padding:12px;display:flex;flex-direction:column;gap:20px">' +
+          groups.map(function (grp) {
+          return '<section aria-labelledby="basics-' + grp.id + '">' +
+          '<div style="margin-bottom:6px">' +
+          '<h2 id="basics-' + grp.id + '" style="margin:0;font-size:12px;font-weight:700;color:var(--muted)">' + esc(grp.label) +
+          '<span class="tnum" style="margin-left:6px;font-weight:400;color:var(--subtle)">' + grp.items.length + '</span></h2>' +
+          (grp.note ? '<p style="margin:2px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(grp.note) + '</p>' : '') +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          grp.items.map(function (b) {
+            const g = BASIC_GUIDE[b.id];
+            const t = b.value === null || b.previous === null ? null : b.value > b.previous ? '▲' : b.value < b.previous ? '▼' : '―';
+            return (
+              '<div class="card" style="padding:14px">' +
+              '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
+              '<div style="min-width:0"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
+              '<div style="margin-top:2px;font-size:10px;color:var(--subtle)">' + esc(b.englishName) + '</div></div>' +
+              badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div>' +
+              (g ? '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(g.headline) + '</p>' : '') +
+              '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px">' +
+              '<div class="tnum" style="font-size:26px;line-height:1;font-weight:700;color:var(--fg-strong)">' + esc(basicShow(b.value, b.precision, b.suffix)) + '</div>' +
+              '<div class="tnum" style="flex-shrink:0;text-align:right;font-size:10.5px;color:var(--muted)">' + (t ? t + ' ' : '') + '직전 ' + esc(basicShow(b.previous, b.precision, b.suffix)) + '</div></div>' +
+              '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(b.reading) + '</p>' +
+              (b.officialNote ? '<p style="margin:6px 0 0;border-radius:9px;background:var(--surface-2);padding:6px 8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">△ ' + esc(b.officialNote) + '</p>' : '') +
+              basicComparisons(b.comparisons || []) +
+              basicGuidePanel(b.id) +
+              '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">' +
+              esc(b.asOfLabel) + ' · 기준 ' + esc(relative(b.meta.asOf)) + ' · 출처 ' + esc((b.meta.sources[0] || {}).name || '알 수 없음') + '</p></div>'
+            );
+          }).join('') + '</div></section>';
+          }).join('') + '</div>') +
+      '<p style="padding:0 12px 8px;margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">나라별 비교값은 발표 기관과 기준 연도가 서로 다를 수 있습니다. 같은 지표라도 어떤 환율(시장 환율 / 구매력평가 환율)로 환산했는지에 따라 순위가 달라지므로, 숫자 하나로 우열을 단정하지 마세요.</p>'
+    );
+  }
+
+  const NAV = [
+    { id: 'home', label: '홈', icon: icon('M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z') },
+    { id: 'market', label: '시장', icon: icon('M3 17l5-6 4 4 5-7 4 5M3 21h18') },
+    { id: 'risk', label: '위험 신호등', icon: icon('M12 3 2.5 20h19zM12 9v5M12 17h.01') },
+    { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
+    { id: 'indicators', label: '지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
+    { id: 'basics', label: '경제 상식', icon: icon('M4 19V5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1zM8 9h6M8 13h8M8 17h5') },
+    { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
+  ];
+
+  /** 사이드바에만 노출하는 시장별 바로가기 */
+  const MARKET_NAV = [
+    { region: 'us', label: '미국' },
+    { region: 'kr', label: '한국' },
+    { region: 'crypto', label: '크립토' },
+  ];
+
+  function renderNav() {
+    document.getElementById('sidenav').innerHTML =
+      NAV.map((n) =>
+        '<li><button type="button" class="navbtn" data-go="' + n.id + '"' +
+        (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('') +
+      '<li aria-hidden="true" style="height:1px;background:var(--border);margin:10px 6px"></li>' +
+      '<li style="padding:0 10px 4px;font-size:10px;font-weight:600;color:var(--subtle)">시장별 화면</li>' +
+      MARKET_NAV.map((m) =>
+        '<li><button type="button" class="navbtn" data-go-region="' + m.region + '" style="font-size:12px;padding:7px 10px"' +
+        (state.view === 'marketRegion' && state.region === m.region ? ' aria-current="page"' : '') + '>' + m.label + '</button></li>').join('');
+
+    document.getElementById('tabnav').innerHTML = NAV.filter((n) => n.id !== 'indicators' && n.id !== 'basics').map((n) =>
+      '<li><button type="button" data-go="' + n.id + '"' + (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('');
+  }
+
+  function render() {
+    document.documentElement.setAttribute('data-cm', state.colorMode);
+    document.getElementById('statusbar').innerHTML = statusBar();
+    const v = {
+      home: viewHome,
+      market: viewMarketHub,
+      marketRegion: viewMarketRegion,
+      risk: viewRisk,
+      calendar: viewCalendar,
+      indicators: viewIndicators,
+      basics: viewBasics,
+      fng: viewFng,
+    }[state.view];
+    document.getElementById('view').innerHTML = v();
+    renderNav();
+    Object.keys(CHARTS).forEach((id) => { if (document.getElementById(id)) drawChart(id); else delete CHARTS[id]; });
+    document.querySelectorAll('.preview [data-scenario]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scenario === state.scenario)));
+  }
+
+  /* ====================================================================== */
+  /* 이벤트                                                                  */
+  /* ====================================================================== */
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    const d = t.dataset;
+
+    if (d.go) { state.view = d.go; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.goFng) { state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.goRegion !== undefined) { state.region = d.goRegion; state.view = 'marketRegion'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.region) { state.region = d.region; return render(); }
+    if (d.goRisk !== undefined) { state.view = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.riskscope) { state.riskScope = d.riskscope; return render(); }
+    if (d.macrom) { state.macroMarket = d.macrom; return render(); }
+    if (d.sort) { state.sort = d.sort; return render(); }
+    if (d.onlywatch !== undefined) { state.onlyWatched = !state.onlyWatched; return render(); }
+    if (d.market) { state.market = d.market; return render(); }
+    if (d.fngm) { state.fngMarket = d.fngm; state.openComp = null; return render(); }
+    if (d.range) { state.range = d.range; return render(); }
+    if (d.crisis) {
+      const t = Number(d.crisis);
+      state.crisisT = state.crisisT === t ? null : t;
+      // 고른 시점이 지금 기간 밖이면 10년으로 넓혀 준다
+      if (state.crisisT !== null && state.crisisT < Date.now() - RANGE_MS[state.range]) state.range = '10Y';
+      return render();
+    }
+    if (d.cal) { state.calMarket = d.cal; return render(); }
+    if (d.cur) { state.currency = d.cur; return render(); }
+    if (d.cm) { state.colorMode = d.cm; return render(); }
+    if (d.comp) { state.openComp = state.openComp === d.comp ? null : d.comp; return render(); }
+    if (d.watch) { state.watch.has(d.watch) ? state.watch.delete(d.watch) : state.watch.add(d.watch); return render(); }
+    if (d.scenario) { state.scenario = d.scenario; return render(); }
+    if (d.themeSet) {
+      document.documentElement.setAttribute('data-theme', d.themeSet);
+      document.querySelectorAll('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === d.themeSet)));
+      return;
+    }
+    if (d.tableToggle) {
+      const box = document.getElementById(d.tableToggle);
+      const tbl = document.getElementById(d.tableToggle + '-table');
+      const show = tbl.hidden;
+      tbl.innerHTML = show ? chartTable(d.tableToggle) : '';
+      tbl.hidden = !show;
+      box.hidden = show;
+      t.textContent = show ? '차트로 보기' : '표로 보기';
+      t.setAttribute('aria-expanded', String(show));
+      return;
+    }
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    const box = e.target.closest('[data-chart]');
+    if (!box) return;
+    chartCursor(box.dataset.chart, e.clientX - box.getBoundingClientRect().left);
+  });
+  document.addEventListener('mouseleave', (e) => {
+    const box = e.target.closest && e.target.closest('[data-chart]');
+    if (!box) return;
+    const tip = box.querySelector('.tip'), cross = box.querySelector('.cross');
+    if (tip) tip.classList.remove('on');
+    if (cross) cross.innerHTML = '';
+  }, true);
+  document.addEventListener('touchmove', (e) => {
+    const box = e.target.closest && e.target.closest('[data-chart]');
+    if (!box) return;
+    chartCursor(box.dataset.chart, e.touches[0].clientX - box.getBoundingClientRect().left);
+  }, { passive: true });
+
+  document.addEventListener('keydown', (e) => {
+    const box = e.target.closest && e.target.closest('[data-chart]');
+    if (!box) return;
+    const c = CHARTS[box.dataset.chart];
+    if (!c || !c.x) return;
+    const id = box.dataset.chart;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); return zoomChart(id, 1 / 1.4); }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); return zoomChart(id, 1.4); }
+    if (e.key === '0') { e.preventDefault(); return setView(id, c.full); }
+    if (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      e.preventDefault();
+      return panChart(id, e.key === 'ArrowRight' ? 0.25 : -0.25);
+    }
+    const n = c.series[0].points.length;
+    let i = c.cursor == null ? n - 1 : c.cursor;
+    if (e.key === 'ArrowRight') i = Math.min(n - 1, i + 1);
+    else if (e.key === 'ArrowLeft') i = Math.max(0, i - 1);
+    else if (e.key === 'Home') i = 0;
+    else if (e.key === 'End') i = n - 1;
+    else return;
+    e.preventDefault();
+    chartCursor(box.dataset.chart, c.x(c.series[0].points[i].t));
+  });
+
+  /* ---------------- 이동 · 확대 입력 ----------------
+     페이지 스크롤을 잡아먹지 않도록, 이미 전체가 보이는데 '축소' 방향으로 굴린 휠은 넘긴다. */
+  document.addEventListener(
+    'wheel',
+    (e) => {
+      const box = e.target.closest && e.target.closest('[data-chart]');
+      if (!box) return;
+      const c = CHARTS[box.dataset.chart];
+      if (!c || !c.full) return;
+      const zoomOut = e.deltaY > 0;
+      if (zoomOut && !isZoomed(c)) return;
+      e.preventDefault();
+      const px = e.clientX - box.getBoundingClientRect().left;
+      zoomChart(box.dataset.chart, zoomOut ? 1.18 : 1 / 1.18, timeAtPx(c, px));
+    },
+    { passive: false },
+  );
+
+  const GES = { id: null, pointers: new Map(), startView: null, startX: 0, startDist: 0, anchorT: 0, moved: false };
+
+  function gestureBegin(c) {
+    const xs = [...GES.pointers.values()];
+    GES.startView = viewOf(c);
+    GES.moved = false;
+    if (xs.length === 1) GES.startX = xs[0];
+    else if (xs.length >= 2) { GES.startDist = Math.abs(xs[0] - xs[1]); GES.anchorT = timeAtPx(c, (xs[0] + xs[1]) / 2); }
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    const box = e.target.closest && e.target.closest('[data-chart]');
+    if (!box) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const c = CHARTS[box.dataset.chart];
+    if (!c || !c.full) return;
+    GES.id = box.dataset.chart;
+    GES.pointers.set(e.pointerId, e.clientX - box.getBoundingClientRect().left);
+    const svg = box.querySelector('svg');
+    if (svg) { svg.setPointerCapture(e.pointerId); svg.classList.add('dragging'); }
+    gestureBegin(c);
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (!GES.id || !GES.pointers.has(e.pointerId)) return;
+    const box = document.getElementById(GES.id);
+    const c = CHARTS[GES.id];
+    if (!box || !c || !GES.startView || !c.innerW) return;
+    GES.pointers.set(e.pointerId, e.clientX - box.getBoundingClientRect().left);
+    const xs = [...GES.pointers.values()];
+    const start = GES.startView;
+    if (xs.length >= 2) {
+      const dist = Math.abs(xs[0] - xs[1]);
+      if (GES.startDist > 8 && dist > 8) {
+        GES.moved = true;
+        const span = start.t1 - start.t0;
+        const next = span * (GES.startDist / dist);
+        const r = (GES.anchorT - start.t0) / span;
+        setView(GES.id, { t0: GES.anchorT - next * r, t1: GES.anchorT + next * (1 - r) });
+      }
+      return;
+    }
+    const dx = xs[0] - GES.startX;
+    if (Math.abs(dx) > 2) GES.moved = true;
+    if (!GES.moved) return;
+    const span = start.t1 - start.t0;
+    const dt = -(dx / c.innerW) * span;
+    setView(GES.id, { t0: start.t0 + dt, t1: start.t1 + dt });
+  });
+
+  function gestureEnd(e) {
+    if (!GES.id || !GES.pointers.has(e.pointerId)) return;
+    const wasSingle = GES.pointers.size === 1;
+    const box = document.getElementById(GES.id);
+    GES.pointers.delete(e.pointerId);
+    const svg = box && box.querySelector('svg');
+    if (svg && svg.hasPointerCapture && svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId);
+    if (GES.pointers.size === 0) {
+      if (svg) svg.classList.remove('dragging');
+      // 끌지 않고 짚기만 했으면 그 자리에 크로스헤어를 세운다
+      if (wasSingle && !GES.moved && box) chartCursor(GES.id, e.clientX - box.getBoundingClientRect().left);
+      GES.id = null;
+    } else {
+      const c = CHARTS[GES.id];
+      if (c) gestureBegin(c);
+    }
+  }
+  document.addEventListener('pointerup', gestureEnd);
+  document.addEventListener('pointercancel', gestureEnd);
+
+  document.addEventListener('dblclick', (e) => {
+    const box = e.target.closest && e.target.closest('[data-chart]');
+    if (!box) return;
+    setView(box.dataset.chart, CHARTS[box.dataset.chart].full);
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-zoom]');
+    if (!btn) return;
+    const id = btn.dataset.zoomId;
+    if (btn.dataset.zoom === 'in') zoomChart(id, 1 / 1.4);
+    else if (btn.dataset.zoom === 'out') zoomChart(id, 1.4);
+    else setView(id, CHARTS[id].full);
+  });
+
+  let rt;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => Object.keys(CHARTS).forEach((id) => document.getElementById(id) && drawChart(id)), 150);
+  });
+
+  setInterval(() => {
+    const c = document.getElementById('clock');
+    if (c) c.innerHTML = kSec(new Date()) + '<small>KST</small>';
+  }, 1000);
+
+  /* 뷰어의 실제 테마(명시 선택 없으면 OS 설정)를 토글 버튼에 반영한다 */
+  function syncThemeButtons() {
+    const explicit = document.documentElement.getAttribute('data-theme');
+    const resolved = explicit || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    document.querySelectorAll('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === resolved)));
+  }
+  syncThemeButtons();
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (!document.documentElement.getAttribute('data-theme')) syncThemeButtons();
+  });
+
+  const capEl = document.getElementById('captured');
+  if (capEl) capEl.innerHTML =
+    '스냅샷 캡처 시각 <strong style="color:var(--fg)">' + esc(kFull(DATA.capturedAt)) + '</strong>. ' +
+    '정지된 스냅샷이라 "N분 전" 같은 상대 시각은 이 시점을 기준으로 계속 늘어납니다. ' +
+    '실제 앱에서는 30초마다 자동 갱신됩니다.';
+
+  render();
+})();
+</script>
+
+<style>
+/* 넓은 화면에서의 다중 열 배치 */
+@media (min-width: 1024px) {
+  .dash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 0 8px; }
+  .market-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .grid-flows { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (min-width: 640px) {
+  .drivers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* ------------------------- 시장 위험 신호등 ------------------------- */
+/* 신호등 구간 막대.
+   지나가지 않은 칸도 원래 색 그대로 둔다 — 어두운 배경에서 밝은 색을 투명하게
+   만들면 노랑이 카키색으로 죽어 신호등으로 읽히지 않기 때문이다.
+   대신 '지금 있는 칸'만 높이를 키운다. 색을 못 봐도 높이로 구분된다. */
+.bandbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-strong) 80%, transparent);
+}
+.bandbar .bseg {
+  height: 58%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1), inset -1px 0 0 color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.bandbar .bseg[data-on='1'] { height: 100%; }
+.bandbar .bseg:last-of-type { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1); }
+
+/* 신호등 램프 3구 */
+.tl-lamp {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 3px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.tl-lamp i { display: block; border-radius: 999px; }
+
+.tl-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
+.tl-tally li { border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; }
+.tl-legend { border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; }
+.tl-legend ul { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 0; padding: 0; }
+.tl-legend li { display: flex; align-items: center; gap: 6px; font-size: 10.5px; }
+.bandmark {
+  position: absolute; top: 50%; width: 3px; height: 16px;
+  transform: translate(-50%, -50%); border-radius: 999px;
+  background: var(--fg-strong); box-shadow: 0 0 0 2px var(--surface);
+}
+.bandscale { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 10px; color: var(--subtle); }
+.bandlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 10px 0 0; padding: 0; }
+.bandlegend li { display: flex; align-items: center; gap: 5px; font-size: 10px; }
+.stagestrip { display: flex; margin: 6px 0 0; padding: 0; list-style: none; font-size: 9px; line-height: 1.25; }
+.stagestrip li { width: 20%; padding: 0 2px; text-align: center; }
+.riskgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.riskcards { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.hubgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.mktgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.risktile { display: block; padding: 10px; }
+.risktile:hover { background: var(--surface-2); }
+@media (min-width: 640px) { .riskgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .riskgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1024px) {
+  .riskcards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hubgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mktgrid { grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+}
+</style>

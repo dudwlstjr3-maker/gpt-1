@@ -337,9 +337,10 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 11개', list.length === 11, `${list.map((b) => b.id).join(', ')}`);
+    check('지표 13개', list.length === 13, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'latte', 'ppp_gap', 'engel', 'pir', 'ccsi', 'lipstick', 'pentagon_pizza'];
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'latte', 'ppp_gap', 'engel', 'pir',
+      'cli', 'buffett', 'ccsi', 'lipstick', 'pentagon_pizza'];
     for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
 
     for (const b of list) {
@@ -456,6 +457,29 @@ async function main() {
     }
     const { body: eb } = await getJson('/api/snapshot?scenario=empty');
     check('빈값 시나리오에서 basics 가 empty', eb.sections?.basics?.status === 'empty', eb.sections?.basics?.status);
+  }
+
+  /* ---------------- 9-3. 오늘의 경제 상식 ---------------- */
+  console.log('\n[9-3] 오늘의 경제 상식 (하루 한 가지)');
+  {
+    const res = await fetch(`${BASE}/`);
+    const html = await res.text();
+    check('홈에 오늘의 경제 상식 칸이 있음', html.includes('오늘의 경제 상식'), `status=${res.status}`);
+
+    // 날짜로 정해지므로 지표 수만큼의 날이면 전부 한 번씩 돌아야 한다
+    const ids = (snap.sections?.basics?.data ?? []).map((b) => b.id);
+    const pick = (key) => {
+      const t = Date.parse(`${key}T00:00:00Z`);
+      const d = Math.floor(t / 86400_000);
+      return ids[((d % ids.length) + ids.length) % ids.length];
+    };
+    const seen = new Set();
+    for (let i = 0; i < ids.length; i += 1) {
+      seen.add(pick(new Date(Date.now() + i * 86400_000).toISOString().slice(0, 10)));
+    }
+    check(`${ids.length}일이면 전부 한 번씩 나옴`, seen.size === ids.length, `${seen.size}/${ids.length}`);
+    check('같은 날은 늘 같은 항목', pick('2026-08-28') === pick('2026-08-28'), pick('2026-08-28'));
+    check('다음 날은 다른 항목', pick('2026-08-28') !== pick('2026-08-29'));
   }
 
   /* ---------------- 8. 시장별 분리 화면 ---------------- */

@@ -799,6 +799,13 @@ const BASIC_PRICES = {
   bigmacUsd: 5.79,
   latteKrw: 5000,
   latteUsd: 4.95,
+  /** 버핏 지수 계산용 — 지수 1포인트당 시가총액, 그리고 명목 GDP */
+  usMcapPerPoint: 1.494e10,
+  usGdpUsd: 29.2e12,
+  krMcapPerPoint: 8.6e8,
+  krGdpUsd: 1.95e12,
+  /** 미국 버핏 지수의 오래된 '보통' 구간 상단 */
+  buffettUsHistorical: 85,
   /** 처분가능소득 기준 지니계수 (0=완전 평등, 1=완전 불평등) */
   giniKr: 0.323,
   giniKrPrev: 0.324,
@@ -893,6 +900,21 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const miseryKrPrev = FIXED_MACRO.krCpiPrev + FIXED_MACRO.krUnemploymentPrev;
   const miseryUs = FIXED_MACRO.usCpi + FIXED_MACRO.usUnemployment;
   const miseryJp = FIXED_MACRO.jpCpi + FIXED_MACRO.jpUnemployment;
+
+  /* ---------- OECD 경기선행지수 ---------- */
+  /* 100 이 장기 평균. DEMO 에서는 지수의 120일 이격도로 방향을 만든다. */
+  const cliAt = (vals: number[], k: number) => {
+    const from = Math.max(0, k - 120);
+    let sum = 0;
+    for (let x = from; x <= k; x += 1) sum += vals[x];
+    const ma = sum / (k - from + 1);
+    return ma > 0 ? clamp(100 + (vals[k] / ma - 1) * 26, 94.5, 106.5) : 100;
+  };
+
+  /* ---------- 버핏 지수 ---------- */
+  const buffett = (index: number, perPoint: number, gdp: number) => (index * perPoint) / gdp * 100;
+  const buffettUsAt = (k: number) => buffett(s.spx[k], BASIC_PRICES.usMcapPerPoint, BASIC_PRICES.usGdpUsd);
+  const buffettKr = buffett(s.kospi[i], BASIC_PRICES.krMcapPerPoint, BASIC_PRICES.krGdpUsd);
 
   /* ---------- 립스틱 지수 ---------- */
   /* 속설대로라면 경기가 나쁠 때 작은 사치가 상대적으로 잘 팔린다.
@@ -1083,6 +1105,52 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       ],
       '분기 갱신 · 아파트 중위가격 ÷ 가구 중위소득',
       true,
+    ),
+
+    mk(
+      'cli',
+      'OECD 경기선행지수',
+      'OECD Composite Leading Indicator',
+      round(cliAt(s.kospi, i), 1),
+      round(cliAt(s.kospi, at(20)), 1),
+      1,
+      '',
+      (() => {
+        const now = cliAt(s.kospi, i);
+        const prev = cliAt(s.kospi, at(20));
+        const level = now >= 100 ? '장기 평균 위' : '장기 평균 아래';
+        const dir = now > prev ? '오르는 중' : now < prev ? '내리는 중' : '보합';
+        return `한국은 ${round(now, 1)}로 ${level}이고 ${dir}입니다. 수준과 방향을 같이 봐야 하며, 이 숫자 하나로 시점을 잡을 수는 없습니다.`;
+      })(),
+      [
+        { label: '한국', value: round(cliAt(s.kospi, i), 1), precision: 1, suffix: '', primary: true },
+        { label: '미국', value: round(cliAt(s.spx, i), 1), precision: 1, suffix: '' },
+        { label: '장기 평균', value: 100, precision: 0, suffix: '' },
+      ],
+      '매월 발표 · 직전 값은 한 달 전 · 사후 수정 잦음',
+      true,
+    ),
+
+    mk(
+      'buffett',
+      '버핏 지수',
+      'Buffett Indicator',
+      round(buffettUsAt(i), 1),
+      round(buffettUsAt(at(20)), 1),
+      1,
+      '%',
+      `미국은 ${round(buffettUsAt(i), 1)}% 입니다. 주식시장 전체의 값이 1년 생산의 ${round(
+        buffettUsAt(i) / 100,
+        2,
+      )}배라는 뜻입니다. 예전에는 ${BASIC_PRICES.buffettUsHistorical}% 부근을 보통이라고 했지만 기준선 자체가 올라갔다는 지적이 많아, 절대 수준보다 그 나라의 과거 범위와 견주는 편이 낫습니다.`,
+      [
+        { label: '미국', value: round(buffettUsAt(i), 1), precision: 1, suffix: '%', primary: true },
+        { label: '한국', value: round(buffettKr, 1), precision: 1, suffix: '%' },
+        { label: '미국 옛 기준', value: BASIC_PRICES.buffettUsHistorical, precision: 0, suffix: '%' },
+      ],
+      '상시 갱신 · 시가총액 ÷ 직전 분기 GDP',
+      false,
+      '어느 기관도 공식 지수로 발표하지 않습니다. 재료가 되는 시가총액과 GDP 는 공식 통계지만, 이 비율 자체는 널리 쓰이는 관행일 뿐입니다.',
     ),
 
     mk(

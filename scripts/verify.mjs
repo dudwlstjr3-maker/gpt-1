@@ -337,11 +337,15 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 12개', list.length === 12, `${list.map((b) => b.id).join(', ')}`);
+    check('지표 9개', list.length === 9, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'ppp_gap', 'engel', 'pir',
-      'cli', 'buffett', 'ccsi', 'lipstick', 'pentagon_pizza'];
-    check('라떼지수는 빠짐 (비공식이라 제외)', !list.some((b) => b.id === 'latte'));
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'ppp_gap', 'engel', 'pir', 'cli', 'ccsi'];
+    // 발표 기관이 없는 개념은 담지 않는다
+    for (const gone of ['latte', 'buffett', 'lipstick', 'pentagon_pizza']) {
+      check(`${gone} 는 빠짐 (비공식이라 제외)`, !list.some((b) => b.id === gone));
+    }
+    check('전부 공식 통계', list.every((b) => b.official === true),
+      list.filter((b) => !b.official).map((b) => b.id).join(', ') || '예외 없음');
     for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
 
     for (const b of list) {
@@ -362,17 +366,10 @@ async function main() {
     // 자리가 카드마다 달라지면 여러 카드를 훑을 때 눈이 자리를 다시 찾아야 한다.
     {
       const FOUR = ['한국', '중국', '일본', '미국'];
-      // 나라 비교가 성립하지 않는 지표는 이유를 적고 빠진다
-      const singleCountry = ['lipstick', 'pentagon_pizza'];
       // 도시끼리 견주는 지표
       const cityBased = { pir: ['서울', '베이징', '도쿄', '뉴욕'] };
 
       for (const b of list) {
-        if (singleCountry.includes(b.id)) {
-          check(`[${b.id}] 나라 비교가 없으면 이유를 적음`,
-            typeof b.comparisonNote === 'string' && b.comparisonNote.length > 10);
-          continue;
-        }
         const labels = b.comparisons.map((c) => c.label.replace(/\s*\(.*\)$/, ''));
         const want = cityBased[b.id] ?? FOUR;
         check(`[${b.id}] ${want.join('·')} 순서로 비교`, JSON.stringify(labels) === JSON.stringify(want),
@@ -384,7 +381,7 @@ async function main() {
       }
 
       // 기준연도·정의가 달라 그대로 견주면 안 되는 지표는 반드시 경고를 단다
-      for (const id of ['ccsi', 'engel', 'cli', 'buffett', 'pir']) {
+      for (const id of ['ccsi', 'engel', 'cli', 'pir']) {
         const b = list.find((x) => x.id === id);
         if (b) {
           check(`[${id}] 그대로 견주면 안 되는 이유를 적음`,

@@ -126,11 +126,15 @@ export class LiveAdapter implements MarketAdapter {
   /**
    * TODO(연결지점 5-2): 1인당 GDP, 빅맥지수, PPP 환율, 엥겔계수, 소비자심리지수.
    *
-   * 출처 후보: World Bank / IMF WEO / OECD PPP / 통계청 가계동향 / 한국은행 ECOS.
+   * 출처 후보: World Bank / IMF WEO / OECD (PPP·경기선행지수) / 통계청 (가계동향·소득분배) /
+   * 한국은행 ECOS (소비자심리지수) / KB·국토부 (주택가격).
    * 빅맥지수 원자료는 이코노미스트가 공개하지만 재배포 조건을 반드시 확인한다.
-   * 라떼(스타벅스)지수는 공식 발표 기관이 없으므로 직접 조사한 값만 쓰고
-   * official: false 로 내려보내 화면에 "공식 지수 아님"이 뜨게 한다.
-   * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다. 없는 값은 null 이다.
+   *
+   * 담는 기준: **발표 기관이 있는 공식 지표만.** 발표 기관이 없는 개념을 넣어야 한다면
+   * official: false 로 내려보내 화면에 "비공식 개념" 배지가 뜨게 한다.
+   * 나라 비교는 한국·중국·일본·미국 네 나라를 그 순서로 채운다. 값이 없으면 null 이고,
+   * 애초에 견줄 수 없는 지표라면 comparisonNote 에 이유를 적는다 (sameScale: false 면 막대도 빠진다).
+   * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다.
    */
   async getBasics(_ctx: AdapterContext): Promise<EconomyBasic[]> {
     throw new NotWiredError('생활 경제 상식 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');

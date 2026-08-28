@@ -265,7 +265,7 @@ export default function BasicsPage() {
         <Notice tone="neutral">
           여기 숫자는 <strong>투자심리 점수의 구성요소가 아닙니다.</strong> 대부분 1년에 한두 번 바뀌는 값이라 그날의
           시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요.
-          공식 통계와 속설이 섞여 있으니 각 카드의 <strong>공식 통계 / 비공식 개념</strong> 배지를 함께 보세요.
+          <strong>전부 통계기관이 발표하는 공식 지표</strong>만 담았습니다 — 발표 기관이 없는 개념은 넣지 않습니다.
         </Notice>
       </div>
 

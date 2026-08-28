@@ -808,16 +808,6 @@ const BASIC_PRICES = {
   /* 구매력평가 환율 (OECD·IMF 수준대) */
   pppCnyPerUsd: 4.2,
   pppJpyPerUsd: 100.0,
-  /* 버핏 지수(시가총액 ÷ GDP)의 오늘 값.
-     DEMO 월드의 지수는 난수 행보라 시총·GDP 상수를 고정해 두면 오늘 값이
-     아무 데나 떨어진다. 그래서 오늘 값을 알려진 수준대에 고정하고,
-     과거 시점은 그 나라 지수가 움직인 만큼만 되돌린다. 합성값이다. */
-  buffettTodayKr: 104,
-  buffettTodayCn: 66,
-  buffettTodayJp: 152,
-  buffettTodayUs: 190,
-  /** 미국 버핏 지수의 오래된 '보통' 구간 상단 */
-  buffettUsHistorical: 85,
   /** 처분가능소득 기준 지니계수 (0=완전 평등, 1=완전 불평등) */
   giniKr: 0.323,
   giniKrPrev: 0.324,
@@ -849,8 +839,11 @@ const BASIC_PRICES = {
   ccsiUs: 97.6,
 } as const;
 
-/** partial 시나리오에서 값이 비는 항목 — 공식 발표 기관이 없는 것부터 빠진다 */
-const PARTIAL_BROKEN_BASICS = new Set(['pentagon_pizza', 'lipstick']);
+/**
+ * partial 시나리오에서 값이 비는 항목.
+ * 분기마다 갱신되고 기관별로 값이 갈리는 PIR 이 실제로도 가장 자주 비는 자리다.
+ */
+const PARTIAL_BROKEN_BASICS = new Set(['pir']);
 
 function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const s = world.s;
@@ -959,7 +952,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const krGdpNow = BASIC_PRICES.krGdpPerCapitaKrw / fx(i);
   const krGdpPrev = BASIC_PRICES.krGdpPerCapitaKrw / fx(at(250));
 
-  /* ---------- 빅맥 · 라떼 · PPP ---------- */
+  /* ---------- 빅맥 · PPP ---------- */
   const bigmacRate = BASIC_PRICES.bigmacKrw / BASIC_PRICES.bigmacUsd;
   const bigmacNow = undervaluedKrw(bigmacRate, i);
     const pppNow = undervaluedKrw(BASIC_PRICES.pppKrwPerUsd, i);
@@ -981,37 +974,6 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     for (let x = from; x <= k; x += 1) sum += vals[x];
     const ma = sum / (k - from + 1);
     return ma > 0 ? clamp(100 + (vals[k] / ma - 1) * 26, 94.5, 106.5) : 100;
-  };
-
-  /* ---------- 버핏 지수 ---------- */
-  /* 오늘 값을 고정하고 과거는 지수가 움직인 비율만큼 되돌린다.
-     중국·일본은 월드에 지수 시계열이 없어 다른 계열을 대리로 쓴다. */
-  const buffettOn = (vals: number[], today: number) => (k: number) =>
-    vals[vals.length - 1] > 0 ? today * (vals[k] / vals[vals.length - 1]) : today;
-  const buffettUsAt = buffettOn(s.spx, BASIC_PRICES.buffettTodayUs);
-  const buffettKrAt = buffettOn(s.kospi, BASIC_PRICES.buffettTodayKr);
-  const buffettKr = buffettKrAt(i);
-  const buffettKrPrev = buffettKrAt(at(20));
-  const buffettCn = buffettOn(s.cyc, BASIC_PRICES.buffettTodayCn)(i);
-  const buffettJp = buffettOn(s.ndx, BASIC_PRICES.buffettTodayJp)(i);
-
-  /* ---------- 립스틱 지수 ---------- */
-  /* 속설대로라면 경기가 나쁠 때 작은 사치가 상대적으로 잘 팔린다.
-     DEMO 에서는 KOSPI 60일 수익률의 반대 방향으로 움직이게 뒀다. */
-  const lipstickAt = (k: number) => {
-    const base = s.kospi[Math.max(0, k - 60)];
-    const ret60 = base > 0 ? (s.kospi[k] / base - 1) * 100 : 0;
-    return clamp(1.4 - ret60 * 0.24, -7, 12);
-  };
-
-  /* ---------- 펜타곤 피자 지수 ---------- */
-  /* 공식 데이터가 없는 개념이라 DEMO 에서는 지정학 긴장의 대리 지표(금·유가)로 움직이게 둔다.
-     실제 붐빔 정도가 아니라 "이 앱 안에서 앞뒤가 맞는 합성값"이라는 뜻이다. */
-  const pizzaAt = (k: number) => {
-    const back = Math.max(0, k - 20);
-    const goldRet = s.gold[back] > 0 ? (s.gold[k] / s.gold[back] - 1) * 100 : 0;
-    const wtiRet = s.wti[back] > 0 ? (s.wti[k] / s.wti[back] - 1) * 100 : 0;
-    return clamp(100 + goldRet * 2.6 + wtiRet * 0.9, 62, 210);
   };
 
   /* ---------- 소비자심리지수 ---------- */
@@ -1194,32 +1156,6 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     ),
 
     mk(
-      'buffett',
-      '버핏 지수',
-      'Buffett Indicator',
-      round(buffettKr, 1),
-      round(buffettKrPrev, 1),
-      1,
-      '%',
-      `한국은 ${round(buffettKr, 1)}%, 미국은 ${round(buffettUsAt(i), 1)}% 입니다. 미국은 주식시장 전체의 값이 1년 생산의 ${round(
-        buffettUsAt(i) / 100,
-        2,
-      )}배라는 뜻입니다. 예전에는 ${BASIC_PRICES.buffettUsHistorical}% 부근을 보통이라고 했지만 기준선 자체가 올라갔다는 지적이 많아, 절대 수준보다 그 나라의 과거 범위와 견주는 편이 낫습니다.`,
-      four(
-        round(buffettKr, 1),
-        round(buffettCn, 1),
-        round(buffettJp, 1),
-        round(buffettUsAt(i), 1),
-        1,
-        '%',
-      ),
-      '상시 갱신 · 시가총액 ÷ 직전 분기 GDP',
-      false,
-      '어느 기관도 공식 지수로 발표하지 않습니다. 재료가 되는 시가총액과 GDP 는 공식 통계지만, 이 비율 자체는 널리 쓰이는 관행일 뿐입니다.',
-      '상장 기업이 그 나라 경제에서 차지하는 비중 자체가 나라마다 다릅니다. 해외 매출이 큰 기업이 많으면 구조적으로 높게 나오므로, 나라끼리 높낮이를 견주기보다 각자의 과거 범위와 견주세요.',
-    ),
-
-    mk(
       'ccsi',
       '소비자심리지수',
       'CCSI',
@@ -1239,48 +1175,6 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       false,
     ),
 
-    mk(
-      'lipstick',
-      '립스틱 지수',
-      'Lipstick Index',
-      round(lipstickAt(i), 1),
-      round(lipstickAt(at(20)), 1),
-      1,
-      '%p',
-      lipstickAt(i) > 0
-        ? `색조화장품 매출이 전체 소매판매보다 ${round(lipstickAt(i), 1)}%p 더 늘었습니다. 속설대로라면 큰 지출을 미루고 작은 사치로 옮겨간 국면이지만, 신제품이나 유행이 이유인 경우가 훨씬 많습니다.`
-        : `색조화장품 매출이 전체 소매판매보다 ${round(Math.abs(lipstickAt(i)), 1)}%p 덜 늘었습니다. 속설이 말하는 방향과는 반대입니다.`,
-      [
-        { label: '한국 지금', value: round(lipstickAt(i), 1), precision: 1, suffix: '%p', primary: true },
-        { label: '20일 전', value: round(lipstickAt(at(20)), 1), precision: 1, suffix: '%p' },
-      ],
-      '정기 발표 없음 · 매출 통계를 직접 조합해야 함',
-      false,
-      '어느 기관도 이런 이름으로 발표하지 않습니다. 검증된 규칙성이 아니며 반대로 움직인 시기도 있습니다. 이 값은 DEMO 합성값입니다.',
-      '나라 비교를 넣지 않았습니다. 화장품 매출을 같은 기준으로 모은 통계가 나라마다 없어서, 네 나라 숫자를 만들려면 지어내야 합니다.',
-    ),
-
-    mk(
-      'pentagon_pizza',
-      '펜타곤 피자 지수',
-      'Pentagon Pizza Index',
-      round(pizzaAt(i), 0),
-      round(pizzaAt(at(5)), 0),
-      0,
-      '',
-      pizzaAt(i) >= 130
-        ? `평소를 100으로 봤을 때 ${round(pizzaAt(i), 0)}입니다. 청사 주변이 평소보다 붐빈다는 뜻일 뿐, 그 안에서 무슨 일이 벌어지는지는 이 숫자로 알 수 없습니다.`
-        : `평소를 100으로 봤을 때 ${round(pizzaAt(i), 0)}입니다. 평소와 크게 다르지 않습니다. 조용하다는 것도 아무것도 증명하지 않습니다.`,
-      [
-        { label: '지금', value: round(pizzaAt(i), 0), precision: 0, suffix: '', primary: true },
-        { label: '5일 전', value: round(pizzaAt(at(5)), 0), precision: 0, suffix: '' },
-        { label: '평소', value: 100, precision: 0, suffix: '' },
-      ],
-      '정기 발표 없음 · 지도 혼잡도를 직접 확인해야 함',
-      false,
-      '발표 기관이 없는 농담성 지표입니다. 근거가 되는 지도 앱 혼잡도는 공개 API 가 없어 자동으로 받아올 수 없고, 적중률이 검증된 적도 없습니다. 이 값은 DEMO 합성값입니다.',
-      '애초에 미국 국방부 청사 하나를 두고 만든 이야기라 다른 나라에 대응하는 숫자가 없습니다.',
-    ),
   ];
 }
 

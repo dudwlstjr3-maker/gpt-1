@@ -10,18 +10,27 @@
  * 나눈 이유는 320px 에서 일곱 칸이면 글자가 뭉개지기 때문이고, 지표 화면에서
  * 이미 쓰고 있는 방식([위험 신호등 | 전체 지표])과도 같아서다.
  *
- * 보기를 주소로 나눈다 (/indices · /basics). 어느 쪽을 보고 있는지가 주소에
- * 남아야 링크로 건네줄 수 있고, 바깥에서 들어온 링크도 제 보기로 열린다.
+ * 두 주소가 각각의 보기로 열린다 (/indices · /basics). 바깥에서 들어온 링크는
+ * 제 보기로 열리고, 하단 탭의 '지수' 는 두 주소 모두에서 활성으로 표시된다.
+ *
+ * **버튼을 누를 때는 주소를 건드리지 않는다.** 보기를 바꾸는 일은 화면을 옮기는
+ * 일이 아니기 때문이다. 처음에는 router.push 로, 다음에는 history.replaceState 로
+ * 주소를 갈아 끼워 봤는데 둘 다 같은 문제를 냈다 — Next 가 주소 변경을 화면
+ * 이동으로 받아 맨 위로 스크롤하고, globals.css 의 scroll-behavior: smooth 때문에
+ * 그 스크롤이 1.4초짜리 애니메이션으로 보였다. 누를 때마다 화면이 통째로 위로
+ * 미끄러지니 다른 화면으로 넘어간 것처럼 읽혔다.
+ *
+ * 그래서 보기는 이 안에서만 들고 있는다. 누른 자리에서 내용만 바뀐다.
+ * 잃는 것은 "지금 보기를 주소로 건네주기" 하나뿐이고, 두 주소가 그대로 살아 있어
+ * 링크로 특정 보기를 여는 일은 여전히 된다.
  */
 
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { MarketIndexBoard } from './MarketIndexBoard';
 import { BasicsBoard } from './BasicsBoard';
 
 export type IndexView = 'market' | 'life';
-
-const PATH: Record<IndexView, string> = { market: '/indices', life: '/basics' };
 
 const HEAD: Record<IndexView, { title: string; desc: string }> = {
   market: {
@@ -34,9 +43,15 @@ const HEAD: Record<IndexView, { title: string; desc: string }> = {
   },
 };
 
-export function IndexScreen({ view }: { view: IndexView }) {
-  const router = useRouter();
+export function IndexScreen({ view: initial }: { view: IndexView }) {
+  const [view, setView] = useState<IndexView>(initial);
+
+  // 바깥에서 다른 주소로 들어오면(지수 탭 → /indices) 그쪽 보기로 맞춘다
+  useEffect(() => setView(initial), [initial]);
+
   const head = HEAD[view];
+
+  const choose = (v: IndexView) => setView(v);
 
   return (
     <div className="pt-2 pb-4">
@@ -50,7 +65,7 @@ export function IndexScreen({ view }: { view: IndexView }) {
           label="지수 보기"
           full
           value={view}
-          onChange={(v: IndexView) => router.push(PATH[v])}
+          onChange={choose}
           options={[
             { value: 'market', label: '시장 지수' },
             { value: 'life', label: '생활 경제 지수' },

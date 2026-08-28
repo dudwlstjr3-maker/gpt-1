@@ -696,6 +696,17 @@ async function main() {
     // 지수 탭은 두 보기를 갖는다 — 시장 지수 / 생활 경제 지수
     check('지수 화면에 보기 전환이 있음', idx.includes('>시장 지수<') && idx.includes('>생활 경제 지수<'));
 
+    // 보기를 바꾸는 일은 화면을 옮기는 일이 아니다. 주소를 건드리면 Next 가
+    // 화면 이동으로 받아 맨 위로 스크롤하고, 뒤로가기가 탭을 벗어나지 못한다.
+    // 브라우저 없이 확인할 수 없는 동작이라 원본에서 막아 둔다.
+    // (주석에는 왜 그렇게 했는지 적혀 있으므로 주석을 걷어내고 본다)
+    const shell = (await readFile('src/components/market/IndexScreen.tsx', 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    for (const bad of ['router.push', 'router.replace', 'history.replaceState', 'history.pushState']) {
+      check(`보기 전환이 ${bad} 를 쓰지 않음`, !shell.includes(bad));
+    }
+
     // 세 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다)
     for (const label of ['미국', '한국', '크립토']) {
       check(`지수 화면에 ${label} 묶음이 있음`, idx.includes(`>${label}</span>`));

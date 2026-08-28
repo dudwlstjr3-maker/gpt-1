@@ -3087,7 +3087,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     if (d.riskscope) { state.riskScope = d.riskscope; return render(); }
     if (d.macrom) { state.macroMarket = d.macrom; return render(); }
     if (d.indview) { state.indView = d.indview; return render(); }
-    if (d.idxview) { state.idxView = d.idxview; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.idxview) { state.idxView = d.idxview; return render(); }
     if (d.sort) { state.sort = d.sort; return render(); }
     if (d.onlywatch !== undefined) { state.onlyWatched = !state.onlyWatched; return render(); }
     if (d.market) { state.market = d.market; return render(); }

@@ -337,10 +337,11 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 13개', list.length === 13, `${list.map((b) => b.id).join(', ')}`);
+    check('지표 12개', list.length === 12, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'latte', 'ppp_gap', 'engel', 'pir',
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'ppp_gap', 'engel', 'pir',
       'cli', 'buffett', 'ccsi', 'lipstick', 'pentagon_pizza'];
+    check('라떼지수는 빠짐 (비공식이라 제외)', !list.some((b) => b.id === 'latte'));
     for (const id of wanted) check(`${id} 포함`, list.some((b) => b.id === id));
 
     for (const b of list) {
@@ -354,6 +355,51 @@ async function main() {
       check(`[${b.id}] 비교값 제공`, Array.isArray(b.comparisons) && b.comparisons.length >= 2);
       if (b.official === false) {
         check(`[${b.id}] 비공식 개념이면 그 사실을 적음`, typeof b.officialNote === 'string' && b.officialNote.length > 10);
+      }
+    }
+
+    // 나라 비교는 한국·중국·일본·미국 네 나라를 같은 자리에 놓는다.
+    // 자리가 카드마다 달라지면 여러 카드를 훑을 때 눈이 자리를 다시 찾아야 한다.
+    {
+      const FOUR = ['한국', '중국', '일본', '미국'];
+      // 나라 비교가 성립하지 않는 지표는 이유를 적고 빠진다
+      const singleCountry = ['lipstick', 'pentagon_pizza'];
+      // 도시끼리 견주는 지표
+      const cityBased = { pir: ['서울', '베이징', '도쿄', '뉴욕'] };
+
+      for (const b of list) {
+        if (singleCountry.includes(b.id)) {
+          check(`[${b.id}] 나라 비교가 없으면 이유를 적음`,
+            typeof b.comparisonNote === 'string' && b.comparisonNote.length > 10);
+          continue;
+        }
+        const labels = b.comparisons.map((c) => c.label.replace(/\s*\(.*\)$/, ''));
+        const want = cityBased[b.id] ?? FOUR;
+        check(`[${b.id}] ${want.join('·')} 순서로 비교`, JSON.stringify(labels) === JSON.stringify(want),
+          labels.join(', '));
+        check(`[${b.id}] 첫 항목이 강조 대상`, b.comparisons[0]?.primary === true);
+        check(`[${b.id}] 비교값 단위가 모두 같음`,
+          b.comparisons.every((c) => c.suffix === b.comparisons[0].suffix),
+          b.comparisons.map((c) => c.suffix).join('|'));
+      }
+
+      // 기준연도·정의가 달라 그대로 견주면 안 되는 지표는 반드시 경고를 단다
+      for (const id of ['ccsi', 'engel', 'cli', 'buffett', 'pir']) {
+        const b = list.find((x) => x.id === id);
+        if (b) {
+          check(`[${id}] 그대로 견주면 안 되는 이유를 적음`,
+            typeof b.comparisonNote === 'string' && b.comparisonNote.length > 10);
+        }
+      }
+
+      // 기준이 다른 값에는 막대를 그리지 않는다 (글 경고만으로는 눈이 먼저 견준다)
+      const ccsi = list.find((b) => b.id === 'ccsi');
+      check('소비자심리지수는 같은 잣대가 아님을 표시', ccsi?.sameScale === false, `${ccsi?.sameScale}`);
+
+      // 달러가 기준인 지표는 미국이 정확히 0 이어야 한다
+      for (const id of ['bigmac', 'ppp_gap']) {
+        const b = list.find((x) => x.id === id);
+        if (b) check(`[${id}] 달러 기준이라 미국은 0%`, b.comparisons[3]?.value === 0, `${b.comparisons[3]?.value}`);
       }
     }
 

@@ -42,16 +42,29 @@ function trendOf(value: number | null, previous: number | null): keyof typeof TR
  * "원"과 "달러"와 "%"를 한 축에 올리면 길이가 아무 뜻도 갖지 못하기 때문이다.
  * 막대를 그리지 못하는 경우에도 숫자는 그대로 보여준다.
  */
-function Comparisons({ items }: { items: BasicComparison[] }) {
+function Comparisons({
+  items,
+  note,
+  sameScale = true,
+}: {
+  items: BasicComparison[];
+  note?: string;
+  sameScale?: boolean;
+}) {
   const values = items.map((c) => c.value).filter((v): v is number => v !== null);
   const sameUnit = items.length > 1 && items.every((c) => c.suffix === items[0].suffix);
-  const max = values.length ? Math.max(...values) : 0;
-  const min = values.length ? Math.min(...values) : 0;
-  const allPositive = values.length > 0 && values.every((v) => v > 0);
+
+  // 부호가 한쪽으로 몰려 있으면 크기로 길이를 잰다.
+  // 저평가율처럼 전부 음수인 값도 "얼마나 벗어났나"를 길이로 보여줄 수 있다.
+  // 부호가 섞이면 길이가 무엇을 뜻하는지 알 수 없으므로 그리지 않는다.
+  const oneSided = values.length > 0 && (values.every((v) => v >= 0) || values.every((v) => v <= 0));
+  const mags = values.map(Math.abs);
+  const magMax = mags.length ? Math.max(...mags) : 0;
+  const magMin = mags.length ? Math.min(...mags) : 0;
+
   // 값들이 서로 비슷하면 막대 길이가 전부 같아 보여 오히려 차이를 감춘다.
-  // 그럴 때는 막대를 빼고 숫자만 남긴다.
-  const spread = max > 0 ? min / max : 1;
-  const bars = sameUnit && allPositive && max > 0 && spread <= 0.7;
+  const spread = magMax > 0 ? magMin / magMax : 1;
+  const bars = sameScale && sameUnit && oneSided && magMax > 0 && spread <= 0.7;
 
   return (
     <dl className="mt-2 space-y-1.5">
@@ -64,7 +77,7 @@ function Comparisons({ items }: { items: BasicComparison[] }) {
                 <span
                   className="block h-2 rounded-full"
                   style={{
-                    width: c.value === null ? 0 : `${Math.max(2, (c.value / max) * 100)}%`,
+                    width: c.value === null ? 0 : `${Math.max(2, (Math.abs(c.value) / magMax) * 100)}%`,
                     background: c.primary ? 'var(--accent)' : 'color-mix(in srgb, var(--muted-fg) 45%, transparent)',
                   }}
                 />
@@ -78,6 +91,14 @@ function Comparisons({ items }: { items: BasicComparison[] }) {
           </dd>
         </div>
       ))}
+      {/* 나라끼리 그대로 견주면 안 되는 지표는 그 이유를 표 바로 밑에 적는다.
+          숫자를 나란히 놓는 순간 사람은 비교부터 하기 때문에, 경고가 표 아래에 있어야 한다. */}
+      {note ? (
+        <p className="mt-1.5 border-t border-border pt-1.5 text-[10px] leading-relaxed break-keep text-subtle">
+          <span aria-hidden="true">※ </span>
+          {note}
+        </p>
+      ) : null}
     </dl>
   );
 }
@@ -179,7 +200,7 @@ function BasicCard({ item }: { item: EconomyBasic }) {
         </p>
       ) : null}
 
-      <Comparisons items={item.comparisons} />
+      <Comparisons items={item.comparisons} note={item.comparisonNote} sameScale={item.sameScale} />
 
       <GuidePanel id={item.id} open={open} onToggle={() => setOpen((v) => !v)} />
 
@@ -231,8 +252,8 @@ export default function BasicsPage() {
         <div className="min-w-0">
           <h1 className="text-lg font-bold text-fg-strong">생활 경제 상식</h1>
           <p className="mt-0.5 text-[11px] break-keep text-muted">
-            시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 뉴스에 나오는 말을 알아듣기 위한 배경 지식으로
-            모았습니다.
+            시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 지표마다 <strong>한국·중국·일본·미국</strong> 네 나라를
+            나란히 놓아, 우리 형편이 어느 쯤인지 바로 견줄 수 있게 했습니다.
           </p>
         </div>
         <Link href="/indicators" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
@@ -291,8 +312,9 @@ export default function BasicsPage() {
       </div>
 
       <p className="mt-4 px-3 text-[10.5px] leading-relaxed break-keep text-subtle">
-        나라별 비교값은 발표 기관과 기준 연도가 서로 다를 수 있습니다. 같은 지표라도 어떤 환율(시장 환율 / 구매력평가
-        환율)로 환산했는지에 따라 순위가 달라지므로, 숫자 하나로 우열을 단정하지 마세요.
+        네 나라 값은 발표 기관과 기준 연도가 서로 다를 수 있습니다. 같은 지표라도 어떤 환율(시장 환율 / 구매력평가
+        환율)로 환산했는지에 따라 순위가 뒤집히므로, 숫자 하나로 우열을 단정하지 마세요. 그대로 견주면 안 되는
+        지표에는 비교표 아래에 <span aria-hidden="true">※</span> 로 이유를 적어 두었습니다.
       </p>
     </div>
   );

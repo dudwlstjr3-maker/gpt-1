@@ -632,6 +632,8 @@ const FIXED_MACRO = {
   usUnemploymentPrev: 4.3,
   krUnemployment: 2.9,
   krUnemploymentPrev: 3.0,
+  cnCpi: 0.3,
+  cnUnemployment: 5.2,
   jpCpi: 2.8,
   jpUnemployment: 2.5,
 } as const;
@@ -795,40 +797,60 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
 
 /** DEMO 에서 쓰는 고정 가격표 — 실제 판매가가 아니라 계산 예시용 수치다. */
 const BASIC_PRICES = {
+  /* 빅맥 현지 가격 — 통화별 */
   bigmacKrw: 5500,
   bigmacUsd: 5.79,
-  latteKrw: 5000,
-  latteUsd: 4.95,
-  /** 버핏 지수 계산용 — 지수 1포인트당 시가총액, 그리고 명목 GDP */
-  usMcapPerPoint: 1.494e10,
-  usGdpUsd: 29.2e12,
-  krMcapPerPoint: 8.6e8,
-  krGdpUsd: 1.95e12,
+  bigmacCny: 25.0,
+  bigmacJpy: 480,
+  /* 오늘의 시장 환율 기준값. DXY 움직임에 맞춰 과거 시점으로 되돌린다 */
+  usdCny: 7.1,
+  usdJpy: 148.0,
+  /* 구매력평가 환율 (OECD·IMF 수준대) */
+  pppCnyPerUsd: 4.2,
+  pppJpyPerUsd: 100.0,
+  /* 버핏 지수(시가총액 ÷ GDP)의 오늘 값.
+     DEMO 월드의 지수는 난수 행보라 시총·GDP 상수를 고정해 두면 오늘 값이
+     아무 데나 떨어진다. 그래서 오늘 값을 알려진 수준대에 고정하고,
+     과거 시점은 그 나라 지수가 움직인 만큼만 되돌린다. 합성값이다. */
+  buffettTodayKr: 104,
+  buffettTodayCn: 66,
+  buffettTodayJp: 152,
+  buffettTodayUs: 190,
   /** 미국 버핏 지수의 오래된 '보통' 구간 상단 */
   buffettUsHistorical: 85,
   /** 처분가능소득 기준 지니계수 (0=완전 평등, 1=완전 불평등) */
   giniKr: 0.323,
   giniKrPrev: 0.324,
-  giniUs: 0.395,
+  giniCn: 0.465,
   giniJp: 0.334,
-  giniOecd: 0.315,
+  giniUs: 0.395,
   /** 소득 대비 주택가격 배수 */
   pirSeoul: 15.2,
   pirSeoulPrev: 15.8,
-  pirKorea: 6.3,
-  pirNewYork: 7.1,
+  pirBeijing: 23.5,
   pirTokyo: 10.4,
+  pirNewYork: 7.1,
   /** OECD 가 계산하는 한국 구매력평가 환율 수준대 */
   pppKrwPerUsd: 891,
   /** 1인당 명목 GDP (원). 달러 환산은 그날 환율로 한다 */
   krGdpPerCapitaKrw: 49_200_000,
-  usGdpPerCapitaUsd: 89_100,
+  cnGdpPerCapitaUsd: 13_700,
   jpGdpPerCapitaUsd: 34_600,
-  oecdGdpPerCapitaUsd: 47_200,
+  usGdpPerCapitaUsd: 89_100,
+  /* 엥겔계수 — 나라마다 외식·주류 포함 범위가 달라 그대로 견주기 어렵다 */
+  engelKr: 12.9,
+  engelKrPrev: 12.6,
+  engelCn: 29.8,
+  engelJp: 26.2,
+  engelUs: 13.0,
+  /* 소비자심리지수 — 기준연도와 산출 방식이 나라마다 완전히 다르다 */
+  ccsiCn: 88.4,
+  ccsiJp: 34.9,
+  ccsiUs: 97.6,
 } as const;
 
 /** partial 시나리오에서 값이 비는 항목 — 공식 발표 기관이 없는 것부터 빠진다 */
-const PARTIAL_BROKEN_BASICS = new Set(['latte', 'pentagon_pizza', 'lipstick']);
+const PARTIAL_BROKEN_BASICS = new Set(['pentagon_pizza', 'lipstick']);
 
 function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   const s = world.s;
@@ -836,15 +858,60 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   /** 발표 주기에 맞춰 과거 시점을 고른다 (거래일 기준) */
   const at = (backDays: number) => Math.max(0, i - backDays);
   const fx = (k: number) => s.usdkrw[k];
+  /**
+   * 위안·엔 환율.
+   * DEMO 월드에 두 통화 시계열이 없어, 오늘 값을 기준으로 잡고 달러지수(DXY)
+   * 움직임만큼 과거로 되돌린다. 실제 시세가 아니라 화면 안에서 앞뒤가 맞는 합성값이다.
+   */
+  const fxRel = (k: number, today: number) => {
+    const d0 = s.dxy[world.dates.length - 1];
+    return d0 > 0 ? today * (s.dxy[k] / d0) : today;
+  };
+  const fxCny = (k: number) => fxRel(k, BASIC_PRICES.usdCny);
+  const fxJpy = (k: number) => fxRel(k, BASIC_PRICES.usdJpy);
 
   const B = BASIC_PRICES;
   const meta = makeMeta(ctx, 'kr');
   const broken = ctx.scenario === 'partial';
 
-  /** 원화가 기준 환율보다 몇 % 싸게 거래되는가 (음수 = 저평가) */
-  const undervalued = (impliedKrwPerUsd: number, k: number) => (impliedKrwPerUsd / fx(k) - 1) * 100;
+  /** 통화가 기준 환율보다 몇 % 싸게 거래되는가 (음수 = 저평가). 달러는 기준이라 늘 0 이다. */
+  const undervalued = (implied: number, market: number) => (implied / market - 1) * 100;
+  const undervaluedKrw = (impliedKrwPerUsd: number, k: number) => undervalued(impliedKrwPerUsd, fx(k));
 
   const won = (v: number) => `${Math.round(v).toLocaleString('ko-KR')}원`;
+
+  /**
+   * 나라 비교는 언제나 한국·중국·일본·미국 순서로 같은 자리에 놓는다.
+   * 카드마다 순서가 달라지면 여러 카드를 훑을 때 눈이 자리를 다시 찾아야 한다.
+   * 한국이 늘 맨 앞이고 강조 표시가 붙는다.
+   */
+  const COUNTRIES = ['한국', '중국', '일본', '미국'] as const;
+
+  const fourLabeled = (
+    labels: readonly string[],
+    values: (number | null)[],
+    precision: number,
+    suffix: string,
+    baseNote?: string,
+  ): EconomyBasic['comparisons'] =>
+    labels.map((label, k) => ({
+      // 달러가 기준인 지표(빅맥·PPP)에서는 미국 자리에 '기준'이라고 적어 준다
+      label: baseNote && k === labels.length - 1 ? `${label} (${baseNote})` : label,
+      value: values[k],
+      precision,
+      suffix,
+      ...(k === 0 ? { primary: true } : {}),
+    }));
+
+  const four = (
+    kr: number | null,
+    cn: number | null,
+    jp: number | null,
+    us: number | null,
+    precision: number,
+    suffix: string,
+    baseNote?: string,
+  ) => fourLabeled(COUNTRIES, [kr, cn, jp, us], precision, suffix, baseNote);
   /** 부호를 문장으로 풀어 준다. "-28.8% 어긋나 있다"는 읽히지 않는다. */
   const gapWords = (v: number) =>
     v < 0
@@ -864,6 +931,9 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     asOfLabel: string,
     official: boolean,
     officialNote?: string,
+    comparisonNote?: string,
+    /** 비교값들이 같은 잣대가 아니면 false — 화면이 막대를 그리지 않는다 */
+    sameScale?: boolean,
   ): EconomyBasic => {
     const missing = broken && PARTIAL_BROKEN_BASICS.has(id);
     return {
@@ -879,6 +949,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       asOfLabel,
       official,
       ...(officialNote ? { officialNote } : {}),
+      ...(comparisonNote ? { comparisonNote } : {}),
+      ...(sameScale === false ? { sameScale: false } : {}),
       meta: missing ? { ...meta, notes: [`${name} 값을 받지 못했습니다.`] } : meta,
     };
   };
@@ -889,20 +961,20 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
   /* ---------- 빅맥 · 라떼 · PPP ---------- */
   const bigmacRate = BASIC_PRICES.bigmacKrw / BASIC_PRICES.bigmacUsd;
-  const latteRate = BASIC_PRICES.latteKrw / BASIC_PRICES.latteUsd;
-  const bigmacNow = undervalued(bigmacRate, i);
-  const latteNow = undervalued(latteRate, i);
-  const pppNow = undervalued(BASIC_PRICES.pppKrwPerUsd, i);
+  const bigmacNow = undervaluedKrw(bigmacRate, i);
+    const pppNow = undervaluedKrw(BASIC_PRICES.pppKrwPerUsd, i);
 
   /* ---------- 미저리 지수 ---------- */
   /* 지표 화면에 나오는 CPI·실업률을 그대로 더한다. 두 화면의 숫자가 어긋나면 안 된다. */
   const miseryKr = FIXED_MACRO.krCpi + FIXED_MACRO.krUnemployment;
   const miseryKrPrev = FIXED_MACRO.krCpiPrev + FIXED_MACRO.krUnemploymentPrev;
   const miseryUs = FIXED_MACRO.usCpi + FIXED_MACRO.usUnemployment;
+  const miseryCn = FIXED_MACRO.cnCpi + FIXED_MACRO.cnUnemployment;
   const miseryJp = FIXED_MACRO.jpCpi + FIXED_MACRO.jpUnemployment;
 
   /* ---------- OECD 경기선행지수 ---------- */
-  /* 100 이 장기 평균. DEMO 에서는 지수의 120일 이격도로 방향을 만든다. */
+  /* 100 이 장기 평균. DEMO 에서는 지수의 120일 이격도로 방향을 만든다.
+     중국·일본은 월드에 지수 시계열이 없어 다른 계열을 대리로 쓴다. 합성값이다. */
   const cliAt = (vals: number[], k: number) => {
     const from = Math.max(0, k - 120);
     let sum = 0;
@@ -912,9 +984,16 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   };
 
   /* ---------- 버핏 지수 ---------- */
-  const buffett = (index: number, perPoint: number, gdp: number) => (index * perPoint) / gdp * 100;
-  const buffettUsAt = (k: number) => buffett(s.spx[k], BASIC_PRICES.usMcapPerPoint, BASIC_PRICES.usGdpUsd);
-  const buffettKr = buffett(s.kospi[i], BASIC_PRICES.krMcapPerPoint, BASIC_PRICES.krGdpUsd);
+  /* 오늘 값을 고정하고 과거는 지수가 움직인 비율만큼 되돌린다.
+     중국·일본은 월드에 지수 시계열이 없어 다른 계열을 대리로 쓴다. */
+  const buffettOn = (vals: number[], today: number) => (k: number) =>
+    vals[vals.length - 1] > 0 ? today * (vals[k] / vals[vals.length - 1]) : today;
+  const buffettUsAt = buffettOn(s.spx, BASIC_PRICES.buffettTodayUs);
+  const buffettKrAt = buffettOn(s.kospi, BASIC_PRICES.buffettTodayKr);
+  const buffettKr = buffettKrAt(i);
+  const buffettKrPrev = buffettKrAt(at(20));
+  const buffettCn = buffettOn(s.cyc, BASIC_PRICES.buffettTodayCn)(i);
+  const buffettJp = buffettOn(s.ndx, BASIC_PRICES.buffettTodayJp)(i);
 
   /* ---------- 립스틱 지수 ---------- */
   /* 속설대로라면 경기가 나쁠 때 작은 사치가 상대적으로 잘 팔린다.
@@ -954,13 +1033,15 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       `한국은 1인당 약 ${Math.round(krGdpNow).toLocaleString('ko-KR')}달러입니다. 미국의 ${round(
         (krGdpNow / BASIC_PRICES.usGdpPerCapitaUsd) * 100,
         0,
-      )}% 수준이며, 원화로는 약 ${(BASIC_PRICES.krGdpPerCapitaKrw / 10000).toLocaleString('ko-KR')}만원입니다. 달러 환산액이라 환율이 오르면 그것만으로도 줄어듭니다.`,
-      [
-        { label: '한국', value: round(krGdpNow, 0), precision: 0, suffix: '달러', primary: true },
-        { label: '미국', value: BASIC_PRICES.usGdpPerCapitaUsd, precision: 0, suffix: '달러' },
-        { label: '일본', value: BASIC_PRICES.jpGdpPerCapitaUsd, precision: 0, suffix: '달러' },
-        { label: 'OECD 평균', value: BASIC_PRICES.oecdGdpPerCapitaUsd, precision: 0, suffix: '달러' },
-      ],
+      )}%, 중국의 ${round((krGdpNow / BASIC_PRICES.cnGdpPerCapitaUsd) * 100, 0)}% 수준이며, 원화로는 약 ${(BASIC_PRICES.krGdpPerCapitaKrw / 10000).toLocaleString('ko-KR')}만원입니다. 달러 환산액이라 환율이 오르면 그것만으로도 줄어듭니다.`,
+      four(
+        round(krGdpNow, 0),
+        BASIC_PRICES.cnGdpPerCapitaUsd,
+        BASIC_PRICES.jpGdpPerCapitaUsd,
+        BASIC_PRICES.usGdpPerCapitaUsd,
+        0,
+        '달러',
+      ),
       '연 1회 발표 · 직전 값은 1년 전',
       true,
     ),
@@ -974,12 +1055,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       3,
       '',
       `한국은 ${B.giniKr} 입니다. 0에 가까울수록 소득이 고르게 나뉘어 있다는 뜻이고, 0.3 아래면 고른 편으로 봅니다. 바로 위 1인당 GDP 가 "평균 얼마"라면 이 숫자는 "얼마나 고르게 나뉘었나"입니다.`,
-      [
-        { label: '한국', value: B.giniKr, precision: 3, suffix: '', primary: true },
-        { label: '미국', value: B.giniUs, precision: 3, suffix: '' },
-        { label: '일본', value: B.giniJp, precision: 3, suffix: '' },
-        { label: 'OECD 평균', value: B.giniOecd, precision: 3, suffix: '' },
-      ],
+      four(B.giniKr, B.giniCn, B.giniJp, B.giniUs, 3, ''),
       '연 1회 발표 · 처분가능소득 기준',
       true,
     ),
@@ -996,11 +1072,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
         miseryKr,
         1,
       )} 입니다. 절대 기준이 있는 숫자가 아니라 예년이나 다른 나라와 견줄 때 씁니다.`,
-      [
-        { label: '한국', value: round(miseryKr, 1), precision: 1, suffix: '', primary: true },
-        { label: '미국', value: round(miseryUs, 1), precision: 1, suffix: '' },
-        { label: '일본', value: round(miseryJp, 1), precision: 1, suffix: '' },
-      ],
+      four(round(miseryKr, 1), round(miseryCn, 1), round(miseryJp, 1), round(miseryUs, 1), 1, ''),
       '매월 갱신 · 물가상승률 + 실업률',
       true,
     ),
@@ -1010,42 +1082,23 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '빅맥지수',
       'Big Mac Index',
       round(bigmacNow, 1),
-      round(undervalued(bigmacRate, at(120)), 1),
+      round(undervaluedKrw(bigmacRate, at(120)), 1),
       1,
       '%',
       `빅맥 값으로 계산한 환율은 ${won(bigmacRate)}인데 시장 환율은 ${won(
         fx(i),
-      )}입니다. 빅맥으로 재보면 ${gapWords(bigmacNow)}는 뜻입니다. 표에 적힌 숫자가 마이너스면 그만큼 싸다는 의미입니다.`,
-      [
-        { label: '한국 빅맥', value: BASIC_PRICES.bigmacKrw, precision: 0, suffix: '원', primary: true },
-        { label: '미국 빅맥', value: BASIC_PRICES.bigmacUsd, precision: 2, suffix: '달러' },
-        { label: '빅맥 환율', value: round(bigmacRate, 0), precision: 0, suffix: '원/달러' },
-        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
-      ],
+      )}입니다. 빅맥으로 재보면 ${gapWords(bigmacNow)}는 뜻입니다. 아래 네 나라 숫자는 모두 달러를 기준(0%)으로 놓고 각 통화가 몇 % 어긋나 있는지이며, 마이너스면 그만큼 싸다는 의미입니다.`,
+      four(
+        round(bigmacNow, 1),
+        round(undervalued(BASIC_PRICES.bigmacCny / BASIC_PRICES.bigmacUsd, fxCny(i)), 1),
+        round(undervalued(BASIC_PRICES.bigmacJpy / BASIC_PRICES.bigmacUsd, fxJpy(i)), 1),
+        0,
+        1,
+        '%',
+        '기준',
+      ),
       '연 2회 발표 · 직전 값은 약 6개월 전',
       true,
-    ),
-
-    mk(
-      'latte',
-      '스타벅스 라떼지수',
-      'Latte Index',
-      round(latteNow, 1),
-      round(undervalued(latteRate, at(120)), 1),
-      1,
-      '%',
-      `톨 사이즈 라떼 값으로 계산한 환율은 ${won(latteRate)}입니다. 시장 환율 ${won(
-        fx(i),
-      )}과 견주면 ${gapWords(latteNow)}는 뜻입니다. 빅맥지수와 숫자가 다른 것이 정상이며, 그 차이가 품목 하나로 물가를 재는 일의 한계를 보여줍니다.`,
-      [
-        { label: '서울 라떼', value: BASIC_PRICES.latteKrw, precision: 0, suffix: '원', primary: true },
-        { label: '뉴욕 라떼', value: BASIC_PRICES.latteUsd, precision: 2, suffix: '달러' },
-        { label: '라떼 환율', value: round(latteRate, 0), precision: 0, suffix: '원/달러' },
-        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
-      ],
-      '정기 발표 없음 · 조사 시점 기준',
-      false,
-      '어느 기관도 공식 발표하지 않는 비공식 개념입니다. 매장·시점에 따라 값이 달라집니다.',
     ),
 
     mk(
@@ -1053,17 +1106,21 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '구매력평가(PPP) 환율 괴리',
       'PPP exchange rate gap',
       round(pppNow, 1),
-      round(undervalued(BASIC_PRICES.pppKrwPerUsd, at(250)), 1),
+      round(undervaluedKrw(BASIC_PRICES.pppKrwPerUsd, at(250)), 1),
       1,
       '%',
       `물가 바구니로 계산한 적정 환율은 ${won(BASIC_PRICES.pppKrwPerUsd)}인데 시장 환율은 ${won(
         fx(i),
-      )}입니다. 물가로 재보면 ${gapWords(pppNow)}는 뜻이며, 빅맥 하나 대신 수백 개 품목으로 계산했다는 점이 빅맥지수와 다릅니다.`,
-      [
-        { label: 'PPP 환율', value: BASIC_PRICES.pppKrwPerUsd, precision: 0, suffix: '원/달러', primary: true },
-        { label: '시장 환율', value: round(fx(i), 0), precision: 0, suffix: '원/달러' },
-        { label: '빅맥 환율', value: round(bigmacRate, 0), precision: 0, suffix: '원/달러' },
-      ],
+      )}입니다. 물가로 재보면 ${gapWords(pppNow)}는 뜻이며, 빅맥 하나 대신 수백 개 품목으로 계산했다는 점이 빅맥지수와 다릅니다. 아래 숫자도 달러를 기준(0%)으로 놓은 값입니다.`,
+      four(
+        round(pppNow, 1),
+        round(undervalued(BASIC_PRICES.pppCnyPerUsd, fxCny(i)), 1),
+        round(undervalued(BASIC_PRICES.pppJpyPerUsd, fxJpy(i)), 1),
+        0,
+        1,
+        '%',
+        '기준',
+      ),
       '연 1회 갱신 · 직전 값은 1년 전',
       true,
     ),
@@ -1072,18 +1129,16 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       'engel',
       '엥겔계수',
       'Engel coefficient',
-      12.9,
-      12.6,
+      B.engelKr,
+      B.engelKrPrev,
       1,
       '%',
-      '가구가 쓰는 돈 100원 가운데 약 13원이 식료품·비주류음료에 들어갑니다. 낮을수록 먹거리 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다.',
-      [
-        { label: '한국', value: 12.9, precision: 1, suffix: '%', primary: true },
-        { label: '미국', value: 6.7, precision: 1, suffix: '%' },
-        { label: '일본', value: 26.2, precision: 1, suffix: '%' },
-      ],
+      `가구가 쓰는 돈 100원 가운데 약 ${Math.round(B.engelKr)}원이 식료품·비주류음료에 들어갑니다. 낮을수록 먹거리 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다.`,
+      four(B.engelKr, B.engelCn, B.engelJp, B.engelUs, 1, '%'),
       '연 1회 발표 · 직전 값은 1년 전',
       true,
+      undefined,
+      '나라마다 외식·주류를 포함하는 범위가 달라 소수점까지 견주는 것은 의미가 없습니다. 큰 차이만 보세요.',
     ),
 
     mk(
@@ -1096,15 +1151,17 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '배',
       `서울은 ${B.pirSeoul}배입니다. 소득을 한 푼도 안 쓰고 ${Math.round(
         B.pirSeoul,
-      )}년을 모아야 집 한 채 값이 된다는 뜻입니다. 전국은 ${B.pirKorea}배로 두 배 넘게 차이 납니다.`,
-      [
-        { label: '서울', value: B.pirSeoul, precision: 1, suffix: '배', primary: true },
-        { label: '전국', value: B.pirKorea, precision: 1, suffix: '배' },
-        { label: '도쿄', value: B.pirTokyo, precision: 1, suffix: '배' },
-        { label: '뉴욕', value: B.pirNewYork, precision: 1, suffix: '배' },
-      ],
+      )}년을 모아야 집 한 채 값이 된다는 뜻입니다. 아래는 나라 전체가 아니라 각국 대표 도시끼리의 비교입니다.`,
+      fourLabeled(
+        ['서울', '베이징', '도쿄', '뉴욕'],
+        [B.pirSeoul, B.pirBeijing, B.pirTokyo, B.pirNewYork],
+        1,
+        '배',
+      ),
       '분기 갱신 · 아파트 중위가격 ÷ 가구 중위소득',
       true,
+      undefined,
+      '나라 전체가 아니라 대표 도시끼리의 비교입니다. 기관마다 정의가 달라 같은 도시도 숫자가 두세 배 차이 납니다.',
     ),
 
     mk(
@@ -1122,35 +1179,44 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
         const dir = now > prev ? '오르는 중' : now < prev ? '내리는 중' : '보합';
         return `한국은 ${round(now, 1)}로 ${level}이고 ${dir}입니다. 수준과 방향을 같이 봐야 하며, 이 숫자 하나로 시점을 잡을 수는 없습니다.`;
       })(),
-      [
-        { label: '한국', value: round(cliAt(s.kospi, i), 1), precision: 1, suffix: '', primary: true },
-        { label: '미국', value: round(cliAt(s.spx, i), 1), precision: 1, suffix: '' },
-        { label: '장기 평균', value: 100, precision: 0, suffix: '' },
-      ],
+      four(
+        round(cliAt(s.kospi, i), 1),
+        round(cliAt(s.cyc, i), 1),
+        round(cliAt(s.ndx, i), 1),
+        round(cliAt(s.spx, i), 1),
+        1,
+        '',
+      ),
       '매월 발표 · 직전 값은 한 달 전 · 사후 수정 잦음',
       true,
+      undefined,
+      '네 나라 모두 100이 그 나라의 장기 평균입니다. 그래서 수준끼리 견주는 것보다 각자 100에서 얼마나, 어느 방향으로 벗어났는지를 보는 편이 낫습니다.',
     ),
 
     mk(
       'buffett',
       '버핏 지수',
       'Buffett Indicator',
-      round(buffettUsAt(i), 1),
-      round(buffettUsAt(at(20)), 1),
+      round(buffettKr, 1),
+      round(buffettKrPrev, 1),
       1,
       '%',
-      `미국은 ${round(buffettUsAt(i), 1)}% 입니다. 주식시장 전체의 값이 1년 생산의 ${round(
+      `한국은 ${round(buffettKr, 1)}%, 미국은 ${round(buffettUsAt(i), 1)}% 입니다. 미국은 주식시장 전체의 값이 1년 생산의 ${round(
         buffettUsAt(i) / 100,
         2,
       )}배라는 뜻입니다. 예전에는 ${BASIC_PRICES.buffettUsHistorical}% 부근을 보통이라고 했지만 기준선 자체가 올라갔다는 지적이 많아, 절대 수준보다 그 나라의 과거 범위와 견주는 편이 낫습니다.`,
-      [
-        { label: '미국', value: round(buffettUsAt(i), 1), precision: 1, suffix: '%', primary: true },
-        { label: '한국', value: round(buffettKr, 1), precision: 1, suffix: '%' },
-        { label: '미국 옛 기준', value: BASIC_PRICES.buffettUsHistorical, precision: 0, suffix: '%' },
-      ],
+      four(
+        round(buffettKr, 1),
+        round(buffettCn, 1),
+        round(buffettJp, 1),
+        round(buffettUsAt(i), 1),
+        1,
+        '%',
+      ),
       '상시 갱신 · 시가총액 ÷ 직전 분기 GDP',
       false,
       '어느 기관도 공식 지수로 발표하지 않습니다. 재료가 되는 시가총액과 GDP 는 공식 통계지만, 이 비율 자체는 널리 쓰이는 관행일 뿐입니다.',
+      '상장 기업이 그 나라 경제에서 차지하는 비중 자체가 나라마다 다릅니다. 해외 매출이 큰 기업이 많으면 구조적으로 높게 나오므로, 나라끼리 높낮이를 견주기보다 각자의 과거 범위와 견주세요.',
     ),
 
     mk(
@@ -1164,13 +1230,13 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       ccsiAt(i) >= 100
         ? `${round(ccsiAt(i), 1)}로 기준선 100을 넘습니다. 살림살이와 앞날을 과거 평균보다 낙관적으로 보는 가구가 더 많다는 뜻입니다.`
         : `${round(ccsiAt(i), 1)}로 기준선 100을 밑돕니다. 살림살이와 앞날을 과거 평균보다 비관적으로 보는 가구가 더 많다는 뜻입니다.`,
-      [
-        { label: '이번 달', value: round(ccsiAt(i), 1), precision: 1, suffix: '', primary: true },
-        { label: '지난달', value: round(ccsiAt(at(20)), 1), precision: 1, suffix: '' },
-        { label: '기준선', value: 100, precision: 0, suffix: '' },
-      ],
+      four(round(ccsiAt(i), 1), B.ccsiCn, B.ccsiJp, B.ccsiUs, 1, ''),
       '매월 발표 · 직전 값은 한 달 전',
       true,
+      undefined,
+      '나라마다 기준연도와 산출 방식이 완전히 달라 숫자를 그대로 견주면 안 됩니다. 한국·중국은 100이 중립이고, 일본은 50 부근이 중립, 미국은 1985년을 100으로 둔 지수입니다. 각 나라 안에서 오르내리는 방향만 보세요.',
+      // 같은 잣대가 아니라서 막대를 그리지 않는다. 길이를 그려 주면 글로 말려도 눈이 먼저 견준다.
+      false,
     ),
 
     mk(
@@ -1185,12 +1251,13 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
         ? `색조화장품 매출이 전체 소매판매보다 ${round(lipstickAt(i), 1)}%p 더 늘었습니다. 속설대로라면 큰 지출을 미루고 작은 사치로 옮겨간 국면이지만, 신제품이나 유행이 이유인 경우가 훨씬 많습니다.`
         : `색조화장품 매출이 전체 소매판매보다 ${round(Math.abs(lipstickAt(i)), 1)}%p 덜 늘었습니다. 속설이 말하는 방향과는 반대입니다.`,
       [
-        { label: '차이', value: round(lipstickAt(i), 1), precision: 1, suffix: '%p', primary: true },
+        { label: '한국 지금', value: round(lipstickAt(i), 1), precision: 1, suffix: '%p', primary: true },
         { label: '20일 전', value: round(lipstickAt(at(20)), 1), precision: 1, suffix: '%p' },
       ],
       '정기 발표 없음 · 매출 통계를 직접 조합해야 함',
       false,
       '어느 기관도 이런 이름으로 발표하지 않습니다. 검증된 규칙성이 아니며 반대로 움직인 시기도 있습니다. 이 값은 DEMO 합성값입니다.',
+      '나라 비교를 넣지 않았습니다. 화장품 매출을 같은 기준으로 모은 통계가 나라마다 없어서, 네 나라 숫자를 만들려면 지어내야 합니다.',
     ),
 
     mk(
@@ -1212,6 +1279,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '정기 발표 없음 · 지도 혼잡도를 직접 확인해야 함',
       false,
       '발표 기관이 없는 농담성 지표입니다. 근거가 되는 지도 앱 혼잡도는 공개 API 가 없어 자동으로 받아올 수 없고, 적중률이 검증된 적도 없습니다. 이 값은 DEMO 합성값입니다.',
+      '애초에 미국 국방부 청사 하나를 두고 만든 이야기라 다른 나라에 대응하는 숫자가 없습니다.',
     ),
   ];
 }

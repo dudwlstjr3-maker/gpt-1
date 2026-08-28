@@ -3,7 +3,7 @@
  * 색상만으로 의미를 전달하지 않도록, 모든 헬퍼는 텍스트/아이콘 라벨을 함께 반환한다.
  */
 
-import { FNG_STAGES, type FngStage, type FngStageId, type RiskLevel } from '@/types';
+import { FNG_STAGES, type FngStage, type FngStageId, type MarketId, type RiskLevel } from '@/types';
 
 /* --------------------------- 신호등 --------------------------- */
 
@@ -151,4 +151,18 @@ export const DIRECTION_LABEL: Record<Direction, string> = {
 
 export function confidenceGlyph(c: 'high' | 'medium' | 'low'): string {
   return c === 'high' ? '●●●' : c === 'medium' ? '●●○' : '●○○';
+}
+
+/* ------------------------------------------------------------------ */
+/* 시장 색                                                              */
+/*                                                                     */
+/* 미국·한국·크립토를 눈으로 훑을 때 쓰는 표식이다.                        */
+/* 신호등(빨·주·노·연두·초)과 겹치지 않는 색만 골랐다 — 겹치면 "위험한       */
+/* 시장"으로 읽힌다. 색은 훑기를 돕는 표식일 뿐이라, 어느 시장인지는 항상    */
+/* 옆의 글자가 말한다. 색만으로 시장을 구분하게 두지 않는다.                */
+/* ------------------------------------------------------------------ */
+
+/** 시장 색. 'global' 은 어느 한 시장에 묶이지 않는 항목이라 중립색을 쓴다. */
+export function marketColor(market: MarketId | 'global'): string {
+  return `var(--mk-${market === 'crypto' ? 'crypto' : market})`;
 }

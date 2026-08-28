@@ -7,10 +7,9 @@
  *  3) 관심 가격과 주요 지수
  *  4) 오늘의 시장 요약
  *  5) 금리·환율·변동성
- *  6) 오늘의 경제 일정
- *  7) 시장별 자금 흐름과 뉴스
- *  8) 예측시장에서 화제인 질문 (시세가 아니라 별도 칸)
- *  9) 오늘의 경제 이야기 (하루 한 가지씩 돌아감)
+ *
+ * 요약까지가 "10초 안에 파악"이고, 그 아래는 탭으로 나눠 한 번에 하나만 본다.
+ *  6) 일정 / 자금·뉴스 / 예측시장 / 경제 이야기
  */
 
 import { useData } from '@/components/providers/DataProvider';
@@ -18,10 +17,7 @@ import { FngSection } from '@/components/market/FngSection';
 import { HomePrices } from '@/components/market/HomePrices';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskSevenSection } from '@/components/market/RiskSeven';
-import { CalendarPreview } from '@/components/market/CalendarList';
-import { PredictionSection } from '@/components/market/PredictionSection';
-import { DailyBasicCard } from '@/components/market/DailyBasicCard';
-import { FlowsNewsSection } from '@/components/market/FlowsNewsSection';
+import { HomeLower } from '@/components/market/HomeLower';
 import { ErrorState } from '@/components/ui/States';
 
 export default function HomePage() {
@@ -57,18 +53,12 @@ export default function HomePage() {
       <RiskSevenSection />
       <HomePrices />
 
-      {/* 데스크톱에서는 아래 섹션들을 2열 대시보드로 배치한다 */}
-      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-2">
-        <div>
-          <SummaryCard />
-          <FlowsNewsSection />
-        </div>
-        <div>
-          <CalendarPreview />
-          <PredictionSection />
-          <DailyBasicCard />
-        </div>
-      </div>
+      <SummaryCard />
+
+      {/* 요약 아래는 탭으로 나눈다.
+          2열로 갈라 놓았더니 두 열의 길이가 달라 왼쪽 아래가 크게 비었고,
+          모바일에서는 끝까지 내리는 데만 5,700px 이 넘었다. */}
+      <HomeLower />
     </div>
   );
 }

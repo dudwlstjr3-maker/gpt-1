@@ -588,7 +588,9 @@ async function main() {
   {
     const res = await fetch(`${BASE}/`);
     const html = await res.text();
-    check('홈에 오늘의 경제 이야기 칸이 있음', html.includes('오늘의 경제 이야기'), `status=${res.status}`);
+    // 홈 아래쪽이 탭으로 나뉜 뒤로 이 칸은 '경제 이야기' 탭을 눌러야 그려진다.
+    // 서버 응답만 보는 이 스크립트에서는 탭이 있는지까지만 확인한다.
+    check('홈에 경제 이야기 탭이 있음', html.includes('>경제 이야기<'), `status=${res.status}`);
 
     // 날짜로 정해지므로 지표 수만큼의 날이면 전부 한 번씩 돌아야 한다
     const ids = (snap.sections?.basics?.data ?? []).map((b) => b.id);
@@ -654,6 +656,26 @@ async function main() {
       const open = i.bands.some((b) => b.from === null || b.to === null);
       check(`[${i.id}] 구간의 양 끝이 열려 있음`, open);
     }
+  }
+
+  /* ---------------- 8-3. 캘린더 · 홈 구성 ---------------- */
+  console.log('\n[8-3] 캘린더 전체 보기 · 홈 탭');
+  {
+    const cal = await (await fetch(`${BASE}/calendar`)).text();
+    check('캘린더에 전체 보기가 있음', cal.includes('>전체<'));
+    check('캘린더에 달력/목록 전환이 있음', cal.includes('>달력<') && cal.includes('>목록<'));
+    // 전체 보기의 기본값이라 세 시장이 모두 담겨 있어야 한다
+    const events = snap.sections?.calendar?.data ?? [];
+    const markets = new Set(events.map((e) => e.market));
+    check('일정이 여러 시장에 걸쳐 있음', markets.size >= 2, [...markets].join(', '));
+
+    const home = await (await fetch(`${BASE}/`)).text();
+    check('홈 아래쪽이 탭으로 나뉨', home.includes('더 살펴보기'));
+    for (const t of ['일정', '자금 · 뉴스', '예측시장', '경제 이야기']) {
+      check(`홈 탭에 ${t} 있음`, home.includes(`>${t}<`));
+    }
+    // 탭이 생겼으니 한 번에 하나만 그려진다 — 나머지는 문서에 없어야 한다
+    check('고르지 않은 탭 내용은 그리지 않음', !home.includes('예측시장에서 화제인 질문'));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

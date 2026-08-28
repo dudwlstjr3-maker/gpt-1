@@ -11,7 +11,7 @@ import { Badge, ModeBadge } from '@/components/ui/Badge';
 import { Gauge } from '@/components/charts/Gauge';
 import { ScoreSparkline } from '@/components/charts/Sparkline';
 import { formatKstTime, formatSigned, NO_VALUE } from '@/lib/format';
-import { confidenceGlyph } from '@/lib/scale';
+import { confidenceGlyph, marketColor } from '@/lib/scale';
 import { useChangeColor } from './useChangeColor';
 import { CyclePhaseBadge } from './FngCycleView';
 import { CONFIDENCE_LABEL, MARKET_LABEL, type DataMode, type FngScore } from '@/types';
@@ -61,7 +61,14 @@ export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
           왼쪽 글자 아래로 배지 하나가 혼자 떨어져 머리 부분이 들쭉날쭉해진다. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={`fng-${score.market}-title`} className="text-sm font-bold text-fg-strong">
+          <h3 id={`fng-${score.market}-title`} className="flex items-center gap-1.5 text-sm font-bold text-fg-strong">
+            {/* 시장 색. 캘린더의 점과 같은 색이라 화면을 옮겨도 같은 시장으로 읽힌다.
+                뜻은 옆의 글자가 지고, 색은 훑기를 도울 뿐이다. */}
+            <span
+              aria-hidden="true"
+              className="block h-2 w-2 shrink-0 rounded-full"
+              style={{ background: marketColor(score.market) }}
+            />
             {MARKET_LABEL[score.market]} 투자심리
           </h3>
           <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>

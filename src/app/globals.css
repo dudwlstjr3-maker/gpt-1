@@ -79,6 +79,14 @@
      그 색이 '구간'을 뜻하는 줄 알고 읽게 되기 때문이다. */
   --series-2: #c4a2f7;
 
+  /* 시장 색 — 미국·한국·크립토를 눈으로 훑을 때 쓰는 표식.
+     신호등(빨·주·노·연두·초)과 겹치지 않는 색만 골랐다. 겹치면 "위험한 시장"으로
+     읽히기 때문이다. 색은 훑기를 돕는 표식일 뿐, 뜻은 항상 옆의 글자가 진다. */
+  --mk-us: #6ea8fe;
+  --mk-kr: #c4a2f7;
+  --mk-crypto: #4ecdc4;
+  --mk-global: #8b98ad;
+
   --skeleton: #1e2637;
   --skeleton-shine: #2a3448;
 
@@ -144,6 +152,10 @@
   --ok: var(--tl-green);
 
   --series-2: #6b3fc4;
+  --mk-us: #1f5fd0;
+  --mk-kr: #6b3fc4;
+  --mk-crypto: #0e7c86;
+  --mk-global: #5a6678;
 
   --skeleton: #e6ebf3;
   --skeleton-shine: #f2f5f9;

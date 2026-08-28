@@ -8,6 +8,7 @@ import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { useNow } from '@/lib/useNow';
 import { formatCountdown, formatKstDate, formatKstTime, NO_VALUE } from '@/lib/format';
+import { marketColor } from '@/lib/scale';
 import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventImportance } from '@/types';
 
 /** 배지는 국가가 아니라 '어느 시장 일정인가'를 보여준다 (크립토는 국가가 없다) */
@@ -34,9 +35,23 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone="neutral" size="xs">
+            {/* 시장 배지에 그 시장 색을 입힌다. 여러 시장이 섞인 목록에서 눈으로 훑는 데 쓰는
+                표식일 뿐, 어느 시장인지는 배지 안의 글자가 말한다. */}
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                borderColor: `color-mix(in srgb, ${marketColor(event.market)} 45%, var(--border))`,
+                background: `color-mix(in srgb, ${marketColor(event.market)} 12%, transparent)`,
+                color: marketColor(event.market),
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="block h-[5px] w-[5px] rounded-full"
+                style={{ background: marketColor(event.market) }}
+              />
               {MARKET_BADGE[event.market]}
-            </Badge>
+            </span>
             <Badge tone={imp.tone} size="xs" title={`중요도 ${imp.label}`}>
               <span aria-hidden="true">{imp.glyph}</span>
               {imp.label}

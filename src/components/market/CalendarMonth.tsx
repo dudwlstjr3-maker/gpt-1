@@ -12,15 +12,22 @@
 
 import { useMemo } from 'react';
 import { kstDateKey } from '@/lib/format';
-import type { CalendarEvent, EventImportance } from '@/types';
+import { marketColor } from '@/lib/scale';
+import { MARKET_LABEL, type CalendarEvent, type MarketId } from '@/types';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
-const DOT_COLOR: Record<EventImportance, string> = {
-  high: 'var(--danger)',
-  medium: 'var(--warn)',
-  low: 'var(--muted-fg)',
-};
+/**
+ * 점의 두 채널.
+ *  - 색  = 어느 시장 일정인가 (미국·한국·크립토·글로벌)
+ *  - 크기 = 중요도. 높음만 굵게 찍는다.
+ * 색과 크기를 서로 다른 뜻에 쓰면 두 가지를 한 번에 읽을 수 있다.
+ * 색만으로 말하지 않도록 각 칸의 스크린리더 라벨에 시장과 건수를 글로 적는다.
+ */
+const DOT_SIZE = (imp: CalendarEvent['importance']) => (imp === 'high' ? 6 : 4);
+const DOT_ALPHA = (imp: CalendarEvent['importance']) => (imp === 'high' ? 1 : imp === 'medium' ? 0.75 : 0.5);
+
+const SCOPE_LABEL = (m: CalendarEvent['market']) => (m === 'global' ? '글로벌' : MARKET_LABEL[m as MarketId]);
 
 /** KST 기준 달력 격자. 앞뒤로 빈 칸을 채워 항상 일요일에서 시작한다. */
 function monthGrid(year: number, month: number): (string | null)[] {
@@ -134,7 +141,10 @@ export function CalendarMonth({
               aria-label={
                 `${month}월 ${day}일` +
                 (isToday ? ' (오늘)' : '') +
-                (list.length ? `, 일정 ${list.length}건${high ? `, 중요 ${high}건` : ''}` : ', 일정 없음')
+                (list.length
+                  ? `, 일정 ${list.length}건${high ? `, 중요 ${high}건` : ''}, ` +
+                    [...new Set(list.map((e) => SCOPE_LABEL(e.market)))].join(' ')
+                  : ', 일정 없음')
               }
               className="flex min-h-[44px] flex-col items-center rounded-md border py-1 transition-colors"
               style={{
@@ -164,13 +174,18 @@ export function CalendarMonth({
                 <span className="mt-0.5 text-[8px] leading-none font-bold text-accent">오늘</span>
               ) : null}
 
-              {/* 색만으로 말하지 않는다. 점 개수가 곧 건수이고, 3건 넘으면 숫자로 적는다. */}
+              {/* 점 개수가 곧 건수, 색은 시장, 크기는 중요도. 3건 넘으면 숫자로 적는다. */}
               <span className="mt-auto flex items-center gap-[2px] pt-1" aria-hidden="true">
                 {list.slice(0, 3).map((e, k) => (
                   <span
                     key={k}
-                    className="block h-[4px] w-[4px] rounded-full"
-                    style={{ background: DOT_COLOR[e.importance] }}
+                    className="block rounded-full"
+                    style={{
+                      width: DOT_SIZE(e.importance),
+                      height: DOT_SIZE(e.importance),
+                      background: marketColor(e.market),
+                      opacity: DOT_ALPHA(e.importance),
+                    }}
                   />
                 ))}
                 {list.length > 3 ? (
@@ -183,16 +198,21 @@ export function CalendarMonth({
       </div>
 
       <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px] text-subtle">
-        {(['high', 'medium', 'low'] as EventImportance[]).map((imp) => (
-          <li key={imp} className="flex items-center gap-1">
+        {(['us', 'kr', 'crypto', 'global'] as const).map((m) => (
+          <li key={m} className="flex items-center gap-1">
             <span
               aria-hidden="true"
-              className="block h-[5px] w-[5px] rounded-full"
-              style={{ background: DOT_COLOR[imp] }}
+              className="block h-[6px] w-[6px] rounded-full"
+              style={{ background: marketColor(m) }}
             />
-            {imp === 'high' ? '중요도 높음' : imp === 'medium' ? '보통' : '낮음'}
+            {m === 'global' ? '글로벌' : MARKET_LABEL[m]}
           </li>
         ))}
+        <li className="flex items-center gap-1">
+          <span aria-hidden="true" className="block h-[6px] w-[6px] rounded-full bg-[var(--muted-fg)]" />
+          <span aria-hidden="true" className="block h-[4px] w-[4px] rounded-full bg-[var(--muted-fg)] opacity-60" />
+          큰 점 = 중요도 높음
+        </li>
         <li>점 하나가 일정 하나입니다. 날짜를 누르면 그날 일정만 아래에 나옵니다.</li>
       </ul>
     </div>

@@ -18,16 +18,20 @@ import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventCateg
  * 미국 탭에서 글로벌 일정이 사라지면 놓치는 일정이 생기기 때문이다.
  */
 /**
- * 시장은 항상 하나만 고른다.
- * 미국·한국·크립토는 열리는 시간도 움직이는 이유도 다른 별개 시장이라,
- * 셋을 한 목록에 섞어 놓으면 무엇을 보고 있는지가 흐려진다.
+ * 캘린더에는 '전체'가 있다.
+ *
+ * 지표·심리 화면에서는 시장을 섞지 않는다 — 미국 CPI 와 BTC 도미넌스를 한 줄에
+ * 세면 "빨간불 1개"가 무슨 뜻인지 알 수 없기 때문이다. 하지만 캘린더는 값을 세는
+ * 곳이 아니라 시간을 늘어놓는 곳이다. "이번 주에 뭐가 몰려 있나"는 세 시장을
+ * 한 번에 봐야 답이 나온다. 대신 어느 시장 일정인지는 시장 색과 배지로 늘 보인다.
  */
-type MarketFilter = MarketId;
+type MarketFilter = MarketId | 'all';
 type ImportanceFilter = 'all' | 'high' | 'medium';
 /** 달력으로 볼지 목록으로 볼지. 달력은 "언제 몰려 있나", 목록은 "다음이 뭔가"에 답한다. */
 type ViewMode = 'month' | 'list';
 
 const MARKET_OPTIONS: { value: MarketFilter; label: string }[] = [
+  { value: 'all', label: '전체' },
   { value: 'us', label: MARKET_LABEL.us },
   { value: 'kr', label: MARKET_LABEL.kr },
   { value: 'crypto', label: MARKET_LABEL.crypto },
@@ -36,7 +40,7 @@ const MARKET_OPTIONS: { value: MarketFilter; label: string }[] = [
 export default function CalendarPage() {
   const { snapshot, refresh } = useData();
   const now = useNow(30_000);
-  const [market, setMarket] = useState<MarketFilter>('us');
+  const [market, setMarket] = useState<MarketFilter>('all');
   const [importance, setImportance] = useState<ImportanceFilter>('all');
   const [category, setCategory] = useState<EventCategory | 'all'>('all');
   const [view, setView] = useState<ViewMode>('month');
@@ -51,7 +55,7 @@ export default function CalendarPage() {
   const filtered = useMemo(() => {
     const events = section?.data ?? [];
     return events.filter((e) => {
-      if (e.market !== market && e.market !== 'global') return false;
+      if (market !== 'all' && e.market !== market && e.market !== 'global') return false;
       if (importance === 'high' && e.importance !== 'high') return false;
       if (importance === 'medium' && e.importance === 'low') return false;
       if (category !== 'all' && e.category !== category) return false;
@@ -84,7 +88,7 @@ export default function CalendarPage() {
     <div className="pt-2">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
-        모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다. 달력에서 날짜를 누르면 그날 일정만 아래에 나옵니다.
+        모든 시각은 KST 기준입니다. 전체를 고르면 세 시장을 한 번에, 시장을 고르면 그 시장과 글로벌 일정을 봅니다. 어느 시장 일정인지는 색과 배지로 표시하며, 달력에서 날짜를 누르면 그날 일정만 아래에 나옵니다.
       </p>
 
       <div className="mt-3 space-y-2 px-3">

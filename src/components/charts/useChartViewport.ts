@@ -46,6 +46,12 @@ export interface ChartViewport {
   zoomBy: (factor: number, anchorT?: number) => void;
   /** 보이는 폭의 비율만큼 민다 (+ 는 미래 쪽) */
   panByRatio: (ratio: number) => void;
+  /**
+   * 지금 끌어서 고르고 있는 구간.
+   * 전체가 보이는 상태에서는 끌어도 옮길 데가 없으므로, 대신 구간을 골라 확대한다.
+   * 화면은 이 값을 받아 고르는 동안 띠를 그린다.
+   */
+  selection: Viewport | null;
   /** 손가락·마우스를 끄는 중인가 (커서 표시를 잠시 감춘다) */
   dragging: boolean;
 }
@@ -68,6 +74,7 @@ export function useChartViewport({
 }): ChartViewport {
   const [view, setView] = useState<Viewport | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [selection, setSelection] = useState<Viewport | null>(null);
 
   // 데이터가 바뀌면(기간 버튼 등) 보던 구간을 버리고 전체로 돌아간다
   const fullKey = full ? `${full.t0}:${full.t1}` : '';
@@ -146,7 +153,21 @@ export function useChartViewport({
     startDist: number;
     startAnchorT: number;
     moved: boolean;
-  }>({ pointers: new Map(), startView: null, startX: 0, startDist: 0, startAnchorT: 0, moved: false });
+    /** 끌기를 시작할 때 전체가 보이고 있었는가 */
+    startedAtFull: boolean;
+  }>({
+    pointers: new Map(),
+    startView: null,
+    startX: 0,
+    startDist: 0,
+    startAnchorT: 0,
+    moved: false,
+    startedAtFull: false,
+  });
+
+  /* 이벤트 핸들러는 한 번만 붙으므로 최신 선택 구간을 참조로 읽는다 */
+  const selRef = useRef<Viewport | null>(null);
+  selRef.current = selection;
 
   useEffect(() => {
     const el = ref.current;
@@ -157,8 +178,12 @@ export function useChartViewport({
 
     const begin = () => {
       const xs = [...g.pointers.values()];
+      const f = state.current.full;
       g.startView = state.current.effective;
       g.moved = false;
+      // 전체가 보이는 상태면 끌어도 옮길 데가 없다. 그때는 구간 고르기로 쓴다.
+      g.startedAtFull =
+        f !== null && state.current.effective.t1 - state.current.effective.t0 >= f.t1 - f.t0 - 1;
       if (xs.length === 1) {
         g.startX = xs[0];
       } else if (xs.length >= 2) {
@@ -200,6 +225,15 @@ export function useChartViewport({
       const dx = xs[0] - g.startX;
       if (Math.abs(dx) > 2) g.moved = true;
       if (!g.moved) return;
+
+      // 전체가 보이던 중이면 구간을 고르는 중이다. 확정은 손을 뗄 때 한다.
+      if (g.startedAtFull) {
+        const a = timeAtPx(g.startX);
+        const bT = timeAtPx(xs[0]);
+        setSelection({ t0: Math.min(a, bT), t1: Math.max(a, bT) });
+        return;
+      }
+
       const span = start.t1 - start.t0;
       const dt = -(dx / W) * span;
       apply({ t0: start.t0 + dt, t1: start.t1 + dt });
@@ -211,6 +245,17 @@ export function useChartViewport({
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       if (g.pointers.size === 0) {
         setDragging(false);
+        // 고르던 구간이 있으면 거기로 확대한다. 너무 좁으면 실수로 본다.
+        const sel = selRef.current;
+        setSelection(null);
+        if (sel) {
+          const f = state.current.full;
+          const wide = f !== null && sel.t1 - sel.t0 > (f.t1 - f.t0) * 0.02;
+          if (wide) {
+            apply(sel);
+            return;
+          }
+        }
         // 끌지 않고 짚기만 했으면 그 자리에 크로스헤어를 세운다
         if (wasSingle && !g.moved) state.current.onTap?.(localX(e.clientX));
       } else {
@@ -230,5 +275,5 @@ export function useChartViewport({
     };
   }, [ref, enabled, apply, timeAtPx]);
 
-  return { view: effective, zoomed, reset, zoomBy, panByRatio, dragging };
+  return { view: effective, zoomed, reset, zoomBy, panByRatio, dragging, selection };
 }

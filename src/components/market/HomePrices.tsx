@@ -8,7 +8,8 @@ import { useData } from '@/components/providers/DataProvider';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { PriceCard } from './PriceCard';
-import { MARKET_IDS, type Quote } from '@/types';
+import { marketColor } from '@/lib/scale';
+import { MARKET_IDS, MARKET_LABEL, type Quote } from '@/types';
 
 const MAX_ON_HOME = 8;
 
@@ -30,13 +31,33 @@ export function HomePrices() {
 
   return (
     <section aria-labelledby="home-prices-title" className="mt-5 px-3">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
+      <div className="mb-2">
         <h2 id="home-prices-title" className="text-base font-bold text-fg-strong">
           관심 가격과 주요 지수
         </h2>
-        <Link href="/market/us" className="text-[11px] font-semibold text-accent hover:underline">
-          미국 시장 →
-        </Link>
+        {/* 시장별 전체 지수·종목 목록으로 들어가는 길.
+            시장 탭을 없앤 뒤로 들어갈 곳이 심리 카드의 버튼 하나뿐이라
+            지수 목록을 찾기 어려웠다. 세 시장을 여기 나란히 세워 둔다. */}
+        <nav aria-label="시장별 전체 목록" className="mt-1.5 flex flex-wrap gap-1.5">
+          {MARKET_IDS.map((m) => (
+            <Link
+              key={m}
+              href={`/market/${m}`}
+              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors hover:bg-surface-2"
+              style={{
+                borderColor: `color-mix(in srgb, ${marketColor(m)} 40%, var(--border))`,
+                color: marketColor(m),
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="block h-[6px] w-[6px] rounded-full"
+                style={{ background: marketColor(m) }}
+              />
+              {MARKET_LABEL[m]} 지수 전체 →
+            </Link>
+          ))}
+        </nav>
       </div>
 
       <SectionGate

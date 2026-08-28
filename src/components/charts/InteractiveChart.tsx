@@ -479,6 +479,39 @@ export function InteractiveChart({
                 );
               })}
 
+              {/* 끌어서 고르고 있는 구간.
+                  전체가 보이는 상태에서는 끌어도 옮길 데가 없으므로 구간 고르기로 쓴다.
+                  손을 떼면 이 구간만 남기고 확대한다. */}
+              {vp.selection ? (
+                (() => {
+                  const x0 = Math.max(MARGIN.left, geometry.x(vp.selection.t0));
+                  const x1 = Math.min(MARGIN.left + geometry.innerW, geometry.x(vp.selection.t1));
+                  if (x1 <= x0) return null;
+                  return (
+                    <g aria-hidden="true">
+                      <rect
+                        x={x0}
+                        y={MARGIN.top}
+                        width={x1 - x0}
+                        height={geometry.innerH}
+                        fill="color-mix(in srgb, var(--accent) 16%, transparent)"
+                      />
+                      {[x0, x1].map((x, i) => (
+                        <line
+                          key={i}
+                          x1={x}
+                          y1={MARGIN.top}
+                          x2={x}
+                          y2={MARGIN.top + geometry.innerH}
+                          stroke="var(--accent)"
+                          strokeWidth={1.5}
+                        />
+                      ))}
+                    </g>
+                  );
+                })()
+              ) : null}
+
               {/* 시점 표식 — 세로 점선 + 번호 배지. 아래 목록의 번호와 짝을 이룬다. */}
               {markers.map((m) => {
                 const mx = geometry.x(m.t);
@@ -570,7 +603,9 @@ export function InteractiveChart({
       </p>
       {!showTable ? (
         <p className="mt-1 text-[10px] leading-relaxed break-keep text-subtle">
-          끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다.
+          {vp.zoomed
+            ? '끌어서 좌우로 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다.'
+            : '끌어서 구간을 고르면 그 구간만 확대됩니다. 확대한 뒤에는 끌어서 좌우로 옮길 수 있습니다. 휠이나 두 손가락으로도 확대·축소할 수 있습니다.'}{' '}
           키보드는 ← → 시점 이동, Shift+← → 화면 이동, ＋/− 확대·축소, 0 전체입니다. 같은 내용을 표로도 볼 수 있습니다.
           {vp.zoomed ? (
             <>

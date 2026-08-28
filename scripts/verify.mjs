@@ -671,6 +671,10 @@ async function main() {
 
     const home = await (await fetch(`${BASE}/`)).text();
     check('홈 아래쪽이 탭으로 나뉨', home.includes('더 살펴보기'));
+    // 시장 탭을 없앤 대신 지수 목록으로 가는 길이 홈에 보여야 한다.
+    // 리액트가 글자 사이에 주석 표시를 넣으므로 통짜 문구로 찾지 않는다.
+    check('홈에 지수 전체 링크가 세 개', (home.match(/지수 전체/g) ?? []).length >= 3,
+      `${(home.match(/지수 전체/g) ?? []).length}개`);
     for (const t of ['일정', '자금 · 뉴스', '예측시장', '경제 이야기']) {
       check(`홈 탭에 ${t} 있음`, home.includes(`>${t}<`));
     }

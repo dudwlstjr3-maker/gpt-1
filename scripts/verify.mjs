@@ -621,7 +621,7 @@ async function main() {
   {
     // 시장 허브와 위험 신호등 화면은 홈·지표 화면과 내용이 겹쳐 없앴다.
     // 바깥 링크가 깨지지 않도록 자리는 남기고 넘겨 준다.
-    for (const [from, to] of [['/market', '/'], ['/risk', '/indicators']]) {
+    for (const [from, to] of [['/market', '/indices'], ['/risk', '/indicators']]) {
       const res = await fetch(`${BASE}${from}`, { redirect: 'manual' });
       const loc = res.headers.get('location') ?? '';
       check(`${from} → ${to} 로 넘김`, res.status >= 300 && res.status < 400 && loc.endsWith(to),
@@ -671,15 +671,61 @@ async function main() {
 
     const home = await (await fetch(`${BASE}/`)).text();
     check('홈 아래쪽이 탭으로 나뉨', home.includes('더 살펴보기'));
-    // 시장 탭을 없앤 대신 지수 목록으로 가는 길이 홈에 보여야 한다.
-    // 리액트가 글자 사이에 주석 표시를 넣으므로 통짜 문구로 찾지 않는다.
-    check('홈에 지수 전체 링크가 세 개', (home.match(/지수 전체/g) ?? []).length >= 3,
-      `${(home.match(/지수 전체/g) ?? []).length}개`);
+    // 지수는 탭으로 떼어 놨다. 홈에는 그리로 가는 길만 남는다.
+    check('홈에서 지수 탭으로 가는 길이 있음', home.includes('/indices'));
     for (const t of ['일정', '자금 · 뉴스', '예측시장', '경제 이야기']) {
       check(`홈 탭에 ${t} 있음`, home.includes(`>${t}<`));
     }
     // 탭이 생겼으니 한 번에 하나만 그려진다 — 나머지는 문서에 없어야 한다
     check('고르지 않은 탭 내용은 그리지 않음', !home.includes('예측시장에서 화제인 질문'));
+  }
+
+  /* ---------------- 8-4. 지수 탭 ---------------- */
+  console.log('\n[8-4] 지수 탭');
+  {
+    const idx = await (await fetch(`${BASE}/indices`)).text();
+
+    // 하단 탭 · 사이드바에 자리를 잡았는가. '지수' 와 '지표' 는 한 글자 차이라
+    // 이름을 '경제지표' 로 늘려 두었다 — 그대로인지도 같이 본다.
+    check('주요 메뉴에 지수 탭이 있음', idx.includes('href="/indices"'));
+    check('지표 탭 이름이 경제지표로 구분됨', idx.includes('>경제지표<'));
+    check('지수와 지표 이름이 서로 다름', !idx.match(/>지표</));
+
+    // 세 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다)
+    for (const label of ['미국', '한국', '크립토']) {
+      check(`지수 화면에 ${label} 묶음이 있음`, idx.includes(`>${label}</span>`));
+    }
+
+    // 목록은 카탈로그가 정하고 값만 받아 온다. 그래서 이름·기호는 값이 오기 전에도
+    // 서 있어야 하고(서버가 그린 HTML 에 있어야 하고), 값은 스냅샷에 있어야 한다.
+    const quotes = snap.sections?.quotes?.data ?? {};
+    const all = [...(quotes.us ?? []), ...(quotes.kr ?? []), ...(quotes.crypto ?? [])];
+    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', 'KOSPI'], ['total_mcap', '전체 시가총액']]) {
+      check(`지수 화면에 ${id} 줄이 있음`, idx.includes(`>${name}</p>`));
+      check(`${id} 값이 스냅샷에 있음`, all.some((x) => x.id === id && x.price !== null));
+    }
+    // 지수만 모은 화면이다 — 개별 종목이 섞여 들어오면 안 된다
+    for (const [id, name] of [['samsung', '삼성전자'], ['nvda', '엔비디아'], ['btc', '비트코인']]) {
+      check(`지수 화면에 개별 종목 ${id} 은 없음`, !idx.includes(`>${name}</p>`) && !idx.includes(`/asset/${id}"`));
+    }
+
+    // 기준점 — "3,714" 는 언제를 100 으로 놓았는지 알아야 읽힌다
+    const baselines = ['1941~1943년 평균 = 10', '1971년 2월 5일 = 100', '1986년 12월 31일 = 135',
+      '1980년 1월 4일 = 100', '1996년 7월 1일 = 1,000', '1990년 1월 3일 = 100', '1973년 3월 = 100'];
+    for (const b of baselines) check(`기준점 표시: ${b}`, idx.includes(b));
+    // 변동성 지수에는 기준 시점이 없다 — 없다는 사실 자체를 밝혀야 한다
+    check('변동성 지수는 기준 시점이 없다고 밝힘',
+      (idx.match(/기준 시점이 없습니다/g) ?? []).length >= 2);
+    // 다우는 기준값 자체가 없는 방식이다
+    check('다우는 기준값이 없다고 밝힘', idx.includes('기준값이 없습니다'));
+
+    // 크립토에 공식 지수가 없다는 사실을 지어내지 않고 밝히는가
+    check('크립토에 공식 지수가 없다고 밝힘', idx.includes('공식 지수는 크립토에 없습니다'));
+
+    // 시장별 화면으로 들어가는 입구를 겸한다
+    for (const m of ['us', 'kr', 'crypto']) {
+      check(`지수 화면에서 ${m} 시장 화면으로 갈 수 있음`, idx.includes(`/market/${m}`));
+    }
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

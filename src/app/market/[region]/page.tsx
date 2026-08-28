@@ -105,7 +105,8 @@ export default function MarketRegionPage() {
       {/* 헤더 */}
       <div className="flex items-start justify-between gap-2 px-3 pt-1">
         <div className="flex min-w-0 items-start gap-2">
-          <Link href="/market" aria-label="시장 목록으로" className="mt-0.5 text-muted">
+          {/* /market 은 없앤 화면이라 지수 탭으로 돌려보낸다 */}
+          <Link href="/indices" aria-label="지수 목록으로" className="mt-0.5 text-muted">
             ←
           </Link>
           <div className="min-w-0">

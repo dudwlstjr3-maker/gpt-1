@@ -28,6 +28,55 @@ const OUT =
 /** 자산 상세까지 담고 싶은 종목. 없으면 조용히 건너뛴다. */
 const ASSET_IDS = ['spx', 'kospi', 'btc'];
 
+/**
+ * '지수' 화면에 필요한 목록과 기준점을 카탈로그에서 그대로 읽어 온다.
+ *
+ * 미리보기 템플릿은 렌더러를 손으로 한 벌 더 갖고 있지만, 데이터까지 손으로
+ * 베끼면 앱과 어긋난다. 기준점은 특히 어긋나면 안 되는 값이라 — 틀린 기준으로
+ * 읽은 지수는 숫자 자체가 거짓말이 된다 — 원본에서 뽑는다.
+ * 모양이 조금이라도 달라지면 조용히 비우지 말고 빌드를 세운다.
+ */
+function readIndexCatalog() {
+  const src = fs.readFileSync(path.join(HERE, '../../src/lib/catalog.ts'), 'utf8');
+
+  const idsBlock = src.match(/export const INDEX_IDS[^=]*=\s*\{([\s\S]*?)\n\};/);
+  if (!idsBlock) throw new Error('catalog.ts 에서 INDEX_IDS 를 찾지 못했습니다.');
+  const ids = {};
+  for (const m of idsBlock[1].matchAll(/(\w+):\s*\[([^\]]*)\]/g)) {
+    ids[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  }
+  for (const m of ['us', 'kr', 'crypto']) {
+    if (!ids[m]?.length) throw new Error(`INDEX_IDS 에 ${m} 이 비어 있습니다.`);
+  }
+
+  // 카탈로그 한 줄에서 id · name · symbol · baseline 을 뽑는다
+  const byId = new Map();
+  for (const line of src.split('\n')) {
+    const id = line.match(/\{\s*id:\s*'([^']+)'/);
+    if (!id) continue;
+    const name = line.match(/\bname:\s*'((?:[^'\\]|\\.)*)'/);
+    const symbol = line.match(/\bsymbol:\s*'((?:[^'\\]|\\.)*)'/);
+    const baseline = line.match(/\bbaseline:\s*'((?:[^'\\]|\\.)*)'/);
+    if (!name || !symbol) continue;
+    byId.set(id[1], {
+      id: id[1],
+      name: name[1],
+      symbol: symbol[1],
+      baseline: baseline ? baseline[1] : null,
+    });
+  }
+
+  const out = {};
+  for (const [market, list] of Object.entries(ids)) {
+    out[market] = list.map((id) => {
+      const item = byId.get(id);
+      if (!item) throw new Error(`카탈로그에 ${id} 가 없습니다 (INDEX_IDS 와 어긋남).`);
+      return item;
+    });
+  }
+  return out;
+}
+
 async function j(url) {
   const res = await fetch(BASE + url);
   if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
@@ -53,7 +102,15 @@ async function main() {
     }
   }
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets };
+  const indices = readIndexCatalog();
+  // 목록에 있는 지수는 스냅샷에도 있어야 한다. 없으면 미리보기에 빈 줄이 남는다.
+  for (const [market, list] of Object.entries(indices)) {
+    const have = new Set((snapshot.sections.quotes?.data?.[market] ?? []).map((q) => q.id));
+    const missing = list.filter((i) => !have.has(i.id)).map((i) => i.id);
+    if (missing.length) throw new Error(`스냅샷에 ${market} 지수가 없습니다: ${missing.join(', ')}`);
+  }
+
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');

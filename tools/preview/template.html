@@ -2081,14 +2081,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
       '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +
       '</div>' +
-      /* 시장 탭을 없앤 뒤로 지수 목록에 들어갈 길이 심리 카드의 버튼 하나뿐이었다.
-         세 시장을 여기 나란히 세워 둔다. */
-      '<nav aria-label="시장별 전체 목록" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([m,l]) =>
-        '<button type="button" data-go-region="' + m + '" style="display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 10px;font-size:11.5px;font-weight:600;border:1px solid color-mix(in srgb,var(--mk-' + m + ') 40%,var(--border));color:var(--mk-' + m + ')">' +
-        '<span aria-hidden="true" style="display:block;width:6px;height:6px;border-radius:99px;background:var(--mk-' + m + ')"></span>' +
-        l + ' 지수 전체 →</button>').join('') +
-      '</nav>' +
+      /* 지수는 '지수' 탭으로 떼어 놨다. 여기서는 그리로 가는 길만 남긴다. */
+      '<p style="margin:4px 0 0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '시장 전체를 재는 지수는 미국 · 한국 · 크립토로 나눠 ' +
+      '<button type="button" class="linkbtn" data-go="indices">지수 탭 →</button>에 모아 뒀습니다.</p>' +
       '<div class="grid-cards">' + ordered.slice(0, 9).map(priceCard).join('') + '</div></section>' +
 
       '<div class="dash">' +
@@ -2252,7 +2248,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     return (
       '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
       '<div style="display:flex;align-items:flex-start;gap:8px;min-width:0">' +
-      '<button type="button" class="backbtn" data-go-region="' + q.market + '" aria-label="시장 화면으로">←</button>' +
+      '<button type="button" class="backbtn" data-go="indices" aria-label="지수 목록으로">←</button>' +
       '<div style="min-width:0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 시장</h1>' +
       '<p style="margin:2px 0 0;font-size:11px;color:var(--subtle);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + SUBTITLE[m] + '</p></div></div>' +
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' + sessBadge(sess.phase) +
@@ -2922,10 +2918,101 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
+  /**
+   * 지수 — 시장 전체를 한 숫자로 재는 값.
+   *
+   * 목록과 기준점은 build.mjs 가 src/lib/catalog.ts 에서 그대로 읽어 담는다.
+   * 손으로 베끼면 앱과 어긋나고, 기준점이 어긋난 지수는 숫자 자체가 거짓말이 된다.
+   */
+  const GROUP_NOTE = {
+    us: '뉴욕 증시 전체를 재는 지수와 변동성 · 달러 지수입니다.',
+    kr: '유가증권 · 코스닥 시장을 재는 지수와 변동성 지수입니다.',
+    crypto: 'KOSPI 나 S&P 500 같은 공식 지수는 크립토에 없습니다. 대신 시장 전체 크기를 재는 값들을 놓았습니다.',
+  };
+
+  function indexRow(item, q) {
+    const un = !q || q.price === null;
+    const col = q ? dirColor(q.changePct) : 'var(--subtle)';
+    const delay = q && q.meta.sources[0] ? q.meta.sources[0].delayMinutes : null;
+    return (
+      '<li style="border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px">' +
+      '<div style="min-width:0;flex:1">' +
+      '<div style="font-size:13.5px;font-weight:600;color:var(--fg-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(item.name) + '</div>' +
+      '<div style="margin-top:2px;font-size:10px;color:var(--subtle)"><span class="tnum">' + esc(item.symbol) + '</span>' +
+      (q ? ' · 기준 ' + esc(kTime(q.meta.asOf)) : '') + '</div></div>' +
+      (un ? '' : sparkline(q.spark, col === 'var(--subtle)' ? 'var(--accent)' : col, 56, 22, false)) +
+      '<div style="flex-shrink:0;text-align:right">' +
+      (un
+        ? '<div style="font-size:12px;font-weight:600;color:var(--warn)">' + NO + '</div>'
+        : '<div class="tnum" style="font-size:13.5px;font-weight:700;line-height:1.2;color:var(--fg-strong)">' + esc(fmtValue(q.price, q)) + '</div>' +
+          '<div class="tnum" style="margin-top:2px;font-size:11px;font-weight:600;color:' + col + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtPct(q.changePct)) +
+          '<span class="sr">' + dirLabel(q.changePct) + '</span></div>') +
+      '</div>' +
+      (q ? freshBadge(q.meta.freshness, delay) : '') +
+      '</div>' +
+      // 기준점 — "3,714" 라는 숫자는 언제를 100 으로 놓았는지 알아야 읽힌다
+      (item.baseline
+        ? '<p style="margin:0;padding:0 12px 8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+          '<b style="color:var(--muted)">기준 · </b>' + esc(item.baseline) + '</p>'
+        : '') +
+      (un
+        ? '<p style="margin:0;padding:0 12px 8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--warn)">' +
+          esc((q && q.unavailableReason) || '값을 받지 못했습니다.') + '</p>'
+        : '') +
+      '</li>'
+    );
+  }
+
+  function viewIndices() {
+    const sn = snap();
+    const data = sn.sections.quotes.data || {};
+    const cat = DATA.indices || { us: [], kr: [], crypto: [] };
+
+    return (
+      '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">지수</h1>' +
+      '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+      '시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.</p></div>' +
+
+      '<div style="padding:12px"><div class="idxgrid">' +
+      MARKETS.map((m) => {
+        const byId = new Map((data[m] || []).map((x) => [x.id, x]));
+        return (
+          '<section class="card" style="overflow:hidden" aria-labelledby="idx-' + m + '">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);padding:8px 12px;background:color-mix(in srgb,' + mkColor(m) + ' 8%,transparent)">' +
+          '<h2 id="idx-' + m + '" style="margin:0;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700">' +
+          // 색은 훑기용 표식일 뿐이고, 어느 시장인지는 옆의 글자가 말한다
+          '<span aria-hidden="true" style="display:block;width:8px;height:8px;border-radius:99px;background:' + mkColor(m) + '"></span>' +
+          '<span style="color:' + mkColor(m) + '">' + MARKET_LABEL[m] + '</span></h2>' +
+          '<button type="button" class="linkbtn" data-go-region="' + m + '">시장 화면 →</button></div>' +
+          '<p style="margin:0;padding:8px 12px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(GROUP_NOTE[m]) + '</p>' +
+          '<ul style="list-style:none;margin:0;padding:0;border-top:1px solid var(--border)">' +
+          (cat[m] || []).map((item) => indexRow(item, byId.get(item.id))).join('') +
+          '</ul></section>'
+        );
+      }).join('') +
+      '</div></div>' +
+
+      '<div style="padding:0 12px"><div class="card" style="padding:12px">' +
+      '<h2 style="margin:0;font-size:13px;font-weight:700;color:var(--fg-strong)">지수 숫자를 읽는 법</h2>' +
+      '<ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+      [
+        ['기준점부터 봅니다.', 'KOSPI 는 1980년 1월 4일의 한국 증시를 100 으로 놓고 잰 값입니다. 지금 3,700 이라면 그때의 37배라는 뜻입니다. 기준이 다른 지수끼리 숫자를 직접 견주는 것은 뜻이 없습니다.'],
+        ['변동성 지수는 방향이 반대입니다.', 'VIX · VKOSPI 는 오를수록 시장이 불안하다는 뜻입니다. 기준 시점 없이 예상 변동폭을 연율 % 로 나타냅니다.'],
+        ['지수는 살 수 있는 물건이 아닙니다.', '시장을 재는 눈금이라서, 실제로 사고파는 것은 그 지수를 따라가도록 만든 상품입니다.'],
+      ].map((r) => '<li><b style="color:var(--fg)">' + r[0] + '</b> ' + esc(r[1]) + '</li>').join('') +
+      '</ul>' +
+      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '지수마다 산출 기관과 방식이 다릅니다. 이 화면은 값을 받아 그대로 보여줄 뿐, 다시 계산하지 않습니다.</p>' +
+      '</div></div>'
+    );
+  }
+
   const NAV = [
     { id: 'home', label: '홈', icon: icon('M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z') },
+    { id: 'indices', label: '지수', icon: icon('M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6') },
     { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
-    { id: 'indicators', label: '지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
+    { id: 'indicators', label: '경제지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
     { id: 'basics', label: '경제 이야기', icon: icon('M4 19V5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1zM8 9h6M8 13h8M8 17h5') },
     { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
   ];
@@ -2957,6 +3044,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     document.getElementById('statusbar').innerHTML = statusBar();
     const v = {
       home: viewHome,
+      indices: viewIndices,
       marketRegion: viewMarketRegion,
       calendar: viewCalendar,
       indicators: viewIndicators,
@@ -2979,7 +3067,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const d = t.dataset;
 
     /* 없앤 화면으로 가려 하면 대신 갈 곳으로 넘긴다 */
-    if (d.go === 'market') { state.view = 'home'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.go === 'market') { state.view = 'indices'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go === 'risk') { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go) { state.view = d.go; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.goFng) { state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
@@ -3294,6 +3382,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 .riskgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .riskcards { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .hubgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.idxgrid { display: flex; flex-direction: column; gap: 12px; }
+@media (min-width: 1000px) { .idxgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
 .mktgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .risktile { display: block; padding: 10px; }
 .risktile:hover { background: var(--surface-2); }

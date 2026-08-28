@@ -8,8 +8,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { PriceCard } from './PriceCard';
-import { marketColor } from '@/lib/scale';
-import { MARKET_IDS, MARKET_LABEL, type Quote } from '@/types';
+import { MARKET_IDS, type Quote } from '@/types';
 
 const MAX_ON_HOME = 8;
 
@@ -35,29 +34,15 @@ export function HomePrices() {
         <h2 id="home-prices-title" className="text-base font-bold text-fg-strong">
           관심 가격과 주요 지수
         </h2>
-        {/* 시장별 전체 지수·종목 목록으로 들어가는 길.
-            시장 탭을 없앤 뒤로 들어갈 곳이 심리 카드의 버튼 하나뿐이라
-            지수 목록을 찾기 어려웠다. 세 시장을 여기 나란히 세워 둔다. */}
-        <nav aria-label="시장별 전체 목록" className="mt-1.5 flex flex-wrap gap-1.5">
-          {MARKET_IDS.map((m) => (
-            <Link
-              key={m}
-              href={`/market/${m}`}
-              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors hover:bg-surface-2"
-              style={{
-                borderColor: `color-mix(in srgb, ${marketColor(m)} 40%, var(--border))`,
-                color: marketColor(m),
-              }}
-            >
-              <span
-                aria-hidden="true"
-                className="block h-[6px] w-[6px] rounded-full"
-                style={{ background: marketColor(m) }}
-              />
-              {MARKET_LABEL[m]} 지수 전체 →
-            </Link>
-          ))}
-        </nav>
+        {/* 지수는 '지수' 탭으로 떼어 놨다. 여기서는 그리로 가는 길만 남긴다.
+            홈에는 관심 종목과 대표 지수 몇 개만 두고, 전체 목록은 탭에서 본다. */}
+        <p className="mt-1 text-[11px] leading-relaxed break-keep text-subtle">
+          시장 전체를 재는 지수는 미국 · 한국 · 크립토로 나눠{' '}
+          <Link href="/indices" className="font-semibold text-accent hover:underline">
+            지수 탭 →
+          </Link>
+          에 모아 뒀습니다.
+        </p>
       </div>
 
       <SectionGate

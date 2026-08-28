@@ -22,11 +22,18 @@ const I = ({ d }: { d: string }) => (
  * 시장은 탭이 아니다.
  * 홈의 심리 카드마다 "○○ 시장 →" 버튼이 있어 거기서 바로 들어가고,
  * 시장을 고르기만 하던 허브 화면은 홈과 내용이 겹쳐서 없앴다.
- * 비워진 자리에는 실제로 자주 여는 지표 화면을 둔다.
+ *
+ * 대신 '지수' 를 탭으로 세웠다. 지수는 종목과 성격이 달라서 — 살 수 있는
+ * 물건이 아니라 시장의 온도계라서 — 홈의 가격 목록에 섞여 있으면 잘 안 보였다.
+ * 세 시장의 지수를 모아 둔 화면이 시장별 화면으로 들어가는 입구도 겸한다.
+ *
+ * '지수' 와 '지표' 는 한 글자 차이라 10px 로 나란히 놓으면 구분되지 않는다.
+ * 그래서 지표 쪽 이름을 '경제지표' 로 늘렸다.
  */
 const NAV: NavItem[] = [
   { href: '/', label: '홈', icon: <I d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
-  { href: '/indicators', label: '지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
+  { href: '/indices', label: '지수', icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
+  { href: '/indicators', label: '경제지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
   { href: '/calendar', label: '캘린더', icon: <I d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4" /> },
   { href: '/watchlist', label: '관심목록', icon: <I d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6L12 16.9 7 19.5l1-5.6-4-3.9 5.5-.8z" /> },
   { href: '/more', label: '더보기', icon: <I d="M4 7h16M4 12h16M4 17h10" /> },
@@ -53,7 +60,7 @@ export function BottomTabs() {
               <Link
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors"
+                className="flex flex-col items-center gap-0.5 px-0.5 py-2 text-[9.5px] font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)' }}
               >
                 {item.icon}
@@ -98,7 +105,7 @@ export function DesktopSidebar() {
           })}
         </ul>
       </nav>
-      {/* 시장은 화면이 분리되어 있고 허브가 없으므로, 사이드바에서 바로 들어간다 */}
+      {/* 지수 화면에서도 들어갈 수 있지만, 데스크톱에서는 한 번에 가는 길을 남겨 둔다 */}
       <div className="mt-4 border-t border-border pt-3">
         <p className="mb-1 px-2.5 text-[10px] font-semibold tracking-wide text-subtle">시장별 화면</p>
         <ul className="space-y-0.5">

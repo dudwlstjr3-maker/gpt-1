@@ -12,6 +12,7 @@ import { FreshnessBadge, ModeBadge, SessionBadge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, SkeletonCard } from '@/components/ui/States';
 import { convertCurrency, formatKoreanCompact, formatKstFull, NO_VALUE } from '@/lib/format';
+import { CATALOG_BY_ID } from '@/lib/catalog';
 import { DIRECTION_LABEL } from '@/lib/scale';
 import { MARKET_LABEL, type AssetDetail, type RangeKey } from '@/types';
 
@@ -113,7 +114,7 @@ export default function AssetPage() {
     return (
       <div className="px-3 pt-3">
         <ErrorState title="종목 상세를 불러오지 못했습니다" message={error} onRetry={load} />
-        <Link href="/market" className="mt-3 inline-block text-[12px] font-semibold text-accent">
+        <Link href="/" className="mt-3 inline-block text-[12px] font-semibold text-accent">
           ← 시장으로
         </Link>
       </div>
@@ -132,7 +133,7 @@ export default function AssetPage() {
     <div className="pt-2 pb-4">
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/market" aria-label="뒤로" className="text-muted">
+          <Link href={`/market/${q.market}`} aria-label="뒤로" className="text-muted">
             ←
           </Link>
           <div className="min-w-0">
@@ -140,6 +141,12 @@ export default function AssetPage() {
             <p className="truncate text-[11px] text-subtle">
               {q.symbol} · {MARKET_LABEL[q.market]}
             </p>
+            {/* 지수는 기준점을 모르면 숫자 자체를 읽을 수 없다 */}
+            {CATALOG_BY_ID.get(q.id)?.baseline ? (
+              <p className="mt-0.5 text-[10.5px] break-keep text-muted">
+                기준 {CATALOG_BY_ID.get(q.id)!.baseline}
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

@@ -125,17 +125,25 @@ export function FngCard({ score, mode }: { score: FngScore; mode: DataMode }) {
         />
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2">
-        <p className="text-[10px] text-subtle">
-          산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
-        </p>
+      {/* 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
+          이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다. */}
+      <div className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2">
+        <Link
+          href={`/market/${score.market}`}
+          className="flex-1 rounded-md bg-accent px-2 py-1.5 text-center text-[11px] font-semibold text-accent-fg hover:opacity-90"
+        >
+          {MARKET_LABEL[score.market]} 시장 →
+        </Link>
         <Link
           href={`/fng/${score.market}`}
-          className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-fg hover:bg-surface-3"
+          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-center text-[11px] font-semibold text-fg hover:bg-surface-3"
         >
-          상세 보기 →
+          심리 상세 →
         </Link>
       </div>
+      <p className="mt-1.5 text-[10px] text-subtle">
+        산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
+      </p>
     </article>
   );
 }

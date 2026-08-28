@@ -608,10 +608,52 @@ async function main() {
 
   /* ---------------- 8. 시장별 분리 화면 ---------------- */
   console.log('\n[8] 시장별 분리 화면');
-  for (const path of ['/market', '/market/us', '/market/kr', '/market/crypto', '/risk', '/fng/us', '/basics', '/indicators']) {
+  for (const path of ['/market/us', '/market/kr', '/market/crypto', '/fng/us', '/basics', '/indicators', '/calendar']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
     check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);
+  }
+
+  /* ---------------- 8-1. 화면 정리 (중복 제거) ---------------- */
+  console.log('\n[8-1] 중복 화면 정리');
+  {
+    // 시장 허브와 위험 신호등 화면은 홈·지표 화면과 내용이 겹쳐 없앴다.
+    // 바깥 링크가 깨지지 않도록 자리는 남기고 넘겨 준다.
+    for (const [from, to] of [['/market', '/'], ['/risk', '/indicators']]) {
+      const res = await fetch(`${BASE}${from}`, { redirect: 'manual' });
+      const loc = res.headers.get('location') ?? '';
+      check(`${from} → ${to} 로 넘김`, res.status >= 300 && res.status < 400 && loc.endsWith(to),
+        `status=${res.status} location=${loc}`);
+    }
+    // 지표 화면 하나가 위험 신호등과 전체 지표를 모두 담는다
+    const html = await (await fetch(`${BASE}/indicators`)).text();
+    check('지표 화면에 위험 신호등 보기가 있음', html.includes('위험 신호등'));
+    check('지표 화면에 전체 지표 보기가 있음', html.includes('전체 지표'));
+    // 홈에서 각 시장으로 바로 들어간다
+    const home = await (await fetch(`${BASE}/`)).text();
+    for (const m of ['us', 'kr', 'crypto']) {
+      check(`홈에 ${m} 시장으로 가는 길이 있음`, home.includes(`/market/${m}`));
+    }
+  }
+
+  /* ---------------- 8-2. 위험 눈금이 상한이 아님을 밝히는가 ---------------- */
+  console.log('\n[8-2] 위험 신호등 눈금 (VIX 40 은 상한이 아니다)');
+  {
+    const risk = snap.sections?.risk?.data?.indicators ?? [];
+    check('위험 지표가 있음', risk.length > 0, `${risk.length}개`);
+    for (const i of risk) {
+      check(`[${i.id}] 눈금 범위가 유효`, i.scaleMax > i.scaleMin, `${i.scaleMin}~${i.scaleMax}`);
+      check(`[${i.id}] 눈금이 어디까지인지 밝힘`,
+        typeof i.scaleNote === 'string' && i.scaleNote.length > 20, `${(i.scaleNote ?? '').length}자`);
+      // 값이 눈금을 벗어났으면 반드시 그렇다고 표시해야 한다
+      const expected =
+        i.value === null ? null : i.value > i.scaleMax ? 'above' : i.value < i.scaleMin ? 'below' : null;
+      check(`[${i.id}] 눈금 밖 여부가 값과 일치`, i.offScale === expected,
+        `value=${i.value} offScale=${i.offScale} 기대=${expected}`);
+      // 최상위 구간은 열려 있어야 한다 (28 이상처럼 위쪽이 막히면 안 된다)
+      const open = i.bands.some((b) => b.from === null || b.to === null);
+      check(`[${i.id}] 구간의 양 끝이 열려 있음`, open);
+    }
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

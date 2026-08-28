@@ -17,6 +17,11 @@ export interface IndicatorGuide {
   whenUp: string;
   /** 값이 내리면 무슨 일이 벌어지는가 */
   whenDown: string;
+  /**
+   * 지수의 기준 시점과 기준값 (있는 것만).
+   * 기준점을 모르면 "104" 같은 숫자를 읽을 방법이 없다.
+   */
+  baseline?: string;
 }
 
 export const INDICATOR_GUIDE: Record<string, IndicatorGuide> = {
@@ -74,11 +79,13 @@ export const INDICATOR_GUIDE: Record<string, IndicatorGuide> = {
     plain: '미국 제조업 구매담당자들에게 "지난달보다 나아졌나"를 물어 만든 지수입니다. 50이 기준선입니다.',
     whenUp: '공장이 바빠지고 있다는 뜻입니다. 50을 넘으면 확장 국면으로 봅니다.',
     whenDown: '주문과 생산이 줄고 있다는 뜻입니다. 50 아래면 위축 국면으로 봅니다.',
+    baseline: '50이 기준선. 50보다 크면 지난달보다 나아졌다는 응답이 더 많았다는 뜻입니다.'
   },
   kr_pmi: {
     plain: '한국 제조업 구매담당자 설문 지수입니다. 수출 경기를 앞서 보여주는 편입니다.',
     whenUp: '수주와 생산이 늘고 있다는 뜻입니다.',
     whenDown: '수출 주문이 줄고 있다는 뜻으로, 반도체·자동차 같은 주력 업종에 먼저 나타납니다.',
+    baseline: '50이 기준선. 절대 수준이 아니라 지난달과 견준 응답 비율입니다.'
   },
 
   /* ---------------- 환율·원자재 ---------------- */
@@ -86,6 +93,7 @@ export const INDICATOR_GUIDE: Record<string, IndicatorGuide> = {
     plain: '달러가 주요국 통화 대비 얼마나 센지를 하나의 숫자로 만든 지수입니다.',
     whenUp: '달러가 강해졌다는 뜻입니다. 신흥국에서 돈이 빠져나가기 쉽고, 원자재 가격에는 눌리는 힘으로 작용합니다.',
     whenDown: '달러가 약해졌다는 뜻입니다. 신흥국 주식과 원자재에 우호적인 환경이 됩니다.',
+    baseline: '1973년 3월 = 100. 지금 100 언저리라면 그때와 비슷한 값이라는 뜻입니다.'
   },
   usdkrw: {
     plain: '1달러를 사는 데 필요한 원화입니다. 숫자가 커질수록 원화가 약해진 것입니다.',
@@ -135,6 +143,7 @@ export const INDICATOR_GUIDE: Record<string, IndicatorGuide> = {
     plain: '주가를 회사가 가진 순자산으로 나눈 값입니다. 1배면 "가진 재산만큼의 값"이라는 뜻입니다.',
     whenUp: '자산 가치보다 주가가 더 쳐주는 쪽으로 움직였다는 뜻입니다.',
     whenDown: '1배 아래로 내려가면 장부상 재산보다도 싸게 거래된다는 뜻입니다. 한국 시장에서 자주 거론되는 지점입니다.',
+    baseline: '1배가 기준. 회사가 가진 순자산만큼의 값이라는 뜻입니다.'
   },
   kospi_div: {
     plain: '주가 대비 배당금의 비율입니다. 은행 이자와 견주어 보는 숫자입니다.',

@@ -12,6 +12,7 @@ import { SignalDot, SignalLegend } from '@/components/ui/Signal';
 import { formatMacroValue } from '@/components/market/PriceCard';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
 import { guideFor } from '@/lib/indicatorGuide';
+import { RiskBoard } from '@/components/market/RiskBoard';
 import type { Signal } from '@/lib/scale';
 import { MARKET_LABEL, type MacroIndicator, type MarketId } from '@/types';
 
@@ -63,6 +64,13 @@ function GuidePanel({ id }: { id: string }) {
       </summary>
       <div className="mt-1.5 rounded-lg bg-surface-2 px-2.5 py-2">
         <p className="text-[11.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
+        {/* 기준점이 있는 지수는 그것부터 알려 준다. 기준을 모르면 숫자를 읽을 수 없다. */}
+        {g.baseline ? (
+          <p className="mt-1.5 rounded-md bg-surface-3 px-2 py-1.5 text-[10.5px] leading-relaxed break-keep text-muted">
+            <span className="font-semibold text-fg">기준 · </span>
+            {g.baseline}
+          </p>
+        ) : null}
         <dl className="mt-2 space-y-1.5 border-t border-border pt-2">
           {[
             { glyph: '▲', label: '오르면', text: g.whenUp },
@@ -85,9 +93,19 @@ function GuidePanel({ id }: { id: string }) {
   );
 }
 
+/**
+ * 보기 전환.
+ *
+ * 위험 신호등은 예전에 /risk 라는 별도 화면이었다. 시장 필터도 같고 지표도
+ * 겹쳐서, 같은 VIX 를 두 화면에서 보게 되는 문제가 있었다. 화면을 하나로 합치고
+ * 안에서 보기만 바꾸도록 했다.
+ */
+type ViewMode = 'risk' | 'all';
+
 export default function IndicatorsPage() {
   const { snapshot, refresh } = useData();
   const [group, setGroup] = useState<GroupFilter>('us');
+  const [view, setView] = useState<ViewMode>('risk');
   const section = snapshot?.sections.macro ?? null;
 
   const list = useMemo(() => {
@@ -116,11 +134,13 @@ export default function IndicatorsPage() {
         화면에 따로 모았습니다.
       </p>
 
-      <div className="mt-2 px-3">
-        <SignalLegend note="시장 위험 신호등과 같은 색 규칙입니다. 색은 평소 범위에서 얼마나 벗어났는지만 나타내며 매매 신호가 아닙니다." />
-      </div>
+      {view === 'all' ? (
+        <div className="mt-2 px-3">
+          <SignalLegend note="위험 신호등과 같은 색 규칙입니다. 색은 평소 범위에서 얼마나 벗어났는지만 나타내며 매매 신호가 아닙니다." />
+        </div>
+      ) : null}
 
-      {alerts.length > 0 ? (
+      {view === 'all' && alerts.length > 0 ? (
         <div className="mt-3 px-3">
           <div className="card p-3" style={{ borderColor: 'color-mix(in srgb, var(--danger) 40%, var(--border))' }}>
             <p className="mb-1.5 text-[12px] font-bold" style={{ color: 'var(--danger)' }}>
@@ -138,10 +158,10 @@ export default function IndicatorsPage() {
         </div>
       ) : null}
 
-      <div className="mt-3 px-3">
+      <div className="mt-3 space-y-2 px-3">
         <SegmentedControl
-          label="지표 그룹"
-          size="xs"
+          label="시장"
+          size="sm"
           full
           value={group}
           onChange={setGroup}
@@ -151,9 +171,22 @@ export default function IndicatorsPage() {
             { value: 'crypto', label: MARKET_LABEL.crypto },
           ]}
         />
+        <SegmentedControl
+          label="보기"
+          size="xs"
+          full
+          value={view}
+          onChange={setView}
+          options={[
+            { value: 'risk', label: '위험 신호등' },
+            { value: 'all', label: '전체 지표' },
+          ]}
+        />
       </div>
 
-      <div className="mt-3 px-3">
+      {view === 'risk' ? <RiskBoard market={group} /> : null}
+
+      <div className="mt-3 px-3" hidden={view !== 'all'}>
         <SectionGate
           section={section}
           onRetry={refresh}

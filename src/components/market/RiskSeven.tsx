@@ -137,11 +137,29 @@ export function RiskBandBar({
             }}
           />
         ) : null}
+
+        {/* 눈금을 벗어난 값을 조용히 가장자리에 붙여 두면 "더 갈 데가 없다"로 잘못 읽힌다.
+            막대 밖으로 화살표를 내밀어 값이 눈금 너머에 있다는 사실을 보이게 한다. */}
+        {indicator.offScale ? (
+          <span
+            aria-hidden="true"
+            className="absolute top-1/2 -translate-y-1/2 text-[11px] leading-none font-bold"
+            style={{
+              [indicator.offScale === 'above' ? 'right' : 'left']: -11,
+              color: RISK_COLOR[indicator.level],
+            }}
+          >
+            {indicator.offScale === 'above' ? '›' : '‹'}
+          </span>
+        ) : null}
       </div>
 
       {showLabels ? (
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
-          <span className="tnum shrink-0 text-subtle">{tick(indicator.scaleMin)}</span>
+          <span className="tnum shrink-0 text-subtle">
+            {indicator.offScale === 'below' ? '‹ ' : ''}
+            {tick(indicator.scaleMin)}
+          </span>
           <span
             className="inline-flex min-w-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold"
             style={{
@@ -151,13 +169,33 @@ export function RiskBandBar({
           >
             <SignalDot signal={riskSignal(indicator.level)} size={6} />
             <span className="truncate">
-              지금 여기 · {RISK_LEVEL_LABEL[indicator.level]} {current?.label ?? ''}
+              {indicator.offScale ? '눈금 밖 · ' : '지금 여기 · '}
+              {RISK_LEVEL_LABEL[indicator.level]} {current?.label ?? ''}
             </span>
           </span>
-          <span className="tnum shrink-0 text-subtle">{tick(indicator.scaleMax)}</span>
+          <span className="tnum shrink-0 text-subtle">
+            {tick(indicator.scaleMax)}
+            {indicator.offScale === 'above' ? ' ›' : ''}
+          </span>
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * 막대가 어디까지만 그려지는지 밝히는 한 줄.
+ *
+ * 눈금 끝을 "위험의 끝"으로 읽으면 VIX 40 과 VIX 80 이 같아 보인다.
+ * 그래서 눈금이 평소 범위에 맞춘 것이라는 사실과, 과거엔 얼마나 더 갔는지를 같이 적는다.
+ */
+export function ScaleNote({ indicator }: { indicator: RiskIndicator }) {
+  if (!indicator.scaleNote) return null;
+  return (
+    <p className="mt-1.5 text-[10px] leading-relaxed break-keep text-subtle">
+      <span aria-hidden="true">※ </span>
+      {indicator.scaleNote}
+    </p>
   );
 }
 
@@ -228,7 +266,7 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
 
   return (
     <Link
-      href="/risk"
+      href="/indicators"
       className="card block p-2.5 transition-colors hover:bg-surface-2"
       aria-label={`${indicator.name} 상세 보기`}
     >
@@ -266,7 +304,7 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 전체 카드 (/risk)                                                     */
+/* 전체 카드 (지표 화면의 위험 신호등 보기)                                                     */
 /* ------------------------------------------------------------------ */
 
 export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
@@ -322,6 +360,7 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
 
       <div className="mt-3">
         <RiskBandBar indicator={indicator} />
+        <ScaleNote indicator={indicator} />
       </div>
 
       {/* 구간 기준을 그대로 노출한다 */}
@@ -364,7 +403,7 @@ export function RiskSevenSection() {
         <h2 id="risk-seven-title" className="text-base font-bold text-fg-strong">
           시장 위험 신호등
         </h2>
-        <Link href="/risk" className="text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/indicators" className="text-[11px] font-semibold text-accent hover:underline">
           기준과 해설 →
         </Link>
       </div>
@@ -437,7 +476,7 @@ export function RiskForMarket({ market }: { market: 'us' | 'kr' | 'crypto' }) {
           <div className="card p-3">
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-bold text-fg-strong">{MARKET_LABEL[market]} 관련 위험 지표</h2>
-              <Link href="/risk" className="text-[11px] font-semibold text-accent hover:underline">
+              <Link href="/indicators" className="text-[11px] font-semibold text-accent hover:underline">
                 신호등 전체 →
               </Link>
             </div>

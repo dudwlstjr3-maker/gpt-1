@@ -112,6 +112,7 @@ function GuidePanel({ id, open, onToggle }: { id: string; open: boolean; onToggl
   if (!g) return null;
 
   const rows: { glyph: string; label: string; text: string }[] = [
+    ...(g.baseline ? [{ glyph: '=', label: '기준', text: g.baseline }] : []),
     { glyph: '?', label: '어떻게 읽나요', text: g.howToRead },
     { glyph: '▲', label: '오르면', text: g.whenUp },
     { glyph: '▼', label: '내리면', text: g.whenDown },

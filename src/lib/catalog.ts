@@ -22,6 +22,14 @@ export interface CatalogItem {
   order: number;
   /** 짧은 설명 (상세/툴팁) */
   note?: string;
+  /**
+   * 지수의 기준 시점과 기준값.
+   *
+   * "3,714" 라는 숫자 자체는 아무 뜻이 없다. 언제를 100(또는 1000)으로 놓고
+   * 거기서 몇 배가 됐는지를 알아야 읽을 수 있어서, 기준점을 같이 적는다.
+   * 기준점이 없는 값(가격·금리·환율)에는 두지 않는다.
+   */
+  baseline?: string;
 }
 
 export const CATALOG: CatalogItem[] = [
@@ -34,7 +42,7 @@ export const CATALOG: CatalogItem[] = [
   { id: 'ust2', name: '미국 국채 2년', symbol: 'US2Y', market: 'us', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: false, hasVolume: false, order: 6 },
   { id: 'ust10', name: '미국 국채 10년', symbol: 'US10Y', market: 'us', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: true, hasVolume: false, order: 7 },
   { id: 'us_spread_10_2', name: '10년-2년 금리차', symbol: '10Y-2Y', market: 'us', kind: 'spread', unit: 'bp', precision: 1, currency: null, home: true, hasVolume: false, order: 8, note: '음수면 장단기 금리 역전' },
-  { id: 'dxy', name: '달러지수 DXY', symbol: 'DXY', market: 'us', kind: 'fx', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 9 },
+  { id: 'dxy', name: '달러지수 DXY', symbol: 'DXY', market: 'us', kind: 'fx', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 9 , baseline: '1973년 3월 = 100'},
   { id: 'gold', name: '금', symbol: 'XAU', market: 'us', kind: 'commodity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: false, order: 10 },
   { id: 'wti', name: 'WTI 원유', symbol: 'CL', market: 'us', kind: 'commodity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: false, order: 11 },
   { id: 'nvda', name: '엔비디아', symbol: 'NVDA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: true, hasVolume: true, order: 12 },
@@ -44,9 +52,9 @@ export const CATALOG: CatalogItem[] = [
   { id: 'tsla', name: '테슬라', symbol: 'TSLA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 16 },
 
   /* ------------------------------- 한국 ------------------------------- */
-  { id: 'kospi', name: 'KOSPI', symbol: 'KOSPI', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 1 },
-  { id: 'kosdaq', name: 'KOSDAQ', symbol: 'KOSDAQ', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 2 },
-  { id: 'kospi200', name: 'KOSPI 200', symbol: 'KOSPI200', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 3 },
+  { id: 'kospi', name: 'KOSPI', symbol: 'KOSPI', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 1 , baseline: '1980년 1월 4일 = 100'},
+  { id: 'kosdaq', name: 'KOSDAQ', symbol: 'KOSDAQ', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 2 , baseline: '1996년 7월 1일 = 1,000'},
+  { id: 'kospi200', name: 'KOSPI 200', symbol: 'KOSPI200', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 3 , baseline: '1990년 1월 3일 = 100'},
   { id: 'vkospi', name: 'VKOSPI', symbol: 'VKOSPI', market: 'kr', kind: 'volatility', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 4, note: '한국 변동성지수' },
   { id: 'usdkrw', name: 'USD/KRW', symbol: 'USDKRW', market: 'kr', kind: 'fx', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 5, note: '상승 = 원화 약세' },
   { id: 'ktb3', name: '국고채 3년', symbol: 'KTB3Y', market: 'kr', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: false, hasVolume: false, order: 6 },

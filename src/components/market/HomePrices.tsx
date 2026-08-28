@@ -34,8 +34,8 @@ export function HomePrices() {
         <h2 id="home-prices-title" className="text-base font-bold text-fg-strong">
           관심 가격과 주요 지수
         </h2>
-        <Link href="/market" className="text-[11px] font-semibold text-accent hover:underline">
-          시장 전체 보기 →
+        <Link href="/market/us" className="text-[11px] font-semibold text-accent hover:underline">
+          미국 시장 →
         </Link>
       </div>
 

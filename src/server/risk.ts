@@ -37,8 +37,15 @@ interface RiskDef {
   precision: number;
   suffix: string;
   direction: 'higher_is_riskier' | 'lower_is_riskier';
+  /**
+   * 막대를 그리는 범위. **위험의 상한이 아니다.**
+   * 과거 극단값까지 눈금에 담으면 평상시 움직임이 한 점으로 뭉개져서,
+   * 평소 범위에 맞춰 그리고 벗어난 값은 따로 표시한다.
+   */
   scaleMin: number;
   scaleMax: number;
+  /** 눈금 밖에서 무슨 일이 있었는지 — 막대 아래 그대로 노출한다 */
+  scaleNote: string;
   bands: RiskBand[];
   why: string;
   /** 이 지표가 오르면 시장에서 무슨 일이 벌어지는가 (초보자용) */
@@ -73,6 +80,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: 10,
     scaleMax: 40,
+    scaleNote:
+      '막대는 40까지만 그립니다. 위험의 상한이 아니라 평소 범위에 맞춘 눈금입니다. 실제로는 2020년 3월 82.69(종가)까지 갔고 2008년에는 장중 89를 찍었습니다. 40을 넘으면 막대는 오른쪽 끝에 멈추고 \'눈금 밖\'으로 표시됩니다.',
     bands: [
       band('calm', null, 15, '15 미만'),
       band('normal', 15, 20, '15~20'),
@@ -101,6 +110,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: 10,
     scaleMax: 35,
+    scaleNote:
+      '막대는 35까지만 그립니다. 2020년 3월에는 69 부근까지, 2008년 금융위기 때도 그와 비슷한 수준까지 올랐습니다. 눈금을 벗어나면 \'눈금 밖\'으로 표시됩니다.',
     bands: [
       band('calm', null, 15, '15 미만'),
       band('normal', 15, 19, '15~19'),
@@ -129,6 +140,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: 2.5,
     scaleMax: 7,
+    scaleNote:
+      '막대는 7%p 까지만 그립니다. 2008년 12월에는 20%p 를 넘었고 2020년 3월에도 10%p 를 넘었습니다. 눈금 끝이 위험의 끝이 아닙니다.',
     bands: [
       band('calm', null, 3.0, '3.0%p 미만'),
       band('normal', 3.0, 3.8, '3.0~3.8%p'),
@@ -157,6 +170,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'lower_is_riskier',
     scaleMin: -80,
     scaleMax: 160,
+    scaleNote:
+      '막대는 -80~160bp 만 그립니다. 2023년에는 -100bp 아래까지 역전됐고, 2010년 전후에는 +290bp 까지 벌어진 적도 있습니다. 양쪽 모두 눈금 밖으로 나갈 수 있습니다.',
     bands: [
       band('alert', null, 0, '0bp 미만 (역전)'),
       band('watch', 0, 20, '0~20bp'),
@@ -185,6 +200,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: 2.5,
     scaleMax: 6,
+    scaleNote:
+      '막대는 2.5~6% 만 그립니다. 2020년에는 0.5% 부근까지 내려갔고, 1980년대 초에는 15%를 넘긴 적도 있습니다.',
     bands: [
       band('calm', null, 3.5, '3.5% 미만'),
       band('normal', 3.5, 4.5, '3.5~4.5%'),
@@ -213,6 +230,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: 1200,
     scaleMax: 1500,
+    scaleNote:
+      '막대는 1,200~1,500원만 그립니다. 1997년 외환위기 때는 1,900원대, 2009년에는 1,500원대 후반까지 갔고, 2007년에는 900원대였습니다.',
     bands: [
       band('calm', null, 1300, '1,300원 미만'),
       band('normal', 1300, 1380, '1,300~1,380원'),
@@ -241,6 +260,8 @@ export const RISK_SEVEN: RiskDef[] = [
     direction: 'higher_is_riskier',
     scaleMin: -0.03,
     scaleMax: 0.06,
+    scaleNote:
+      '막대는 -0.03~0.06% 만 그립니다. 과열 국면에서는 0.1%를 훌쩍 넘기며 튀는 일이 흔합니다. 눈금 끝이 상한이 아닙니다.',
     bands: [
       band('watch', null, 0, '0% 미만 (숏 우위)'),
       band('calm', 0, 0.01, '0~0.01%'),
@@ -270,6 +291,13 @@ function levelOf(def: RiskDef, value: number): RiskLevel {
     if (okFrom && okTo) return b.level;
   }
   return 'normal';
+}
+
+/** 값이 막대 범위를 벗어났는지. 벗어난 값은 화면에서 따로 알린다. */
+function offScaleOf(def: RiskDef, value: number): 'below' | 'above' | null {
+  if (value > def.scaleMax) return 'above';
+  if (value < def.scaleMin) return 'below';
+  return null;
 }
 
 /** 스케일 위에서 값의 위치(0~100). 밴드 바의 마커 위치로 쓴다. */
@@ -348,6 +376,8 @@ export function buildRiskDigest(
       bands: def.bands,
       scaleMin: def.scaleMin,
       scaleMax: def.scaleMax,
+      offScale: value === null ? null : offScaleOf(def, value),
+      scaleNote: def.scaleNote,
       why: def.why,
       whenUp: def.whenUp,
       whenDown: def.whenDown,

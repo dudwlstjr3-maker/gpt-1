@@ -7,8 +7,9 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { EventRow } from '@/components/market/CalendarList';
+import { CalendarMonth } from '@/components/market/CalendarMonth';
 import { useNow } from '@/lib/useNow';
-import { formatKstDate } from '@/lib/format';
+import { formatKstDate, kstDateKey } from '@/lib/format';
 import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventCategory, type MarketId } from '@/types';
 
 /**
@@ -23,6 +24,8 @@ import { EVENT_CATEGORY_LABEL, MARKET_LABEL, type CalendarEvent, type EventCateg
  */
 type MarketFilter = MarketId;
 type ImportanceFilter = 'all' | 'high' | 'medium';
+/** 달력으로 볼지 목록으로 볼지. 달력은 "언제 몰려 있나", 목록은 "다음이 뭔가"에 답한다. */
+type ViewMode = 'month' | 'list';
 
 const MARKET_OPTIONS: { value: MarketFilter; label: string }[] = [
   { value: 'us', label: MARKET_LABEL.us },
@@ -36,18 +39,27 @@ export default function CalendarPage() {
   const [market, setMarket] = useState<MarketFilter>('us');
   const [importance, setImportance] = useState<ImportanceFilter>('all');
   const [category, setCategory] = useState<EventCategory | 'all'>('all');
+  const [view, setView] = useState<ViewMode>('month');
+
+  const todayKey = kstDateKey(now ?? Date.now());
+  const [cursor, setCursor] = useState(() => ({ year: Number(todayKey.slice(0, 4)), month: Number(todayKey.slice(5, 7)) }));
+  const [selected, setSelected] = useState<string | null>(todayKey);
 
   const section = snapshot?.sections.calendar ?? null;
 
-  const grouped = useMemo(() => {
+  /** 시장·중요도·분류를 거친 일정. 달력과 목록이 같은 집합을 본다. */
+  const filtered = useMemo(() => {
     const events = section?.data ?? [];
-    const filtered = events.filter((e) => {
+    return events.filter((e) => {
       if (e.market !== market && e.market !== 'global') return false;
       if (importance === 'high' && e.importance !== 'high') return false;
       if (importance === 'medium' && e.importance === 'low') return false;
       if (category !== 'all' && e.category !== category) return false;
       return true;
     });
+  }, [section, market, importance, category]);
+
+  const grouped = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const e of filtered) {
       const key = formatKstDate(e.scheduledAt);
@@ -56,7 +68,15 @@ export default function CalendarPage() {
       map.set(key, arr);
     }
     return [...map.entries()];
-  }, [section, market, importance, category]);
+  }, [filtered]);
+
+  /** 고른 날의 일정. 시각 순으로 정렬해 그날 순서대로 읽히게 한다. */
+  const selectedEvents = useMemo(() => {
+    if (!selected) return [];
+    return filtered
+      .filter((e) => kstDateKey(new Date(e.scheduledAt)) === selected)
+      .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
+  }, [filtered, selected]);
 
   const categories: (EventCategory | 'all')[] = ['all', ...(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[])];
 
@@ -64,7 +84,7 @@ export default function CalendarPage() {
     <div className="pt-2">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
-        모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.
+        모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다. 달력에서 날짜를 누르면 그날 일정만 아래에 나옵니다.
       </p>
 
       <div className="mt-3 space-y-2 px-3">
@@ -85,6 +105,16 @@ export default function CalendarPage() {
               { value: 'all', label: '전체' },
               { value: 'medium', label: '보통 이상' },
               { value: 'high', label: '높음만' },
+            ]}
+          />
+          <SegmentedControl
+            label="보기"
+            size="xs"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'month', label: '달력' },
+              { value: 'list', label: '목록' },
             ]}
           />
         </div>
@@ -119,7 +149,45 @@ export default function CalendarPage() {
           empty={<EmptyState title="등록된 일정이 없습니다" />}
         >
           {() =>
-            grouped.length === 0 ? (
+            view === 'month' ? (
+              <>
+                <CalendarMonth
+                  events={filtered}
+                  year={cursor.year}
+                  month={cursor.month}
+                  selected={selected}
+                  today={todayKey}
+                  onSelect={setSelected}
+                  onMonthChange={(y, m) => setCursor({ year: y, month: m })}
+                />
+
+                {/* 고른 날의 일정. 달력에서 누른 날이 여기로 이어진다. */}
+                <section aria-label="고른 날의 일정" aria-live="polite">
+                  <h2 className="mb-1.5 text-[12px] font-bold text-muted">
+                    {selected ? formatKstDate(`${selected}T00:00:00+09:00`) : '날짜를 고르세요'}
+                    {selected ? (
+                      <span className="ml-1.5 font-normal text-subtle">
+                        {selectedEvents.length ? `${selectedEvents.length}건` : '일정 없음'}
+                      </span>
+                    ) : null}
+                  </h2>
+                  {selected && selectedEvents.length > 0 ? (
+                    <div className="card overflow-hidden">
+                      <ul>
+                        {selectedEvents.map((e) => (
+                          <EventRow key={e.id} event={e} now={now} />
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title={selected ? '이날은 등록된 일정이 없습니다' : '날짜를 눌러 보세요'}
+                      description={selected ? '다른 날짜를 눌러 보세요.' : undefined}
+                    />
+                  )}
+                </section>
+              </>
+            ) : grouped.length === 0 ? (
               <EmptyState title="조건에 맞는 일정이 없습니다" description="필터를 바꿔 보세요." />
             ) : (
               <>

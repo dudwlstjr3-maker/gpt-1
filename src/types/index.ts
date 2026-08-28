@@ -630,9 +630,16 @@ export interface RiskIndicator {
   /** 밴드 스케일에서 현재 값의 위치 (0~100). null = 값 없음 */
   position: number | null;
   bands: RiskBand[];
-  /** 스케일 표시 범위 */
+  /** 스케일 표시 범위. 위험의 한계가 아니라 막대를 그리는 범위일 뿐이다 */
   scaleMin: number;
   scaleMax: number;
+  /**
+   * 값이 막대 범위를 벗어났는가.
+   * 벗어난 값을 조용히 가장자리에 붙여 두면 "더 갈 데가 없다"로 잘못 읽힌다.
+   */
+  offScale: 'below' | 'above' | null;
+  /** 이 막대가 어디까지만 그려지는지, 과거엔 얼마나 더 갔는지 */
+  scaleNote: string;
   /** 이 지표가 왜 중요한가 (고정 설명) */
   why: string;
   /** 값이 오르면 무슨 일이 벌어지는가 (초보자용 고정 설명) */

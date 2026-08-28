@@ -35,7 +35,7 @@ export default function WatchlistPage() {
     <div className="pt-2">
       <div className="flex items-baseline justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">관심목록</h1>
-        <Link href="/market" className="text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/market/us" className="text-[11px] font-semibold text-accent hover:underline">
           종목 추가 →
         </Link>
       </div>
@@ -46,7 +46,7 @@ export default function WatchlistPage() {
             title="관심목록이 비어 있습니다"
             description="시장 화면에서 카드의 ☆ 를 눌러 추가하세요. 관심목록 항목은 홈 화면 상단에 먼저 표시됩니다."
             action={
-              <Link href="/market" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg">
+              <Link href="/market/us" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg">
                 시장 화면으로 이동
               </Link>
             }

@@ -98,8 +98,11 @@ export function Notice({
       className="flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed break-keep"
       style={{ background: `color-mix(in srgb, ${color} 10%, transparent)`, color }}
     >
-      <span aria-hidden="true">ⓘ</span>
-      <span>{children}</span>
+      {/* 줄지 않게 못 박는다. 눌리면 글리프가 제 상자를 넘어 옆 글자 위로 올라탄다. */}
+      <span aria-hidden="true" className="shrink-0">
+        ⓘ
+      </span>
+      <span className="min-w-0">{children}</span>
     </p>
   );
 }

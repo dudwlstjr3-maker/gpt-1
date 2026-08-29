@@ -833,6 +833,33 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-8. 글자가 제 상자를 넘지 않게 ---------------- */
+  console.log('\n[8-8] 눌리면 안 되는 것');
+  {
+    // 가로 배치 안에서 배지·글리프는 기본값(flex-shrink:1)이라 옆의 긴 문단에 밀려
+    // 상자가 줄고, 글자가 상자를 넘어 문단 위로 올라탄다. 실제로 '사실'·'해석' 배지가
+    // 요약 문장과 겹쳐 보였다. 브라우저 없이 볼 수 없는 문제라 원본에서 막아 둔다.
+    const badge = await readFile('src/components/ui/Badge.tsx', 'utf8');
+    check('배지가 눌리지 않음 (앱)', badge.includes('shrink-0') && badge.includes('whitespace-nowrap'));
+
+    const states = await readFile('src/components/ui/States.tsx', 'utf8');
+    check('알림 상자의 ⓘ 가 눌리지 않음 (앱)', /ⓘ[\s\S]{0,40}<\/span>/.test(states)
+      && /className="shrink-0"[\s\S]{0,40}ⓘ/.test(states));
+
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    const css = (sel, prop) => {
+      const m = tpl.match(new RegExp('\\' + sel.replace('.', '.') + '\\s*\\{([^}]*)\\}'));
+      return m ? m[1].includes(prop) : false;
+    };
+    check('배지가 눌리지 않음 (미리보기)',
+      /\.badge\s*\{[^}]*flex-shrink:\s*0/.test(tpl) && /\.badge\s*\{[^}]*white-space:\s*nowrap/.test(tpl));
+    check('알림 상자의 글리프가 눌리지 않음 (미리보기)',
+      /\.notice > span:first-child\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
+    check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
+    check('종목 이름이 길면 잘림 (미리보기)', /\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
+    check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

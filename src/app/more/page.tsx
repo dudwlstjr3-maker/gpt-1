@@ -231,7 +231,7 @@ export default function MorePage() {
                   <span className="block text-[13px] font-semibold text-fg">{l.label}</span>
                   <span className="block truncate text-[11px] text-subtle">{l.desc}</span>
                 </span>
-                <span aria-hidden="true" className="text-muted">
+                <span aria-hidden="true" className="shrink-0 text-muted">
                   →
                 </span>
               </Link>

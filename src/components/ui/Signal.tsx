@@ -131,8 +131,11 @@ export function SignalTally({ items, total }: { items: SignalTallyItem[]; total:
                 {count}
                 <span className="ml-0.5 text-[10px] font-normal text-subtle">개</span>
               </p>
+              {/* 어느 지표인지는 바로 아래 게이지들이 이름으로 댄다.
+                  여기까지 이름을 늘어놓으면 한 화면에서 일곱 이름을 세 번 읽게 된다.
+                  집계 칸은 '몇 개가 어느 수준인가' 만 말한다. */}
               <p className="mt-1 text-[9.5px] leading-tight break-keep text-subtle">
-                {active ? found!.names.join(' · ') : SIGNAL_MEANING[s]}
+                {SIGNAL_MEANING[s]}
               </p>
             </li>
           );

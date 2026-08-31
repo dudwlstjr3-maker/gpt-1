@@ -425,6 +425,9 @@ section.block { padding: 0 12px; margin-top: 22px; }
 
 .deltas { display: flex; gap: 6px; margin-top: 4px; }
 .delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: 9px; padding: 6px 2px; }
+/* 한 칸만 남았을 때는 가로로 눕힌다 */
+.delta.one { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.delta.one small { display: inline; }
 .delta small { display: block; font-size: 10px; color: var(--muted); }
 .delta b { display: block; font-size: 12.5px; margin-top: 1px; }
 
@@ -656,6 +659,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       <div class="seg" role="group" aria-label="테마">
         <button type="button" data-theme-set="dark" aria-pressed="true">다크</button>
         <button type="button" data-theme-set="light" aria-pressed="false">라이트</button>
+      </div>
+      <div class="seg" role="group" aria-label="표시 통화">
+        <button type="button" data-cur="KRW" aria-pressed="true">₩</button>
+        <button type="button" data-cur="USD" aria-pressed="false">$</button>
+      </div>
+      <div class="seg" role="group" aria-label="등락 색상">
+        <button type="button" data-cm="korean" aria-pressed="true">한국식</button>
+        <button type="button" data-cm="global" aria-pressed="false">글로벌</button>
       </div>
     </div>
   </div>
@@ -1381,6 +1392,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       modeBadge() +
       (state.scenario !== 'normal' ? badge('b-warn', '시나리오: ' + state.scenario) : '') +
       statusBadge +
+      // 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다.
+      '<span class="tnum" style="font-size:11px;color:var(--subtle)">' + esc(relative(s.lastFullUpdate)) + ' 갱신</span>' +
       '</div><button type="button" class="ghost" data-noop>↻ 새로고침</button></div>' +
 
       '<div class="chips">' + sessions.map((x) => {
@@ -1389,41 +1402,38 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '<b>' + MARKET_LABEL[x.m] + '</b><span style="color:' + color + '">' + SESSION_LABEL[x.phase] + '</span></span>';
       }).join('') + '</div>' +
 
-      '<div class="sb-foot"><p>마지막 전체 업데이트 <span class="tnum" style="color:var(--fg)">' + esc(relative(s.lastFullUpdate)) + '</span>' +
-      ' · 환율 <span class="tnum" style="color:var(--fg)">' + esc(fmtNum(s.usdKrw, 2)) + '원</span></p>' +
-      '<div class="sb-toggles">' +
-      '<div class="seg" role="group" aria-label="표시 통화">' +
-      '<button type="button" data-cur="KRW" aria-pressed="' + (state.currency === 'KRW') + '">₩</button>' +
-      '<button type="button" data-cur="USD" aria-pressed="' + (state.currency === 'USD') + '">$</button></div>' +
-      '<div class="seg" role="group" aria-label="등락 색상">' +
-      '<button type="button" data-cm="korean" aria-pressed="' + (state.colorMode === 'korean') + '">한국식</button>' +
-      '<button type="button" data-cm="global" aria-pressed="' + (state.colorMode === 'global') + '">글로벌</button></div>' +
-      '</div></div>'
+      /* 통화·색상 전환은 앱에서 더보기 설정으로 옮겼다. 한 번 정해 두면 며칠씩 그대로 두는
+         설정이라 모든 화면 맨 위에 늘 띄워 둘 만한 것이 아니었다.
+         미리보기에서는 화면 전환을 눌러 볼 수 있게 컨트롤 줄에 남겨 둔다. */
+      ''
     );
   }
 
   function fngCard(f, standalone) {
     const un = f.score === null;
-    const driver = (kind, d) =>
+    // 값이 없으면 "판단할 데이터가 부족합니다" 를 적는 대신 줄을 그리지 않는다
+    const driver = (kind, d) => !d ? '' :
       '<div class="driver"><span class="g" style="color:' + dirColor(kind === 'up' ? 1 : -1) + '">' + (kind === 'up' ? '▲' : '▼') + '</span>' +
-      '<div><span class="lbl">' + (kind === 'up' ? '상승 요인 ' : '하락 요인 ') + '</span>' + esc(d ? d.label : '판단할 데이터가 부족합니다') +
-      (d ? '<span class="det">' + esc(fmtSigned(d.contribution, 2)) + '점 기여</span>' : '') + '</div></div>';
+      '<div><span class="lbl">' + (kind === 'up' ? '상승 ' : '하락 ') + '</span>' + esc(d.label) +
+      '<span class="det">' + esc(fmtSigned(d.contribution, 2)) + '점 기여</span></div></div>';
 
     return (
       '<article class="card fngcard">' +
       '<header><div><h3><span aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;background:' + mkColor(f.market) + '"></span>' + MARKET_LABEL[f.market] + (standalone === false ? '' : ' 투자심리') + '</h3>' +
       (standalone === false ? '' : '<div class="sub">자체 산출 지수 · ' + esc(f.formulaVersion) + '</div>') + '</div>' +
-      '<div class="fng-right">' + modeBadge() + confBadge(f.confidence, f.confidenceReason) + '</div></header>' +
+      // 신뢰도는 높을 때 말하지 않는다. 늘 붙어 있으면 배지가 아니라 장식이 된다.
+      '<div class="fng-right">' + modeBadge() + (f.confidence === 'high' ? '' : confBadge(f.confidence, f.confidenceReason)) + '</div></header>' +
       '<div style="display:flex;justify-content:center">' + gauge(f.score, 168) + '</div>' +
       (un
         ? '<p class="notice n-warn" style="margin:4px 0 0">' + esc(f.unavailableReason || '데이터가 부족해 점수를 산출할 수 없습니다.') + '</p>'
-        : '<div class="deltas">' +
-          [['전일', f.deltaDay], ['1주', f.deltaWeek], ['1개월', f.deltaMonth]].map(([l, v]) =>
-            '<div class="delta"><small>' + l + '</small><b class="tnum" style="color:' + dirColor(v) + '">' + dirGlyph(v) + ' ' + esc(fmtSigned(v, 1)) +
-            '<span class="sr">' + dirLabel(v) + '</span></b></div>').join('') + '</div>') +
+        // 1주·1개월은 심리 상세의 '기간별 심리 위치' 가 더 잘 보여준다. 여기는 어제와 견준 값 하나만.
+        : '<div class="deltas"><div class="delta one"><small>어제보다</small>' +
+          '<b class="tnum" style="color:' + dirColor(f.deltaDay) + '">' + dirGlyph(f.deltaDay) + ' ' + esc(fmtSigned(f.deltaDay, 1)) +
+          '<span class="sr">' + dirLabel(f.deltaDay) + '</span></b></div></div>') +
       '<div class="sparkrow"><small>최근 30일</small>' + scoreSpark(f.spark, 132, 30) + '</div>' +
       '<div class="drivers">' + driver('up', f.topPositive) + driver('down', f.topNegative) + '</div>' +
-      '<div class="fngfoot"><small>산출 ' + esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</small>' +
+      // 충족률이 온전하지 않을 때만 말한다 — 100% 라고 매번 적으면 정작 떨어진 날을 놓친다
+      '<div class="fngfoot">' + (f.coverage < 0.999 ? '<small>산출 ' + esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</small>' : '<small></small>') +
       '<button type="button" class="ghost" data-go-region="' + f.market + '" style="margin-right:6px">' + esc(MARKET_LABEL[f.market]) + ' 시장 →</button>' +
       '<button type="button" class="ghost" data-go-fng="' + f.market + '">심리 상세 →</button></div>' +
       '</article>'
@@ -1439,7 +1449,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<div class="pcard-top"><div style="display:flex;gap:6px;align-items:flex-start;min-width:0">' +
       '<button type="button" class="star" data-watch="' + q.id + '" aria-pressed="' + state.watch.has(q.id) + '" aria-label="' + esc(q.name) + ' 관심목록 전환">' +
       (state.watch.has(q.id) ? '★' : '☆') + '</button>' +
-      '<div style="min-width:0"><div class="pcard-name">' + esc(q.name) + '</div><div class="pcard-sym">' + esc(q.symbol) + '</div></div></div>' +
+      '<div style="min-width:0"><div class="pcard-name">' + esc(q.name) + '</div>' +
+      '<div class="pcard-sym">' + esc(q.symbol) + ' · <span class="tnum">' + esc(kTime(q.meta.asOf)) + '</span></div></div></div>' +
       '<div style="display:flex;gap:4px;flex-shrink:0">' + sessBadge(q.session) + freshBadge(q.meta.freshness, delay) + '</div></div>' +
       (un
         ? '<p class="notice n-warn" style="margin-top:8px">' + esc(q.unavailableReason || '값을 받지 못했습니다.') + '</p>'
@@ -1448,10 +1459,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '<div class="pcard-chg tnum" style="color:' + col + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtChange(q.change, q)) + ' (' + esc(fmtPct(q.changePct)) + ')' +
           '<span class="sr">' + dirLabel(q.changePct) + '</span></div></div>' +
           sparkline(q.spark, col === 'var(--subtle)' ? 'var(--accent)' : col, 84, 30, true) + '</div>') +
-      '<div class="pcard-foot">' +
-      (q.volume !== null ? '<span>거래량 ' + esc(koCompact(q.volume, 1)) + '</span>' : '') +
-      '<span>기준 ' + esc(kTime(q.meta.asOf)) + '</span>' +
-      '<span>출처 ' + esc((q.meta.sources[0] || {}).name || '알 수 없음') + '</span></div>' +
+      // 할 말이 있을 때만 그린다. 출처는 종목 상세가, DEMO/LIVE 는 상태바가 말한다.
+      (q.volume !== null ? '<div class="pcard-foot"><span>거래량 ' + esc(koCompact(q.volume, 1)) + '</span></div>' : '') +
       '</article>'
     );
   }
@@ -1617,9 +1626,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<button type="button" class="card risktile" data-go-risk style="text-align:left;border-width:1px" aria-label="' + esc(i.name + ' 상세 보기') + '">' +
       '<div style="display:flex;align-items:flex-start;gap:6px">' + lamp(riskSignal(i.level), 'sm', i.shortName) +
       '<div style="min-width:0;flex:1"><div style="font-size:11px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</div>' +
-      '<div style="font-size:9.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + '</div>' +
-      '<div style="margin-top:2px;font-size:10px;font-weight:700;color:' + RISK_COLOR[i.level] + '">' +
-      RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</div></div></div>' +
+      '<div style="font-size:9.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
+      '<b style="color:' + RISK_COLOR[i.level] + '">' + RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</b></div></div></div>' +
       (un
         ? '<p style="margin:6px 0 0;font-size:10px;color:var(--warn)">' + esc(i.unavailableReason || '값 없음') + '</p>'
         : '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-top:6px">' +
@@ -2090,7 +2098,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<div class="sub" style="margin-top:2px">자체 산출 지수 · ' + esc((fng[0] || {}).formulaVersion || '') + '</div></div>' +
       '<span class="hint" style="flex-shrink:0">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
       '<div class="fng-scroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
-      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 모두 0~100 척도지만 구성 지표와 가중치가 서로 다릅니다. 같은 숫자라도 의미가 동일하지 않으므로 시장 간 직접 비교는 피해 주세요.</span></p></div>' +
+      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
       '</section>' +
 
       '<section class="block"><div class="block-head"><h2>시장 위험 신호등</h2>' +
@@ -2099,16 +2107,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         ? '<div style="margin-bottom:8px">' + signalTally(s.sections.risk.data) + '</div>' +
           riskHeadline(s.sections.risk.data) +
           '<div class="riskgrid" style="margin-top:8px">' + s.sections.risk.data.indicators.map(riskTile).join('') + '</div>' +
-          '<div style="margin-top:8px">' + signalLegend("초록·노랑·빨강은 지표가 평소 범위에서 얼마나 벗어났는지만 나타냅니다. 사라·팔라는 신호가 아닙니다.") + '</div>'
+          '<div style="margin-top:8px">' + signalLegend("사라·팔라는 신호가 아닙니다.") + '</div>'
         : '<p style="font-size:12px;color:var(--muted)">위험 지표를 산출할 데이터가 없습니다.</p>') +
       '</section>' +
 
+      /* 지수는 '지수' 탭으로 떼어 놨다. 설명 두 줄이던 것을 머리 옆 링크 하나로 줄였다. */
       '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +
-      '</div>' +
-      /* 지수는 '지수' 탭으로 떼어 놨다. 여기서는 그리로 가는 길만 남긴다. */
-      '<p style="margin:4px 0 0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
-      '시장 전체를 재는 지수는 미국 · 한국 · 크립토로 나눠 ' +
-      '<button type="button" class="linkbtn" data-go="indices">지수 탭 →</button>에 모아 뒀습니다.</p>' +
+      '<button type="button" class="linkbtn" data-go="indices">지수 전체 →</button></div>' +
       '<div class="grid-cards">' + ordered.slice(0, 9).map(priceCard).join('') + '</div></section>' +
 
       '<div class="dash">' +

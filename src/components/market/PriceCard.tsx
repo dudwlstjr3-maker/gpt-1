@@ -43,7 +43,11 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
             <Link href={`/asset/${quote.id}`} className="block truncate text-sm font-semibold text-fg-strong hover:underline">
               {quote.name}
             </Link>
-            <p className="truncate text-[10px] text-subtle">{quote.symbol}</p>
+            {/* 기준 시각을 기호 옆에 붙인다. 예전에는 카드마다 아래에 구분선을 긋고
+                시각 하나만 적은 줄이 따로 있었다 — 여덟 장이면 줄 여덟, 선 여덟이었다. */}
+            <p className="truncate text-[10px] text-subtle">
+              {quote.symbol} <span className="tnum">· {formatKstTime(quote.meta.asOf)}</span>
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -79,14 +83,19 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
         </div>
       )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-border pt-1.5 text-[10px] text-subtle">
-        {quote.volume !== null ? <span>거래량 {formatKoreanCompact(quote.volume, 1)}</span> : null}
-        <span>기준 {formatKstTime(quote.meta.asOf)}</span>
-        <span className="truncate">출처 {quote.meta.sources[0]?.name ?? '알 수 없음'}</span>
-        {f.conversionUnavailable(quote) ? (
-          <span style={{ color: 'var(--warn)' }}>환율 없음 — 환산 불가</span>
-        ) : null}
-      </div>
+      {/*
+       * 아래 줄은 할 말이 있을 때만 그린다.
+       * 출처는 카드마다 적지 않는다 — DEMO/LIVE 는 상단 상태바가, 자세한 출처와
+       * 이용 조건은 종목 상세 화면이 말한다. 값을 잘못 읽게 만드는 것(환산 불가)만 띄운다.
+       */}
+      {quote.volume !== null || f.conversionUnavailable(quote) ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-subtle">
+          {quote.volume !== null ? <span>거래량 {formatKoreanCompact(quote.volume, 1)}</span> : null}
+          {f.conversionUnavailable(quote) ? (
+            <span style={{ color: 'var(--warn)' }}>환율 없음 — 환산 불가</span>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -11,6 +11,7 @@
  */
 
 import Link from 'next/link';
+import { buildRiskHeadline } from '@/lib/riskHeadline';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, Skeleton, EmptyState } from '@/components/ui/States';
 import { Badge, type Tone } from '@/components/ui/Badge';
@@ -272,11 +273,15 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
     >
       <div className="flex items-start gap-1.5">
         <SignalLight signal={riskSignal(indicator.level)} size="sm" label={indicator.shortName} />
+        {/* 시장과 단계를 한 줄에 붙인다. 세 줄로 쌓으면 타일 일곱 장이 그만큼 길어진다. */}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold text-fg">{indicator.shortName}</p>
-          <p className="text-[9.5px] text-subtle">{SCOPE_LABEL[indicator.scope]}</p>
-          <p className="mt-0.5 text-[10px] font-bold" style={{ color: RISK_COLOR[indicator.level] }}>
-            <span aria-hidden="true">{RISK_LEVEL_GLYPH[indicator.level]}</span> {RISK_LEVEL_LABEL[indicator.level]}
+          <p className="flex items-center gap-1 text-[9.5px] text-subtle">
+            <span className="truncate">{SCOPE_LABEL[indicator.scope]}</span>
+            <span aria-hidden="true">·</span>
+            <span className="shrink-0 font-bold" style={{ color: RISK_COLOR[indicator.level] }}>
+              <span aria-hidden="true">{RISK_LEVEL_GLYPH[indicator.level]}</span> {RISK_LEVEL_LABEL[indicator.level]}
+            </span>
           </p>
         </div>
       </div>
@@ -442,7 +447,10 @@ export function RiskSevenSection() {
                 role="status"
               >
                 <SignalLight signal={worst} size="sm" label="종합" />
-                <p className="min-w-0 flex-1 text-[12px] leading-relaxed break-keep text-fg">{digest.headline}</p>
+                {/* 이름은 아래 게이지들이 댄다. 문장은 개수만 말한다. */}
+                <p className="min-w-0 flex-1 text-[12px] leading-relaxed break-keep text-fg">
+                  {buildRiskHeadline(digest.indicators, false)}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
@@ -452,7 +460,9 @@ export function RiskSevenSection() {
               </div>
 
               <div className="mt-2">
-                <SignalLegend note="초록·노랑·빨강은 지표가 평소 범위에서 얼마나 벗어났는지만 나타냅니다. 사라·팔라는 신호가 아닙니다." />
+                {/* 범례의 세 칸이 이미 '평소 범위 / 살펴볼 수준 / 경계 수준' 이라고 말한다.
+                    그 아래에 두 문장을 더 붙이면 같은 말을 길게 반복하는 것이 된다. */}
+                <SignalLegend note="사라·팔라는 신호가 아닙니다." />
               </div>
             </>
           );

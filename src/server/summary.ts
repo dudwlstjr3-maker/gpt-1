@@ -22,49 +22,54 @@ export function buildSummary(
 ): MarketSummary {
   const lines: SummaryLine[] = [];
 
-  /* ---------- 1줄: 세 시장 심리 (사실) ---------- */
+  /*
+   * 이 카드는 홈에서 심리 카드 · 위험 신호등 · 가격 카드 **아래**에 선다.
+   * 그래서 세 점수와 대표 시세를 다시 늘어놓으면 방금 본 것을 한 번 더 읽는 꼴이 된다.
+   * 여기서는 위에서 안 보이는 것만 적는다 — 눈에 띄게 움직인 것, 그리고 그 원인.
+   */
+
+  /* ---------- 1줄: 가장 크게 움직인 것 (사실) ---------- */
   const scored = fng.filter((f) => f.score !== null);
-  if (scored.length > 0) {
-    const parts = scored.map((f) => {
-      const delta = f.deltaDay === null ? '' : ` (전일 ${formatSigned(f.deltaDay, 1)})`;
-      return `${MARKET_LABEL[f.market]} ${formatScore(f.score)}점 ${f.stage?.label ?? ''}${delta}`;
-    });
-    const unavailable = fng.filter((f) => f.score === null).map((f) => MARKET_LABEL[f.market]);
-    const tail = unavailable.length ? ` · ${unavailable.join('·')}는 산출 불가` : '';
-    lines.push({
-      kind: 'fact',
-      // 같은 화면 위쪽의 머리와 아래쪽 고지가 이미 "자체 산출" 이라고 말한다.
-      // 이 줄의 일은 세 숫자를 늘어놓는 것이다.
-      text: `심리 점수: ${parts.join(' · ')}${tail}.`,
-      evidence: scored.map((f) => `fng:${f.market}`),
-    });
-  }
-
-  /* ---------- 2줄: 대표 가격 움직임 (사실) ---------- */
-  const pick = (id: string) => quotes.find((q) => q.id === id && q.changePct !== null);
-  const headline = ['spx', 'kospi', 'btc'].map(pick).filter((q): q is Quote => Boolean(q));
-  const risk = ['vix', 'usdkrw'].map(pick).filter((q): q is Quote => Boolean(q));
-
-  if (headline.length > 0) {
-    const priceText = headline
-      .map((q) => `${q.name} ${formatSigned(q.changePct, 2)}%`)
-      .join(' · ');
-    const riskText = risk.length
-      ? ` / 위험 지표 ${risk.map((q) => `${q.name} ${formatNumber(q.price, q.precision)} (${formatSigned(q.changePct, 2)}%)`).join(' · ')}`
-      : '';
-    lines.push({
-      kind: 'fact',
-      text: `${priceText}${riskText}.`,
-      evidence: [...headline, ...risk].map((q) => `quote:${q.id}`),
-    });
-  }
-
-  /* ---------- 3줄: 심리 변화의 주된 기여 요인 (해석) ---------- */
-  const movers = scored
+  const moved = [...scored]
     .filter((f) => f.deltaDay !== null && Math.abs(f.deltaDay) >= 0.5)
     .sort((a, b) => Math.abs(b.deltaDay as number) - Math.abs(a.deltaDay as number));
 
-  const lead = movers[0];
+  const pick = (id: string) => quotes.find((q) => q.id === id && q.changePct !== null);
+  const watched = ['spx', 'kospi', 'btc'].map(pick).filter((q): q is Quote => Boolean(q));
+  const biggest = [...watched].sort(
+    (a, b) => Math.abs(b.changePct as number) - Math.abs(a.changePct as number),
+  )[0];
+
+  if (moved[0] || biggest) {
+    const bits: string[] = [];
+    if (moved[0]) {
+      const f = moved[0];
+      bits.push(
+        `${MARKET_LABEL[f.market]} 심리 ${formatScore(f.score)}점 ${f.stage?.label ?? ''} (어제보다 ${formatSigned(f.deltaDay, 1)})`,
+      );
+    }
+    if (biggest) bits.push(`${biggest.name} ${formatSigned(biggest.changePct, 2)}%`);
+    lines.push({
+      kind: 'fact',
+      text: `오늘 가장 크게 움직인 것 — ${bits.join(' · ')}.`,
+      evidence: [
+        ...(moved[0] ? [`fng:${moved[0].market}`] : []),
+        ...(biggest ? [`quote:${biggest.id}`] : []),
+      ],
+    });
+  }
+
+  const unavailable = fng.filter((f) => f.score === null).map((f) => MARKET_LABEL[f.market]);
+  if (unavailable.length > 0) {
+    lines.push({
+      kind: 'insufficient',
+      text: `${unavailable.join(' · ')} 점수는 산출할 수 없었습니다.`,
+      evidence: [],
+    });
+  }
+
+  /* ---------- 2줄: 심리 변화의 주된 기여 요인 (해석) ---------- */
+  const lead = moved[0];
   if (lead) {
     const driver = (lead.deltaDay as number) > 0 ? lead.topPositive : lead.topNegative;
     if (driver) {
@@ -79,7 +84,7 @@ export function buildSummary(
     }
   }
 
-  /* ---------- 3줄이 안 되면 위험 지표 상태로 보완 (사실) ---------- */
+  /* ---------- 주의 단계가 있으면 그것만 (사실) ---------- */
   if (lines.length < 3) {
     const alerts = macro.filter((m) => m.riskLevel === 'alert' && m.value !== null);
     if (alerts.length > 0) {

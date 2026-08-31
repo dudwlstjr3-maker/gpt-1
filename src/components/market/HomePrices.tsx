@@ -30,19 +30,15 @@ export function HomePrices() {
 
   return (
     <section aria-labelledby="home-prices-title" className="mt-5 px-3">
-      <div className="mb-2">
+      {/* 지수는 '지수' 탭으로 떼어 놨다. 여기서는 그리로 가는 길만 남긴다.
+          설명 두 줄이던 것을 머리 옆 링크 하나로 줄였다 — 홈에서 매번 읽을 문장이 아니다. */}
+      <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 id="home-prices-title" className="text-base font-bold text-fg-strong">
           관심 가격과 주요 지수
         </h2>
-        {/* 지수는 '지수' 탭으로 떼어 놨다. 여기서는 그리로 가는 길만 남긴다.
-            홈에는 관심 종목과 대표 지수 몇 개만 두고, 전체 목록은 탭에서 본다. */}
-        <p className="mt-1 text-[11px] leading-relaxed break-keep text-subtle">
-          시장 전체를 재는 지수는 미국 · 한국 · 크립토로 나눠{' '}
-          <Link href="/indices" className="font-semibold text-accent hover:underline">
-            지수 탭 →
-          </Link>
-          에 모아 뒀습니다.
-        </p>
+        <Link href="/indices" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+          지수 전체 →
+        </Link>
       </div>
 
       <SectionGate

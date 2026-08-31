@@ -9,7 +9,6 @@ import { useEffect, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { Badge, ModeBadge } from '@/components/ui/Badge';
-import { SegmentedControl } from '@/components/ui/Controls';
 import { formatKstTimeSec, formatRelative } from '@/lib/format';
 import { sessionHint } from '@/lib/marketHours';
 import { MARKET_LABEL, SESSION_LABEL, type MarketSession, type SessionPhase } from '@/types';
@@ -56,8 +55,7 @@ function SessionChip({ session }: { session: MarketSession }) {
 }
 
 export function StatusBar() {
-  const { snapshot, revalidating, error, receivedAt, refresh } = useData();
-  const { settings, update } = useSettings();
+  const { snapshot, revalidating, error, refresh } = useData();
   const [, tick] = useState(0);
 
   // 상대 시각("3분 전")을 살아 있게 유지
@@ -103,6 +101,10 @@ export function StatusBar() {
                 정상
               </Badge>
             ) : null}
+            {/* 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다. */}
+            <span className="tnum truncate text-[11px] text-subtle">
+              {snapshot ? formatRelative(snapshot.lastFullUpdate) : '—'} 갱신
+            </span>
           </div>
 
           <button
@@ -127,40 +129,14 @@ export function StatusBar() {
               ))}
         </div>
 
-        {/* 3행: 마지막 업데이트 + 전환 컨트롤 (좁은 화면에서는 두 줄로 나뉜다) */}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-          <p className="order-2 min-w-0 flex-1 basis-full truncate text-[11px] text-muted sm:order-1 sm:basis-auto">
-            마지막 전체 업데이트{' '}
-            <span className="tnum text-fg">
-              {snapshot ? formatRelative(snapshot.lastFullUpdate) : '—'}
-            </span>
-            {receivedAt ? <span className="ml-1 text-subtle">· 수신 {formatRelative(receivedAt)}</span> : null}
-            {error ? <span className="ml-1" style={{ color: 'var(--warn)' }}>· 갱신 실패</span> : null}
-          </p>
-          <div className="order-1 flex shrink-0 items-center gap-1.5 sm:order-2">
-            <SegmentedControl
-              label="표시 통화"
-              size="xs"
-              value={settings.currency}
-              onChange={(v) => update({ currency: v })}
-              options={[
-                { value: 'KRW', label: '₩', srLabel: '원화로 표시' },
-                { value: 'USD', label: '$', srLabel: '달러로 표시' },
-              ]}
-            />
-            <SegmentedControl
-              label="등락 색상"
-              size="xs"
-              value={settings.colorMode}
-              onChange={(v) => update({ colorMode: v })}
-              options={[
-                { value: 'korean', label: '한국식', srLabel: '한국식 색상: 상승 빨강, 하락 파랑' },
-                { value: 'global', label: '글로벌', srLabel: '글로벌 색상: 상승 초록, 하락 빨강' },
-              ]}
-            />
-          </div>
-        </div>
-
+        {/*
+         * 통화·색상 전환은 더보기 → 표시 통화 / 등락 색상 에 그대로 있다.
+         * 한 번 정해 두면 며칠씩 그대로 두는 설정이라, 모든 화면 맨 위에 늘 띄워
+         * 둘 만한 것이 아니었다. 상태바가 네 줄이던 것을 두 줄로 줄인다.
+         *
+         * 수신 시각도 뺐다. '마지막 전체 업데이트' 와 거의 늘 같은 값이라
+         * 두 개를 나란히 두면 무엇이 다른지 알 수 없다.
+         */}
         {error ? (
           <p className="mt-1.5 text-[11px]" style={{ color: 'var(--warn)' }} role="status">
             최신 데이터를 받지 못해 마지막 정상 데이터를 표시하고 있습니다. ({error})

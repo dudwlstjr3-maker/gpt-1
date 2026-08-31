@@ -19,7 +19,7 @@ import { CONFIDENCE_LABEL, MARKET_LABEL, type DataMode, type FngScore } from '@/
 function DeltaChip({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
-    <div className="flex flex-1 flex-col items-center gap-0.5 rounded-lg bg-surface-2 py-1.5">
+    <div className="mt-1 flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 py-1.5">
       <span className="text-[10px] text-muted">{label}</span>
       <span className="tnum flex items-center gap-0.5 text-[12px] font-semibold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
@@ -30,21 +30,25 @@ function DeltaChip({ label, value }: { label: string; value: number | null }) {
   );
 }
 
+/**
+ * 점수를 밀어 올린·끌어내린 구성요소 한 줄.
+ * 없으면 "판단할 데이터가 부족합니다" 를 적는 대신 줄을 그리지 않는다.
+ * 없다는 말을 굳이 읽게 할 이유가 없고, 카드 셋이 나란히 서면 그 줄만 세 번 보였다.
+ */
 function DriverRow({ kind, label, detail }: { kind: 'up' | 'down'; label: string | null; detail: string | null }) {
   const c = useChangeColor();
   const color = c.color(kind === 'up' ? 1 : -1);
+  if (!label) return null;
   return (
-    <div className="flex items-start gap-1.5">
-      <span aria-hidden="true" className="mt-px text-[10px] font-bold" style={{ color }}>
+    <div className="flex items-baseline gap-1.5">
+      <span aria-hidden="true" className="text-[10px] font-bold" style={{ color }}>
         {kind === 'up' ? '▲' : '▼'}
       </span>
-      <div className="min-w-0">
-        <p className="text-[11px] leading-tight break-keep text-fg">
-          <span className="text-muted">{kind === 'up' ? '상승 요인 ' : '하락 요인 '}</span>
-          {label ?? '판단할 데이터가 부족합니다'}
-        </p>
-        {detail ? <p className="text-[10px] text-subtle">{detail}</p> : null}
-      </div>
+      <p className="min-w-0 flex-1 text-[11px] leading-tight break-keep text-fg">
+        <span className="text-muted">{kind === 'up' ? '상승 ' : '하락 '}</span>
+        {label}
+      </p>
+      {detail ? <span className="tnum shrink-0 text-[10px] text-subtle">{detail}</span> : null}
     </div>
   );
 }
@@ -90,17 +94,16 @@ export function FngCard({
         <ModeBadge mode={mode} size="xs" />
       </div>
 
-      {/* 국면과 신뢰도는 한 줄로 묶어 제목 아래에 깐다. 좁으면 자연스럽게 넘어간다. */}
+      {/* 신뢰도는 높을 때 말하지 않는다. 늘 붙어 있으면 배지가 아니라 장식이 된다.
+          문제가 있을 때만 뜨게 해 두면 그때 눈에 걸린다. */}
       <div className="mt-1.5 mb-2 flex flex-wrap items-center gap-1">
         <CyclePhaseBadge cycle={score.cycle} />
-        <Badge
-          tone={score.confidence === 'high' ? 'ok' : score.confidence === 'medium' ? 'neutral' : 'warn'}
-          size="xs"
-          title={score.confidenceReason}
-        >
-          <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
-          신뢰도 {CONFIDENCE_LABEL[score.confidence]}
-        </Badge>
+        {score.confidence !== 'high' ? (
+          <Badge tone={score.confidence === 'medium' ? 'neutral' : 'warn'} size="xs" title={score.confidenceReason}>
+            <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
+            신뢰도 {CONFIDENCE_LABEL[score.confidence]}
+          </Badge>
+        ) : null}
       </div>
 
       <div className="flex flex-col items-center">
@@ -116,11 +119,9 @@ export function FngCard({
           {score.unavailableReason ?? '데이터가 부족해 점수를 산출할 수 없습니다.'}
         </p>
       ) : (
-        <div className="mt-1 flex items-stretch gap-1.5">
-          <DeltaChip label="전일" value={score.deltaDay} />
-          <DeltaChip label="1주" value={score.deltaWeek} />
-          <DeltaChip label="1개월" value={score.deltaMonth} />
-        </div>
+        /* 1주·1개월은 심리 상세의 '기간별 심리 위치' 가 더 잘 보여준다.
+           홈 카드에는 어제와 견준 값 하나만 둔다. */
+        <DeltaChip label="어제보다" value={score.deltaDay} />
       )}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
@@ -162,9 +163,13 @@ export function FngCard({
           심리 상세 →
         </Link>
       </div>
-      <p className="mt-1.5 text-[10px] text-subtle">
-        산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
-      </p>
+      {/* 갱신 시각은 상태바가 늘 들고 있다. 여기서는 충족률이 온전하지 않을 때만 말한다 —
+          100% 라고 매번 적어 두면 정작 90% 로 떨어진 날을 놓친다. */}
+      {score.coverage < 0.999 ? (
+        <p className="mt-1.5 text-[10px] text-subtle">
+          산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
+        </p>
+      ) : null}
     </article>
   );
 }

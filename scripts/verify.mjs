@@ -7,6 +7,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 
 const BASE = process.env.VERIFY_BASE_URL ?? 'http://localhost:3000';
 
@@ -858,6 +859,50 @@ async function main() {
     check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     check('종목 이름이 길면 잘림 (미리보기)', /\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
     check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
+  }
+
+  /* ---------------- 8-9. LIVE 연결 ---------------- */
+  console.log('\n[8-9] 실데이터 연결');
+  {
+    // 이 컨테이너는 제공사로 나갈 수 없어 실제 호출은 못 한다.
+    // 대신 "무엇이 붙었고 무엇이 아직인지" 를 원본에서 확인한다.
+    const live = await readFile('src/server/adapters/live/index.ts', 'utf8');
+    const crypto = await readFile('src/server/adapters/live/crypto.ts', 'utf8');
+    const macro = await readFile('src/server/adapters/live/macro.ts', 'utf8');
+
+    check('CoinGecko 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/coingecko.ts'));
+    check('Binance 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/binance.ts'));
+    check('FRED 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/fred.ts'));
+
+    check('크립토 시세가 연결됨', live.includes('cryptoQuotes') && live.includes('fetchCoinQuotes'));
+    check('크립토 심리 입력이 연결됨', live.includes('buildCryptoFngInput'));
+    check('크립토 벤치마크가 연결됨', /getBenchmark[\s\S]{0,400}fetchCoinSeries/.test(live));
+    check('거시 지표가 FRED 에 연결됨', live.includes('buildFredMacro'));
+    check('환율이 연결됨', /getUsdKrw[\s\S]{0,300}fetchLatest/.test(live));
+
+    // 못 채우는 지표는 지어내지 않고 사유를 남긴다
+    for (const id of ['long_liq_share', 'exchange_netflow_14d', 'search_trend', 'news_sentiment']) {
+      check(`[${id}] 못 받는 지표에 사유가 있음`, crypto.includes(`forcedMissing.${id} =`));
+    }
+    check('결측을 0 으로 채우지 않음', !/\|\|\s*0;/.test(crypto) && crypto.includes('null'));
+
+    // 근거 없는 위험 단계를 매기지 않는다
+    check('구간 기준이 없으면 단계를 매기지 않음', macro.includes("return { level: 'unknown'"));
+
+    // 키가 브라우저로 새지 않는다
+    const envRefs = [...live.matchAll(/NEXT_PUBLIC_[A-Z_]+/g)].map((m) => m[0]);
+    check('LIVE 어댑터가 NEXT_PUBLIC_ 키를 쓰지 않음', envRefs.length === 0, envRefs.join(', ') || '없음');
+
+    // 점검 스크립트
+    check('연결 점검 스크립트가 있음', existsSync('scripts/check-live.mjs'));
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    check('npm run check:live 가 등록됨', Boolean(pkg.scripts['check:live']));
+
+    // 아직 안 붙은 곳은 조용히 빈 값을 만들지 않고 오류를 던진다
+    for (const what of ['getFlows', 'getCalendar', 'getNews']) {
+      check(`${what} 은 아직 연결 전이라 오류를 던짐`,
+        new RegExp(`${what}[\\s\\S]{0,300}NotWiredError`).test(live));
+    }
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

@@ -14,6 +14,21 @@
 
 import { getKeys } from '@/server/config';
 import { AdapterNotConfiguredError, fetchJson } from '@/server/http';
+import { catalogFor } from '@/lib/catalog';
+import { buildCryptoFngInput } from './crypto';
+import { buildFredMacro } from './macro';
+import { binanceConfig } from './providers/binance';
+import {
+  COIN_ID,
+  COINGECKO_SOURCE,
+  coinGeckoConfig,
+  fetchCoinQuotes,
+  fetchCoinSeries,
+  fetchGlobal,
+  fetchStablecoinMcap,
+  type CoinGeckoConfig,
+} from './providers/coingecko';
+import { fetchLatest, fredConfig } from './providers/fred';
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
 import type {
@@ -38,6 +53,27 @@ class NotWiredError extends Error {
     super(`${what} 의 LIVE 연결이 아직 구현되지 않았습니다. 구현 위치: ${where}`);
     this.name = 'NotWiredError';
   }
+}
+
+/** 달러 → 십억 달러. 화면이 usd_bn 단위로 그린다. */
+function toBn(v: number | null): number | null {
+  return v === null ? null : v / 1e9;
+}
+
+/** LIVE 는 받은 시각을 그대로 쓴다. 지연 여부는 제공사가 밝힌 값으로 판단한다. */
+function meta(asOf: string, fetchedAt: string, source: DataSource, notes?: string[]) {
+  const delay = source.delayMinutes ?? null;
+  const ageMin = (Date.parse(fetchedAt) - Date.parse(asOf)) / 60_000;
+  return {
+    asOf,
+    fetchedAt,
+    freshness: (Number.isFinite(ageMin) && ageMin > 60 ? 'stale' : delay && delay > 5 ? 'delayed' : 'live') as
+      | 'live'
+      | 'delayed'
+      | 'stale',
+    sources: [source],
+    ...(notes && notes.length ? { notes } : {}),
+  };
 }
 
 function envUrl(name: string): string | null {
@@ -66,8 +102,10 @@ export class LiveAdapter implements MarketAdapter {
    *   - meta.asOf 는 제공사가 준 기준 시각을 그대로 쓴다. 없으면 null 처리하고 사유를 notes 에 남긴다.
    *   - meta.sources[].delayMinutes 에 계약상 지연 시간을 정확히 기입한다.
    */
-  async getQuotes(market: MarketId, _ctx: AdapterContext): Promise<Quote[]> {
-    const key = this.keyFor(market);
+  async getQuotes(market: MarketId, ctx: AdapterContext): Promise<Quote[]> {
+    // 크립토는 키 없이 공개 API 로 실제 값을 받는다.
+    if (market === 'crypto') return this.cryptoQuotes(ctx);
+
     const base = envUrl(this.baseUrlEnvFor(market));
     if (!base) {
       throw new NotWiredError(
@@ -75,10 +113,88 @@ export class LiveAdapter implements MarketAdapter {
         `src/server/adapters/live/index.ts > LiveAdapter.getQuotes (환경변수 ${this.baseUrlEnvFor(market)} 미설정)`,
       );
     }
-    // 실제 연결 시 아래 주석을 구현으로 교체한다.
-    void key;
+    void this.keyFor(market);
     void fetchJson;
     throw new NotWiredError(`${market} 시세 normalize`, 'src/server/adapters/live/index.ts > normalizeQuote');
+  }
+
+  /** CoinGecko 로 코인 시세와 시장 전체 값을 채운다. 못 받은 항목은 사유를 남기고 비운다. */
+  private async cryptoQuotes(ctx: AdapterContext): Promise<Quote[]> {
+    const cg = this.coinGecko();
+    const items = catalogFor('crypto');
+    const coinIds = items.filter((i) => COIN_ID[i.id]).map((i) => i.id);
+
+    const [quotes, global, stable] = await Promise.all([
+      fetchCoinQuotes(cg, coinIds).catch(() => new Map()),
+      fetchGlobal(cg).catch(() => null),
+      fetchStablecoinMcap(cg).catch(() => null),
+    ]);
+
+    const fetchedAt = new Date().toISOString();
+    const source: DataSource = { ...COINGECKO_SOURCE };
+
+    return items.map((item) => {
+      const base = {
+        id: item.id,
+        name: item.name,
+        symbol: item.symbol,
+        market: 'crypto' as const,
+        kind: item.kind,
+        currency: item.currency,
+        unit: item.unit,
+        precision: item.precision,
+        volume: null as number | null,
+        spark: [] as SeriesPoint[],
+        session: 'always' as const,
+      };
+
+      const coin = quotes.get(item.id);
+      if (coin) {
+        const prev =
+          coin.price !== null && coin.changePct !== null && coin.changePct !== -100
+            ? coin.price / (1 + coin.changePct / 100)
+            : null;
+        return {
+          ...base,
+          price: coin.price,
+          change: coin.price !== null && prev !== null ? coin.price - prev : null,
+          changePct: coin.changePct,
+          volume: item.hasVolume ? coin.volume : null,
+          ...(item.hasVolume ? { volumeUnit: 'usd_bn' as const } : {}),
+          meta: meta(coin.asOf ?? fetchedAt, fetchedAt, source),
+          ...(coin.price === null ? { unavailableReason: '제공사가 값을 주지 않았습니다.' } : {}),
+        };
+      }
+
+      // 시장 전체를 재는 값들
+      const wide: Record<string, number | null> = {
+        total_mcap: global ? toBn(global.totalMcapUsd) : null,
+        total_vol: global ? toBn(global.totalVolUsd) : null,
+        btc_dom: global ? global.btcDominancePct : null,
+        stable_mcap: toBn(stable),
+      };
+      if (item.id in wide) {
+        const v = wide[item.id];
+        return {
+          ...base,
+          price: v,
+          change: null,
+          changePct: item.id === 'total_mcap' && global ? global.mcapChangePct24h : null,
+          meta: meta(global?.asOf ?? fetchedAt, fetchedAt, source),
+          ...(v === null ? { unavailableReason: '제공사가 값을 주지 않았습니다.' } : {}),
+        };
+      }
+
+      // 무료 제공사로 못 받는 항목 (선물 펀딩비·미결제약정·청산)은 사유를 적고 비운다
+      return {
+        ...base,
+        price: null,
+        change: null,
+        changePct: null,
+        meta: meta(fetchedAt, fetchedAt, source, ['무료 제공사에 없는 값입니다.']),
+        unavailableReason: '무료 제공사에 없는 값이라 표시하지 않습니다.',
+      };
+    });
   }
 
   /* ------------------------ Fear & Greed 입력 ------------------------ */
@@ -95,7 +211,15 @@ export class LiveAdapter implements MarketAdapter {
    * 일부 지표를 아직 붙이지 못했다면 metrics 에서 빼면 된다.
    * 엔진이 자동으로 결측 처리하고, 가중치 70% 미만이면 "산출 불가"로 표시한다.
    */
-  async getFngInput(market: MarketId, _ctx: AdapterContext): Promise<EngineInput> {
+  async getFngInput(market: MarketId, ctx: AdapterContext): Promise<EngineInput> {
+    if (market === 'crypto') {
+      return buildCryptoFngInput({
+        cg: this.coinGecko(),
+        bn: binanceConfig(envUrl('CRYPTO_DERIV_BASE_URL')),
+        now: ctx.now,
+        days: 600,
+      });
+    }
     void allMetricIds(market);
     void COMPONENTS;
     throw new NotWiredError(
@@ -107,6 +231,10 @@ export class LiveAdapter implements MarketAdapter {
   /* --------------------------- 벤치마크 --------------------------- */
   /** TODO(연결지점 3): 점수와 겹쳐 볼 대표 지수 시계열 (미국=S&P 500, 한국=KOSPI, 크립토=BTC). */
   async getBenchmark(market: MarketId, _ctx: AdapterContext): Promise<BenchmarkSeries | null> {
+    if (market === 'crypto') {
+      const series = await fetchCoinSeries(this.coinGecko(), 'bitcoin', 365);
+      return series.length ? { id: 'btc', name: '비트코인', series, precision: 0 } : null;
+    }
     throw new NotWiredError(`${market} 벤치마크 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getBenchmark');
   }
 
@@ -118,8 +246,10 @@ export class LiveAdapter implements MarketAdapter {
 
   /* --------------------------- 거시 지표 --------------------------- */
   /** TODO(연결지점 5): FRED / ECOS 등 거시지표. riskLevel 판정 기준은 팀 정책에 맞게 조정. */
-  async getMacro(_ctx: AdapterContext): Promise<MacroIndicator[]> {
-    throw new NotWiredError('거시·위험 지표', 'src/server/adapters/live/index.ts > LiveAdapter.getMacro');
+  async getMacro(ctx: AdapterContext): Promise<MacroIndicator[]> {
+    const key = getKeys().macro;
+    if (!key) throw new AdapterNotConfiguredError('거시 지표(FRED)', ['MACRO_API_KEY']);
+    return buildFredMacro(fredConfig(key, envUrl('MACRO_BASE_URL')), ctx.now);
   }
 
   /* ------------------------ 생활 속 경제 이야기 ------------------------ */
@@ -210,16 +340,29 @@ export class LiveAdapter implements MarketAdapter {
   /* -------------------------- 종목 상세 차트 -------------------------- */
   /** TODO(연결지점 8): 종목 상세 차트 (1D 는 분봉, 나머지는 일봉). */
   async getAssetSeries(id: string, range: RangeKey, _ctx: AdapterContext): Promise<SeriesPoint[]> {
+    const coin = COIN_ID[id];
+    if (coin) {
+      const days: Partial<Record<RangeKey, number>> = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+      return fetchCoinSeries(this.coinGecko(), coin, days[range] ?? 30);
+    }
     throw new NotWiredError(`${id} ${range} 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getAssetSeries');
   }
 
   /* ----------------------------- 환율 ----------------------------- */
   /** TODO(연결지점 9): USD/KRW 환율 (통화 전환에 사용). */
   async getUsdKrw(_ctx: AdapterContext): Promise<number | null> {
-    throw new NotWiredError('USD/KRW 환율', 'src/server/adapters/live/index.ts > LiveAdapter.getUsdKrw');
+    const key = getKeys().macro;
+    if (!key) throw new AdapterNotConfiguredError('환율(FRED)', ['MACRO_API_KEY']);
+    const last = await fetchLatest(fredConfig(key, envUrl('MACRO_BASE_URL')), 'usdkrw');
+    return last ? last.v : null;
   }
 
   /* ---------------------------- 내부 ---------------------------- */
+
+  /** CoinGecko 설정. 무료 티어는 키 없이도 되고, CRYPTO_API_KEY 가 있으면 한도가 올라간다. */
+  private coinGecko(): CoinGeckoConfig {
+    return coinGeckoConfig(getKeys().crypto, envUrl('CRYPTO_BASE_URL'));
+  }
 
   private keyFor(market: MarketId): string {
     const keys = getKeys();

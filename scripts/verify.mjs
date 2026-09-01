@@ -871,6 +871,8 @@ async function main() {
     const macro = await readFile('src/server/adapters/live/macro.ts', 'utf8');
 
     check('CoinGecko 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/coingecko.ts'));
+    check('Stooq 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/stooq.ts'));
+    check('Cboe 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/cboe.ts'));
     check('Binance 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/binance.ts'));
     check('FRED 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/fred.ts'));
 
@@ -897,6 +899,22 @@ async function main() {
     check('연결 점검 스크립트가 있음', existsSync('scripts/check-live.mjs'));
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
     check('npm run check:live 가 등록됨', Boolean(pkg.scripts['check:live']));
+
+    // 미국·한국도 붙었는지
+    const eq = await readFile('src/server/adapters/live/equities.ts', 'utf8');
+    check('미국·한국 시세가 연결됨', live.includes('stooqQuotes') && live.includes('fetchQuotes'));
+    check('미국 심리 입력이 연결됨', live.includes('buildUsFngInput'));
+    check('한국 심리 입력이 연결됨', live.includes('buildKrFngInput'));
+    check('풋/콜 비율이 연결됨', eq.includes('fetchEquityPutCall'));
+
+    // 지연을 0 으로 적지 않는다 — 실시간이 아닌 것을 실시간이라 하지 않는다
+    const stooq = await readFile('src/server/adapters/live/providers/stooq.ts', 'utf8');
+    check('Stooq 지연을 실시간이라 적지 않음', /delayMinutes:\s*15/.test(stooq));
+
+    // 무료로 못 받는 미국·한국 지표에도 사유가 있다
+    for (const id of ['us_new_high_low', 'us_volume_breadth', 'vkospi_level', 'kr_foreign_net_20d']) {
+      check(`[${id}] 못 받는 지표에 사유가 있음`, eq.includes(`${id}:`));
+    }
 
     // 아직 안 붙은 곳은 조용히 빈 값을 만들지 않고 오류를 던진다
     for (const what of ['getFlows', 'getCalendar', 'getNews']) {

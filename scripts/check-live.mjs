@@ -74,12 +74,66 @@ if (!FRED_KEY) {
   }
 }
 
-console.log('\n[미국·한국 시세] 아직 연결되지 않았습니다');
-console.log('  · 미국 시세(US_MARKET_API_KEY)와 한국 시세·수급(KR_MARKET_API_KEY)은 제공사를 정한 뒤 붙입니다.');
-console.log('  · 붙기 전까지 그 시장은 DEMO 이거나 해당 카드만 오류로 표시됩니다.');
+const STOOQ = process.env.US_MARKET_BASE_URL || 'https://stooq.com';
+
+async function probeText(label, url, pick) {
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.text();
+    console.log(`  ✓ ${label} — ${pick(body)}  (${Date.now() - t0}ms)`);
+    ok += 1;
+  } catch (e) {
+    console.log(`  ✗ ${label} — ${e instanceof Error ? e.message : String(e)}`);
+    bad += 1;
+  }
+}
+
+/** Stooq CSV 한 줄에서 종가를 뽑는다 */
+function csvClose(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return '빈 응답';
+  const head = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  const ci = head.indexOf('close');
+  const di = head.indexOf('date');
+  return lines
+    .slice(1, 4)
+    .map((l) => {
+      const c = l.split(',');
+      return `${c[0]} ${c[ci] ?? '?'} (${c[di] ?? '?'})`;
+    })
+    .join(' · ');
+}
+
+console.log('\n[미국·한국 시세] Stooq — 키 없이 됩니다 (실시간 아님, 15분 안팎 지연)');
+await probeText('미국 지수', `${STOOQ}/q/l/?s=^spx,^ndx,^dji,^vix&f=sd2t2ohlcv&h&e=csv`, csvClose);
+await probeText('한국 지수', `${STOOQ}/q/l/?s=^kospi,^kosdaq&f=sd2t2ohlcv&h&e=csv`, csvClose);
+await probeText('미국 개별주', `${STOOQ}/q/l/?s=nvda.us,aapl.us&f=sd2t2ohlcv&h&e=csv`, csvClose);
+await probeText('S&P 500 일별 시계열', `${STOOQ}/q/d/l/?s=^spx&i=d`,
+  (b) => `${b.trim().split(/\r?\n/).length - 1}일치`);
+
+console.log('\n[미국 풋/콜] Cboe — 키 없이 됩니다 (일별 마감 통계)');
+await probeText('주식 풋/콜 비율',
+  'https://cdn.cboe.com/api/global/us_indices/daily_statistics/Cboe_Volume_And_Put_Call_Ratios.csv',
+  (b) => `${b.trim().split(/\r?\n/).length - 1}줄`);
+
+console.log('\n[아직 못 붙인 것]');
+console.log('  · 한국 투자자별 순매수 · VKOSPI · 전종목 등락 — 무료 실시간 소스가 없습니다.');
+console.log('    (증권사 계좌 API 나 공공데이터포털 일별 데이터가 필요합니다)');
+console.log('  · 미국 52주 신고가/신저가 · 거래량 등락 폭 — 무료로 공개하는 곳이 없습니다.');
+console.log('  · 경제 캘린더 · 뉴스 — 제공사 미정.');
 
 console.log(`\n결과: ${ok}건 성공, ${bad}건 실패`);
-console.log(ok > 0
-  ? '크립토 카드와 심리 점수, 위험 신호등(VIX·스프레드·금리)이 실제 값으로 채워집니다.'
-  : '한 곳도 닿지 않았습니다. 네트워크가 막혀 있는지 먼저 확인하세요.');
+if (ok === 0) {
+  console.log('한 곳도 닿지 않았습니다. 네트워크가 막혀 있는지 먼저 확인하세요.');
+} else {
+  console.log('실제 값으로 채워지는 것 — 세 시장 시세 카드, 크립토 심리 점수,');
+  console.log('위험 신호등(VIX·하이일드·장단기 금리차·국채), 경제지표, 환율.');
+  console.log('');
+  console.log('심리 점수 확보 가중치(무료 소스 기준) — 문턱은 70%');
+  console.log('  크립토 약 85%  → 산출됩니다');
+  console.log('  미국   약 71%  → 산출됩니다 (Cboe 풋/콜이 있어야 넘습니다)');
+  console.log('  한국   약 33%  → 산출 불가로 표시됩니다');
+}
 process.exit(bad > 0 && ok === 0 ? 1 : 0);

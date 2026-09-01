@@ -28,7 +28,10 @@ import {
   fetchStablecoinMcap,
   type CoinGeckoConfig,
 } from './providers/coingecko';
-import { fetchLatest, fredConfig } from './providers/fred';
+import { fetchLatest, fredConfig, type FredConfig } from './providers/fred';
+import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
+import { buildKrFngInput, buildUsFngInput } from './equities';
+import { getSession } from '@/lib/marketHours';
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
 import type {
@@ -106,16 +109,75 @@ export class LiveAdapter implements MarketAdapter {
     // 크립토는 키 없이 공개 API 로 실제 값을 받는다.
     if (market === 'crypto') return this.cryptoQuotes(ctx);
 
-    const base = envUrl(this.baseUrlEnvFor(market));
-    if (!base) {
-      throw new NotWiredError(
-        `${market} 시세`,
-        `src/server/adapters/live/index.ts > LiveAdapter.getQuotes (환경변수 ${this.baseUrlEnvFor(market)} 미설정)`,
-      );
-    }
-    void this.keyFor(market);
-    void fetchJson;
-    throw new NotWiredError(`${market} 시세 normalize`, 'src/server/adapters/live/index.ts > normalizeQuote');
+    // 미국·한국은 Stooq CSV 로 받는다. 키가 없어도 되지만 실시간이 아니라
+    // 15분 안팎 지연이며, 그 사실을 배지로 그대로 띄운다.
+    return this.stooqQuotes(market);
+  }
+
+  /** Stooq 로 지수·종목 시세를 채운다. 심볼이 없는 항목은 사유를 적고 비운다. */
+  private async stooqQuotes(market: MarketId): Promise<Quote[]> {
+    const cfg = stooqConfig(envUrl(this.baseUrlEnvFor(market)));
+    const items = catalogFor(market);
+    const ids = items.filter((i) => STOOQ_SYMBOL[i.id]).map((i) => i.id);
+    const quotes = await fetchQuotes(cfg, ids).catch(() => new Map());
+
+    const fetchedAt = new Date().toISOString();
+    const source: DataSource = { ...STOOQ_SOURCE };
+    const session = getSession(market, new Date()).phase;
+
+    return items.map((item) => {
+      const base = {
+        id: item.id,
+        name: item.name,
+        symbol: item.symbol,
+        market,
+        kind: item.kind,
+        currency: item.currency,
+        unit: item.unit,
+        precision: item.precision,
+        volume: null as number | null,
+        spark: [] as SeriesPoint[],
+        session,
+      };
+
+      if (!STOOQ_SYMBOL[item.id]) {
+        return {
+          ...base,
+          price: null,
+          change: null,
+          changePct: null,
+          meta: meta(fetchedAt, fetchedAt, source, ['무료 제공사에 이 심볼이 없습니다.']),
+          unavailableReason: '무료 제공사에 없는 항목이라 표시하지 않습니다.',
+        };
+      }
+
+      const q = quotes.get(item.id);
+      if (!q || q.close === null) {
+        return {
+          ...base,
+          price: null,
+          change: null,
+          changePct: null,
+          meta: meta(fetchedAt, fetchedAt, source, ['제공사가 값을 주지 않았습니다.']),
+          unavailableReason: '제공사가 값을 주지 않았습니다.',
+        };
+      }
+
+      // Stooq 의 한 줄에는 전일 종가가 없다. 시가 대비 변화로 그날의 움직임을 나타낸다.
+      const change = q.open !== null ? q.close - q.open : null;
+      const changePct = q.open !== null && q.open !== 0 ? (q.close / q.open - 1) * 100 : null;
+
+      return {
+        ...base,
+        price: q.close,
+        change,
+        changePct,
+        volume: item.hasVolume ? q.volume : null,
+        ...(item.hasVolume ? { volumeUnit: 'count' as const } : {}),
+        meta: meta(q.asOf ?? fetchedAt, fetchedAt, source,
+          change === null ? ['시가를 받지 못해 등락을 계산하지 않았습니다.'] : undefined),
+      };
+    });
   }
 
   /** CoinGecko 로 코인 시세와 시장 전체 값을 채운다. 못 받은 항목은 사유를 남기고 비운다. */
@@ -220,12 +282,15 @@ export class LiveAdapter implements MarketAdapter {
         days: 600,
       });
     }
+    const deps = {
+      stooq: stooqConfig(envUrl(this.baseUrlEnvFor(market))),
+      fred: this.fred(),
+      now: ctx.now,
+      days: 700,
+    };
     void allMetricIds(market);
     void COMPONENTS;
-    throw new NotWiredError(
-      `${market} Fear & Greed 원시 지표`,
-      'src/server/adapters/live/index.ts > LiveAdapter.getFngInput',
-    );
+    return market === 'us' ? buildUsFngInput(deps) : buildKrFngInput(deps);
   }
 
   /* --------------------------- 벤치마크 --------------------------- */
@@ -235,7 +300,10 @@ export class LiveAdapter implements MarketAdapter {
       const series = await fetchCoinSeries(this.coinGecko(), 'bitcoin', 365);
       return series.length ? { id: 'btc', name: '비트코인', series, precision: 0 } : null;
     }
-    throw new NotWiredError(`${market} 벤치마크 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getBenchmark');
+    const id = market === 'us' ? 'spx' : 'kospi';
+    const name = market === 'us' ? 'S&P 500' : 'KOSPI';
+    const series = await fetchDailySeries(stooqConfig(envUrl(this.baseUrlEnvFor(market))), id, 400);
+    return series.length ? { id, name, series, precision: 2 } : null;
   }
 
   /* -------------------------- 투자자 수급 -------------------------- */
@@ -345,6 +413,11 @@ export class LiveAdapter implements MarketAdapter {
       const days: Partial<Record<RangeKey, number>> = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
       return fetchCoinSeries(this.coinGecko(), coin, days[range] ?? 30);
     }
+    if (STOOQ_SYMBOL[id]) {
+      const days: Partial<Record<RangeKey, number>> = { '1D': 5, '1W': 10, '1M': 35, '3M': 100, '1Y': 400, '3Y': 1200 };
+      // Stooq 무료 CSV 는 일봉만 준다. 1D 는 분봉이 없어 최근 며칠을 대신 보여준다.
+      return fetchDailySeries(stooqConfig(null), id, days[range] ?? 35);
+    }
     throw new NotWiredError(`${id} ${range} 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getAssetSeries');
   }
 
@@ -362,6 +435,12 @@ export class LiveAdapter implements MarketAdapter {
   /** CoinGecko 설정. 무료 티어는 키 없이도 되고, CRYPTO_API_KEY 가 있으면 한도가 올라간다. */
   private coinGecko(): CoinGeckoConfig {
     return coinGeckoConfig(getKeys().crypto, envUrl('CRYPTO_BASE_URL'));
+  }
+
+  /** FRED 설정. 키가 없으면 null 을 돌려주고, 그 지표들은 사유와 함께 빈다. */
+  private fred(): FredConfig | null {
+    const key = getKeys().macro;
+    return key ? fredConfig(key, envUrl('MACRO_BASE_URL')) : null;
   }
 
   private keyFor(market: MarketId): string {

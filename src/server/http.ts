@@ -66,6 +66,23 @@ export interface FetchOptions {
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export async function fetchJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
+  return fetchWith(url, options, 'application/json', (res) => res.json() as Promise<T>);
+}
+
+/**
+ * CSV 처럼 JSON 이 아닌 응답용.
+ * 타임아웃·재시도·호스트별 요청 제한은 fetchJson 과 똑같이 적용된다.
+ */
+export async function fetchText(url: string, options: FetchOptions = {}): Promise<string> {
+  return fetchWith(url, options, 'text/csv, text/plain, */*', (res) => res.text());
+}
+
+async function fetchWith<T>(
+  url: string,
+  options: FetchOptions,
+  accept: string,
+  read: (res: Response) => Promise<T>,
+): Promise<T> {
   const host = safeHost(url);
   const retries = options.retries ?? HTTP_MAX_RETRIES;
   const timeoutMs = options.timeoutMs ?? HTTP_TIMEOUT_MS;
@@ -78,7 +95,7 @@ export async function fetchJson<T>(url: string, options: FetchOptions = {}): Pro
     try {
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { accept: 'application/json', ...(options.headers ?? {}) },
+        headers: { accept, ...(options.headers ?? {}) },
         // 캐시는 우리 SWR 레이어가 담당한다.
         cache: 'no-store',
       });
@@ -88,7 +105,7 @@ export async function fetchJson<T>(url: string, options: FetchOptions = {}): Pro
         if (!retryable || attempt === retries) throw err;
         lastError = err;
       } else {
-        return (await res.json()) as T;
+        return await read(res);
       }
     } catch (e) {
       const err =

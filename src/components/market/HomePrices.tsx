@@ -8,7 +8,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { PriceCard } from './PriceCard';
-import { MARKET_IDS, type Quote } from '@/types';
+import { INDEX_MARKET_IDS, type Quote } from '@/types';
 
 const MAX_ON_HOME = 8;
 
@@ -20,7 +20,7 @@ export function HomePrices() {
   const ordered = useMemo(() => {
     if (!section?.data) return [];
     const all = new Map<string, Quote>();
-    for (const m of MARKET_IDS) for (const q of section.data[m] ?? []) all.set(q.id, q);
+    for (const m of INDEX_MARKET_IDS) for (const q of section.data[m] ?? []) all.set(q.id, q);
 
     const ids: string[] = [];
     for (const id of settings.watchlist) if (all.has(id)) ids.push(id);

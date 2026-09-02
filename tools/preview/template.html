@@ -749,7 +749,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   };
 
   const snap = () => (state.scenario === 'partial' ? DATA.partial : DATA.snapshot);
-  const MARKETS = ['us', 'kr', 'crypto'];
+  const MARKETS = ['us', 'crypto'];
+  /** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
+  const INDEX_MARKETS = ['us', 'kr', 'crypto'];
   const MARKET_LABEL = { us: '미국', kr: '한국', crypto: '크립토' };
 
   /* ====================================================================== */
@@ -1375,7 +1377,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   function statusBar() {
     const s = snap();
     const now = new Date();
-    const sessions = MARKETS.map((m) => ({ m, ...session(m, now) }));
+    const sessions = INDEX_MARKETS.map((m) => ({ m, ...session(m, now) }));
     const statuses = Object.values(s.sections).map((x) => x.status);
     const bad = statuses.filter((x) => x === 'error').length;
     const stale = statuses.filter((x) => x === 'stale').length;
@@ -2072,7 +2074,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const fng = s.sections.fng.data || [];
     const quotes = s.sections.quotes.data || {};
     const all = new Map();
-    MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => all.set(q.id, q)));
+    INDEX_MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => all.set(q.id, q)));
     const homeIds = ['spx', 'ndx', 'vix', 'ust10', 'us_spread_10_2', 'nvda', 'kospi', 'kosdaq', 'vkospi', 'usdkrw', 'samsung', 'btc', 'eth', 'total_mcap', 'btc_dom'];
     const ordered = [];
     state.watch.forEach((id) => { if (all.has(id)) ordered.push(all.get(id)); });
@@ -2952,7 +2954,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
    */
   const GROUP_NOTE = {
     us: '뉴욕 증시 전체를 재는 지수와 변동성 · 달러 지수입니다.',
-    kr: '유가증권 · 코스닥 시장을 재는 지수와 변동성 지수입니다.',
+    kr: '유가증권 · 코스닥 시장을 재는 지수입니다. 한국은 심리 점수를 낼 만큼의 무료 데이터가 없어 지수만 둡니다.',
     crypto: 'KOSPI 나 S&P 500 같은 공식 지수는 크립토에 없습니다. 대신 시장 전체 크기를 재는 값들을 놓았습니다.',
   };
 
@@ -3015,7 +3017,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
     return (
       '<div style="padding:12px"><div class="idxgrid">' +
-      MARKETS.map((m) => {
+      INDEX_MARKETS.map((m) => {
         const byId = new Map((data[m] || []).map((x) => [x.id, x]));
         return (
           '<section class="card" style="overflow:hidden" aria-labelledby="idx-' + m + '">' +
@@ -3024,7 +3026,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           // 색은 훑기용 표식일 뿐이고, 어느 시장인지는 옆의 글자가 말한다
           '<span aria-hidden="true" style="display:block;width:8px;height:8px;border-radius:99px;background:' + mkColor(m) + '"></span>' +
           '<span style="color:' + mkColor(m) + '">' + MARKET_LABEL[m] + '</span></h2>' +
-          '<button type="button" class="linkbtn" data-go-region="' + m + '">시장 화면 →</button></div>' +
+          // 한국은 시장 화면이 없다. 없는 곳으로 가는 문을 그리지 않는다.
+          (MARKETS.indexOf(m) >= 0 ? '<button type="button" class="linkbtn" data-go-region="' + m + '">시장 화면 →</button>' : '') + '</div>' +
           '<p style="margin:0;padding:8px 12px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(GROUP_NOTE[m]) + '</p>' +
           '<ul style="list-style:none;margin:0;padding:0;border-top:1px solid var(--border)">' +
           (cat[m] || []).map((item) => indexRow(item, byId.get(item.id))).join('') +
@@ -3059,7 +3062,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   /** 사이드바에만 노출하는 시장별 바로가기 */
   const MARKET_NAV = [
     { region: 'us', label: '미국' },
-    { region: 'kr', label: '한국' },
     { region: 'crypto', label: '크립토' },
   ];
 

@@ -14,7 +14,7 @@ import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
 import { guideFor } from '@/lib/indicatorGuide';
 import { RiskBoard } from '@/components/market/RiskBoard';
 import type { Signal } from '@/lib/scale';
-import { MARKET_LABEL, type MacroIndicator, type MarketId } from '@/types';
+import { MARKET_IDS, MARKET_LABEL, type MacroIndicator, type MarketId } from '@/types';
 
 /**
  * 시장은 항상 하나만 고른다.
@@ -165,11 +165,8 @@ export default function IndicatorsPage() {
           full
           value={group}
           onChange={setGroup}
-          options={[
-            { value: 'us', label: MARKET_LABEL.us },
-            { value: 'kr', label: MARKET_LABEL.kr },
-            { value: 'crypto', label: MARKET_LABEL.crypto },
-          ]}
+          // 한국은 시장에서 뺐다. 원/달러처럼 실제로 되는 값은 글로벌로 옮겨 두 곳 모두에서 보인다.
+          options={MARKET_IDS.map((m) => ({ value: m, label: MARKET_LABEL[m] }))}
         />
         <SegmentedControl
           label="보기"

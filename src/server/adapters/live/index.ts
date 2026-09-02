@@ -282,6 +282,14 @@ export class LiveAdapter implements MarketAdapter {
         days: 600,
       });
     }
+    if (market === 'kr') {
+      // 한국은 시장에서 뺐다. 여기까지 불렸다면 호출하는 쪽이 잘못된 것이라
+      // 빈 값을 만들어 덮지 않고 그대로 알린다.
+      throw new NotWiredError(
+        '한국 Fear & Greed',
+        '한국은 무료 소스로 확보 가중치가 약 33% 라 시장에서 제외했습니다 (MARKET_IDS 참조)',
+      );
+    }
     const deps = {
       stooq: stooqConfig(envUrl(this.baseUrlEnvFor(market))),
       fred: this.fred(),

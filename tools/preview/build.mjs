@@ -90,8 +90,9 @@ async function main() {
   // 부분 실패 화면을 미리보기에서도 전환해 볼 수 있게 같이 담는다
   const partial = await j('/api/snapshot?scenario=partial');
 
+  // 점수를 내는 시장만. 한국은 무료 소스로 확보 가중치가 약 33% 라 시장에서 뺐다.
   const details = {};
-  for (const m of ['us', 'kr', 'crypto']) details[m] = (await j(`/api/fng/${m}`)).detail;
+  for (const m of ['us', 'crypto']) details[m] = (await j(`/api/fng/${m}`)).detail;
 
   const assets = {};
   for (const id of ASSET_IDS) {

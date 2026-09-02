@@ -40,7 +40,10 @@ async function main() {
   check('모드가 DEMO 또는 LIVE', snap.mode === 'DEMO' || snap.mode === 'LIVE', `mode=${snap.mode}`);
 
   const fng = snap.sections?.fng?.data ?? [];
-  check('미국·한국·크립토 카드 3개', fng.length === 3, `${fng.map((f) => f.market).join(', ')}`);
+  // 한국은 심리 점수를 낼 수 없어(무료 소스로 확보 가중치 약 33%) 시장에서 뺐다.
+  // KOSPI·KOSDAQ 시세와 원/달러는 지수·지표 화면에 그대로 남아 있다.
+  check('심리 카드는 미국·크립토 둘', fng.length === 2, `${fng.map((f) => f.market).join(', ')}`);
+  check('심리 카드에 한국이 없음', !fng.some((f) => f.market === 'kr'));
 
   for (const f of fng) {
     check(
@@ -147,12 +150,19 @@ async function main() {
     }
   }
 
-  for (const m of ['us', 'kr', 'crypto']) {
+  // 점수를 내는 시장만 검사한다 (한국은 시장에서 뺐다)
+  const SCORED = ['us', 'crypto'];
+  for (const m of SCORED) {
     const { body } = await getJson(`/api/fng/${m}`);
     await checkWeighting(`[${m}]`, body.detail);
   }
+  // 없앤 시장으로 들어오면 404 여야 한다 — 조용히 다른 시장을 돌려주지 않는다
+  {
+    const { status } = await getJson('/api/fng/kr');
+    check('/api/fng/kr 은 404', status === 404, `status=${status}`);
+  }
   // 결측이 생겨 재조정이 실제로 일어나는 경로도 같은 잣대로 확인한다
-  for (const m of ['us', 'kr', 'crypto']) {
+  for (const m of SCORED) {
     const { body } = await getJson(`/api/fng/${m}?scenario=partial`);
     await checkWeighting(`[${m}/부분실패]`, body.detail);
   }
@@ -216,9 +226,9 @@ async function main() {
 
   check('미국: 재조정된 적용 가중치 합계 100', Math.abs((us?.components ?? []).reduce((a, c) => a + c.effectiveWeight, 0) - 100) < 0.5,
     `${(us?.components ?? []).reduce((a, c) => a + c.effectiveWeight, 0).toFixed(2)}%`);
-  check('한국: 70% 미만이면 산출 불가', kr?.score === null && typeof kr?.unavailableReason === 'string',
-    `coverage=${kr?.coverage}`);
-  check('한국: 산출 불가 사유 제공', typeof kr?.unavailableReason === 'string' && kr.unavailableReason.length > 0);
+  // 한국은 무료 소스로 확보 가중치가 약 33% 라 늘 산출 불가로만 뜨는 카드가 된다.
+  // 그래서 시장에서 뺐다. 대신 KOSPI·KOSDAQ 시세는 지수 화면에 그대로 있다.
+  check('한국은 심리 카드가 없음', kr === undefined);
 
   /* ---------------- 5. 상태 시나리오 ---------------- */
   console.log('\n[5] 상태 재현 시나리오');
@@ -234,7 +244,7 @@ async function main() {
 
   /* ---------------- 6. 상세 라우트 ---------------- */
   console.log('\n[6] 상세 API');
-  for (const m of ['us', 'kr', 'crypto']) {
+  for (const m of ['us', 'crypto']) {
     const { status: s, body } = await getJson(`/api/fng/${m}`);
     check(`[${m}] 점수 상세 200`, s === 200, `status=${s}`);
     const d = body.detail;
@@ -256,7 +266,9 @@ async function main() {
   console.log('\n[7] 시장 위험 신호등');
   const risk = snap.sections?.risk?.data;
   check('위험 섹션 존재', risk !== undefined && risk !== null);
-  check('지표가 정확히 7개', (risk?.indicators ?? []).length === 7, `${risk?.indicators?.length}개`);
+  // VKOSPI 를 뺐다 — 무료로 받을 길이 없고, 한국을 시장에서 뺀 뒤로 놓일 자리도 없다.
+  check('지표가 정확히 6개', (risk?.indicators ?? []).length === 6, `${risk?.indicators?.length}개`);
+  check('VKOSPI 는 없음', !(risk?.indicators ?? []).some((i) => i.id === 'vkospi'));
   check('종합 문구 제공', typeof risk?.headline === 'string' && risk.headline.length > 0, risk?.headline);
 
   const LEVELS = ['calm', 'normal', 'watch', 'alert'];
@@ -285,9 +297,12 @@ async function main() {
     if (!i.why || !i.reading) check(`${label} 설명·해석 제공`, false, '');
   }
   check('모든 지표의 구간·단계·위치·설명이 일관됨', true);
-  check('세 시장이 모두 포함됨',
-    ['us', 'kr', 'crypto'].every((m) => (risk?.indicators ?? []).some((i) => i.scope === m)),
+  check('미국·글로벌·크립토가 모두 포함됨',
+    ['us', 'global', 'crypto'].every((m) => (risk?.indicators ?? []).some((i) => i.scope === m)),
     (risk?.indicators ?? []).map((i) => i.scope).join(','));
+  // 원/달러는 한국을 뺀 뒤에도 남는다 — 실제 값이 나오고 통화 전환에 계속 쓰인다
+  check('원/달러가 글로벌로 남아 있음',
+    (risk?.indicators ?? []).some((i) => i.id === 'usdkrw' && i.scope === 'global'));
   check('공포지수·정크본드·국채가 포함됨',
     ['vix', 'hy_oas', 'ust10'].every((id) => (risk?.indicators ?? []).some((i) => i.id === id)));
 
@@ -325,7 +340,7 @@ async function main() {
 
   /* ---------------- 7-3. 구간별 과거 통계 ---------------- */
   console.log('\n[7-3] 구간별 과거 통계');
-  for (const m of ['us', 'kr', 'crypto']) {
+  for (const m of ['us', 'crypto']) {
     const { body } = await getJson(`/api/fng/${m}`);
     const bs = body.detail?.bandStats;
     check(`[${m}] 구간 통계 제공`, bs !== null && bs !== undefined, bs ? `표본 ${bs.totalDays}일` : '없음');
@@ -341,7 +356,7 @@ async function main() {
 
   /* ---------------- 7-4. 10년 히스토리와 과거 위기 표식 ---------------- */
   console.log('\n[7-4] 10년 히스토리 · 과거 위기 표식');
-  for (const m of ['us', 'kr', 'crypto']) {
+  for (const m of ['us', 'crypto']) {
     const { body } = await getJson(`/api/fng/${m}`);
     const d = body.detail;
     const hist = d?.history ?? [];
@@ -386,10 +401,9 @@ async function main() {
   {
     const want = {
       us: { comps: 7, must: [], missing: [] },
-      kr: { comps: 7, must: ['kr_deposit_chg_20d'], missing: [] },
       crypto: { comps: 8, must: ['search_trend', 'news_sentiment'], missing: [] },
     };
-    for (const m of ['us', 'kr', 'crypto']) {
+    for (const m of ['us', 'crypto']) {
       const { body } = await getJson(`/api/fng/${m}`);
       const d = body.detail;
       const comps = d?.components ?? [];
@@ -487,12 +501,15 @@ async function main() {
     // 미저리 지수는 지표 화면의 CPI·실업률을 그대로 더한 값이어야 한다.
     // 두 화면이 다른 숫자를 보여주면 어느 쪽을 믿어야 할지 알 수 없다.
     {
-      const macro = snap.sections?.macro?.data ?? [];
-      const pick = (id) => macro.find((m) => m.id === id)?.value ?? null;
-      const cpi = pick('kr_cpi');
-      const un = pick('kr_unemployment');
-      const misery = list.find((b) => b.id === 'misery')?.value ?? null;
-      check('한국 실업률이 지표 목록에 있음', un !== null, `${un}`);
+      // 한국을 시장에서 뺀 뒤로 거시 목록에 한국 물가·실업률이 없다.
+      // 미저리 지수는 스스로 "물가 X% 와 실업률 Y% 를 더해 Z" 라고 적으므로,
+      // 그 문장에서 두 숫자를 꺼내 합이 실제 값과 맞는지 본다.
+      const miseryItem = list.find((b) => b.id === 'misery') ?? null;
+      const misery = miseryItem?.value ?? null;
+      const m2 = (miseryItem?.reading ?? '').match(/물가상승률\s*(-?[\d.]+)%\s*와\s*실업률\s*(-?[\d.]+)%/);
+      const cpi = m2 ? Number(m2[1]) : null;
+      const un = m2 ? Number(m2[2]) : null;
+      check('미저리 지수가 근거 두 숫자를 밝힘', cpi !== null && un !== null, miseryItem?.reading?.slice(0, 40) ?? '없음');
       if (cpi !== null && un !== null && misery !== null) {
         check('미저리 지수 = 물가상승률 + 실업률', Math.abs(misery - (cpi + un)) < 0.05,
           `${misery} vs ${cpi} + ${un} = ${(cpi + un).toFixed(1)}`);
@@ -636,9 +653,10 @@ async function main() {
     check('지표 화면에 전체 지표 보기가 있음', html.includes('전체 지표'));
     // 홈에서 각 시장으로 바로 들어간다
     const home = await (await fetch(`${BASE}/`)).text();
-    for (const m of ['us', 'kr', 'crypto']) {
+    for (const m of ['us', 'crypto']) {
       check(`홈에 ${m} 시장으로 가는 길이 있음`, home.includes(`/market/${m}`));
     }
+    check('홈에 한국 시장으로 가는 길은 없음', !home.includes('/market/kr'));
   }
 
   /* ---------------- 8-2. 위험 눈금이 상한이 아님을 밝히는가 ---------------- */
@@ -740,9 +758,11 @@ async function main() {
     check('크립토에 공식 지수가 없다고 밝힘', idx.includes('공식 지수는 크립토에 없습니다'));
 
     // 시장별 화면으로 들어가는 입구를 겸한다
-    for (const m of ['us', 'kr', 'crypto']) {
+    for (const m of ['us', 'crypto']) {
       check(`지수 화면에서 ${m} 시장 화면으로 갈 수 있음`, idx.includes(`/market/${m}`));
     }
+    // 한국 묶음은 남지만 시장 화면은 없다 — 링크를 걸지 않는다
+    check('지수 화면에 한국 시장 화면 링크는 없음', !idx.includes('/market/kr'));
   }
 
   /* ---------------- 8-5. 생활 경제 지수 (지수 탭의 두 번째 보기) ---------------- */
@@ -904,7 +924,9 @@ async function main() {
     const eq = await readFile('src/server/adapters/live/equities.ts', 'utf8');
     check('미국·한국 시세가 연결됨', live.includes('stooqQuotes') && live.includes('fetchQuotes'));
     check('미국 심리 입력이 연결됨', live.includes('buildUsFngInput'));
-    check('한국 심리 입력이 연결됨', live.includes('buildKrFngInput'));
+    // 한국은 시장에서 뺐다 — 점수 경로가 불리면 조용히 빈 값을 만들지 않고 알린다
+    check('한국은 점수를 내지 않음', /market === 'kr'[\s\S]{0,200}NotWiredError/.test(live));
+    check('한국 지수는 시세로 남아 있음', live.includes('stooqQuotes'));
     check('풋/콜 비율이 연결됨', eq.includes('fetchEquityPutCall'));
 
     // 지연을 0 으로 적지 않는다 — 실시간이 아닌 것을 실시간이라 하지 않는다

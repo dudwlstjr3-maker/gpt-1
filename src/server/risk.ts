@@ -100,34 +100,6 @@ export const RISK_SEVEN: RiskDef[] = [
     },
   },
   {
-    id: 'vkospi',
-    name: '한국 공포지수 VKOSPI',
-    shortName: 'VKOSPI',
-    scope: 'kr',
-    source: { kind: 'quote', id: 'vkospi' },
-    unit: 'point',
-    precision: 2,
-    suffix: '',
-    direction: 'higher_is_riskier',
-    scaleMin: 10,
-    scaleMax: 35,
-    scaleNote:
-      '막대는 35까지만 그립니다. 2020년 3월에는 69 부근까지, 2008년 금융위기 때도 그와 비슷한 수준까지 올랐습니다. 눈금을 벗어나면 \'눈금 밖\'으로 표시됩니다.',
-    bands: [
-      band('calm', null, 15, '15 미만'),
-      band('normal', 15, 19, '15~19'),
-      band('watch', 19, 25, '19~25'),
-      band('alert', 25, null, '25 이상'),
-    ],
-    why: 'KOSPI200 옵션에서 계산한 한국판 변동성지수입니다. 국내 증시의 불안 정도를 봅니다.',
-    readings: {
-      calm: '국내 변동성 기대가 낮은 구간입니다.',
-      normal: '평상시 범위 안에 있습니다.',
-      watch: '평균을 웃돌고 있습니다. 파생 수급에 따른 등락이 커질 수 있는 구간입니다.',
-      alert: '급등 구간입니다. 지수 하락과 함께 나타나는 경우가 많습니다.',
-    },
-  },
-  {
     id: 'hy_oas',
     name: '하이일드 신용스프레드 (정크본드)',
     shortName: '정크본드 스프레드',
@@ -215,9 +187,11 @@ export const RISK_SEVEN: RiskDef[] = [
   },
   {
     id: 'usdkrw',
+    // 한국을 시장에서 뺐지만 원/달러는 그대로 둔다 — 실제 값이 나오고,
+    // 통화 전환과 미국 자산의 원화 환산에 계속 쓰인다. 어느 한 시장에 묶이지 않으므로 글로벌로.
     name: 'USD/KRW 환율',
     shortName: '원/달러',
-    scope: 'kr',
+    scope: 'global',
     source: { kind: 'quote', id: 'usdkrw' },
     unit: 'point',
     precision: 2,

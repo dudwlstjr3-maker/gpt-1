@@ -8,8 +8,8 @@
  */
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { SegmentedControl } from '@/components/ui/Controls';
@@ -59,6 +59,14 @@ function sortQuotes(list: Quote[], key: SortKey): Quote[] {
 
 export default function MarketRegionPage() {
   const params = useParams<{ region: string }>();
+  // 한국은 심리 점수를 낼 수 없어 시장에서 뺐다. 옛 링크로 들어오면 조용히 미국으로
+  // 튀지 않고 지수 화면으로 보낸다 — 거기에 KOSPI·KOSDAQ 이 그대로 있다.
+  const router = useRouter();
+  const isKorea = params.region === 'kr';
+  useEffect(() => {
+    if (isKorea) router.replace('/indices');
+  }, [isKorea, router]);
+
   const region = (MARKET_IDS.includes(params.region as MarketId) ? params.region : 'us') as MarketId;
 
   const { snapshot, refresh } = useData();

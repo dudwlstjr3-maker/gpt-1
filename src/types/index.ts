@@ -9,9 +9,24 @@
 /* 공통                                                                 */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 시장 구분.
+ *
+ * 'kr' 은 타입에 남아 있지만 **심리 점수를 내는 시장이 아니다.**
+ * 한국은 투자자별 순매수 · VKOSPI · 전종목 등락을 무료로 받을 길이 없어
+ * 확보 가중치가 약 33% 에 그친다. 문턱(70%)을 한참 밑돌아 늘 "산출 불가" 로만
+ * 뜨는 카드가 되므로, 시장 목록에서 뺐다.
+ *
+ * 대신 **되는 것은 그대로 둔다** — KOSPI · KOSDAQ 시세와 원/달러 환율은
+ * 실제 값이 나오므로 지수 화면과 지표 화면에 남긴다.
+ */
 export type MarketId = 'us' | 'kr' | 'crypto';
 
-export const MARKET_IDS: MarketId[] = ['us', 'kr', 'crypto'];
+/** 심리 점수를 내고 시장 화면을 갖는 시장. 한국은 여기 없다. */
+export const MARKET_IDS: MarketId[] = ['us', 'crypto'];
+
+/** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
+export const INDEX_MARKET_IDS: MarketId[] = ['us', 'kr', 'crypto'];
 
 export const MARKET_LABEL: Record<MarketId, string> = {
   us: '미국',

@@ -134,6 +134,6 @@ if (ok === 0) {
   console.log('심리 점수 확보 가중치(무료 소스 기준) — 문턱은 70%');
   console.log('  크립토 약 85%  → 산출됩니다');
   console.log('  미국   약 71%  → 산출됩니다 (Cboe 풋/콜이 있어야 넘습니다)');
-  console.log('  한국   약 33%  → 산출 불가로 표시됩니다');
+  console.log('  한국   시장에서 제외 — KOSPI·KOSDAQ 시세는 지수 화면에 남습니다');
 }
 process.exit(bad > 0 && ok === 0 ? 1 : 0);

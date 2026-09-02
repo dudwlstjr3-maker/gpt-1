@@ -9,7 +9,7 @@ import { useSettings } from '@/components/providers/SettingsProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
 import { PriceCard } from '@/components/market/PriceCard';
 import { CATALOG_BY_ID } from '@/lib/catalog';
-import { MARKET_IDS, MARKET_LABEL, type Quote } from '@/types';
+import { INDEX_MARKET_IDS, MARKET_LABEL, type Quote } from '@/types';
 
 export default function WatchlistPage() {
   const { snapshot, refresh } = useData();
@@ -18,7 +18,7 @@ export default function WatchlistPage() {
 
   const quotes = useMemo(() => {
     const all = new Map<string, Quote>();
-    if (section?.data) for (const m of MARKET_IDS) for (const q of section.data[m] ?? []) all.set(q.id, q);
+    if (section?.data) for (const m of INDEX_MARKET_IDS) for (const q of section.data[m] ?? []) all.set(q.id, q);
     return settings.watchlist.map((id) => all.get(id)).filter((q): q is Quote => q !== undefined);
   }, [section, settings.watchlist]);
 

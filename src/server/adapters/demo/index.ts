@@ -707,24 +707,16 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
   return [
     mk('us_policy_rate', '미국 기준금리', '미국', 4.25, 4.5, 'percent', 2, true,
       { level: 'watch', note: '인하 사이클 진행 중 — 발표 일정 확인' }, meta),
-    mk('kr_policy_rate', '한국 기준금리', '한국', 2.5, 2.75, 'percent', 2, true,
-      { level: 'normal', note: '완화 기조 유지' }, metaKr),
     mk('us_cpi', '미국 CPI (전년비)', '미국', FIXED_MACRO.usCpi, FIXED_MACRO.usCpiPrev, 'percent', 1, true,
       { level: 'watch', note: '목표치 2% 상회' }, meta),
-    mk('kr_cpi', '한국 CPI (전년비)', '한국', FIXED_MACRO.krCpi, FIXED_MACRO.krCpiPrev, 'percent', 1, false,
-      { level: 'normal', note: '목표 부근' }, metaKr),
     mk('us_core_pce', '미국 근원 PCE (전년비)', '미국', 2.7, 2.8, 'percent', 1, false,
       { level: 'watch', note: '연준이 가장 중시하는 물가 지표' }, meta),
     mk('us_unemployment', '미국 실업률', '미국', FIXED_MACRO.usUnemployment, FIXED_MACRO.usUnemploymentPrev, 'percent', 1, true,
       { level: 'watch', note: '완만한 상승 추세' }, meta),
-    mk('kr_unemployment', '한국 실업률', '한국', FIXED_MACRO.krUnemployment, FIXED_MACRO.krUnemploymentPrev, 'percent', 1, false,
-      { level: 'normal', note: '낮은 수준 유지' }, metaKr),
     mk('us_nfp', '미국 비농업 고용 (천 명)', '미국', 73, 105, 'count', 0, false,
       { level: 'watch', note: '고용 증가 속도 둔화' }, meta),
     mk('us_pmi', '미국 ISM 제조업 PMI', '미국', 48.7, 49.1, 'point', 1, false,
       { level: 'alert', note: '50 미만 = 위축 국면' }, meta),
-    mk('kr_pmi', '한국 제조업 PMI', '한국', 49.5, 48.9, 'point', 1, false,
-      { level: 'watch', note: '50 부근에서 등락' }, metaKr),
     mk('us_spread', '미국 10년-2년 금리차', '미국', round(spread, 1), round(spreadPrev, 1), 'bp', 1, true,
       spread < 0
         ? { level: 'alert', note: '장단기 금리 역전 상태' }
@@ -735,7 +727,7 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
     mk('dxy', '달러지수 DXY', '글로벌', round(s.dxy[i], 2), round(s.dxy[i - 1], 2), 'point', 2, false,
       s.dxy[i] > 106 ? { level: 'watch', note: '강달러 — 신흥국 자금 유출 압력' } : { level: 'normal', note: '중립 범위' }, meta,
       undefined, sparkOf(s.dxy, d)),
-    mk('usdkrw', 'USD/KRW', '한국', round(usdkrwNow, 2), round(s.usdkrw[i - 1], 2), 'point', 2, true,
+    mk('usdkrw', 'USD/KRW', '글로벌', round(usdkrwNow, 2), round(s.usdkrw[i - 1], 2), 'point', 2, true,
       usdkrwNow > 1420
         ? { level: 'alert', note: '원화 약세 심화 구간' }
         : usdkrwNow > 1380
@@ -754,18 +746,6 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
       undefined, sparkOf(s.wti, d)),
     mk('spx_pe', 'S&P 500 예상 P/E', '미국', 21.4, 21.1, 'ratio', 1, false,
       { level: 'watch', note: '장기 평균 대비 높은 편' }, meta),
-    mk('kospi_pe', 'KOSPI P/E', '한국', 11.2, 11.0, 'ratio', 1, false,
-      { level: 'normal', note: '장기 평균 부근' }, metaKr),
-    mk('kospi_pb', 'KOSPI P/B', '한국', 1.02, 1.0, 'ratio', 2, false,
-      { level: 'normal', note: '1배 부근' }, metaKr),
-    mk('kospi_div', 'KOSPI 배당수익률', '한국', 2.05, 2.08, 'percent', 2, false,
-      { level: 'normal', note: '' }, metaKr),
-    mk('kr_investor_deposit', '투자자예탁금', '한국',
-      round(s.investorDeposit[i] / 10000, 1), round(s.investorDeposit[i - 1] / 10000, 1), 'count', 1, false,
-      s.investorDeposit[i] < s.investorDeposit[i - 20]
-        ? { level: 'watch', note: '대기 매수 자금 감소 추세' }
-        : { level: 'normal', note: '증권계좌에 들어와 아직 쓰이지 않은 돈' }, metaKr, '조원',
-      sparkOf(s.investorDeposit, d, 1 / 10000)),
     mk('crypto_mcap', '크립토 전체 시가총액', '크립토', round(c.totalMcap[ci] / 1e9, 1), round(c.totalMcap[ci - 1] / 1e9, 1), 'usd_bn', 1, false,
       { level: 'normal', note: '' }, metaCr, undefined, sparkOf(c.totalMcap, cd, 1 / 1e9)),
     mk('btc_dom', 'BTC 도미넌스', '크립토', round(c.btcDom[ci], 2), round(c.btcDom[ci - 1], 2), 'percent', 2, false,
@@ -777,12 +757,6 @@ function buildMacro(world: DemoWorld, ctx: AdapterContext): MacroIndicator[] {
         : vixNow > 20
           ? { level: 'watch', note: '경계 구간' }
           : { level: 'normal', note: '안정 구간' }, meta, undefined, sparkOf(s.vix, d)),
-    mk('vkospi', 'VKOSPI', '한국', round(vkospiNow, 2), round(s.vkospi[i - 1], 2), 'point', 2, true,
-      vkospiNow > 25
-        ? { level: 'alert', note: '변동성 급등' }
-        : vkospiNow > 19
-          ? { level: 'watch', note: '경계 구간' }
-          : { level: 'normal', note: '안정 구간' }, metaKr, undefined, sparkOf(s.vkospi, d)),
   ];
 }
 

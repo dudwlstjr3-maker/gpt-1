@@ -29,12 +29,12 @@ import { useFormatter } from '@/components/market/useFormatter';
 import { indicesFor, type CatalogItem } from '@/lib/catalog';
 import { marketColor } from '@/lib/scale';
 import { formatKstTime, NO_VALUE } from '@/lib/format';
-import { MARKET_IDS, MARKET_LABEL, type MarketId, type Quote } from '@/types';
+import { INDEX_MARKET_IDS, MARKET_IDS, MARKET_LABEL, type MarketId, type Quote } from '@/types';
 
 /** 시장마다 "이 목록이 무엇인지" 한 줄. 크립토는 공식 지수가 없다는 사실을 밝힌다. */
 const GROUP_NOTE: Record<MarketId, string> = {
   us: '뉴욕 증시 전체를 재는 지수와 변동성 · 달러 지수입니다.',
-  kr: '유가증권 · 코스닥 시장을 재는 지수와 변동성 지수입니다.',
+  kr: '유가증권 · 코스닥 시장을 재는 지수입니다. 한국은 심리 점수를 낼 만큼의 무료 데이터가 없어 지수만 둡니다.',
   crypto:
     'KOSPI 나 S&P 500 같은 공식 지수는 크립토에 없습니다. 대신 시장 전체 크기를 재는 값들을 놓았습니다.',
 };
@@ -142,7 +142,7 @@ export function MarketIndexBoard() {
   /** 목록은 카탈로그가 정하고, 값은 받아 온 것을 붙인다 */
   const groups = useMemo(() => {
     const data = section?.data ?? null;
-    return MARKET_IDS.map((m) => {
+    return INDEX_MARKET_IDS.map((m) => {
       const byId = new Map((data?.[m] ?? []).map((q) => [q.id, q]));
       return {
         market: m,
@@ -181,12 +181,15 @@ export function MarketIndexBoard() {
                   />
                   <span style={{ color: marketColor(g.market) }}>{MARKET_LABEL[g.market]}</span>
                 </h2>
-                <Link
-                  href={`/market/${g.market}`}
-                  className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
-                >
-                  시장 화면 →
-                </Link>
+                {/* 한국은 심리 점수를 낼 수 없어 시장 화면이 없다. 없는 곳으로 가는 문을 그리지 않는다. */}
+                {MARKET_IDS.includes(g.market) ? (
+                  <Link
+                    href={`/market/${g.market}`}
+                    className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
+                  >
+                    시장 화면 →
+                  </Link>
+                ) : null}
               </div>
 
               <p className="px-3 py-2 text-[10.5px] leading-relaxed break-keep text-subtle">

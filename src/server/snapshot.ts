@@ -29,7 +29,7 @@ import type {
   Snapshot,
   SnapshotSections,
 } from '@/types';
-import { MARKET_IDS } from '@/types';
+import { INDEX_MARKET_IDS, MARKET_IDS } from '@/types';
 
 /**
  * 홈 스냅샷이 만드는 히스토리 길이.
@@ -175,7 +175,8 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
       const c = new ValidationCollector();
       const byMarket = {} as Record<MarketId, Quote[]>;
       let latestMeta: Meta | null = null;
-      for (const m of MARKET_IDS) {
+      // 시세는 세 묶음 모두 받는다 — 한국은 점수를 내지 않지만 KOSPI·KOSDAQ 은 지수 화면에 남는다
+      for (const m of INDEX_MARKET_IDS) {
         const list = await adapter.getQuotes(m, ctx);
         byMarket[m] = list.map((q) => validateQuote(q, c));
         if (list[0]) latestMeta = list[0].meta;
@@ -187,7 +188,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
       };
     },
     now,
-    (d) => MARKET_IDS.every((m) => (d[m] ?? []).length === 0),
+    (d) => INDEX_MARKET_IDS.every((m) => (d[m] ?? []).length === 0),
   );
 
   /* -------- Fear & Greed -------- */
@@ -304,7 +305,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
   );
 
   /* -------- 시장 위험 신호등 -------- */
-  const flatQuotes: Quote[] = quotes.data ? MARKET_IDS.flatMap((m) => quotes.data?.[m] ?? []) : [];
+  const flatQuotes: Quote[] = quotes.data ? INDEX_MARKET_IDS.flatMap((m) => quotes.data?.[m] ?? []) : [];
   const riskData = buildRiskDigest(flatQuotes, macro.data ?? [], now, macro.meta);
   const risk: Section<typeof riskData> = {
     status:

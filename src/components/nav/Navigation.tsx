@@ -118,7 +118,6 @@ export function DesktopSidebar() {
         <ul className="space-y-0.5">
           {[
             { href: '/market/us', label: '미국' },
-            { href: '/market/kr', label: '한국' },
             { href: '/market/crypto', label: '크립토' },
           ].map((m) => {
             const active = pathname === m.href;

@@ -114,7 +114,8 @@ export default function MarketRegionPage() {
       <div className="flex items-start justify-between gap-2 px-3 pt-1">
         <div className="flex min-w-0 items-start gap-2">
           {/* /market 은 없앤 화면이라 지수 탭으로 돌려보낸다 */}
-          <Link href="/indices" aria-label="지수 목록으로" className="mt-0.5 text-muted">
+          {/* shrink-0 이 없으면 320px 에서 옆의 제목에 밀려 화살표가 제 상자를 넘는다 */}
+          <Link href="/indices" aria-label="지수 목록으로" className="mt-0.5 shrink-0 text-muted">
             ←
           </Link>
           <div className="min-w-0">

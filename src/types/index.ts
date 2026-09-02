@@ -539,6 +539,14 @@ export interface EconomyBasic {
    * 값에 길이를 그려 주면, 글로 "견주지 말라"고 적어 둬도 눈이 먼저 비교해 버린다.
    */
   sameScale?: boolean;
+  /**
+   * 지나온 값. 연 1~2회 발표되는 지표라 점이 성기고, 그래서 더 유용하다 —
+   * 숫자 하나만 보면 그게 높은 건지 낮은 건지 알 수가 없다.
+   * 받지 못하면 비운다. 화면은 있을 때만 선을 그린다.
+   */
+  history?: SeriesPoint[];
+  /** 나라별 지나온 값 (비교선용). 없으면 한국 선만 그린다. */
+  historyByCountry?: { label: string; points: SeriesPoint[] }[];
   /** 기준 시점 표기 (예: "2025년", "2025년 7월") */
   asOfLabel: string;
   /** 통계기관이 공식 발표하는 지표인지 */

@@ -122,7 +122,7 @@ export default function IndicatorsPage() {
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
         <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
-          생활 속 경제 이야기 →
+          생활 경제 지수 →
         </Link>
       </div>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">

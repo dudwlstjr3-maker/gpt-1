@@ -541,6 +541,18 @@ dl.kv dd { margin: 0; text-align: right; color: var(--fg); }
 .comp-desc { margin: 0 0 9px; font-size: 11.5px; color: var(--muted); line-height: 1.65; word-break: keep-all; }
 
 .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+
+/* 차트마다 붙는 표 대안. 앱의 .scroll-x / .data-table 과 같은 모양을 낸다. */
+.scroll-x { overflow-x: auto; }
+table.data-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+table.data-table th, table.data-table td { padding: 6px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+table.data-table tr:last-child th, table.data-table tr:last-child td { border-bottom: 0; }
+table.data-table th:first-child, table.data-table td:first-child { text-align: left; }
+table.data-table thead th { font-size: 10.5px; font-weight: 600; color: var(--muted); }
+
+/* 큰 숫자와 지나온 선. 좁은 화면에서는 위아래로, 넓어지면 나란히. */
+.btrend { display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 640px) { .btrend { flex-direction: row; align-items: flex-start; gap: 12px; } }
 table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.data th, table.data td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
 table.data tr:last-child td, table.data tr:last-child th { border-bottom: 0; }
@@ -722,7 +734,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   const state = {
     /* 지표 화면 안에서 위험 신호등을 볼지 전체 지표를 볼지 */
     indView: 'risk',
-    idxView: 'market',
     /* 캘린더: 달력으로 볼지 목록으로 볼지, 어느 달을 보고 있는지, 어느 날을 골랐는지 */
     calView: 'month',
     /* 홈 아래쪽에서 지금 보고 있는 탭 */
@@ -2064,7 +2075,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       (item.value === null ? NO : esc(fmtNum(item.value, item.precision)) + esc(item.suffix || '')) + '</div>' +
       '<button type="button" class="linkbtn" data-go="basics">읽는 법 보기 →</button></div>' +
       '<p style="margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
-      '하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 ' + list.length + '가지는 지수 탭의 생활 경제 지수 보기에 있습니다.</p>' +
+      '하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 ' + list.length + '가지는 생활 탭에 있습니다.</p>' +
       '</div></section>'
     );
   }
@@ -2593,7 +2604,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
       '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 · 위험 지표</h1>' +
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 속 경제 이야기 →</button></div>' +
-      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 지수 탭의 “생활 경제 지수” 보기에 따로 모았습니다.</p></div>' +
+      '<p style="margin:2px 0 0;font-size:11px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 “생활” 탭에 따로 모았습니다.</p></div>' +
       '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
       [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
@@ -2862,16 +2873,107 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
-  function basicGuidePanel(id) {
+  /**
+   * 지나온 값 — 앱의 BasicTrend 와 같은 그림.
+   *
+   * 이 화면의 숫자는 1년에 한두 번만 바뀐다. "1인당 GDP 36,855달러" 하나만 보면
+   * 오른 것인지 내린 것인지 알 수가 없어서, 지나온 선을 옆에 둔다.
+   * 나라 이름은 범례가 아니라 선 끝에 직접 붙인다 — 옅은 선 셋이 서로 교차하면
+   * 묶음 범례로는 어느 선이 어느 나라인지 알 길이 없다.
+   */
+  const TREND_GL = 52, TREND_GR = 40, TREND_W = 300;
+
+  /** 이름표가 겹치지 않게 위아래로 밀어낸다 */
+  function trendSpread(ys, min, lo, hi) {
+    const order = ys.map((y, i) => ({ i: i, y: y })).sort((a, b) => a.y - b.y);
+    const out = new Array(ys.length);
+    let prev = -Infinity;
+    order.forEach((o) => { const y = Math.max(o.y, prev + min); out[o.i] = y; prev = y; });
+    const over = out.length ? Math.max.apply(null, out) - hi : 0;
+    if (over > 0) for (let i = 0; i < out.length; i += 1) out[i] = Math.max(lo, out[i] - over);
+    return out;
+  }
+
+  function basicTrend(b) {
+    const raw = (b.historyByCountry && b.historyByCountry.length)
+      ? b.historyByCountry
+      : (b.history && b.history.length > 1 ? [{ label: '한국', points: b.history }] : []);
+    const clean = raw
+      .map((s) => ({ label: s.label, points: (s.points || []).filter((p) => isNum(p.v)) }))
+      .filter((s) => s.points.length >= 2);
+    if (!clean.length) return '';
+    let mine = clean.filter((s) => s.label === '한국')[0] || clean[0];
+
+    const h = 104, top = 9, bottom = h - 17;
+    const all = clean.reduce((a, s) => a.concat(s.points), []);
+    const tx = extent(all.map((p) => p.t));
+    const vy = extent(all.map((p) => p.v));
+    const x = scale(tx, [TREND_GL, TREND_W - TREND_GR]);
+    const y = scale(vy, [bottom, top]);
+    const fmt = (v) => fmtNum(v, b.precision) + (b.suffix || '');
+    const yr = (t) => new Date(t).getUTCFullYear();
+    const path = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+    const shortL = (l) => String(l).replace(/\s*[(（].*$/, '');
+
+    const ends = clean.map((s) => {
+      const p = s.points[s.points.length - 1];
+      return { label: s.label, x: x(p.t), y: y(p.v), mine: s.label === mine.label };
+    });
+    const ey = trendSpread(ends.map((e) => e.y), 11, top, bottom);
+    const last = mine.points[mine.points.length - 1];
+
+    return (
+      '<div><svg viewBox="0 0 ' + TREND_W + ' ' + h + '" width="100%" height="' + h + '" role="img" ' +
+      'aria-label="' + esc(b.name + ' — ' + yr(tx[0]) + '년부터 ' + yr(tx[1]) + '년까지, ' + mine.label + ' 마지막 값 ' + fmt(last.v)) + '">' +
+      // 위아래 눈금선. 눈금이 없으면 "미국이 위에 있다" 까지만 알고 얼마나 위인지는 모른다.
+      [[top, vy[1]], [bottom, vy[0]]].map((g) =>
+        '<line x1="' + TREND_GL + '" x2="' + (TREND_W - TREND_GR) + '" y1="' + g[0] + '" y2="' + g[0] + '" stroke="var(--border)" stroke-width="1"/>' +
+        '<text x="' + (TREND_GL - 6) + '" y="' + (g[0] + 3.2) + '" font-size="9" fill="var(--subtle)" text-anchor="end">' + esc(fmt(g[1])) + '</text>').join('') +
+      // 0 선이 구간 안에 있으면 그어 준다 — 부호가 바뀌는 지표는 그 선이 기준이다
+      (vy[0] < 0 && vy[1] > 0
+        ? '<line x1="' + TREND_GL + '" x2="' + (TREND_W - TREND_GR) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) +
+          '" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 3"/>'
+        : '') +
+      clean.filter((s) => s.label !== mine.label).map((s) =>
+        '<path d="' + path(s.points) + '" fill="none" stroke="var(--series-2)" stroke-width="1.2" opacity=".55"/>').join('') +
+      '<path d="' + path(mine.points) + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" fill="var(--accent)"/>' +
+      ends.map((e, i) =>
+        (Math.abs(ey[i] - e.y) > 1.5
+          ? '<line x1="' + (e.x + 2).toFixed(1) + '" x2="' + (TREND_W - TREND_GR + 4) + '" y1="' + e.y.toFixed(1) + '" y2="' + ey[i].toFixed(1) +
+            '" stroke="' + (e.mine ? 'var(--accent)' : 'var(--series-2)') + '" stroke-width=".8" opacity=".45"/>'
+          : '') +
+        '<text x="' + (TREND_W - TREND_GR + 6) + '" y="' + (ey[i] + 3.2).toFixed(1) + '" font-size="9.5" font-weight="' + (e.mine ? 700 : 400) +
+        '" fill="' + (e.mine ? 'var(--accent)' : 'var(--subtle)') + '">' + esc(shortL(e.label)) + '</text>').join('') +
+      '<text x="' + TREND_GL + '" y="' + (h - 1) + '" font-size="9" fill="var(--subtle)">' + yr(tx[0]) + '</text>' +
+      '<text x="' + (TREND_W - TREND_GR) + '" y="' + (h - 1) + '" font-size="9" fill="var(--subtle)" text-anchor="end">' + yr(tx[1]) + '</text>' +
+      '</svg>' +
+      // 그림을 못 보는 사람에게도 같은 내용이 가야 한다
+      '<details style="margin-top:2px"><summary style="cursor:pointer;list-style:none;text-align:right;font-size:10px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
+      '<div class="scroll-x" style="margin-top:6px;border:1px solid var(--border);border-radius:9px"><table class="data-table">' +
+      '<thead><tr><th>연도</th>' + clean.map((s) => '<th>' + esc(s.label) + '</th>').join('') + '</tr></thead><tbody>' +
+      mine.points.slice(-12).reverse().map((p) =>
+        '<tr><th class="tnum" style="font-weight:400">' + yr(p.t) + '</th>' +
+        clean.map((s) => {
+          const hit = s.points.filter((q) => yr(q.t) === yr(p.t))[0];
+          return '<td class="tnum">' + (hit ? esc(fmt(hit.v)) : '—') + '</td>';
+        }).join('') + '</tr>').join('') +
+      '</tbody></table></div></details></div>'
+    );
+  }
+
+  function basicGuidePanel(id, caution) {
     const g = BASIC_GUIDE[id];
     if (!g) return '';
     const rows = [].concat(
+      [['ⓘ', '이게 뭔가요', g.headline]],
       g.baseline ? [['=', '기준', g.baseline]] : [],
       [
       ['?', '어떻게 읽나요', g.howToRead],
       ['▲', '오르면', g.whenUp],
       ['▼', '내리면', g.whenDown],
-      ['!', '조심할 점', g.caution],
+      // 제공사가 준 주의 문구는 카드 본문에서 접어 이리로 옮겼다
+      ['!', '조심할 점', caution ? caution + ' ' + g.caution : g.caution],
       ['↔', '시장 이야기와의 연결', g.marketLink],
     ]);
     return (
@@ -2921,7 +3023,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '</div>' +
           '<div style="display:flex;flex-direction:column;gap:10px">' +
           grp.items.map(function (b) {
-            const g = BASIC_GUIDE[b.id];
             const t = b.value === null || b.previous === null ? null : b.value > b.previous ? '▲' : b.value < b.previous ? '▼' : '―';
             return (
               '<div class="card" style="padding:14px">' +
@@ -2929,14 +3030,16 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
               '<div style="min-width:0"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
               '<div style="margin-top:2px;font-size:10px;color:var(--subtle)">' + esc(b.englishName) + '</div></div>' +
               badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div>' +
-              (g ? '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(g.headline) + '</p>' : '') +
-              '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px">' +
+              // 큰 숫자와 지나온 선을 나란히 둔다. 값이 1년에 한두 번만 바뀌어서,
+              // 숫자 하나만 보면 그게 높은 건지 낮은 건지 알 수가 없다.
+              '<div class="btrend" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+              '<div style="flex-shrink:0">' +
               '<div class="tnum" style="font-size:26px;line-height:1;font-weight:700;color:var(--fg-strong)">' + esc(basicShow(b.value, b.precision, b.suffix)) + '</div>' +
-              '<div class="tnum" style="flex-shrink:0;text-align:right;font-size:10.5px;color:var(--muted)">' + (t ? t + ' ' : '') + '직전 ' + esc(basicShow(b.previous, b.precision, b.suffix)) + '</div></div>' +
+              '<div class="tnum" style="margin-top:4px;font-size:10.5px;color:var(--muted)">' + (t ? t + ' ' : '') + '직전 ' + esc(basicShow(b.previous, b.precision, b.suffix)) + '</div></div>' +
+              '<div style="min-width:0;flex:1">' + basicTrend(b) + '</div></div>' +
               '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(b.reading) + '</p>' +
-              (b.officialNote ? '<p style="margin:6px 0 0;border-radius:9px;background:var(--surface-2);padding:6px 8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">△ ' + esc(b.officialNote) + '</p>' : '') +
               basicComparisons(b.comparisons || [], b.comparisonNote, b.sameScale) +
-              basicGuidePanel(b.id) +
+              basicGuidePanel(b.id, b.officialNote) +
               '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10px;color:var(--subtle)">' +
               esc(b.asOfLabel) + ' · 기준 ' + esc(relative(b.meta.asOf)) + ' · 출처 ' + esc((b.meta.sources[0] || {}).name || '알 수 없음') + '</p></div>'
             );
@@ -2992,22 +3095,28 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
-  function viewIndices() {
-    // 지수 탭은 두 보기를 갖는다. 빅맥지수·1인당 GDP 같은 값도 지수라서 한 탭에 둔다.
+  /**
+   * 두 화면은 각자 탭이다.
+   *
+   * 한동안 한 탭 안의 두 보기였는데 — 320px 에서 일곱 칸이면 글자가 뭉개질까
+   * 걱정해서였다 — 재어 보니 아니었다. 둘 다 '지수' 라 불리지만 한쪽은 오늘의
+   * 시장, 다른 쪽은 한 해의 살림이라 같은 자리에 두면 무엇을 보는지가 흐려진다.
+   */
+  function head(title, desc) {
     return (
       '<div style="padding:14px 12px 0">' +
-      '<h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' +
-      (state.idxView === 'life' ? '생활 속 경제 이야기' : '지수') + '</h1>' +
-      '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
-      (state.idxView === 'life'
-        ? '시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 지표마다 <b>한국·중국·일본·미국</b> 네 나라를 나란히 놓았으니, 우리 형편이 어느 쯤인지 편하게 견줘 보세요.'
-        : '시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.') + '</p></div>' +
-      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="지수 보기">' +
-      [['market', '시장 지수'], ['life', '생활 경제 지수']].map(([v, l]) =>
-        '<button type="button" style="flex:1" data-idxview="' + v + '" aria-pressed="' + (state.idxView === v) + '">' + l + '</button>').join('') +
-      '</div></div>' +
-      (state.idxView === 'life' ? basicsBoard() : marketIndexBoard())
+      '<h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' + title + '</h1>' +
+      '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + desc + '</p></div>'
     );
+  }
+
+  function viewIndices() {
+    return head('시장 지수', '시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.') + marketIndexBoard();
+  }
+
+  function viewBasics() {
+    return head('생활 경제 지수',
+      '시세가 아니라 살림살이의 크기를 재는 숫자들입니다. <b>한국·중국·일본·미국</b>을 나란히 놓았습니다.') + basicsBoard();
   }
 
   function marketIndexBoard() {
@@ -3054,6 +3163,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   const NAV = [
     { id: 'home', label: '홈', icon: icon('M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z') },
     { id: 'indices', label: '지수', icon: icon('M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6') },
+    { id: 'basics', label: '생활', icon: icon('M4 8h16l-1.3 11.1a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9zM9 8V5.5a3 3 0 0 1 6 0V8') },
     { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
     { id: 'indicators', label: '경제지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
     { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
@@ -3086,6 +3196,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const v = {
       home: viewHome,
       indices: viewIndices,
+      basics: viewBasics,
       marketRegion: viewMarketRegion,
       calendar: viewCalendar,
       indicators: viewIndicators,
@@ -3107,8 +3218,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const d = t.dataset;
 
     /* 없앤 화면으로 가려 하면 대신 갈 곳으로 넘긴다 */
-    if (d.go === 'market') { state.view = 'indices'; state.idxView = 'market'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
-    if (d.go === 'basics') { state.view = 'indices'; state.idxView = 'life'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.go === 'market') { state.view = 'indices'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go === 'risk') { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go) { state.view = d.go; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.goFng) { state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
@@ -3118,7 +3228,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     if (d.riskscope) { state.riskScope = d.riskscope; return render(); }
     if (d.macrom) { state.macroMarket = d.macrom; return render(); }
     if (d.indview) { state.indView = d.indview; return render(); }
-    if (d.idxview) { state.idxView = d.idxview; return render(); }
     if (d.sort) { state.sort = d.sort; return render(); }
     if (d.onlywatch !== undefined) { state.onlyWatched = !state.onlyWatched; return render(); }
     if (d.market) { state.market = d.market; return render(); }

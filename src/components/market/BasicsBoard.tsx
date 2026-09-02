@@ -6,8 +6,7 @@
  * 뉴스에 나오는 1인당 GDP·빅맥지수 같은 말이 무슨 뜻인지 편하게 읽어 보는 판이다.
  * 투자심리 점수의 구성요소가 아니고, 매매 판단에 쓰라고 둔 것도 아니다.
  *
- * '지수' 탭의 두 보기 가운데 하나로 들어간다 (/basics). 머리와 보기 전환은
- * IndexScreen 이 그리고, 여기서는 본문만 그린다.
+ * '생활' 탭의 본문이다 (/basics). 제목은 화면 쪽에서 그린다.
  */
 
 import { useState } from 'react';
@@ -16,6 +15,7 @@ import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/S
 import { Badge } from '@/components/ui/Badge';
 import { formatNumber, formatRelative, NO_VALUE } from '@/lib/format';
 import { basicGuideFor, BASIC_GROUPS } from '@/lib/economyBasics';
+import { BasicTrend, type TrendSeries } from '@/components/charts/BasicTrend';
 import type { BasicComparison, EconomyBasic } from '@/types';
 
 /** 값 + 단위. 값이 없으면 임의로 채우지 않고 그대로 비운다. */
@@ -108,16 +108,28 @@ function Comparisons({
 /* 해설                                                                */
 /* ------------------------------------------------------------------ */
 
-function GuidePanel({ id, open, onToggle }: { id: string; open: boolean; onToggle: () => void }) {
+function GuidePanel({
+  id,
+  open,
+  onToggle,
+  caution,
+}: {
+  id: string;
+  open: boolean;
+  onToggle: () => void;
+  /** 제공사가 준 주의 문구. 카드 본문에서 접어 이리로 옮겼다. */
+  caution?: string;
+}) {
   const g = basicGuideFor(id);
   if (!g) return null;
 
   const rows: { glyph: string; label: string; text: string }[] = [
+    { glyph: 'ⓘ', label: '이게 뭔가요', text: g.headline },
     ...(g.baseline ? [{ glyph: '=', label: '기준', text: g.baseline }] : []),
     { glyph: '?', label: '어떻게 읽나요', text: g.howToRead },
     { glyph: '▲', label: '오르면', text: g.whenUp },
     { glyph: '▼', label: '내리면', text: g.whenDown },
-    { glyph: '!', label: '조심할 점', text: g.caution },
+    { glyph: '!', label: '조심할 점', text: caution ? `${caution} ${g.caution}` : g.caution },
     { glyph: '↔', label: '시장 이야기와의 연결', text: g.marketLink },
   ];
 
@@ -160,8 +172,15 @@ function GuidePanel({ id, open, onToggle }: { id: string; open: boolean; onToggl
 
 function BasicCard({ item }: { item: EconomyBasic }) {
   const [open, setOpen] = useState(false);
-  const g = basicGuideFor(item.id);
   const t = trendOf(item.value, item.previous);
+
+  // 나라별 선이 있으면 그대로, 없으면 한국 선 하나만
+  const trend: TrendSeries[] =
+    item.historyByCountry && item.historyByCountry.length > 0
+      ? item.historyByCountry
+      : item.history && item.history.length > 1
+        ? [{ label: '한국', points: item.history }]
+        : [];
 
   return (
     <li className="card p-3.5">
@@ -176,38 +195,46 @@ function BasicCard({ item }: { item: EconomyBasic }) {
         </Badge>
       </div>
 
-      {g ? <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-muted">{g.headline}</p> : null}
-
-      <div className="mt-2.5 flex items-end justify-between gap-2 border-t border-border pt-2.5">
-        <p className="tnum text-[26px] leading-none font-bold text-fg-strong">
-          {show(item.value, item.precision, item.suffix)}
-        </p>
-        <p className="tnum shrink-0 text-right text-[10.5px] text-muted">
-          {t ? (
-            <>
-              <span aria-hidden="true">{TREND_GLYPH[t]}</span>
-              <span className="sr-only">직전보다 {TREND_LABEL[t]}.</span>{' '}
-            </>
-          ) : null}
-          직전 {show(item.previous, item.precision, item.suffix)}
-        </p>
+      {/*
+       * 큰 숫자와 지나온 선을 나란히 둔다.
+       * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
+       * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다.
+       */}
+      <div className="mt-2.5 border-t border-border pt-2.5 sm:flex sm:items-start sm:gap-3">
+        <div className="shrink-0">
+          <p className="tnum text-[26px] leading-none font-bold text-fg-strong">
+            {show(item.value, item.precision, item.suffix)}
+          </p>
+          <p className="tnum mt-1 text-[10.5px] text-muted">
+            {t ? (
+              <>
+                <span aria-hidden="true">{TREND_GLYPH[t]}</span>
+                <span className="sr-only">직전보다 {TREND_LABEL[t]}.</span>{' '}
+              </>
+            ) : null}
+            직전 {show(item.previous, item.precision, item.suffix)}
+          </p>
+        </div>
+        {trend.length > 0 ? (
+          <div className="mt-2 min-w-0 flex-1 sm:mt-0">
+            <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
+          </div>
+        ) : null}
       </div>
 
       <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-fg">{item.reading}</p>
 
-      {item.officialNote ? (
-        <p className="mt-1.5 rounded-lg bg-surface-2 px-2 py-1.5 text-[10.5px] leading-relaxed break-keep text-subtle">
-          <span aria-hidden="true">△ </span>
-          {item.officialNote}
-        </p>
-      ) : null}
-
       <Comparisons items={item.comparisons} note={item.comparisonNote} sameScale={item.sameScale} />
 
-      <GuidePanel id={item.id} open={open} onToggle={() => setOpen((v) => !v)} />
+      {/*
+       * 개념 설명 · 조심할 점은 접어 둔다.
+       * 아홉 장이 나란히 서면 카드마다 서너 문단이라 훑을 수가 없었다.
+       * 숫자를 보러 온 사람은 숫자만 보고, 궁금해진 사람만 펼친다.
+       */}
+      <GuidePanel id={item.id} open={open} onToggle={() => setOpen((v) => !v)} caution={item.officialNote} />
 
       <p className="mt-2 border-t border-border pt-2 text-[10px] text-subtle">
-        {item.asOfLabel} · 기준 {formatRelative(item.meta.asOf)} · 출처 {item.meta.sources[0]?.name ?? '알 수 없음'}
+        {item.asOfLabel} · 출처 {item.meta.sources[0]?.name ?? '알 수 없음'}
       </p>
     </li>
   );

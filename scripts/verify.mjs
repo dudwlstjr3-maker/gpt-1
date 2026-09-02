@@ -712,18 +712,18 @@ async function main() {
     check('지표 탭 이름이 경제지표로 구분됨', idx.includes('>경제지표<'));
     check('지수와 지표 이름이 서로 다름', !idx.match(/>지표</));
 
-    // 지수 탭은 두 보기를 갖는다 — 시장 지수 / 생활 경제 지수
-    check('지수 화면에 보기 전환이 있음', idx.includes('>시장 지수<') && idx.includes('>생활 경제 지수<'));
+    // 생활 경제 지수는 이제 제 탭이다 — 지수 화면 안에 보기 전환이 남아 있으면 안 된다
+    check('생활 탭이 따로 있음', idx.includes('href="/basics"') && idx.includes('>생활<'));
+    check('지수 화면에 보기 전환이 없음', !idx.includes('aria-label="지수 보기"'));
+    check('지수 화면에 생활 경제 지수 본문이 없음', !idx.includes('투자심리 점수의 구성요소가 아닙니다'));
 
-    // 보기를 바꾸는 일은 화면을 옮기는 일이 아니다. 주소를 건드리면 Next 가
-    // 화면 이동으로 받아 맨 위로 스크롤하고, 뒤로가기가 탭을 벗어나지 못한다.
-    // 브라우저 없이 확인할 수 없는 동작이라 원본에서 막아 둔다.
-    // (주석에는 왜 그렇게 했는지 적혀 있으므로 주석을 걷어내고 본다)
-    const shell = (await readFile('src/components/market/IndexScreen.tsx', 'utf8'))
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/\/\/.*$/gm, '');
-    for (const bad of ['router.push', 'router.replace', 'history.replaceState', 'history.pushState']) {
-      check(`보기 전환이 ${bad} 를 쓰지 않음`, !shell.includes(bad));
+    // 일곱 칸이 320px 에 들어가야 한다. 가장 긴 이름이 네 글자를 넘으면 넘친다.
+    const labels = [...idx.matchAll(/href="(\/[a-z]*)"[^>]*aria-current[^>]*>|href="(\/[a-z]*)"/g)];
+    check('하단 탭이 일곱 칸', (idx.match(/href="\/(|indices|basics|indicators|calendar|watchlist|more)"/g) ?? []).length >= 7,
+      `${labels.length}개 링크`);
+    for (const [href, label, max] of [['/basics', '생활', 2], ['/watchlist', '관심', 2], ['/indicators', '경제지표', 4]]) {
+      check(`탭 이름 ${label} 이 ${max}자 이하`, label.length <= max);
+      check(`탭 ${label} 이 ${href} 를 가리킴`, idx.includes(`href="${href}"`));
     }
 
     // 세 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다)
@@ -765,15 +765,14 @@ async function main() {
     check('지수 화면에 한국 시장 화면 링크는 없음', !idx.includes('/market/kr'));
   }
 
-  /* ---------------- 8-5. 생활 경제 지수 (지수 탭의 두 번째 보기) ---------------- */
+  /* ---------------- 8-5. 생활 탭 ---------------- */
   console.log('\n[8-5] 생활 경제 지수');
   {
     const life = await (await fetch(`${BASE}/basics`)).text();
 
-    // 같은 껍데기, 다른 보기. 머리와 전환은 그대로 있어야 한다.
-    check('생활 경제 지수도 지수 탭 껍데기를 씀',
-      life.includes('>시장 지수<') && life.includes('>생활 경제 지수<'));
-    check('생활 경제 지수 머리가 바뀜', life.includes('생활 속 경제 이야기'));
+    // 제 탭을 가졌으니 제 머리를 갖는다. 지수 탭의 껍데기를 빌려 쓰지 않는다.
+    check('생활 화면에 제 제목이 있음', life.includes('>생활 경제 지수</h1>'));
+    check('생활 화면에 보기 전환이 없음', !life.includes('aria-label="지수 보기"'));
     // 시장 지수 본문이 같이 그려지면 한 화면에 두 목록이 겹친다
     check('시장 지수 본문은 그리지 않음', !life.includes('지수 숫자를 읽는 법'));
 
@@ -801,7 +800,54 @@ async function main() {
     for (const b of basics) {
       check(`[${b.id}] 발표 기관이 있음`, Boolean(b.meta?.sources?.[0]?.name), b.meta?.sources?.[0]?.name ?? '없음');
       check(`[${b.id}] 네 나라 비교가 있음`, (b.comparisons ?? []).length === 4, `${(b.comparisons ?? []).length}개국`);
+      // 비교의 중심이 어디인지 표시돼야 화면이 그 줄을 굵게 그린다
+      check(`[${b.id}] 비교의 중심이 한 곳뿐`,
+        (b.comparisons ?? []).filter((c) => c.primary).length === 1,
+        `${(b.comparisons ?? []).filter((c) => c.primary).length}개`);
     }
+
+    /*
+     * 그래프. 이 화면의 값은 1년에 한두 번만 바뀌어서 숫자 하나로는 높은지 낮은지
+     * 알 수가 없다. 지나온 선이 그 물음을 답한다.
+     */
+    for (const b of basics) {
+      const byC = b.historyByCountry ?? [];
+      check(`[${b.id}] 나라별 시계열이 넷`, byC.length === 4, `${byC.length}개`);
+      check(`[${b.id}] 시계열이 두 점 이상`, byC.every((h) => (h.points ?? []).length >= 2),
+        byC.map((h) => (h.points ?? []).length).join('/'));
+      // 비교표의 이름과 선의 이름이 어긋나면 어느 선이 어느 나라인지 알 수 없다
+      const cmpLabels = (b.comparisons ?? []).map((c) => c.label).join('|');
+      check(`[${b.id}] 선 이름이 비교표와 같음`, byC.map((h) => h.label).join('|') === cmpLabels,
+        byC.map((h) => h.label).join('|'));
+
+      /*
+       * 카드에는 "▼ 직전 42,726달러" 가 찍힌다. 선이 그 값을 지나지 않으면
+       * 화살표는 큰 하락을 말하는데 그림은 평평해서 둘 중 하나가 거짓말이 된다.
+       */
+      const kr = b.history ?? [];
+      if (b.previous !== null && b.previous !== undefined && kr.length > 1) {
+        const r = (v) => Number(v.toFixed(b.precision));
+        check(`[${b.id}] 직전값이 시계열 위에 있음`, r(kr[kr.length - 2].v) === r(b.previous),
+          `선 ${r(kr[kr.length - 2].v)} vs 직전 ${r(b.previous)}`);
+      }
+      // 선의 마지막 점은 카드에 크게 찍히는 값과 같아야 한다
+      if (b.value !== null && kr.length > 0) {
+        const r = (v) => Number(v.toFixed(b.precision));
+        check(`[${b.id}] 시계열 끝이 현재값과 같음`, r(kr[kr.length - 1].v) === r(b.value),
+          `선 ${r(kr[kr.length - 1].v)} vs 값 ${r(b.value)}`);
+      }
+    }
+
+    // 그림을 못 보는 사람에게도 같은 내용이 가야 한다 (이 앱의 모든 차트가 그렇다)
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    check('그래프에 표 대안이 있음', trend.includes('표로 보기') && trend.includes('<table'));
+    check('그래프에 그림 설명이 있음', trend.includes('role="img"') && trend.includes('aria-labelledby'));
+    // 비교선 셋을 한 칸에 묶은 범례로는 어느 선이 어느 나라인지 알 수 없었다.
+    // 이름은 선 끝에 직접 붙인다.
+    check('나라 이름이 선 끝에 붙음', trend.includes('shortLabel(e.label)'));
+    // 눈금이 없으면 "미국이 위에 있다" 까지만 알고 얼마나 위인지는 알 수 없다
+    check('그래프에 값 눈금이 있음', /\{fmt\(g\.v\)\}/.test(trend));
+    check('이름표가 서로 겹치지 않게 밀어냄', trend.includes('function spread('));
   }
 
   /* ---------------- 8-6. 공포·탐욕 구성요소 개수 ---------------- */
@@ -937,6 +983,28 @@ async function main() {
     for (const id of ['us_new_high_low', 'us_volume_breadth', 'vkospi_level', 'kr_foreign_net_20d']) {
       check(`[${id}] 못 받는 지표에 사유가 있음`, eq.includes(`${id}:`));
     }
+
+    /*
+     * 생활 경제 지수 — 세계은행(연 1회)과 이코노미스트 빅맥지수(연 2회).
+     * 아홉 가운데 다섯만 닿는다. 나머지 넷은 무료로 받을 길이 없어서 비워 둔다.
+     * 못 닿는 것을 지어내지 않는 것이 이 화면의 유일한 규칙이다.
+     */
+    const basicsSrc = await readFile('src/server/adapters/live/basics.ts', 'utf8');
+    check('세계은행 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/worldbank.ts'));
+    check('빅맥지수 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/bigmac.ts'));
+    check('생활 경제 지수가 연결됨', live.includes('buildLiveBasics'));
+    check('생활 경제 지수가 세계은행을 씀', basicsSrc.includes('fetchIndicator'));
+    check('생활 경제 지수가 빅맥지수를 씀', basicsSrc.includes('fetchBigMac'));
+    check('실데이터에도 나라별 시계열이 붙음', basicsSrc.includes('historyByCountry'));
+    // 세계은행은 나라마다 마지막 발표 연도가 다르다. 말하지 않으면 같은 해로 읽힌다.
+    check('기준 연도가 다르면 밝힘', basicsSrc.includes('기준 연도가 나라마다 다릅니다'));
+    // 무료로 못 받는 넷은 왜 없는지 원본에 적어 둔다
+    for (const what of ['엥겔계수', 'PIR', 'OECD 경기선행지수']) {
+      check(`못 받는 지표 사유: ${what}`, basicsSrc.includes(what));
+    }
+    // 값을 못 받으면 빈 목록이지, 0 이나 지어낸 값이 아니다
+    check('생활 경제 지수가 실패를 0 으로 채우지 않음',
+      basicsSrc.includes('return null;') && !/\|\|\s*0[,;)]/.test(basicsSrc));
 
     // 아직 안 붙은 곳은 조용히 빈 값을 만들지 않고 오류를 던진다
     for (const what of ['getFlows', 'getCalendar', 'getNews']) {

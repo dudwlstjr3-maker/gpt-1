@@ -903,6 +903,36 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     sameScale?: boolean,
   ): EconomyBasic => {
     const missing = broken && PARTIAL_BROKEN_BASICS.has(id);
+    /*
+     * 지나온 값. 실데이터에서는 세계은행·이코노미스트가 수십 년치를 주므로,
+     * DEMO 도 같은 모양을 갖춰야 화면이 두 모드에서 똑같이 그려진다.
+     * 나라별 마지막 값에서 거꾸로 걸어가며 만든다 — 날짜 키로 시드가 정해져
+     * 매번 같은 선이 나온다.
+     */
+    const years = 16;
+    const walk = (endValue: number | null, seedKey: string, prevValue?: number | null): SeriesPoint[] => {
+      if (endValue === null) return [];
+      const rnd = mulberry32(hashSeed(`${id}:${seedKey}`));
+      const pts: SeriesPoint[] = [];
+      let v = endValue;
+      for (let k = 0; k < years; k += 1) {
+        pts.push({ t: Date.UTC(new Date(ctx.now).getUTCFullYear() - k, 0, 1), v: round(v, precision + 2) });
+        // 직전 발표값은 카드에 "▼ 직전 42,726달러" 로 그대로 찍힌다. 선이 그 값을
+        // 지나지 않으면 화살표는 큰 하락을 말하는데 그림은 평평해서, 둘 중 하나가
+        // 거짓말을 하는 꼴이 된다. 그래서 한 해 전 자리는 걸음이 아니라 그 값이다.
+        if (k === 0 && prevValue !== null && prevValue !== undefined) v = prevValue;
+        // 해마다 조금씩 되돌린다. 폭은 값의 크기에 비례시켜 단위가 달라도 자연스럽게 보이게.
+        else v = v / (1 + (rnd() - 0.42) * 0.06);
+      }
+      return pts.reverse();
+    };
+
+    const historyByCountry = missing
+      ? undefined
+      : comparisons
+          .filter((c) => c.value !== null)
+          .map((c) => ({ label: c.label, points: walk(c.value, c.label, c.primary ? previous : undefined) }));
+
     return {
       id,
       name,
@@ -913,6 +943,12 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       suffix,
       reading: missing ? '이번 갱신에서 값을 받지 못했습니다. 빈 값을 임의로 채우지 않습니다.' : reading,
       comparisons: missing ? comparisons.map((c) => ({ ...c, value: null })) : comparisons,
+      ...(historyByCountry && historyByCountry.length
+        ? {
+            history: historyByCountry.find((h) => h.label === '한국')?.points ?? historyByCountry[0].points,
+            historyByCountry,
+          }
+        : {}),
       asOfLabel,
       official,
       ...(officialNote ? { officialNote } : {}),
@@ -1023,7 +1059,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '%',
       `빅맥 값으로 계산한 환율은 ${won(bigmacRate)}인데 시장 환율은 ${won(
         fx(i),
-      )}입니다. 빅맥으로 재보면 ${gapWords(bigmacNow)}는 뜻입니다. 아래 네 나라 숫자는 모두 달러를 기준(0%)으로 놓고 각 통화가 몇 % 어긋나 있는지이며, 마이너스면 그만큼 싸다는 의미입니다.`,
+      )}입니다. 빅맥으로 재보면 ${gapWords(bigmacNow)}는 뜻입니다.`,
       four(
         round(bigmacNow, 1),
         round(undervalued(BASIC_PRICES.bigmacCny / BASIC_PRICES.bigmacUsd, fxCny(i)), 1),
@@ -1035,6 +1071,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       ),
       '연 2회 발표 · 직전 값은 약 6개월 전',
       true,
+      undefined,
+      '네 숫자 모두 달러를 기준(0%)으로 놓고 각 통화가 몇 % 어긋나 있는지입니다. 마이너스면 그만큼 싸다는 뜻입니다.',
     ),
 
     mk(
@@ -1047,7 +1085,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '%',
       `물가 바구니로 계산한 적정 환율은 ${won(BASIC_PRICES.pppKrwPerUsd)}인데 시장 환율은 ${won(
         fx(i),
-      )}입니다. 물가로 재보면 ${gapWords(pppNow)}는 뜻이며, 빅맥 하나 대신 수백 개 품목으로 계산했다는 점이 빅맥지수와 다릅니다. 아래 숫자도 달러를 기준(0%)으로 놓은 값입니다.`,
+      )}입니다. 물가로 재보면 ${gapWords(pppNow)}는 뜻이며, 빅맥 하나 대신 수백 개 품목으로 계산했다는 점이 빅맥지수와 다릅니다.`,
       four(
         round(pppNow, 1),
         round(undervalued(BASIC_PRICES.pppCnyPerUsd, fxCny(i)), 1),
@@ -1059,6 +1097,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       ),
       '연 1회 갱신 · 직전 값은 1년 전',
       true,
+      undefined,
+      '빅맥지수와 마찬가지로 달러를 기준(0%)으로 놓은 값입니다.',
     ),
 
     mk(
@@ -1087,7 +1127,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       '배',
       `서울은 ${B.pirSeoul}배입니다. 소득을 한 푼도 안 쓰고 ${Math.round(
         B.pirSeoul,
-      )}년을 모아야 집 한 채 값이 된다는 뜻입니다. 아래는 나라 전체가 아니라 각국 대표 도시끼리의 비교입니다.`,
+      )}년을 모아야 집 한 채 값이 된다는 뜻입니다.`,
       fourLabeled(
         ['서울', '베이징', '도쿄', '뉴욕'],
         [B.pirSeoul, B.pirBeijing, B.pirTokyo, B.pirNewYork],

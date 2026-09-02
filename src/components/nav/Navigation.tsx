@@ -10,8 +10,6 @@ interface NavItem {
   href: string;
   label: string;
   icon: ReactNode;
-  /** 같은 탭에 속한 다른 주소 (보기만 다른 경우) */
-  also?: string[];
 }
 
 const I = ({ d }: { d: string }) => (
@@ -29,26 +27,29 @@ const I = ({ d }: { d: string }) => (
  * 물건이 아니라 시장의 온도계라서 — 홈의 가격 목록에 섞여 있으면 잘 안 보였다.
  * 세 시장의 지수를 모아 둔 화면이 시장별 화면으로 들어가는 입구도 겸한다.
  *
- * 그 탭은 두 보기를 갖는다 — 시장 지수(/indices)와 생활 경제 지수(/basics).
- * 빅맥지수·1인당 GDP 같은 값도 지수라서 한 탭에 두었다. 칸을 하나 더 늘리지
- * 않은 것은 320px 에서 일곱 칸이면 글자가 뭉개지기 때문이다.
+ * '생활' 도 탭이다. 한동안 지수 탭 안의 두 번째 보기로 접어 두었는데, 320px
+ * 에서 일곱 칸이면 글자가 뭉개질까 걱정해서였다. 재어 보니 아니었다 — 가장 긴
+ * 이름이 네 글자(38px)이고 한 칸이 45.7px 이라 남는다. 걱정 하나 때문에 성격이
+ * 다른 두 화면을 겹쳐 둘 이유는 없어서 갈라 놓았다. '관심목록' 은 '관심' 으로
+ * 줄였다 — 별 모양 아이콘이 이미 나머지 두 글자를 말하고 있다.
  *
  * '지수' 와 '지표' 는 한 글자 차이라 10px 로 나란히 놓으면 구분되지 않는다.
- * 그래서 지표 쪽 이름을 '경제지표' 로 늘렸다.
+ * 그래서 지표 쪽 이름을 '경제지표' 로 늘렸다. 같은 이유로 생활 경제 지수는
+ * '생활지수' 가 아니라 '생활' 이다.
  */
 const NAV: NavItem[] = [
   { href: '/', label: '홈', icon: <I d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
-  { href: '/indices', label: '지수', also: ['/basics'], icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
+  { href: '/indices', label: '지수', icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
+  { href: '/basics', label: '생활', icon: <I d="M4 8h16l-1.3 11.1a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9zM9 8V5.5a3 3 0 0 1 6 0V8" /> },
   { href: '/indicators', label: '경제지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
   { href: '/calendar', label: '캘린더', icon: <I d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4" /> },
-  { href: '/watchlist', label: '관심목록', icon: <I d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6L12 16.9 7 19.5l1-5.6-4-3.9 5.5-.8z" /> },
+  { href: '/watchlist', label: '관심', icon: <I d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6L12 16.9 7 19.5l1-5.6-4-3.9 5.5-.8z" /> },
   { href: '/more', label: '더보기', icon: <I d="M4 7h16M4 12h16M4 17h10" /> },
 ];
 
 function isActive(pathname: string, item: NavItem): boolean {
   if (item.href === '/') return pathname === '/';
-  const hit = (h: string) => pathname === h || pathname.startsWith(`${h}/`);
-  return hit(item.href) || (item.also ?? []).some(hit);
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 export function BottomTabs() {
@@ -67,7 +68,7 @@ export function BottomTabs() {
               <Link
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="flex flex-col items-center gap-0.5 px-0.5 py-2 text-[9.5px] font-semibold whitespace-nowrap transition-colors"
+                className="flex min-w-0 flex-col items-center gap-0.5 px-px py-2 text-[9.5px] font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)' }}
               >
                 {item.icon}
@@ -87,7 +88,7 @@ export function DesktopSidebar() {
     <aside className="sticky top-0 hidden h-screen w-56 shrink-0 border-r border-border px-3 py-4 lg:block">
       <div className="mb-5 px-2">
         <p className="text-base font-bold text-fg-strong">Market Mood 3</p>
-        <p className="mt-0.5 text-[11px] text-subtle">미국 · 한국 · 크립토 투자심리</p>
+        <p className="mt-0.5 text-[11px] text-subtle">미국 · 크립토 투자심리와 지수</p>
       </div>
       <nav aria-label="주요 메뉴">
         <ul className="space-y-0.5">
@@ -139,10 +140,7 @@ export function DesktopSidebar() {
 
       <div className="mt-4 border-t border-border pt-3">
         <ul className="space-y-0.5">
-          {[
-            { href: '/indicators', label: '경제 · 위험 지표' },
-            { href: '/alerts', label: '알림 설정' },
-          ].map((s) => (
+          {[{ href: '/alerts', label: '알림 설정' }].map((s) => (
             <li key={s.href}>
               <Link
                 href={s.href}

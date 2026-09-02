@@ -17,6 +17,9 @@ import { AdapterNotConfiguredError, fetchJson } from '@/server/http';
 import { catalogFor } from '@/lib/catalog';
 import { buildCryptoFngInput } from './crypto';
 import { buildFredMacro } from './macro';
+import { buildLiveBasics } from './basics';
+import { bigMacConfig } from './providers/bigmac';
+import { worldBankConfig } from './providers/worldbank';
 import { binanceConfig } from './providers/binance';
 import {
   COIN_ID,
@@ -342,8 +345,12 @@ export class LiveAdapter implements MarketAdapter {
    * 애초에 견줄 수 없는 지표라면 comparisonNote 에 이유를 적는다 (sameScale: false 면 막대도 빠진다).
    * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다.
    */
-  async getBasics(_ctx: AdapterContext): Promise<EconomyBasic[]> {
-    throw new NotWiredError('생활 속 경제 이야기', 'src/server/adapters/live/index.ts > LiveAdapter.getBasics');
+  async getBasics(ctx: AdapterContext): Promise<EconomyBasic[]> {
+    return buildLiveBasics({
+      wb: worldBankConfig(envUrl('WORLDBANK_BASE_URL')),
+      bigmac: bigMacConfig(envUrl('BIGMAC_CSV_URL')),
+      now: ctx.now,
+    });
   }
 
   /* --------------------------- 예측시장 --------------------------- */

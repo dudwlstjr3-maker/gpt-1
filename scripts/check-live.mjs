@@ -118,11 +118,41 @@ await probeText('주식 풋/콜 비율',
   'https://cdn.cboe.com/api/global/us_indices/daily_statistics/Cboe_Volume_And_Put_Call_Ratios.csv',
   (b) => `${b.trim().split(/\r?\n/).length - 1}줄`);
 
+const WB = process.env.WORLDBANK_BASE_URL || 'https://api.worldbank.org/v2';
+const BIGMAC = process.env.BIGMAC_CSV_URL
+  || 'https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv';
+
+console.log('\n[생활 경제 지수] 세계은행 · 이코노미스트 — 키 없이 됩니다 (연 1~2회 갱신)');
+for (const [label, ind] of [
+  ['1인당 GDP', 'NY.GDP.PCAP.CD'],
+  ['지니계수', 'SI.POV.GINI'],
+  ['물가상승률', 'FP.CPI.TOTL.ZG'],
+  ['실업률', 'SL.UEM.TOTL.ZS'],
+  ['PPP 환산계수', 'PA.NUS.PPP'],
+  ['시장 환율', 'PA.NUS.FCRF'],
+]) {
+  await probe(label, `${WB}/country/KR;CN;JP;US/indicator/${ind}?format=json&per_page=8&mrnev=2`,
+    (b) => {
+      const rows = (Array.isArray(b) ? b[1] : null) ?? [];
+      const kr = rows.find((r) => r?.countryiso3code === 'KOR' || r?.country?.id === 'KR');
+      return kr ? `한국 ${kr.date} = ${kr.value}  (전체 ${rows.length}행)` : `${rows.length}행 · 한국 없음`;
+    });
+}
+await probeText('빅맥지수', BIGMAC, (b) => {
+  const lines = b.trim().split(/\r?\n/);
+  const head = lines[0].split(',').map((h) => h.trim());
+  const i = { iso: head.indexOf('iso_a3'), date: head.indexOf('date'), usd: head.indexOf('USD_raw') };
+  const kr = lines.slice(1).filter((l) => l.split(',')[i.iso] === 'KOR').at(-1)?.split(',');
+  return kr ? `한국 ${kr[i.date]} · 달러 대비 ${(Number(kr[i.usd]) * 100).toFixed(1)}%  (전체 ${lines.length - 1}행)` : `${lines.length - 1}행 · 한국 없음`;
+});
+
 console.log('\n[아직 못 붙인 것]');
 console.log('  · 한국 투자자별 순매수 · VKOSPI · 전종목 등락 — 무료 실시간 소스가 없습니다.');
 console.log('    (증권사 계좌 API 나 공공데이터포털 일별 데이터가 필요합니다)');
 console.log('  · 미국 52주 신고가/신저가 · 거래량 등락 폭 — 무료로 공개하는 곳이 없습니다.');
 console.log('  · 경제 캘린더 · 뉴스 — 제공사 미정.');
+console.log('  · 엥겔계수 · PIR · OECD 경기선행지수 · 소비자심리지수 — 무료 API 가 없거나');
+console.log('    기관마다 정의가 달라 한 숫자로 못 모읍니다. 생활 경제 지수 아홉 중 다섯만 실데이터입니다.')
 
 console.log(`\n결과: ${ok}건 성공, ${bad}건 실패`);
 if (ok === 0) {
@@ -135,5 +165,7 @@ if (ok === 0) {
   console.log('  크립토 약 85%  → 산출됩니다');
   console.log('  미국   약 71%  → 산출됩니다 (Cboe 풋/콜이 있어야 넘습니다)');
   console.log('  한국   시장에서 제외 — KOSPI·KOSDAQ 시세는 지수 화면에 남습니다');
+  console.log('');
+  console.log('생활 경제 지수 — 아홉 중 다섯 (1인당 GDP · 지니계수 · 미저리 · PPP 괴리 · 빅맥지수)');
 }
 process.exit(bad > 0 && ok === 0 ? 1 : 0);

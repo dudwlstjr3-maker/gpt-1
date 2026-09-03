@@ -14,9 +14,10 @@ import { ErrorState, SkeletonCard } from '@/components/ui/States';
 import { convertCurrency, formatKoreanCompact, formatKstFull, NO_VALUE } from '@/lib/format';
 import { CATALOG_BY_ID } from '@/lib/catalog';
 import { DIRECTION_LABEL } from '@/lib/scale';
-import { MARKET_LABEL, type AssetDetail, type RangeKey } from '@/types';
+import { ASSET_RANGES, MARKET_LABEL, type AssetDetail, type RangeKey } from '@/types';
 
-const RANGES: RangeKey[] = ['1D', '1W', '1M', '3M', '1Y'];
+// API 가 채우는 구간과 같아야 한다. 한 곳(@/types)에서 정한다.
+const RANGES = ASSET_RANGES;
 const RANGE_LABEL: Record<RangeKey, string> = {
   '1D': '1일',
   '1W': '1주',
@@ -257,7 +258,7 @@ export default function AssetPage() {
             series={series}
             height={250}
             label={`${q.name} ${RANGE_LABEL[range]} 가격 추이${overlay ? ` 및 ${MARKET_LABEL[q.market]} 심리 점수` : ''}`}
-            emptyMessage="해당 기간의 시계열 데이터가 없습니다."
+            emptyMessage={detail.unavailable?.[range] ?? '해당 기간의 시계열 데이터가 없습니다.'}
           />
           {overlay ? (
             <p className="mt-2 text-[10px] break-keep text-subtle">

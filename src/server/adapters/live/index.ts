@@ -13,14 +13,14 @@
  */
 
 import { getKeys } from '@/server/config';
-import { AdapterNotConfiguredError, fetchJson } from '@/server/http';
+import { AdapterNotConfiguredError, SeriesUnavailableError, fetchJson } from '@/server/http';
 import { catalogFor } from '@/lib/catalog';
 import { buildCryptoFngInput } from './crypto';
 import { buildFredMacro } from './macro';
 import { buildLiveBasics } from './basics';
 import { bigMacConfig } from './providers/bigmac';
 import { worldBankConfig } from './providers/worldbank';
-import { binanceConfig } from './providers/binance';
+import { binanceConfig, fetchFundingHistory, fetchOpenInterestHistory } from './providers/binance';
 import {
   COIN_ID,
   COINGECKO_SOURCE,
@@ -31,7 +31,7 @@ import {
   fetchStablecoinMcap,
   type CoinGeckoConfig,
 } from './providers/coingecko';
-import { fetchLatest, fredConfig, type FredConfig } from './providers/fred';
+import { fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
 import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
@@ -59,6 +59,45 @@ class NotWiredError extends Error {
     super(`${what} 의 LIVE 연결이 아직 구현되지 않았습니다. 구현 위치: ${where}`);
     this.name = 'NotWiredError';
   }
+}
+
+/** 상세 차트를 FRED 에서 받는 종목. 카탈로그 id → FRED 계열 키. */
+const ASSET_FRED_SERIES: Record<string, FredSeriesKey | undefined> = {
+  ust2: 'ust2',
+  ust10: 'ust10',
+  us_spread_10_2: 'us_spread',
+};
+
+/**
+ * 무료로는 과거 시계열을 받을 길이 없는 종목과 그 이유.
+ *
+ * 값(현재가)은 받아 오지만 지나온 선은 못 그리는 것들이다. 화면이 빈 상자만
+ * 보여주면 사람은 고장인 줄 알고 새로고침을 누른다. 그래서 이유를 적어 둔다.
+ */
+const NO_FREE_SERIES: Record<string, string | undefined> = {
+  /* 크립토 시장 전체 지표 — CoinGecko 는 과거 전체 시총·도미넌스를 유료로만 준다 */
+  total_mcap: 'CoinGecko 무료 API 는 시장 전체 시가총액의 과거 값을 주지 않습니다 (유료 플랜 전용).',
+  total_vol: 'CoinGecko 무료 API 는 전체 거래대금의 과거 값을 주지 않습니다 (유료 플랜 전용).',
+  btc_dom: 'CoinGecko 무료 API 는 도미넌스의 과거 값을 주지 않습니다 (유료 플랜 전용).',
+  stable_mcap: 'CoinGecko 무료 API 는 스테이블코인 시총의 과거 값을 주지 않습니다 (유료 플랜 전용).',
+  liquidations: '청산 규모를 무료로 공개하는 거래소가 없습니다.',
+  /* 한국 — 무료 실시간 소스가 없어 시장 자체를 뺐다. 지수 시세만 Stooq 로 남아 있다. */
+  kospi200: 'KOSPI 200 은 무료로 과거 시계열을 주는 곳이 없습니다. KOSPI · KOSDAQ 은 지수 화면에 있습니다.',
+  vkospi: 'VKOSPI 는 KRX 유료 데이터입니다.',
+  ktb3: '국고채 금리는 한국은행 ECOS 연결이 필요합니다.',
+  ktb10: '국고채 금리는 한국은행 ECOS 연결이 필요합니다.',
+  samsung: '한국 개별주는 무료 실시간·과거 시세 소스가 없습니다 (증권사 계좌 API 가 필요합니다).',
+  hynix: '한국 개별주는 무료 실시간·과거 시세 소스가 없습니다 (증권사 계좌 API 가 필요합니다).',
+  hyundai: '한국 개별주는 무료 실시간·과거 시세 소스가 없습니다 (증권사 계좌 API 가 필요합니다).',
+  naver: '한국 개별주는 무료 실시간·과거 시세 소스가 없습니다 (증권사 계좌 API 가 필요합니다).',
+  kakao: '한국 개별주는 무료 실시간·과거 시세 소스가 없습니다 (증권사 계좌 API 가 필요합니다).',
+};
+
+/** FRED 는 시작 날짜로 자른다. 여유를 조금 둬야 휴일로 앞이 비지 않는다. */
+function startDateFor(range: RangeKey): string {
+  const days: Record<RangeKey, number> = { '1D': 7, '1W': 14, '1M': 45, '3M': 120, '1Y': 400, '3Y': 1150 };
+  const d = new Date(Date.now() - days[range] * 86_400_000);
+  return d.toISOString().slice(0, 10);
 }
 
 /** 달러 → 십억 달러. 화면이 usd_bn 단위로 그린다. */
@@ -421,18 +460,82 @@ export class LiveAdapter implements MarketAdapter {
   }
 
   /* -------------------------- 종목 상세 차트 -------------------------- */
-  /** TODO(연결지점 8): 종목 상세 차트 (1D 는 분봉, 나머지는 일봉). */
+
+  /**
+   * 종목 상세 차트.
+   *
+   * 구간마다 받을 수 있는 곳이 다르고, **받을 수 없는 구간이 종목마다 다르다.**
+   * 예전에는 못 받는 구간을 다른 구간 데이터로 슬쩍 메웠다 —
+   * 코인 3년치를 달라고 하면 30일치를 주고, Stooq 에 1일치를 달라고 하면
+   * 5일치 일봉을 줬다. 화면에는 "3년" · "1일" 이라고 적혀 있으니 그대로 거짓말이다.
+   * 지금은 못 받으면 못 받는다고 하고, 왜 못 받는지를 같이 올려보낸다.
+   */
   async getAssetSeries(id: string, range: RangeKey, _ctx: AdapterContext): Promise<SeriesPoint[]> {
+    /* 코인 — CoinGecko. 무료 티어는 과거 365일까지만 준다. */
     const coin = COIN_ID[id];
     if (coin) {
       const days: Partial<Record<RangeKey, number>> = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
-      return fetchCoinSeries(this.coinGecko(), coin, days[range] ?? 30);
+      const d = days[range];
+      if (d === undefined) {
+        throw new SeriesUnavailableError(
+          'CoinGecko 무료 API 는 과거 365일까지만 줍니다. 3년 구간은 유료 플랜이 필요합니다.',
+        );
+      }
+      return fetchCoinSeries(this.coinGecko(), coin, d);
     }
+
+    /* 미국 국채 금리와 장단기 금리차 — FRED. 발표 즉시 갱신되는 일별 계열이다. */
+    const fredKey = ASSET_FRED_SERIES[id];
+    if (fredKey) {
+      const cfg = this.fred();
+      if (!cfg) throw new AdapterNotConfiguredError(`${id} 시계열(FRED)`, ['MACRO_API_KEY']);
+      if (range === '1D') {
+        throw new SeriesUnavailableError('국채 금리는 하루 한 번 발표됩니다. 하루 안의 움직임은 없습니다.');
+      }
+      return fetchSeries(cfg, fredKey, { start: startDateFor(range) });
+    }
+
+    /* 펀딩비 · 미결제약정 — Binance. 둘 다 보관 기간이 짧다. */
+    if (id === 'funding' || id === 'open_interest') {
+      const cfg = binanceConfig(envUrl('CRYPTO_DERIV_BASE_URL'));
+      if (id === 'funding') {
+        // 8시간마다 한 번 정산되므로 하루에 세 점이다. 1일 구간은 선이 되지 않는다.
+        const counts: Partial<Record<RangeKey, number>> = { '1W': 21, '1M': 90, '3M': 270 };
+        const n = counts[range];
+        if (n === undefined) {
+          throw new SeriesUnavailableError(
+            range === '1D'
+              ? '펀딩비는 8시간마다 한 번 정산됩니다. 하루치로는 점 세 개뿐이라 그리지 않습니다.'
+              : 'Binance 공개 API 가 주는 펀딩비 이력의 한계를 넘는 구간입니다.',
+          );
+        }
+        return fetchFundingHistory(cfg, 'BTCUSDT', n);
+      }
+      // 미결제약정 이력은 무료 엔드포인트가 최근 30일까지만 준다
+      const oi: Partial<Record<RangeKey, { period: '1h' | '4h' | '1d'; limit: number }>> = {
+        '1D': { period: '1h', limit: 24 },
+        '1W': { period: '4h', limit: 42 },
+        '1M': { period: '1d', limit: 30 },
+      };
+      const spec = oi[range];
+      if (!spec) {
+        throw new SeriesUnavailableError('Binance 무료 미결제약정 이력은 최근 30일까지만 제공합니다.');
+      }
+      return fetchOpenInterestHistory(cfg, 'BTCUSDT', spec.period, spec.limit);
+    }
+
+    /* 지수 · 개별주 · 원자재 — Stooq. 일봉만 있다. */
     if (STOOQ_SYMBOL[id]) {
-      const days: Partial<Record<RangeKey, number>> = { '1D': 5, '1W': 10, '1M': 35, '3M': 100, '1Y': 400, '3Y': 1200 };
-      // Stooq 무료 CSV 는 일봉만 준다. 1D 는 분봉이 없어 최근 며칠을 대신 보여준다.
+      if (range === '1D') {
+        throw new SeriesUnavailableError('Stooq 무료 CSV 는 일봉만 있어 하루 안의 움직임을 그릴 수 없습니다.');
+      }
+      const days: Partial<Record<RangeKey, number>> = { '1W': 10, '1M': 35, '3M': 100, '1Y': 400, '3Y': 1200 };
       return fetchDailySeries(stooqConfig(null), id, days[range] ?? 35);
     }
+
+    /* 여기까지 왔으면 무료로 받을 길이 없는 값이다. 사유를 그대로 올려보낸다. */
+    const why = NO_FREE_SERIES[id];
+    if (why) throw new SeriesUnavailableError(why);
     throw new NotWiredError(`${id} ${range} 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getAssetSeries');
   }
 

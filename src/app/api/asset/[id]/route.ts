@@ -8,7 +8,9 @@ import { getAdapter } from '@/server/adapters/registry';
 import { computeFng } from '@/server/fng/engine';
 import { CATALOG_BY_ID } from '@/lib/catalog';
 import { kstDateKey } from '@/lib/format';
+import { SeriesUnavailableError } from '@/server/http';
 import {
+  ASSET_RANGES,
   DEMO_SCENARIOS,
   type AssetDetail,
   type DemoScenario,
@@ -20,7 +22,8 @@ import {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const RANGES: RangeKey[] = ['1D', '1W', '1M', '3M', '1Y', '3Y'];
+// 화면이 내주는 구간과 같아야 한다. 한 곳(@/types)에서 정한다.
+const RANGES = ASSET_RANGES;
 const RANGE_MS: Record<RangeKey, number> = {
   '1D': 86400_000,
   '1W': 7 * 86400_000,
@@ -56,9 +59,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const quote = quotes.find((q) => q.id === id);
         if (!quote) throw new Error('시세를 찾을 수 없습니다.');
 
-        const ranges = {} as Record<RangeKey, { t: number; v: number }[]>;
+        /*
+         * 구간 하나가 막혔다고 화면 전체를 내리지 않는다.
+         * 예전에는 여섯 구간을 한 줄로 await 해서, 무료로 못 받는 구간이 하나라도
+         * 있으면 종목 상세가 통째로 502 였다 — 값도 이름도 다 있는데 화면이 안 떴다.
+         * 이제는 못 받은 구간만 비우고, 왜 비었는지를 같이 올려보낸다.
+         */
+        const ranges: Partial<Record<RangeKey, { t: number; v: number }[]>> = {};
+        const unavailable: Partial<Record<RangeKey, string>> = {};
         for (const r of RANGES) {
-          ranges[r] = await adapter.getAssetSeries(id, r, ctx);
+          try {
+            ranges[r] = await adapter.getAssetSeries(id, r, ctx);
+          } catch (e) {
+            ranges[r] = [];
+            unavailable[r] =
+              e instanceof SeriesUnavailableError
+                ? e.reason
+                : `이 구간을 받아오지 못했습니다: ${e instanceof Error ? e.message : String(e)}`;
+          }
         }
 
         const input = await adapter.getFngInput(item.market, ctx);
@@ -74,7 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           computedAt: now.toISOString(),
         });
 
-        const fngOverlay = {} as Record<RangeKey, FngHistoryPoint[]>;
+        const fngOverlay: Partial<Record<RangeKey, FngHistoryPoint[]>> = {};
         for (const r of RANGES) {
           const cutoff = now.getTime() - RANGE_MS[r];
           const slice = history.filter((p) => p.t >= cutoff);
@@ -82,7 +100,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           fngOverlay[r] = slice.length >= 2 ? slice : history.slice(-7);
         }
 
-        return { quote, ranges, fngOverlay, mode: adapter.mode };
+        return {
+          quote,
+          ranges,
+          ...(Object.keys(unavailable).length > 0 ? { unavailable } : {}),
+          fngOverlay,
+          mode: adapter.mode,
+        };
       },
       { ttlMs: 120_000 },
     );

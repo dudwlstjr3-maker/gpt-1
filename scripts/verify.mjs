@@ -1006,6 +1006,67 @@ async function main() {
     check('생활 경제 지수가 실패를 0 으로 채우지 않음',
       basicsSrc.includes('return null;') && !/\|\|\s*0[,;)]/.test(basicsSrc));
 
+    /*
+     * 종목 상세 차트 — 40개 종목이 전부 "받아 오거나, 왜 못 받는지 말하거나" 둘 중 하나여야 한다.
+     * 아무 데도 안 걸리면 NotWiredError 가 나고, 그건 화면에 "구현되지 않았습니다" 로 뜬다.
+     * 값도 이름도 다 있는 종목에 그 문구가 뜨면 고장으로 읽힌다.
+     */
+    const idsIn = (src, name) => {
+      const m = src.match(new RegExp(`${name}[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}`));
+      return m ? [...m[1].matchAll(/^\s{2}'?([a-z_0-9]+)'?:/gm)].map((x) => x[1]) : [];
+    };
+    const stooqSrc = await readFile('src/server/adapters/live/providers/stooq.ts', 'utf8');
+    const cgSrc = await readFile('src/server/adapters/live/providers/coingecko.ts', 'utf8');
+    const covered = new Set([
+      ...idsIn(cgSrc, 'COIN_ID'),
+      ...idsIn(stooqSrc, 'STOOQ_SYMBOL'),
+      ...idsIn(live, 'ASSET_FRED_SERIES'),
+      ...idsIn(live, 'NO_FREE_SERIES'),
+      'funding',
+      'open_interest',
+    ]);
+    const quoted = Object.values(snap.sections?.quotes?.data ?? {}).flat().map((q) => q.id);
+    const fellThrough = quoted.filter((id) => !covered.has(id));
+    check('모든 종목이 시계열 소스 또는 사유를 가짐', fellThrough.length === 0,
+      fellThrough.join(', ') || `${quoted.length}종목 전부`);
+
+    // 사유는 빈 문자열이면 안 된다 — 화면이 그 자리에 그대로 찍는다.
+    // (ASSET_FRED_SERIES 같은 다른 표까지 세지 않도록 NO_FREE_SERIES 블록 안만 본다)
+    const noFreeBlock = live.match(/NO_FREE_SERIES[^=]*=\s*\{([\s\S]*?)\n\};/)?.[1] ?? '';
+    const reasons = [...noFreeBlock.matchAll(/^\s{2}[a-z_0-9]+:\s*\n?\s*'([^']*)'/gm)].map((m) => m[1]);
+    check('못 받는 사유가 전부 문장으로 적혀 있음',
+      reasons.length >= 10 && reasons.every((r) => r.length > 15), `${reasons.length}개`);
+
+    /*
+     * 못 받는 구간을 다른 구간 데이터로 메우지 않는다.
+     * 코인 3년치를 달라는데 30일치를 주고 화면에 "3년"이라 적으면 그대로 거짓말이다.
+     */
+    check('없는 구간을 기본값으로 메우지 않음', !/days\[range\]\s*\?\?\s*30/.test(live));
+    check('받을 수 없는 구간은 사유와 함께 알림', live.includes('SeriesUnavailableError'));
+
+    // 구간 하나가 막혀도 종목 상세 전체가 죽으면 안 된다 (해당 카드만 오류 처리)
+    const assetRoute = await readFile('src/app/api/asset/[id]/route.ts', 'utf8');
+    check('구간 하나가 막혀도 상세가 통째로 실패하지 않음',
+      /for \(const r of RANGES\)[\s\S]{0,200}try \{[\s\S]{0,200}getAssetSeries/.test(assetRoute));
+    check('빈 구간이 왜 비었는지 올려보냄', assetRoute.includes('unavailable'));
+    const assetPage = await readFile('src/app/asset/[id]/page.tsx', 'utf8');
+    check('화면이 그 사유를 그 자리에 찍음', assetPage.includes('detail.unavailable?.[range]'));
+
+    /*
+     * 화면이 내주는 구간과 API 가 받아 오는 구간이 같아야 한다.
+     * 어긋나 있을 때는 API 가 3년치를 매번 한 번 더 부르고 그대로 버렸다.
+     * 무료 API 는 호출 한도가 빠듯해서 그냥 낭비가 아니라 손해다.
+     */
+    check('구간 목록을 한 곳에서 정함',
+      assetPage.includes('ASSET_RANGES') && assetRoute.includes('ASSET_RANGES'));
+    check('구간 목록을 따로 들고 있지 않음',
+      !/RANGES(:\s*RangeKey\[\])?\s*=\s*\[/.test(assetPage.replace(/ASSET_RANGES/g, '')) &&
+      !/RANGES(:\s*RangeKey\[\])?\s*=\s*\[/.test(assetRoute.replace(/ASSET_RANGES/g, '')));
+    const detailBody = await (await fetch(`${BASE}/api/asset/btc`)).json();
+    const served = Object.keys(detailBody.ranges ?? {});
+    check('API 가 화면에 없는 구간을 받아 오지 않음', !served.includes('3Y'), served.join('·'));
+    check('화면이 쓰는 다섯 구간이 모두 옴', served.length === 5, `${served.length}개`);
+
     // 아직 안 붙은 곳은 조용히 빈 값을 만들지 않고 오류를 던진다
     for (const what of ['getFlows', 'getCalendar', 'getNews']) {
       check(`${what} 은 아직 연결 전이라 오류를 던짐`,

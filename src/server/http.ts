@@ -26,6 +26,22 @@ export class AdapterNotConfiguredError extends Error {
   }
 }
 
+/**
+ * 받을 수 있는 길이 아예 없는 값.
+ *
+ * '아직 안 붙였다'(NotWiredError)와 다르다. 이건 무료로는 존재하지 않는 데이터라
+ * 나중에 누가 와서 구현해도 안 되는 것이고, 그래서 화면이 "잠시 후 다시" 라고
+ * 말하면 거짓말이 된다. 이유를 그대로 들고 다니다가 그 자리에 찍는다.
+ */
+export class SeriesUnavailableError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'SeriesUnavailableError';
+    this.reason = reason;
+  }
+}
+
 /* ---------------------- 호스트별 토큰 버킷 ---------------------- */
 
 const buckets = new Map<string, { tokens: number; last: number }>();

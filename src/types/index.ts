@@ -823,11 +823,33 @@ export const DEMO_SCENARIOS: { id: DemoScenario; label: string; description: str
 
 export type RangeKey = '1D' | '1W' | '1M' | '3M' | '1Y' | '3Y';
 
+/**
+ * 종목 상세 화면이 실제로 내주는 구간.
+ *
+ * 화면과 API 가 따로 들고 있다가 어긋나 있었다 — 화면은 다섯 칸인데 API 는
+ * 여섯 구간을 받아 와서, 3년치는 매번 제공사를 한 번 더 부르고 그대로 버렸다.
+ * 무료 API 는 호출 한도가 빠듯해서 그냥 낭비가 아니라 실제로 손해다.
+ * 이제 한 곳에서 정하고 양쪽이 같이 읽는다.
+ *
+ * 3년을 뺀 이유는 두 가지다. 320px 에서 여섯 칸이면 글자가 붙고,
+ * CoinGecko 무료 티어가 애초에 365일까지만 준다.
+ */
+export const ASSET_RANGES: RangeKey[] = ['1D', '1W', '1M', '3M', '1Y'];
+
 export interface AssetDetail {
   quote: Quote;
-  ranges: Record<RangeKey, SeriesPoint[]>;
+  /** ASSET_RANGES 에 있는 구간만 채워진다 */
+  ranges: Partial<Record<RangeKey, SeriesPoint[]>>;
+  /**
+   * 비어 있는 구간이 왜 비었는지.
+   *
+   * 무료 제공사는 종목마다 주는 기간이 다르다 — 코인은 365일까지, Stooq 는
+   * 일봉만, 한국 개별주는 아예 없다. 빈 상자만 보여주면 사람은 고장인 줄 알고
+   * 새로고침을 누르므로, 그 자리에 이유를 대신 찍는다.
+   */
+  unavailable?: Partial<Record<RangeKey, string>>;
   /** 같은 시장의 F&G 점수(겹쳐보기용) */
-  fngOverlay: Record<RangeKey, FngHistoryPoint[]>;
+  fngOverlay: Partial<Record<RangeKey, FngHistoryPoint[]>>;
   mode: DataMode;
 }
 

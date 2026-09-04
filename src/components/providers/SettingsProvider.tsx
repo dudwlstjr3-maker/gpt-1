@@ -7,7 +7,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { defaultHomeIds, defaultWatchlist } from '@/lib/catalog';
-import type { AlertRule, DemoScenario } from '@/types';
+import type { AlertRule, Criterion, DemoScenario } from '@/types';
 import type { ChangeColorMode } from '@/lib/scale';
 import type { DisplayCurrency } from '@/lib/format';
 
@@ -25,6 +25,11 @@ export interface Settings {
   alertsEnabled: boolean;
   notificationsGranted: boolean;
   alertRules: AlertRule[];
+  /**
+   * 내 기준 — 사용자가 정한 조건.
+   * 기본값이 없다. 앱이 조건을 제안하면 그건 사용자의 기준이 아니라 앱의 훈수가 된다.
+   */
+  criteria: Criterion[];
 }
 
 const STORAGE_KEY = 'mm3.settings.v1';
@@ -40,6 +45,7 @@ const DEFAULTS: Settings = {
   alertsEnabled: false,
   notificationsGranted: false,
   alertRules: [],
+  criteria: [],
 };
 
 interface SettingsContextValue {
@@ -79,6 +85,7 @@ function sanitize(raw: unknown): Settings {
     alertsEnabled: typeof r.alertsEnabled === 'boolean' ? r.alertsEnabled : false,
     notificationsGranted: typeof r.notificationsGranted === 'boolean' ? r.notificationsGranted : false,
     alertRules: Array.isArray(r.alertRules) ? (r.alertRules as AlertRule[]) : [],
+    criteria: Array.isArray(r.criteria) ? (r.criteria as Criterion[]) : [],
   };
 }
 

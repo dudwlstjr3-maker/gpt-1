@@ -20,14 +20,22 @@ import { CalendarPreview } from './CalendarList';
 import { FlowsNewsSection } from './FlowsNewsSection';
 import { PredictionSection } from './PredictionSection';
 import { DailyBasicCard } from './DailyBasicCard';
+import { CriteriaSummaryCard } from './CriteriaSummaryCard';
 
-type Tab = 'calendar' | 'flows' | 'prediction' | 'basics';
+type Tab = 'calendar' | 'flows' | 'prediction' | 'basics' | 'criteria';
 
+/*
+ * 이름이 전부 두 글자인 이유.
+ * 칸이 다섯이 되면서 320px 에서 한 칸이 58px 이 됐다. 12px 글자로 네 글자를
+ * 넣으면 '예측시 / 장' 처럼 두 줄로 쪼개져 오히려 못 읽는다. 각 탭 안에 제
+ * 제목이 다시 나오므로, 여기서는 어느 칸인지만 구분되면 된다.
+ */
 const TABS: { value: Tab; label: string }[] = [
   { value: 'calendar', label: '일정' },
-  { value: 'flows', label: '자금 · 뉴스' },
-  { value: 'prediction', label: '예측시장' },
-  { value: 'basics', label: '경제 이야기' },
+  { value: 'flows', label: '자금' },
+  { value: 'prediction', label: '예측' },
+  { value: 'basics', label: '경제' },
+  { value: 'criteria', label: '기준' },
 ];
 
 export function HomeLower() {
@@ -49,6 +57,7 @@ export function HomeLower() {
       {tab === 'flows' ? <FlowsNewsSection /> : null}
       {tab === 'prediction' ? <PredictionSection /> : null}
       {tab === 'basics' ? <DailyBasicCard /> : null}
+      {tab === 'criteria' ? <CriteriaSummaryCard /> : null}
     </section>
   );
 }

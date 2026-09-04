@@ -43,7 +43,7 @@ async function getJson(path) {
  */
 async function unitTests() {
   console.log('[0] 순수 로직 단위 테스트 (node --test)');
-  const files = ['scripts/fred-calendar.test.mjs'].filter((f) => existsSync(f));
+  const files = ['scripts/fred-calendar.test.mjs', 'scripts/criteria.test.mjs'].filter((f) => existsSync(f));
   if (files.length === 0) {
     check('단위 테스트 파일이 있음', false, '없음');
     return;
@@ -644,7 +644,7 @@ async function main() {
     const html = await res.text();
     // 홈 아래쪽이 탭으로 나뉜 뒤로 이 칸은 '경제 이야기' 탭을 눌러야 그려진다.
     // 서버 응답만 보는 이 스크립트에서는 탭이 있는지까지만 확인한다.
-    check('홈에 경제 이야기 탭이 있음', html.includes('>경제 이야기<'), `status=${res.status}`);
+    check('홈에 경제 이야기 탭이 있음', html.includes('>경제<'), `status=${res.status}`);
 
     // 날짜로 정해지므로 지표 수만큼의 날이면 전부 한 번씩 돌아야 한다
     const ids = (snap.sections?.basics?.data ?? []).map((b) => b.id);
@@ -728,11 +728,22 @@ async function main() {
     check('홈 아래쪽이 탭으로 나뉨', home.includes('더 살펴보기'));
     // 지수는 탭으로 떼어 놨다. 홈에는 그리로 가는 길만 남는다.
     check('홈에서 지수 탭으로 가는 길이 있음', home.includes('/indices'));
-    for (const t of ['일정', '자금 · 뉴스', '예측시장', '경제 이야기']) {
+    /*
+     * 탭 이름이 전부 두 글자다. 칸이 다섯이 되면서 320px 에서 한 칸이 58px 이 됐고,
+     * 12px 글자로 네 글자를 넣으면 '예측시 / 장' 처럼 두 줄로 쪼개진다.
+     */
+    for (const t of ['일정', '자금', '예측', '경제', '기준']) {
       check(`홈 탭에 ${t} 있음`, home.includes(`>${t}<`));
     }
     // 탭이 생겼으니 한 번에 하나만 그려진다 — 나머지는 문서에 없어야 한다
     check('고르지 않은 탭 내용은 그리지 않음', !home.includes('예측시장에서 화제인 질문'));
+    /*
+     * '내 기준' 으로 가는 길은 홈의 '기준' 탭과 더보기 두 곳이다.
+     * 홈은 고르지 않은 탭을 아예 그리지 않으므로 서버 HTML 에는 링크가 없다 —
+     * 그래서 여기서는 더보기 쪽을 확인한다.
+     */
+    const more = await (await fetch(`${BASE}/more`)).text();
+    check('더보기에서 내 기준으로 갈 수 있음', more.includes('/criteria') && more.includes('>내 기준<'));
   }
 
   /* ---------------- 8-4. 지수 탭 ---------------- */
@@ -959,6 +970,53 @@ async function main() {
     check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     check('종목 이름이 길면 잘림 (미리보기)', /\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
     check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
+  }
+
+  /* ---------------- 8-10. 내 기준 (매매 판단을 하지 않는다) ---------------- */
+  console.log('\n[8-10] 내 기준');
+  {
+    /*
+     * 이 화면은 이 앱에서 선을 넘기 가장 쉬운 자리다. 여러 지표를 모아 놓고
+     * "그래서 지금 어떤가" 를 묻는 화면이라, 조금만 밀면 매매 신호가 된다.
+     * 그래서 코드와 화면 양쪽에서 못 넘게 막아 둔다.
+     */
+    const rules = await readFile('src/lib/criteriaRules.mjs', 'utf8');
+    const board = await readFile('src/components/market/CriteriaBoard.tsx', 'utf8');
+    const card = await readFile('src/components/market/CriteriaSummaryCard.tsx', 'utf8');
+    const page = await (await fetch(`${BASE}/criteria`)).text();
+
+    check('내 기준 화면이 있음', page.includes('>내 기준</h1>'));
+
+    // 요약은 등급이 아니라 개수여야 한다
+    check('요약이 개수뿐이고 등급을 만들지 않음',
+      /met:\s*results\.filter/.test(rules) &&
+      !/(grade|verdict|rating|recommendation|signal)\s*[:=]/i.test(rules));
+    check('충족 개수를 화면이 개수로 적음',
+      board.includes('개 중 {sum.met}개 맞음') && card.includes('개 중 {sum.met}개 맞음'));
+
+    // 모르는 것을 충족으로 세면 "5개 중 5개" 가 거짓이 된다
+    check('판정 불가를 따로 셈', /unknown:\s*results\.filter/.test(rules));
+    check('판정 불가가 충족에 섞이지 않음',
+      rules.includes("r.status === 'met'") && rules.includes("r.status === 'unknown'"));
+    check('값이 없으면 0 으로 읽지 않음',
+      rules.includes('산출하지 못했습니다') && !/\?\?\s*0|\|\|\s*0/.test(rules));
+
+    // 앱이 조건을 제안하면 그건 사용자의 기준이 아니라 앱의 훈수다
+    const settingsSrc = await readFile('src/components/providers/SettingsProvider.tsx', 'utf8');
+    check('기본 조건을 깔아 두지 않음', /criteria:\s*\[\]/.test(settingsSrc));
+
+    // 매매를 권하는 말이 화면에 없어야 한다
+    const banned = ['매수', '매도', '사세요', '파세요', '매매 신호', '추천합니다', '유리합니다'];
+    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const [name, src] of [['판정 로직', strip(rules)], ['화면', strip(board)], ['홈 카드', strip(card)]]) {
+      const hit = banned.filter((w) => src.includes(w));
+      check(`${name}에 매매를 권하는 말이 없음`, hit.length === 0, hit.join(', ') || '없음');
+    }
+    // 다만 "신호가 아니다" 라는 말은 반드시 있어야 한다
+    check('신호가 아니라는 말이 요약 옆에 있음',
+      board.includes('사거나 팔라는 신호가 아닙니다') && card.includes('사거나 팔라는 신호가 아닙니다'));
+    check('과거 성과 표를 붙이지 않는 이유를 밝힘',
+      /지난[\s\S]{0,20}결과가 다음을 보장하지 않고/.test(board));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

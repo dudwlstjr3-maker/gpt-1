@@ -857,6 +857,23 @@ export interface AssetDetail {
 /* 알림                                                                 */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* 내 기준 — 사용자가 정한 조건                                          */
+/*                                                                     */
+/* 매매 신호가 아니다. 조건도 문턱도 사용자가 정하고, 앱은 "지금 그 값이  */
+/* 얼마인가" 만 답한다. 그래서 결과에 등급이 없고 개수만 있다.            */
+/* ------------------------------------------------------------------ */
+
+export type CriterionComparator = 'gte' | 'lte';
+
+export type Criterion =
+  /** 시장의 심리 점수 */
+  | { id: string; kind: 'fng'; market: MarketId; comparator: CriterionComparator; value: number }
+  /** 위험 신호등에서 특정 단계인 지표의 개수 */
+  | { id: string; kind: 'risk_count'; level: RiskLevel; comparator: CriterionComparator; value: number }
+  /** 특정 위험 지표의 값 */
+  | { id: string; kind: 'risk_value'; indicatorId: string; comparator: CriterionComparator; value: number };
+
 export type AlertRuleType =
   | 'fng_stage_change'
   | 'fng_threshold'

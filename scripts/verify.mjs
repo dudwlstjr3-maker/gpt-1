@@ -8,6 +8,10 @@
 
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const run = promisify(execFile);
 
 const BASE = process.env.VERIFY_BASE_URL ?? 'http://localhost:3000';
 
@@ -30,8 +34,38 @@ async function getJson(path) {
   return { status: res.status, body };
 }
 
+/**
+ * 순수 로직 단위 테스트를 먼저 돌린다.
+ *
+ * 아래의 나머지 검사는 돌아가는 서버를 상대로 하는 것이라 DEMO 데이터를 본다.
+ * 실데이터 정규화기(예: FRED 발표 일정)는 DEMO 경로를 타지 않아 그쪽 검사로는
+ * 한 줄도 실행되지 않는다. 그래서 node --test 로 따로 태운다.
+ */
+async function unitTests() {
+  console.log('[0] 순수 로직 단위 테스트 (node --test)');
+  const files = ['scripts/fred-calendar.test.mjs'].filter((f) => existsSync(f));
+  if (files.length === 0) {
+    check('단위 테스트 파일이 있음', false, '없음');
+    return;
+  }
+  for (const file of files) {
+    try {
+      const { stdout } = await run('node', ['--test', file], { encoding: 'utf8' });
+      const passed = Number(stdout.match(/^# pass (\d+)$/m)?.[1] ?? 0);
+      const failed = Number(stdout.match(/^# fail (\d+)$/m)?.[1] ?? 0);
+      check(`${file} — ${passed}건 통과`, failed === 0 && passed > 0, failed > 0 ? `${failed}건 실패` : '');
+    } catch (e) {
+      const out = String(e.stdout ?? '') + String(e.stderr ?? '');
+      const failed = out.match(/^# fail (\d+)$/m)?.[1] ?? '?';
+      check(`${file}`, false, `${failed}건 실패`);
+    }
+  }
+}
+
 async function main() {
   console.log(`검증 대상: ${BASE}\n`);
+
+  await unitTests();
 
   /* ---------------- 1. 기본 스냅샷 ---------------- */
   console.log('[1] 홈 스냅샷 (scenario=normal)');
@@ -1067,8 +1101,54 @@ async function main() {
     check('API 가 화면에 없는 구간을 받아 오지 않음', !served.includes('3Y'), served.join('·'));
     check('화면이 쓰는 다섯 구간이 모두 옴', served.length === 5, `${served.length}개`);
 
+    /*
+     * 경제 캘린더 — FRED 발표 일정.
+     * 값이 아니라 '언제 발표되는가' 만 받는다. 시각·예상치는 주지 않으므로
+     * 그 자리를 지어내지 않았는지가 이 절의 전부다.
+     */
+    const cal = await readFile('src/server/adapters/live/providers/fredCalendarRules.mjs', 'utf8');
+    const calFetch = await readFile('src/server/adapters/live/providers/fredCalendar.ts', 'utf8');
+    check('캘린더 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/fredCalendar.ts'));
+    check('경제 캘린더가 연결됨', live.includes('fetchFredCalendar'));
+    const calMethod = live.match(/async getCalendar\([\s\S]*?\n  }\n/)?.[0] ?? '';
+    check('getCalendar 가 더는 미연결 오류를 던지지 않음',
+      calMethod !== '' && !calMethod.includes('NotWiredError'));
+    // 앞으로의 일정을 받으려면 이 파라미터가 있어야 한다. 없으면 지나간 날짜만 온다.
+    check('앞으로의 발표 예정일을 받아옴', calFetch.includes('include_release_dates_with_no_data'));
+    check('캘린더가 새 키를 요구하지 않음 (이미 있는 FRED 키를 씀)',
+      calMethod.includes('getKeys().macro') && !/CALENDAR_API_KEY/.test(calMethod));
+
+    // FRED 는 날짜만 준다. 08:30 같은 값을 채워 넣으면 카운트다운이 틀린 곳을 향한다.
+    check('시각을 모르면 timeTbd 를 세움', /timeTbd:\s*true/.test(cal));
+    check('시각을 지어내지 않음 (자정 고정)', cal.includes("T00:00:00.000+09:00"));
+    check('일정만 받으므로 예상치·발표값을 비움',
+      /forecast:\s*null/.test(cal) && /previous:\s*null/.test(cal) && /actual:\s*null/.test(cal));
+    // 규칙에 없는 release 를 짐작해서 분류하면 지역 통계가 전국 지표 옆에 앉는다
+    check('모르는 발표는 버림', cal.includes('if (rule === null || scheduledAt === null) return null;'));
+    check('지역 통계를 전국 지표로 착각하지 않음', cal.includes('REGIONAL'));
+    check('중요도를 추론하지 않고 표에 적힌 것만 씀', /importance:\s*rule\.importance/.test(cal));
+    check('캘린더가 결측을 0 으로 채우지 않음', !/\?\?\s*0|\|\|\s*0/.test(cal));
+    // 일정표에 '실시간' 배지가 붙으면 안 된다
+    check('캘린더 지연을 0 으로 적지 않음', /delayMinutes:\s*1440/.test(calFetch));
+
+    /*
+     * 규칙표의 이름은 실제 응답으로 확인해야 한다. 그 확인 경로가 코드에 있어야
+     * 추측이 그대로 굳지 않는다.
+     */
+    const chk = await readFile('scripts/check-live.mjs', 'utf8');
+    check('실제 release 이름을 확인할 길이 있음',
+      chk.includes('규칙표에 없는 이름') && chk.includes('fredCalendarRules.mjs'));
+    // 못 받는 것은 못 받는다고 적어 둔다
+    check('FOMC 회의 일정의 한계를 밝힘',
+      chk.includes('FOMC 회의 일정') && cal.includes('여덟 번 중 네 번'));
+
+    // 시각을 모르는 일정에 시계를 그리지 않는다
+    const calList = await readFile('src/components/market/CalendarList.tsx', 'utf8');
+    check('화면이 시각 미정을 시각처럼 그리지 않음',
+      calList.includes('시각 미정') && !/formatKstTime\(event\.scheduledAt\)\s*\}\s*\n\s*\{event\.timeTbd/.test(calList));
+
     // 아직 안 붙은 곳은 조용히 빈 값을 만들지 않고 오류를 던진다
-    for (const what of ['getFlows', 'getCalendar', 'getNews']) {
+    for (const what of ['getFlows', 'getNews']) {
       check(`${what} 은 아직 연결 전이라 오류를 던짐`,
         new RegExp(`${what}[\\s\\S]{0,300}NotWiredError`).test(live));
     }

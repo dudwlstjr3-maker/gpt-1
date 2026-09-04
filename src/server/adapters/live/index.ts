@@ -32,6 +32,7 @@ import {
   type CoinGeckoConfig,
 } from './providers/coingecko';
 import { fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
+import { fetchFredCalendar, fredCalendarConfig } from './providers/fredCalendar';
 import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
@@ -444,9 +445,17 @@ export class LiveAdapter implements MarketAdapter {
   }
 
   /* ---------------------------- 캘린더 ---------------------------- */
-  /** TODO(연결지점 6): 경제 캘린더. scheduledAt 은 반드시 KST(+09:00) 로 정규화한다. */
-  async getCalendar(_ctx: AdapterContext): Promise<CalendarEvent[]> {
-    throw new NotWiredError('경제 캘린더', 'src/server/adapters/live/index.ts > LiveAdapter.getCalendar');
+  /**
+   * 경제 캘린더 — FRED 가 모아 둔 미국 발표 일정.
+   *
+   * 여기서 나오지 않는 것(한국·크립토 일정, 발표 시각, 예상치)을 다른 데서
+   * 끌어와 채우지 않는다. DEMO 값으로 메우면 모드가 섞이고, 시각을 지어내면
+   * 화면의 카운트다운이 그럴듯하게 틀린 곳을 향해 흘러간다.
+   */
+  async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {
+    const key = getKeys().macro;
+    if (!key) throw new AdapterNotConfiguredError('경제 캘린더(FRED)', ['MACRO_API_KEY']);
+    return fetchFredCalendar(fredCalendarConfig(key, envUrl('MACRO_BASE_URL')), ctx.now);
   }
 
   /* ----------------------------- 뉴스 ----------------------------- */

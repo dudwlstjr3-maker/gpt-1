@@ -118,6 +118,42 @@ await probeText('주식 풋/콜 비율',
   'https://cdn.cboe.com/api/global/us_indices/daily_statistics/Cboe_Volume_And_Put_Call_Ratios.csv',
   (b) => `${b.trim().split(/\r?\n/).length - 1}줄`);
 
+/*
+ * 경제 캘린더 — FRED 발표 일정.
+ *
+ * 여기서 release 이름을 **그대로 출력**하는 것이 핵심이다.
+ * fredCalendarRules.mjs 의 RELEASE_RULES 는 이름으로 발표를 골라내는데, 그 이름을
+ * 실제 응답으로 확인하지 않으면 추측이 코드에 남는다. 키를 넣고 한 번 돌려
+ * 아래 목록과 규칙표를 대조하면 된다. 규칙에 안 걸린 이름은 화면에 안 뜬다.
+ */
+if (FRED_KEY) {
+  console.log('\n[경제 캘린더] FRED 발표 일정 — 위 FRED 키를 그대로 씁니다');
+  const { RELEASE_RULES, ruleFor } = await import('../src/server/adapters/live/providers/fredCalendarRules.mjs');
+  const today = new Date();
+  const day = (n) => new Date(today.getTime() + n * 86400000).toISOString().slice(0, 10);
+  const url =
+    `${FRED}/releases/dates?api_key=${FRED_KEY}&file_type=json` +
+    `&include_release_dates_with_no_data=true&sort_order=asc&limit=1000` +
+    `&realtime_start=${day(-7)}&realtime_end=${day(45)}`;
+  await probe('발표 일정', url, (b) => {
+    const rows = Array.isArray(b.release_dates) ? b.release_dates : [];
+    const names = [...new Set(rows.map((r) => r?.release_name).filter((n) => typeof n === 'string'))].sort();
+    const hit = names.filter((n) => ruleFor(n) !== null);
+    const missed = names.filter((n) => ruleFor(n) === null);
+    console.log(`      규칙에 걸린 발표 ${hit.length}종 / 전체 ${names.length}종`);
+    for (const n of hit) console.log(`        ✓ ${n}`);
+    console.log(`      규칙표에 없는 이름 ${missed.length}종 (화면에 안 뜹니다). 앞 20개:`);
+    for (const n of missed.slice(0, 20)) console.log(`        · ${n}`);
+    if (hit.length < RELEASE_RULES.length) {
+      console.log(`      ⚠ 규칙 ${RELEASE_RULES.length}개 중 ${hit.length}개만 실제로 걸렸습니다.`);
+      console.log('        안 걸린 규칙은 FRED 의 실제 이름과 다릅니다 — 위 목록을 보고 고치세요.');
+    }
+    return `${rows.length}행`;
+  });
+} else {
+  console.log('\n[경제 캘린더] FRED 발표 일정 — MACRO_API_KEY 가 없어 건너뜁니다');
+}
+
 const WB = process.env.WORLDBANK_BASE_URL || 'https://api.worldbank.org/v2';
 const BIGMAC = process.env.BIGMAC_CSV_URL
   || 'https://raw.githubusercontent.com/TheEconomist/big-mac-data/master/output-data/big-mac-full-index.csv';
@@ -150,7 +186,10 @@ console.log('\n[아직 못 붙인 것]');
 console.log('  · 한국 투자자별 순매수 · VKOSPI · 전종목 등락 — 무료 실시간 소스가 없습니다.');
 console.log('    (증권사 계좌 API 나 공공데이터포털 일별 데이터가 필요합니다)');
 console.log('  · 미국 52주 신고가/신저가 · 거래량 등락 폭 — 무료로 공개하는 곳이 없습니다.');
-console.log('  · 경제 캘린더 · 뉴스 — 제공사 미정.');
+console.log('  · 뉴스 — 제공사 미정.');
+console.log('  · FOMC 회의 일정 — 연준이 기계가 읽을 수 있는 형태로 공개하지 않습니다.');
+console.log('    (HTML 페이지와 지나간 보도자료 RSS 뿐이고 스크래핑은 하지 않습니다)');
+console.log('    분기별 경제전망요약(SEP)이 회의 날 나오므로 여덟 번 중 네 번만 잡힙니다.');
 console.log('  · 엥겔계수 · PIR · OECD 경기선행지수 · 소비자심리지수 — 무료 API 가 없거나');
 console.log('    기관마다 정의가 달라 한 숫자로 못 모읍니다. 생활 경제 지수 아홉 중 다섯만 실데이터입니다.')
 

@@ -1552,7 +1552,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       (CAT[e.category] === MARKET_BADGE[e.market] ? '' : '<span style="font-size:10px;color:var(--subtle)">' + CAT[e.category] + '</span>') + '</div>' +
       '<div class="ev-title">' + esc(e.title) + '</div>' +
       (e.note ? '<div class="ev-note">' + esc(e.note) + '</div>' : '') + '</div>' +
-      '<div class="ev-time"><b class="tnum">' + esc(kTime(e.scheduledAt)) + '</b><small class="tnum">' + esc(kDate(e.scheduledAt)) + ' KST</small>' +
+      // 시각을 모르는 일정에 시계를 그리지 않는다 (앱의 CalendarList 와 같은 규칙).
+      // FRED 처럼 날짜만 주는 제공사가 붙으면서 실제로 생긴 경우다.
+      '<div class="ev-time">' +
+      (e.timeTbd
+        ? '<b style="font-size:11px;font-weight:600;color:var(--muted)">시각 미정</b>'
+        : '<b class="tnum">' + esc(kTime(e.scheduledAt)) + '</b>') +
+      '<small class="tnum">' + esc(kDate(e.scheduledAt)) + ' KST</small>' +
       '<small class="tnum" style="color:' + (t <= now ? 'var(--subtle)' : 'var(--accent)') + '">' + esc(countdown(t - now)) + '</small></div></div>' +
       '<dl class="ev-meta" style="margin:6px 0 0">' +
       '<div><span>예상 </span><b class="tnum">' + esc(e.forecast || NO) + '</b></div>' +

@@ -65,9 +65,18 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
           {event.note ? <p className="mt-0.5 text-[10px] text-subtle">{event.note}</p> : null}
         </div>
         <div className="shrink-0 text-right">
+          {/*
+            시각을 모르는 일정에 시계를 그리지 않는다.
+            예전에는 자정을 찍고 뒤에 '*' 를 붙였는데, 별표에 아무 설명이 없어
+            "00:00 에 발표" 로 읽혔다. FRED 처럼 날짜만 주는 제공사가 붙으면서
+            그런 일정이 실제로 생겼다 — 모르면 모른다고 적는다.
+          */}
           <p className="tnum text-[12px] font-semibold text-fg-strong">
-            {formatKstTime(event.scheduledAt)}
-            {event.timeTbd ? '*' : ''}
+            {event.timeTbd ? (
+              <span className="text-[11px] text-muted">시각 미정</span>
+            ) : (
+              formatKstTime(event.scheduledAt)
+            )}
           </p>
           <p className="tnum text-[10px] text-subtle">{formatKstDate(event.scheduledAt)} KST</p>
           <p className="tnum mt-0.5 text-[10px]" style={{ color: past ? 'var(--subtle-fg)' : 'var(--accent)' }}>

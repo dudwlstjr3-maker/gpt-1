@@ -18,12 +18,18 @@
  *    "미국 선이 위에 있다" 까지만 알 수 있지 얼마나 위인지는 알 수 없다.
  *  - 눈금을 두 개만 두는 것은 작은 그림에 촘촘히 넣으면 오히려 안 읽히기 때문이다.
  *  - 차트를 못 보는 사람을 위해 같은 내용을 표로도 제공한다 (이 앱의 모든 차트가 그렇다).
+ *
+ * 확대·축소·이동은 여기 붙이지 않는다. 104px 짜리 그림에 조작 버튼까지 넣으면
+ * 정작 선 볼 자리가 없어진다. 대신 **누르면 큰 창으로 열리고**, 거기서 끌기·휠·핀치가
+ * 다 된다. 큰 창은 이 앱의 상세용 차트를 그대로 쓴다.
  */
 
 import { useId, useState } from 'react';
 import { formatNumber } from '@/lib/format';
 import type { SeriesPoint } from '@/types';
 import { downsample, extent, linePath, linearScale } from './chartUtils';
+import { ChartModal, ExpandTrigger } from './ChartModal';
+import { InteractiveChart, type ChartSeries } from './InteractiveChart';
 
 export interface TrendSeries {
   label: string;
@@ -84,6 +90,7 @@ export function BasicTrend({
 }) {
   const id = useId();
   const [showTable, setShowTable] = useState(false);
+  const [big, setBig] = useState(false);
 
   const clean = series
     .map((s) => ({ ...s, points: downsample(s.points.filter((p) => Number.isFinite(p.v)), 80) }))
@@ -111,8 +118,28 @@ export function BasicTrend({
   });
   const endY = spread(ends, 11, top, bottom);
 
+  /**
+   * 큰 창에서 쓸 시리즈.
+   *
+   * 작은 그림에서는 비교 나라를 전부 같은 옅은 색으로 두고 이름을 선 끝에 붙여
+   * 구분했다. 큰 창은 범례가 위에 서므로 **나라마다 색이 달라야** 범례가 일을 한다.
+   * 같은 색 셋에 이름만 다르게 적어 두면 범례가 오히려 거짓말이 된다.
+   */
+  const COMPARE = ['var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
+  let ci = 0;
+  const bigSeries: ChartSeries[] = clean.map((s) => ({
+    id: s.label,
+    name: shortLabel(s.label),
+    points: s.points,
+    color: s.label === mine.label ? 'var(--accent)' : COMPARE[ci++ % COMPARE.length],
+    axis: 'left',
+    precision,
+    suffix,
+  }));
+
   return (
     <div>
+      <ExpandTrigger label={label} onClick={() => setBig(true)}>
       <svg
         viewBox={`0 0 ${VIEW_W} ${height}`}
         width="100%"
@@ -216,6 +243,16 @@ export function BasicTrend({
           {yearOf(t1)}
         </text>
       </svg>
+      </ExpandTrigger>
+
+      <ChartModal
+        open={big}
+        onClose={() => setBig(false)}
+        title={label}
+        subtitle="끌어서 이동 · 휠이나 두 손가락으로 확대·축소 · 두 번 누르면 전체로"
+      >
+        <InteractiveChart series={bigSeries} height={340} label={label} expandable={false} />
+      </ChartModal>
 
       <div className="mt-0.5 text-right">
         <button

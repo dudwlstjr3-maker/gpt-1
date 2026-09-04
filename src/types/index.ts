@@ -362,6 +362,9 @@ export interface FngBandStat {
   avgForward: number | null;
   /** 중앙값(%) */
   medianForward: number | null;
+  /** 사분위수 — 화면의 상자그림이 쓴다 */
+  p25: number | null;
+  p75: number | null;
   /** 플러스로 끝난 비율(%) */
   positiveShare: number | null;
   /** 최악/최선 */

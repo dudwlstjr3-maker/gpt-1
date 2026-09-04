@@ -1,7 +1,7 @@
 /**
  * 시장 위험 신호등.
  *
- * 세 시장을 관통하는 핵심 위험 게이지 7개만 골라, 현재 값이 어느 구간에 있는지와
+ * 세 시장을 관통하는 핵심 위험 게이지만 골라, 현재 값이 어느 구간에 있는지와
  * 그것이 무슨 뜻인지를 한 화면에서 읽을 수 있게 만든다.
  *
  * 설계 원칙
@@ -70,7 +70,14 @@ const band = (level: RiskLevel, from: number | null, to: number | null, label: s
 /* 신호등 지표 정의                                                             */
 /* ------------------------------------------------------------------ */
 
-export const RISK_SEVEN: RiskDef[] = [
+/**
+ * 신호등에 세우는 지표.
+ *
+ * 처음에는 일곱 개였는데 VKOSPI(한국 공포지수)를 뺐다 — 무료로 받을 길이 없어
+ * 영원히 '값 없음' 인 타일이 하나 남아 있었기 때문이다. 지금은 여섯 개다.
+ * 개수를 코드·문서에 숫자로 적어 두지 않는다. 적어 두면 이렇게 어긋난다.
+ */
+export const RISK_GAUGES: RiskDef[] = [
   {
     id: 'vix',
     name: '미국 공포지수 VIX',
@@ -281,7 +288,7 @@ export function buildRiskDigest(
   const quoteById = new Map(quotes.map((q) => [q.id, q]));
   const macroById = new Map(macro.map((m) => [m.id, m]));
 
-  const indicators: RiskIndicator[] = RISK_SEVEN.map((def) => {
+  const indicators: RiskIndicator[] = RISK_GAUGES.map((def) => {
     let value: number | null = null;
     let previous: number | null = null;
     let change: number | null = null;

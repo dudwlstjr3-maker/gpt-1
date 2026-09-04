@@ -13,7 +13,10 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
+import { ChartModal, ExpandTrigger } from '@/components/charts/ChartModal';
+import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
 import { SectionGate, SkeletonCard } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import type { RegimeBand, RegimeBoard as Board, RegimeDigest } from '@/types';
@@ -58,8 +61,15 @@ function ScaleStrip({ score, band }: { score: number; band: RegimeBand | null })
   );
 }
 
-/** 20년 점수 곡선. 직접 그린 SVG (차트 라이브러리를 쓰지 않는 프로젝트다) */
+/**
+ * 20년 점수 곡선(작은 것).
+ *
+ * 홈 카드 안이라 44px 밖에 안 되므로 조작 버튼을 넣지 않는다. 대신 **누르면 큰 창**이
+ * 열리고 거기서 끌기·확대·축소가 다 된다. 손톱만 한 그림에 버튼을 넣는 것보다
+ * 그림을 통째로 누르게 하는 편이 손가락에도 맞는다.
+ */
 function HistorySpark({ history, band }: { history: { t: number; score: number }[]; band: RegimeBand | null }) {
+  const [big, setBig] = useState(false);
   if (history.length < 8) return null;
   const W = 300;
   const H = 44;
@@ -76,8 +86,22 @@ function HistorySpark({ history, band }: { history: { t: number; score: number }
   const last = pt(history[history.length - 1]);
   const years = Math.round((t1 - t0) / (365.25 * 86_400_000));
 
+  const bigSeries: ChartSeries[] = [
+    {
+      id: 'regime',
+      name: '국면 점수',
+      points: history.map((h) => ({ t: h.t, v: h.score })),
+      color: 'var(--accent)',
+      axis: 'left',
+      precision: 1,
+      fixed0to100: true,
+      area: true,
+    },
+  ];
+
   return (
     <div className="mt-3">
+      <ExpandTrigger label={`최근 ${years}년 국면 점수`} onClick={() => setBig(true)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-11 w-full" role="img" aria-label={`최근 ${years}년 국면 점수 곡선`}>
         {/* 25 / 75 기준선 — 곡선만 있으면 높낮이를 읽을 수 없다 */}
         {[25, 75].map((v) => (
@@ -95,7 +119,16 @@ function HistorySpark({ history, band }: { history: { t: number; score: number }
         <path d={d} fill="none" stroke="var(--muted-fg)" strokeWidth="1.2" strokeLinejoin="round" />
         <circle cx={last[0]} cy={last[1]} r="2.8" fill={bandColor(band)} />
       </svg>
-      <p className="tnum mt-0.5 text-[9.5px] text-subtle">최근 {years}년 · 점선은 25점과 75점</p>
+      </ExpandTrigger>
+      <p className="tnum mt-0.5 text-[9.5px] text-subtle">최근 {years}년 · 점선은 25점과 75점 · 누르면 크게 볼 수 있습니다</p>
+      <ChartModal
+        open={big}
+        onClose={() => setBig(false)}
+        title={`국면 점수 ${years}년 추이`}
+        subtitle="끌어서 이동 · 휠이나 두 손가락으로 확대·축소 · 두 번 누르면 전체로"
+      >
+        <InteractiveChart series={bigSeries} height={340} label={`국면 점수 ${years}년 추이`} expandable={false} />
+      </ChartModal>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { SignalDot, SignalLegend, SignalLight, SignalTally } from '@/components/ui/Signal';
-import { RiskCard, RISK_COLOR, formatRiskValue, tallyRisk } from '@/components/market/RiskSeven';
+import { RiskCard, RISK_COLOR, formatRiskValue, tallyRisk } from '@/components/market/RiskGauges';
 import { formatKstFull } from '@/lib/format';
 import { riskSignal } from '@/lib/scale';
 import { buildRiskHeadline } from '@/lib/riskHeadline';

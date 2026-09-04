@@ -782,7 +782,9 @@ async function main() {
     // 서 있어야 하고(서버가 그린 HTML 에 있어야 하고), 값은 스냅샷에 있어야 한다.
     const quotes = snap.sections?.quotes?.data ?? {};
     const all = [...(quotes.us ?? []), ...(quotes.kr ?? []), ...(quotes.crypto ?? [])];
-    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', 'KOSPI'], ['total_mcap', '전체 시가총액']]) {
+    // 한국에서 실제로 쓰는 말이 있는 지수는 한글 이름으로 세운다.
+    // 원문 기호(SPX·KOSPI 등)는 이름 아래에 그대로 남아 검색이 막히지 않는다.
+    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', '코스피'], ['total_mcap', '전체 시가총액']]) {
       check(`지수 화면에 ${id} 줄이 있음`, idx.includes(`>${name}</p>`));
       check(`${id} 값이 스냅샷에 있음`, all.some((x) => x.id === id && x.price !== null));
     }
@@ -1112,6 +1114,87 @@ async function main() {
       tpl.includes('DATA.regimeEvidence') && !/fwd12Mean:\s*-?\d/.test(tpl));
     const buildSrc = await readFile('tools/preview/build.mjs', 'utf8');
     check('미리보기 빌드가 원본 모듈에서 검증 결과를 읽음', buildSrc.includes("import('../../src/lib/regimeEvidence.mjs')"));
+  }
+
+
+  /* ---------------- 8-12. 그래프 조작 · 구간별 통계 ---------------- */
+  console.log('\n[8-12] 그래프 조작 · 구간별 과거 통계');
+  {
+    const cycle = await readFile('src/server/fng/cycle.ts', 'utf8');
+    const bandView = await readFile('src/components/market/BandStatsView.tsx', 'utf8');
+    const modal = await readFile('src/components/charts/ChartModal.tsx', 'utf8');
+    const inter = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const tpl2 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* 구간별 과거 통계 — 6개월 */
+    check('구간별 통계가 6개월(126거래일) 기준', /BAND_FORWARD_DAYS = 126/.test(cycle));
+    const bs = (await getJson('/api/fng/us')).body?.detail?.bandStats;
+    check('API 가 126거래일로 집계함', bs?.forwardDays === 126, String(bs?.forwardDays));
+    check('화면이 개월로도 말해 줌', bandView.includes('개월(') && bandView.includes('거래일)'));
+
+    /* 상자그림 — 평균만 그리면 구간마다 답이 정해진 것처럼 읽힌다 */
+    check('사분위수를 함께 산출함', /p25:/.test(cycle) && /p75:/.test(cycle));
+    const sample = (bs?.bands ?? []).filter((b) => b.avgForward !== null);
+    check('표본이 있는 구간에 사분위수가 옴',
+      sample.length > 0 && sample.every((b) => typeof b.p25 === 'number' && typeof b.p75 === 'number'),
+      `${sample.length}개 구간`);
+    check('사분위수가 최저~최고 안에 있음',
+      sample.every((b) => b.worst <= b.p25 && b.p25 <= b.medianForward && b.medianForward <= b.p75 && b.p75 <= b.best));
+    check('구간마다 상자그림을 그림', bandView.includes('function BoxRow') && bandView.includes('중앙값'));
+    check('모든 구간이 같은 눈금을 씀', bandView.includes('function domainOf') && bandView.includes('공통 범위'));
+    check('겹친다는 점을 읽는 법으로 적어 둠', bandView.includes('범위가 서로 얼마나 겹치는지'));
+
+    /* 크게 보기 */
+    check('그래프를 크게 보는 창이 있음', modal.includes("role=\"dialog\"") && modal.includes('aria-modal="true"'));
+    check('Esc 로 닫힘', /e\.key === 'Escape'/.test(modal));
+    check('닫으면 초점이 돌아옴', modal.includes('returnTo.current?.focus'));
+    check('열려 있는 동안 뒤 페이지가 안 밀림', modal.includes("document.body.style.overflow = 'hidden'"));
+    check('초점이 창 밖으로 새지 않음', /e\.key !== 'Tab'/.test(modal) && modal.includes('first.focus()'));
+    check('상세 차트에 크게 보기가 있음', inter.includes('expandable') && inter.includes('<ChartModal'));
+    check('큰 창 안에서 또 열리지 않음', inter.includes('expandable={false}'));
+    check('작은 그림도 눌러서 크게 볼 수 있음', trend.includes('<ExpandTrigger') && trend.includes('expandable={false}'));
+    check('큰 창에서는 계열마다 색이 다름', trend.includes('--series-3') && trend.includes('범례가 일을 한다'));
+
+    // 이 화면들은 자료를 클라이언트에서 받아 그리므로 서버가 그린 HTML 에는 뼈대만 있다.
+    // 그래서 화면 자체가 아니라 그 화면이 쓰는 컴포넌트에서 확인한다.
+    const regimeBoard = await readFile('src/components/market/RegimeBoard.tsx', 'utf8');
+    const regimeDetail = await readFile('src/components/market/RegimeDetail.tsx', 'utf8');
+    check('국면 홈 카드의 곡선을 눌러 크게 볼 수 있음', regimeBoard.includes('<ExpandTrigger'));
+    check('국면 20년 곡선이 조작 가능한 차트임', regimeDetail.includes('<InteractiveChart'));
+    for (const page of ['/basics', '/regime']) {
+      const res = await fetch(`${BASE}${page}`);
+      check(`${page} 응답 200`, res.status === 200, `status=${res.status}`);
+    }
+
+    /* 지연·실시간 배지는 카드에서 제일 작은 글씨 */
+    const badge = await readFile('src/components/ui/Badge.tsx', 'utf8');
+    check('지연·실시간이 가장 작은 크기', /size = '2xs'/.test(badge) && /text-\[9\.5px\]/.test(badge));
+    check("'오래된 데이터' 는 한 단계 크게 둠", badge.includes("size === '2xs' ? 'xs' : size"));
+
+    /* 지수 이름 — 한국에서 쓰는 말이 있으면 한글로 */
+    const cat = await readFile('src/lib/catalog.ts', 'utf8');
+    for (const [id, ko] of [['kospi', '코스피'], ['kosdaq', '코스닥'], ['ndx', '나스닥 종합'], ['usdkrw', '원/달러 환율']]) {
+      check(`${id} 이름이 한글`, new RegExp(`id: '${id}', name: '${ko}'`).test(cat));
+    }
+    // 고유명사까지 억지로 옮기지는 않는다 — 옮기면 오히려 못 알아본다
+    check('S&P 500 은 그대로 둠', /id: 'spx', name: 'S&P 500'/.test(cat));
+    check('원문 기호가 남아 검색이 막히지 않음', /id: 'kospi',[^\n]*symbol: 'KOSPI'/.test(cat));
+
+    /* 신호등 개수를 문서에 숫자로 박지 않는다 */
+    const risk = await readFile('src/server/risk.ts', 'utf8');
+    const defined = (risk.match(/^    id: '/gm) ?? []).length;
+    const shown = snap.sections?.risk?.data?.indicators?.length ?? 0;
+    check('정의한 위험 지표 수와 화면에 뜬 수가 같음', defined === shown, `정의 ${defined} / 화면 ${shown}`);
+    check('개수를 코드에 숫자로 박아 두지 않음', !/게이지 7개|RISK_SEVEN|일곱 개만/.test(risk));
+    check('왜 여섯 개인지 적어 둠', risk.includes('VKOSPI') && risk.includes('지금은 여섯 개'));
+
+    /* 미리보기도 같은 것을 갖고 있어야 한다 */
+    check('미리보기에 상자그림이 있음', tpl2.includes('function bandBox') && tpl2.includes('function bandAxis'));
+    check('미리보기에 큰 창이 있음', tpl2.includes('function openZoom') && tpl2.includes('cmodal'));
+    check('미리보기 큰 창도 Esc 로 닫힘', /Escape' && document\.querySelector\('\.cmodal-back'\)/.test(tpl2));
+    check('미리보기 국면 곡선도 조작 가능', tpl2.includes("lineChart([{ id: 'regime'"));
+    check('미리보기 배지도 작게', tpl2.includes("size === '2xs'"));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

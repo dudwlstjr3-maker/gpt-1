@@ -12,8 +12,8 @@
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
-import { RegimeBoardBody, bandColor } from '@/components/market/RegimeBoard';
-import { bandFor } from '@/lib/regimeRules.mjs';
+import { RegimeBoardBody } from '@/components/market/RegimeBoard';
+import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
 import {
   EVIDENCE_BUCKETS,
   EVIDENCE_FINDINGS,
@@ -30,52 +30,34 @@ import type { RegimeDigest } from '@/types';
 
 /* ------------------------------ 20년 곡선 ------------------------------ */
 
+/**
+ * 20년 곡선.
+ *
+ * 직접 그리지 않고 이 앱의 상세용 차트를 그대로 쓴다. 그래야 끌기·확대·축소·
+ * 키보드 조작·표로 보기·크게 보기가 다른 차트와 똑같이 동작한다.
+ * 예전에는 여기만 손으로 그린 정적 SVG 였는데, 조작이 안 되는 그림이 하나만
+ * 섞여 있으면 사용자는 그게 고장 난 줄 안다.
+ */
 function BigChart({ history }: { history: { t: number; score: number }[] }) {
   if (history.length < 8) {
     return <p className="card p-3.5 text-[12px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
   }
-  const W = 320;
-  const H = 130;
-  const L = 22;
-  const B = 16;
-  const t0 = history[0].t;
-  const t1 = history[history.length - 1].t;
-  const span = Math.max(1, t1 - t0);
-  const x = (t: number) => L + ((t - t0) / span) * (W - L - 4);
-  const y = (s: number) => (H - B) - (Math.min(100, Math.max(0, s)) / 100) * (H - B - 6);
-
-  const d = history.map((h, i) => `${i === 0 ? 'M' : 'L'}${x(h.t).toFixed(1)},${y(h.score).toFixed(1)}`).join(' ');
-  const last = history[history.length - 1];
-
-  // 연도 눈금 — 5년 간격이면 320px 에서도 겹치지 않는다
-  const years: number[] = [];
-  const y0 = new Date(t0).getUTCFullYear();
-  const y1 = new Date(t1).getUTCFullYear();
-  for (let yr = Math.ceil(y0 / 5) * 5; yr <= y1; yr += 5) years.push(yr);
-
+  const years = Math.round((history[history.length - 1].t - history[0].t) / (365.25 * 86_400_000));
+  const series: ChartSeries[] = [
+    {
+      id: 'regime',
+      name: '국면 점수',
+      points: history.map((h) => ({ t: h.t, v: h.score })),
+      color: 'var(--accent)',
+      axis: 'left',
+      precision: 1,
+      fixed0to100: true,
+      area: true,
+    },
+  ];
   return (
     <div className="card p-3.5">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="국면 점수 20년 곡선">
-        {[0, 25, 50, 75, 100].map((v) => (
-          <g key={v}>
-            <line x1={L} x2={W - 4} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeWidth="1" strokeDasharray={v === 50 ? '0' : '3 3'} />
-            <text x={L - 4} y={y(v) + 3} textAnchor="end" fontSize="7.5" fill="var(--subtle-fg)">
-              {v}
-            </text>
-          </g>
-        ))}
-        {years.map((yr) => {
-          const t = Date.UTC(yr, 0, 1);
-          if (t < t0 || t > t1) return null;
-          return (
-            <text key={yr} x={x(t)} y={H - 4} textAnchor="middle" fontSize="7.5" fill="var(--subtle-fg)">
-              {String(yr).slice(2)}
-            </text>
-          );
-        })}
-        <path d={d} fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinejoin="round" />
-        <circle cx={x(last.t)} cy={y(last.score)} r="3" fill={bandColor(bandFor(last.score))} />
-      </svg>
+      <InteractiveChart series={series} height={190} label={`국면 점수 ${years}년 추이`} />
       <p className="mt-1 text-[10.5px] leading-relaxed break-keep text-subtle">
         매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은
         기간과 비교한 값입니다.

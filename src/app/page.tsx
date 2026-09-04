@@ -17,7 +17,7 @@ import { FngSection } from '@/components/market/FngSection';
 import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
 import { SummaryCard } from '@/components/market/SummaryCard';
-import { RiskSevenSection } from '@/components/market/RiskSeven';
+import { RiskGaugesSection } from '@/components/market/RiskGauges';
 import { HomeLower } from '@/components/market/HomeLower';
 import { ErrorState } from '@/components/ui/States';
 
@@ -54,7 +54,7 @@ export default function HomePage() {
       {/* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다.
           같은 질문이 아니라서 나란히 둔다. */}
       <RegimeBoardCard />
-      <RiskSevenSection />
+      <RiskGaugesSection />
       <HomePrices />
 
       <SummaryCard />

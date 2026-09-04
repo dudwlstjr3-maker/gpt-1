@@ -273,7 +273,7 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
     >
       <div className="flex items-start gap-1.5">
         <SignalLight signal={riskSignal(indicator.level)} size="sm" label={indicator.shortName} />
-        {/* 시장과 단계를 한 줄에 붙인다. 세 줄로 쌓으면 타일 일곱 장이 그만큼 길어진다. */}
+        {/* 시장과 단계를 한 줄에 붙인다. 세 줄로 쌓으면 타일이 그만큼 길어진다. */}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold text-fg">{indicator.shortName}</p>
           <p className="flex items-center gap-1 text-[9.5px] text-subtle">
@@ -398,7 +398,7 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
 /* 홈 섹션                                                              */
 /* ------------------------------------------------------------------ */
 
-export function RiskSevenSection() {
+export function RiskGaugesSection() {
   const { snapshot, refresh } = useData();
   const section = snapshot?.sections.risk ?? null;
 

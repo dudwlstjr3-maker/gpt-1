@@ -31,6 +31,7 @@ import {
 } from './chartUtils';
 import { SeriesTable, summarizeSeries, type TableSeries } from './SeriesTable';
 import { useChartViewport } from './useChartViewport';
+import { ChartModal } from './ChartModal';
 
 export interface ChartSeries {
   id: string;
@@ -110,6 +111,7 @@ export function InteractiveChart({
   maxPoints = 320,
   markers = [],
   focusT = null,
+  expandable = true,
 }: {
   series: ChartSeries[];
   height?: number;
@@ -120,6 +122,11 @@ export function InteractiveChart({
   markers?: ChartMarker[];
   /** 바깥에서 지정한 강조 시점 (목록에서 항목을 고른 경우) */
   focusT?: number | null;
+  /**
+   * '크게' 버튼을 보일지.
+   * 큰 창 안에서 또 크게 열 수는 없으므로 창 안쪽 차트는 false 로 넘긴다.
+   */
+  expandable?: boolean;
 }) {
   const [wrapRef, size] = useSize<HTMLDivElement>();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -129,6 +136,7 @@ export function InteractiveChart({
    */
   const [cursorT, setCursorT] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
+  const [big, setBig] = useState(false);
   const liveId = useId();
 
   /** 결측을 걸러낸 원본 (뷰포트 계산의 기준) */
@@ -363,6 +371,15 @@ export function InteractiveChart({
                 ⤢
               </ChartButton>
             </div>
+          ) : null}
+          {expandable && !showTable ? (
+            <button
+              type="button"
+              onClick={() => setBig(true)}
+              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+            >
+              크게
+            </button>
           ) : null}
           <button
             type="button"
@@ -615,6 +632,26 @@ export function InteractiveChart({
             </>
           ) : null}
         </p>
+      ) : null}
+
+      {/* 크게 보기 — 창 안의 차트는 또 열 수 없게 expandable 을 끈다 */}
+      {expandable ? (
+        <ChartModal
+          open={big}
+          onClose={() => setBig(false)}
+          title={label}
+          subtitle="끌어서 이동 · 휠이나 두 손가락으로 확대·축소 · 두 번 누르면 전체로"
+        >
+          <InteractiveChart
+            series={series}
+            height={380}
+            label={label}
+            markers={markers}
+            focusT={focusT}
+            maxPoints={maxPoints}
+            expandable={false}
+          />
+        </ChartModal>
       ) : null}
     </div>
   );

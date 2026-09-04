@@ -17,7 +17,7 @@ import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/S
 import { Badge, SessionBadge } from '@/components/ui/Badge';
 import { PriceCard } from '@/components/market/PriceCard';
 import { FngCard } from '@/components/market/FngCard';
-import { RiskForMarket } from '@/components/market/RiskSeven';
+import { RiskForMarket } from '@/components/market/RiskGauges';
 import { EventRow } from '@/components/market/CalendarList';
 import { useChangeColor } from '@/components/market/useChangeColor';
 import { useFormatter } from '@/components/market/useFormatter';

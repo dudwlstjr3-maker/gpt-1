@@ -24,14 +24,18 @@ export function Badge({
   children: ReactNode;
   tone?: Tone;
   title?: string;
-  size?: 'xs' | 'sm';
+  size?: '2xs' | 'xs' | 'sm';
 }) {
   const s = TONE_STYLE[tone];
   return (
     <span
       title={title}
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border font-semibold whitespace-nowrap ${
-        size === 'xs' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-[11px]'
+        size === '2xs'
+          ? 'px-1.5 py-0 text-[9.5px]'
+          : size === 'xs'
+            ? 'px-1.5 py-0.5 text-[10px]'
+            : 'px-2 py-0.5 text-[11px]'
       }`}
       style={{ background: s.bg, color: s.fg, borderColor: s.border }}
     >
@@ -53,18 +57,25 @@ export function ModeBadge({ mode, size = 'sm' }: { mode: DataMode; size?: 'xs' |
   );
 }
 
+/**
+ * 지연·실시간 표시.
+ *
+ * 카드에서 제일 작은 글씨다(9.5px). 이건 **숫자를 읽고 난 뒤에** 확인하는 정보라
+ * 가격이나 등락률과 같은 크기로 서 있으면 시선을 뺏는다.
+ * 다만 '오래된 데이터' 만은 한 단계 크게 둔다 — 그건 값을 믿기 전에 봐야 하는 경고다.
+ */
 export function FreshnessBadge({
   freshness,
   delayMinutes,
-  size = 'xs',
+  size = '2xs',
 }: {
   freshness: Freshness;
   delayMinutes?: number | null;
-  size?: 'xs' | 'sm';
+  size?: '2xs' | 'xs' | 'sm';
 }) {
   if (freshness === 'stale') {
     return (
-      <Badge tone="warn" size={size} title="기준 시각이 오래되었습니다.">
+      <Badge tone="warn" size={size === '2xs' ? 'xs' : size} title="기준 시각이 오래되었습니다.">
         오래된 데이터
       </Badge>
     );

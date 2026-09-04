@@ -128,7 +128,8 @@ await probeText('주식 풋/콜 비율',
  */
 if (FRED_KEY) {
   console.log('\n[경제 캘린더] FRED 발표 일정 — 위 FRED 키를 그대로 씁니다');
-  const { RELEASE_RULES, ruleFor } = await import('../src/server/adapters/live/providers/fredCalendarRules.mjs');
+  const { RELEASE_RULES, ruleFor, FOMC_DECISION_DAYS, FOMC_RELEASE_ID_NOT_A_SCHEDULE } =
+    await import('../src/server/adapters/live/providers/fredCalendarRules.mjs');
   const today = new Date();
   const day = (n) => new Date(today.getTime() + n * 86400000).toISOString().slice(0, 10);
   const url =
@@ -137,16 +138,44 @@ if (FRED_KEY) {
     `&realtime_start=${day(-7)}&realtime_end=${day(45)}`;
   await probe('발표 일정', url, (b) => {
     const rows = Array.isArray(b.release_dates) ? b.release_dates : [];
-    const names = [...new Set(rows.map((r) => r?.release_name).filter((n) => typeof n === 'string'))].sort();
-    const hit = names.filter((n) => ruleFor(n) !== null);
-    const missed = names.filter((n) => ruleFor(n) === null);
-    console.log(`      규칙에 걸린 발표 ${hit.length}종 / 전체 ${names.length}종`);
-    for (const n of hit) console.log(`        ✓ ${n}`);
-    console.log(`      규칙표에 없는 이름 ${missed.length}종 (화면에 안 뜹니다). 앞 20개:`);
-    for (const n of missed.slice(0, 20)) console.log(`        · ${n}`);
-    if (hit.length < RELEASE_RULES.length) {
-      console.log(`      ⚠ 규칙 ${RELEASE_RULES.length}개 중 ${hit.length}개만 실제로 걸렸습니다.`);
-      console.log('        안 걸린 규칙은 FRED 의 실제 이름과 다릅니다 — 위 목록을 보고 고치세요.');
+    const byId = new Map();
+    for (const r of rows) {
+      if (r && typeof r === 'object' && r.release_id !== undefined) {
+        byId.set(Number(r.release_id), String(r.release_name ?? ''));
+      }
+    }
+    const hit = RELEASE_RULES.filter((r) => byId.has(r.releaseId));
+    const missing = RELEASE_RULES.filter((r) => !byId.has(r.releaseId));
+
+    console.log(`      규칙 ${RELEASE_RULES.length}개 중 ${hit.length}개가 실제 응답에 있습니다`);
+    for (const r of hit) {
+      const actual = byId.get(r.releaseId);
+      const same = actual === r.name;
+      console.log(`        ✓ ${r.releaseId} ${actual}${same ? '' : `   ⚠ 기록해 둔 이름과 다름: "${r.name}"`}`);
+    }
+    for (const r of missing) {
+      console.log(`        ✗ ${r.releaseId} (${r.name}) — 이 구간 응답에 없습니다`);
+    }
+    if (missing.length > 0) {
+      console.log('        (조회 구간에 발표가 없어서일 수도 있습니다. 구간을 넓혀 다시 보세요)');
+    }
+
+    // 이름만 FOMC 인 release. 일정표가 아니라는 걸 눈으로 확인할 수 있게 찍는다.
+    const noise = rows.filter((r) => Number(r?.release_id) === FOMC_RELEASE_ID_NOT_A_SCHEDULE);
+    if (noise.length > 0) {
+      const dates = [...new Set(noise.map((r) => r.date))].sort();
+      const real = dates.filter((d) => FOMC_DECISION_DAYS.includes(d));
+      console.log(`      release ${FOMC_RELEASE_ID_NOT_A_SCHEDULE}(FOMC Press Release) 날짜 ${dates.length}개 중`);
+      console.log(`        실제 회의일은 ${real.length}개뿐입니다 — 그래서 이 release 를 일정으로 쓰지 않습니다.`);
+      console.log(`        회의 아닌 날: ${dates.filter((d) => !real.includes(d)).slice(0, 8).join(' ') || '없음'}`);
+    }
+
+    // 손으로 옮긴 FOMC 표가 낡지 않았는지
+    const today = new Date().toISOString().slice(0, 10);
+    const future = FOMC_DECISION_DAYS.filter((d) => d >= today);
+    console.log(`      손으로 옮긴 FOMC 표: 앞으로 남은 회의 ${future.length}회 (다음 ${future[0] ?? '없음'})`);
+    if (future.length < 4) {
+      console.log('      ⚠ 남은 회의가 얼마 없습니다. 연준 페이지에서 다음 해 일정을 옮겨 적으세요.');
     }
     return `${rows.length}행`;
   });

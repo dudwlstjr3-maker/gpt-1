@@ -20,17 +20,36 @@
  *  - **시각이 없다.** 날짜만 준다. timeTbd 를 세우고 시각을 지어내지 않는다.
  *  - **예상치·이전값이 없다.** 일정만 준다. 비운 채로 둔다.
  *  - **미국뿐이다.** 한국·크립토 일정은 여기서 나오지 않는다. 없는 것을 만들지 않는다.
- *  - **FOMC 회의 일정은 절반만 잡힌다.** 연준은 회의 일정표를 기계가 읽을 수 있는
- *    형태로 공개하지 않는다(HTML 페이지와 지나간 보도자료 RSS 뿐이고, 스크래핑은
- *    이 프로젝트가 금지한다). 다만 분기마다 나오는 경제전망요약(SEP)이 회의 날
- *    발표되므로 여덟 번 중 네 번은 이 경로로 잡힌다. 나머지 네 번은 알 수 없다.
+ *  - **FOMC 는 FRED 에서 못 받는다.** release 101 의 이름이 "FOMC Press Release" 라
+ *    일정처럼 보이지만, FRED 가 데이터를 새로 올릴 때마다 날짜를 찍어서 실제 회의가
+ *    없는 날이 잔뜩 섞여 있다. 그래서 연준이 공개한 회의 일정을 손으로 옮긴 표를
+ *    따로 두고 합친다 (fredCalendarRules.mjs 의 FOMC_DECISION_DAYS).
  */
 
 import { fetchJson } from '@/server/http';
 import type { CalendarEvent, DataSource } from '@/types';
-import { kstDateKey, normalizeReleaseDates } from './fredCalendarRules.mjs';
+import {
+  FOMC_SOURCE_URL,
+  FOMC_VERIFIED_ON,
+  fomcEvents,
+  kstDateKey,
+  mergeEvents,
+  normalizeReleaseDates,
+} from './fredCalendarRules.mjs';
 
 const DEFAULT_BASE = 'https://api.stlouisfed.org/fred';
+
+/**
+ * FOMC 는 FRED 가 아니라 연준이 공개한 일정을 옮긴 것이라 출처를 따로 붙인다.
+ * 한 화면에 두 출처가 섞일 때 어느 줄이 어디서 왔는지 보이게 해야 한다.
+ */
+export const FOMC_CALENDAR_SOURCE: DataSource = {
+  name: '미 연방준비제도 공개 회의 일정',
+  url: FOMC_SOURCE_URL,
+  /* 연 단위로 미리 공개되는 일정이다. '지연' 이라는 말이 어울리지 않아 넉넉히 잡는다. */
+  delayMinutes: 10_080,
+  terms: `연준이 공개한 회의 일정을 옮겨 적었습니다 (${FOMC_VERIFIED_ON} 확인).`,
+};
 
 export const FRED_CALENDAR_SOURCE: DataSource = {
   name: 'FRED 발표 일정 (세인트루이스 연은)',
@@ -86,7 +105,13 @@ export async function fetchFredCalendar(cfg: FredCalendarConfig, now: Date): Pro
   if (!Array.isArray(raw.release_dates)) {
     throw new Error('FRED 발표 일정 응답에 release_dates 배열이 없습니다.');
   }
-  return normalizeReleaseDates(raw.release_dates, FRED_CALENDAR_SOURCE);
+  const releases = normalizeReleaseDates(raw.release_dates, FRED_CALENDAR_SOURCE);
+  const fomc = fomcEvents(
+    kstDateKey(now.getTime() - LOOKBACK_DAYS * DAY_MS),
+    kstDateKey(now.getTime() + LOOKAHEAD_DAYS * DAY_MS),
+    FOMC_CALENDAR_SOURCE,
+  );
+  return mergeEvents(releases, fomc);
 }
 
 /**

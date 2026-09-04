@@ -1,123 +1,95 @@
 /**
- * FRED 발표 일정 정규화 — 순수 함수만 모아 둔 곳.
+ * 경제 캘린더 정규화 — 순수 함수만 모아 둔 곳.
  *
  * 왜 .mjs 로 떼어냈나
  *  이 앱은 런타임 의존성이 next·react·react-dom 뿐이라 ts-node 같은 걸 쓸 수 없다.
  *  `node --test` 는 TypeScript 를 못 읽으므로, 단위 테스트를 붙이려면 순수 로직이
  *  평범한 JS 파일이어야 한다. 네트워크를 타는 부분은 fredCalendar.ts 에 남겼다.
- *  (타입은 옆의 fredCalendar.d.mts 가 붙여 준다)
+ *  (타입은 옆의 fredCalendarRules.d.mts 가 붙여 준다)
+ *
+ *  파일 이름이 fredCalendar.ts 와 다른 것도 이유가 있다. 같은 이름으로 뒀더니
+ *  webpack 이 .ts 대신 .mjs 를 물어와서 런타임에 함수가 없다고 터졌다.
+ *  tsc 는 .d.mts 를 보고 통과시켜서 못 잡는다 — 실제로 돌려야 나오는 종류다.
  */
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /**
- * 어떤 발표를 캘린더에 올릴 것인가.
+ * 캘린더에 올릴 발표 — **release id 로 맞춘다.**
  *
- * FRED 는 release 이름을 영어로만 주고 중요도·분류를 주지 않는다. 그래서 여기서
- * 정한다. 규칙은 셋이다.
+ * 처음에는 release 이름을 정규식으로 맞췄다. 이름은 제공사가 언제든 바꿀 수 있고,
+ * 무엇보다 내가 그 이름을 실제로 확인하지 못한 채 적고 있었다. id 는 숫자라
+ * 틀리면 그냥 안 걸리고, 맞으면 정확히 하나만 걸린다.
  *
- *  1. **모르는 release 는 버린다.** FRED 에는 수백 개의 release 가 있고 대부분은
- *     이 앱과 상관없는 지역·업종 통계다. 넓은 키워드로 긁어오면 "미시시피주
- *     고용" 같은 게 미국 고용보고서 옆에 앉는다. 매칭에 실패하면 조용히 뺀다.
- *  2. **중요도는 표에 적힌 것만 쓴다.** 제공사가 안 주는 값을 추론으로 만들면
- *     그 순간부터 화면의 '높음' 배지가 근거 없는 말이 된다.
- *  3. **이름은 정확히 겹치는 것만 잡는다.** 지역 통계에는 대개 주 이름이나
- *     대도시권 이름이 붙으므로, 그런 접두·접미가 붙은 것은 rejects 로 걸러낸다.
+ * 아래 id 는 공개 저장소 두 곳의 FRED 응답 기록과 독립 구현에서 교차 확인했다.
+ * (name 은 확인 당시의 표기이며 화면에는 쓰지 않는다 — 대조용 메모다)
  *
- * 이 표는 FRED 응답을 실제로 받아 보고 확정해야 한다.
- * `npm run check:live` 가 FRED 가 준 release 이름을 그대로 출력하므로,
- * 키를 넣고 한 번 돌린 뒤 여기 이름과 맞는지 대조하면 된다.
+ * 이름 매칭을 버리면서 함께 사라진 위험: FRED 에는 "Consumer Price Index, Japan",
+ * "Median Consumer Price Index", "Research Consumer Price Index" 처럼 헷갈리는
+ * 이름이 여럿 있다. id 로 맞추면 이런 것들이 애초에 후보에 오르지 않는다.
  */
 export const RELEASE_RULES = [
-  {
-    id: 'cpi',
-    /* 미국 전국 소비자물가지수. 지역 CPI 는 이름에 지역명이 붙으므로 제외된다. */
-    match: /^consumer price index$/i,
-    title: '미국 소비자물가지수 (CPI)',
-    category: 'inflation',
-    importance: 'high',
-  },
-  {
-    id: 'employment_situation',
-    /* 비농업 고용·실업률이 함께 나오는 월간 고용보고서 */
-    match: /^employment situation$/i,
-    title: '미국 고용보고서 (비농업 고용 · 실업률)',
-    category: 'employment',
-    importance: 'high',
-  },
-  {
-    id: 'gdp',
-    match: /^gross domestic product$/i,
-    title: '미국 GDP',
-    category: 'gdp',
-    importance: 'high',
-  },
-  {
-    id: 'pce',
-    /* 연준이 물가 판단에 가장 크게 쓰는 개인소비지출 물가 */
-    match: /^personal income and outlays$/i,
-    title: '미국 개인소득·소비지출 (PCE 물가)',
-    category: 'inflation',
-    importance: 'high',
-  },
-  {
-    id: 'ppi',
-    match: /^producer price index$/i,
-    title: '미국 생산자물가지수 (PPI)',
-    category: 'inflation',
-    importance: 'medium',
-  },
-  {
-    id: 'retail_sales',
-    match: /^advance monthly sales for retail and food services$/i,
-    title: '미국 소매판매',
-    category: 'gdp',
-    importance: 'medium',
-  },
-  {
-    id: 'jobless_claims',
-    match: /^unemployment insurance weekly claims report$/i,
-    title: '미국 주간 신규 실업수당 청구',
-    category: 'employment',
-    importance: 'medium',
-  },
-  {
-    id: 'jolts',
-    match: /^job openings and labor turnover survey$/i,
-    title: '미국 구인·이직 보고서 (JOLTS)',
-    category: 'employment',
-    importance: 'low',
-  },
-  {
-    id: 'fomc_projections',
-    /*
-     * FOMC 가 분기마다 내는 경제전망요약. FOMC 회의 자체의 일정표는 연준이
-     * 기계가 읽을 수 있는 형태로 공개하지 않지만, 이 발표는 FOMC 회의 날에
-     * 나오므로 여덟 번 중 네 번은 회의 날짜를 알 수 있다.
-     * 나머지 네 번은 이 소스로 알 수 없고, 없는 것을 지어내지 않는다.
-     */
-    match: /summary of economic projections$/i,
-    title: 'FOMC 경제전망요약 (SEP) · 정책금리 결정일',
-    category: 'central_bank',
-    importance: 'high',
-  },
-  {
-    id: 'h15',
-    match: /^h\.15 selected interest rates$/i,
-    title: '미국 주요 금리 (H.15)',
-    category: 'central_bank',
-    importance: 'low',
-  },
+  { releaseId: 10, id: 'cpi', name: 'Consumer Price Index',
+    title: '미국 소비자물가지수 (CPI)', category: 'inflation', importance: 'high' },
+  { releaseId: 46, id: 'ppi', name: 'Producer Price Index',
+    title: '미국 생산자물가지수 (PPI)', category: 'inflation', importance: 'medium' },
+  { releaseId: 50, id: 'employment_situation', name: 'Employment Situation',
+    title: '미국 고용보고서 (비농업 고용 · 실업률)', category: 'employment', importance: 'high' },
+  { releaseId: 51, id: 'trade', name: 'International Trade in Goods and Services',
+    title: '미국 무역수지', category: 'gdp', importance: 'low' },
+  { releaseId: 53, id: 'gdp', name: 'Gross Domestic Product',
+    title: '미국 GDP', category: 'gdp', importance: 'high' },
+  { releaseId: 54, id: 'pce', name: 'Personal Income and Outlays',
+    title: '미국 개인소득·소비지출 (PCE 물가)', category: 'inflation', importance: 'high' },
+  { releaseId: 180, id: 'jobless_claims', name: 'Unemployment Insurance Weekly Claims Report',
+    title: '미국 주간 신규 실업수당 청구', category: 'employment', importance: 'medium' },
+  { releaseId: 192, id: 'jolts', name: 'Job Openings and Labor Turnover Survey',
+    title: '미국 구인·이직 보고서 (JOLTS)', category: 'employment', importance: 'low' },
 ];
 
 /**
- * 지역·업종 통계 걸러내기.
+ * **FRED release 101 (FOMC Press Release) 은 쓰지 않는다.**
  *
- * FRED 에는 "Consumer Price Index" 와 이름이 비슷한 지역 통계가 많다.
- * 규칙의 정규식이 `^...$` 로 묶여 있어 대부분 걸러지지만, 한 겹 더 둔다.
- * 여기 걸리면 규칙과 맞더라도 버린다.
+ * 이름만 보면 FOMC 일정 같지만 아니다. FRED 는 데이터를 새로 올릴 때마다 이
+ * release 에 날짜를 찍어서, 실제 회의가 없는 날이 잔뜩 섞여 있다. 공개 저장소
+ * 두 곳이 각각 독립적으로 같은 사실을 적어 두었다 —
+ *   "FRED lists 'FOMC Press Release' on many dates for data refreshes"
+ *   "release id 101 is a known non-schedule"
+ * 그대로 쓰면 회의가 아닌 날에 "FOMC 정책금리 결정" 이 뜬다.
  */
-const REGIONAL = /\b(state|states|metropolitan|county|counties|region|regional|district|area|city|msa)\b/i;
+export const FOMC_RELEASE_ID_NOT_A_SCHEDULE = 101;
+
+/**
+ * FOMC 정책금리 결정일 — 손으로 옮겨 적은 표.
+ *
+ * 연준은 회의 일정을 사람이 읽는 HTML 로만 공개한다. 기계가 읽을 수 있는 것은
+ * *지나간* 보도자료 RSS 뿐이고, 스크래핑은 이 프로젝트가 하지 않는다.
+ * 그래서 여기만 예외적으로 손으로 옮긴 값이 들어간다.
+ *
+ * 지어낸 값이 아니라는 근거
+ *  - 원 출처: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+ *  - 공개 저장소 **네 곳**의 서로 다른 구현에서 같은 날짜를 확인했다.
+ *    그중 한 곳은 이틀짜리 회의의 양일을 모두 적어 두는데, 그 둘째 날이
+ *    아래 날짜와 정확히 일치한다 (정책 결정은 회의 마지막 날에 나온다).
+ *  - 확인일: 2026-09-04
+ *
+ * 손으로 적은 값의 진짜 위험은 틀리는 게 아니라 **낡는 것**이다. 그래서 아래
+ * COVERED_THROUGH 를 두고, 그 뒤로는 아무것도 내보내지 않는다. 조용히 비는
+ * 편이 작년 일정을 올해 것인 양 보여주는 것보다 낫다.
+ */
+export const FOMC_SOURCE_URL = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
+export const FOMC_VERIFIED_ON = '2026-09-04';
+export const FOMC_COVERED_THROUGH = '2028-01-26';
+export const FOMC_DECISION_DAYS = [
+  /* 2026 */
+  '2026-01-28', '2026-03-18', '2026-04-29', '2026-06-17',
+  '2026-07-29', '2026-09-16', '2026-10-28', '2026-12-09',
+  /* 2027 */
+  '2027-01-27', '2027-03-17', '2027-04-28', '2027-06-09',
+  '2027-07-28', '2027-09-15', '2027-10-27', '2027-12-08',
+  /* 2028 — 2027년 일정 발표에 함께 공개된 1월분까지만 */
+  '2028-01-26',
+];
 
 /** 문자열이면 다듬어 돌려주고, 아니면 null. 빈 문자열도 null 이다. */
 export function textOrNull(v) {
@@ -157,11 +129,11 @@ export function kstDateKey(ms) {
   return new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-/** release 이름에 맞는 규칙. 없으면 null — 지어내지 않는다. */
-export function ruleFor(releaseName) {
-  const name = textOrNull(releaseName);
-  if (name === null || REGIONAL.test(name)) return null;
-  return RELEASE_RULES.find((r) => r.match.test(name)) ?? null;
+/** release id 에 맞는 규칙. 없으면 null — 짐작해서 분류하지 않는다. */
+export function ruleFor(releaseId) {
+  const n = typeof releaseId === 'number' ? releaseId : Number(textOrNull(releaseId));
+  if (!Number.isInteger(n)) return null;
+  return RELEASE_RULES.find((r) => r.releaseId === n) ?? null;
 }
 
 /**
@@ -171,12 +143,11 @@ export function ruleFor(releaseName) {
 export function normalizeReleaseDate(row, source) {
   if (row === null || typeof row !== 'object' || Array.isArray(row)) return null;
 
-  const releaseName = textOrNull(row.release_name);
+  const rule = ruleFor(row.release_id);
   const scheduledAt = kstDateIso(row.date);
-  const rule = ruleFor(releaseName);
   if (rule === null || scheduledAt === null) return null;
 
-  const releaseId = row.release_id === undefined ? null : String(row.release_id);
+  const givenName = textOrNull(row.release_name);
 
   return {
     id: `fred-${rule.id}-${String(row.date)}`,
@@ -196,14 +167,14 @@ export function normalizeReleaseDate(row, source) {
     previous: null,
     actual: null,
     unit: null,
-    note: `원문 일정명: ${releaseName}${releaseId === null ? '' : ` (FRED release ${releaseId})`}`,
+    note: `원문 일정명: ${givenName ?? rule.name} (FRED release ${rule.releaseId})`,
     source: { ...source },
   };
 }
 
 /**
- * 응답 배열 → 일정 목록. 같은 날 같은 발표가 두 번 오면 하나만 남기고
- * 시간순으로 세운다. (FRED 는 realtime 구간에 따라 같은 행을 반복해 준다)
+ * 응답 배열 → 일정 목록. 같은 날 같은 발표가 두 번 오면 하나만 남긴다.
+ * (FRED 는 realtime 구간에 따라 같은 행을 반복해 준다)
  */
 export function normalizeReleaseDates(rows, source) {
   if (!Array.isArray(rows)) return [];
@@ -214,6 +185,56 @@ export function normalizeReleaseDates(rows, source) {
     if (event === null || seen.has(event.id)) continue;
     seen.add(event.id);
     out.push(event);
+  }
+  return out;
+}
+
+/**
+ * FOMC 정책금리 결정일 → CalendarEvent.
+ *
+ * 손으로 옮긴 표에서만 만든다. 구간 밖이거나 표가 덮는 기간을 넘어서면 아무것도
+ * 내보내지 않는다 — 낡은 표로 없는 회의를 그리는 것이 최악이다.
+ */
+export function fomcEvents(fromKey, toKey, source) {
+  const from = textOrNull(fromKey);
+  const to = textOrNull(toKey);
+  if (from === null || to === null) return [];
+
+  return FOMC_DECISION_DAYS.filter((d) => d >= from && d <= to && d <= FOMC_COVERED_THROUGH)
+    .map((d) => {
+      const scheduledAt = kstDateIso(d);
+      if (scheduledAt === null) return null;
+      return {
+        id: `fomc-${d}`,
+        title: 'FOMC 정책금리 결정',
+        country: 'US',
+        market: 'us',
+        category: 'central_bank',
+        importance: 'high',
+        scheduledAt,
+        /* 연준은 보통 현지 14:00 에 발표하지만 그 시각까지 공개 일정으로 받은 게 아니다 */
+        timeTbd: true,
+        forecast: null,
+        previous: null,
+        actual: null,
+        unit: null,
+        note: `연준이 공개한 회의 일정 (${FOMC_VERIFIED_ON} 확인). 이틀 회의의 마지막 날이 결정일입니다.`,
+        source: { ...source },
+      };
+    })
+    .filter((e) => e !== null);
+}
+
+/** 두 목록을 합쳐 날짜순으로. 같은 id 는 한 번만. */
+export function mergeEvents(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const e of list ?? []) {
+      if (e === null || seen.has(e.id)) continue;
+      seen.add(e.id);
+      out.push(e);
+    }
   }
   return out.sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
 }

@@ -1125,7 +1125,16 @@ async function main() {
       /forecast:\s*null/.test(cal) && /previous:\s*null/.test(cal) && /actual:\s*null/.test(cal));
     // 규칙에 없는 release 를 짐작해서 분류하면 지역 통계가 전국 지표 옆에 앉는다
     check('모르는 발표는 버림', cal.includes('if (rule === null || scheduledAt === null) return null;'));
-    check('지역 통계를 전국 지표로 착각하지 않음', cal.includes('REGIONAL'));
+    // 이름이 아니라 release id 로 맞춘다. "Consumer Price Index, Japan" 같은 이름에 안 속는다.
+    check('발표를 이름이 아니라 release id 로 맞춤',
+      /releaseId:\s*10\b/.test(cal) && /r\.releaseId === n/.test(cal));
+    // FRED release 101 은 이름만 FOMC 이고 실제로는 일정표가 아니다
+    check('FOMC Press Release(101) 를 일정으로 쓰지 않음',
+      cal.includes('FOMC_RELEASE_ID_NOT_A_SCHEDULE') && !/releaseId:\s*101\b/.test(cal));
+    // 손으로 옮긴 표는 낡는 것이 가장 위험하다 — 덮는 기간을 넘으면 비운다
+    check('FOMC 표에 출처·확인일·덮는 기간이 있음',
+      cal.includes('FOMC_SOURCE_URL') && cal.includes('FOMC_VERIFIED_ON') && cal.includes('FOMC_COVERED_THROUGH'));
+    check('FOMC 표가 덮는 기간을 넘으면 내보내지 않음', cal.includes('d <= FOMC_COVERED_THROUGH'));
     check('중요도를 추론하지 않고 표에 적힌 것만 씀', /importance:\s*rule\.importance/.test(cal));
     check('캘린더가 결측을 0 으로 채우지 않음', !/\?\?\s*0|\|\|\s*0/.test(cal));
     // 일정표에 '실시간' 배지가 붙으면 안 된다
@@ -1136,11 +1145,15 @@ async function main() {
      * 추측이 그대로 굳지 않는다.
      */
     const chk = await readFile('scripts/check-live.mjs', 'utf8');
-    check('실제 release 이름을 확인할 길이 있음',
-      chk.includes('규칙표에 없는 이름') && chk.includes('fredCalendarRules.mjs'));
+    check('실제 응답과 규칙표를 대조할 길이 있음',
+      chk.includes('기록해 둔 이름과 다름') && chk.includes('fredCalendarRules.mjs'));
+    check('손으로 옮긴 FOMC 표가 낡았는지 점검함',
+      chk.includes('앞으로 남은 회의') && chk.includes('연준 페이지에서 다음 해 일정을'));
     // 못 받는 것은 못 받는다고 적어 둔다
-    check('FOMC 회의 일정의 한계를 밝힘',
-      chk.includes('FOMC 회의 일정') && cal.includes('여덟 번 중 네 번'));
+    // 손으로 옮긴 값이 왜 거기 있는지, 어디서 왔는지가 코드에 적혀 있어야 한다
+    check('FOMC 를 손으로 옮긴 이유와 출처를 밝힘',
+      cal.includes('federalreserve.gov/monetarypolicy/fomccalendars.htm') &&
+      cal.includes('스크래핑은 이 프로젝트가 하지 않는다'));
 
     // 시각을 모르는 일정에 시계를 그리지 않는다
     const calList = await readFile('src/components/market/CalendarList.tsx', 'utf8');

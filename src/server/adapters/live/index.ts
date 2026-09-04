@@ -31,13 +31,14 @@ import {
   fetchStablecoinMcap,
   type CoinGeckoConfig,
 } from './providers/coingecko';
-import { fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
+import { FRED_SOURCE, fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
 import { fetchFredCalendar, fredCalendarConfig } from './providers/fredCalendar';
 import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
+import type { RegimeSeries } from '@/server/regime';
 import type {
   CalendarEvent,
   DataSource,
@@ -361,6 +362,62 @@ export class LiveAdapter implements MarketAdapter {
   /** TODO(연결지점 4): KRX 투자자별 순매수 (외국인·기관·개인, 단위 억원). */
   async getFlows(_ctx: AdapterContext): Promise<FlowSummary> {
     throw new NotWiredError('한국 투자자별 순매수', 'src/server/adapters/live/index.ts > LiveAdapter.getFlows');
+  }
+
+  /* -------------------------- 국면 전광판 -------------------------- */
+  /**
+   * 20년치 원자료를 모은다.
+   *
+   *  - 변동성·신용 스프레드: FRED (VIXCLS, BAMLH0A0HYM2) — 둘 다 20년보다 긴 이력이 있다.
+   *  - 낙폭·추세: Stooq 의 S&P 500 일별 종가에서 직접 계산한다.
+   *
+   * 축 하나가 실패해도 전체를 던지지 않는다. 빠진 축은 커버리지 규칙이 처리하고,
+   * 화면은 "무엇이 빠졌고 왜인지" 를 그대로 보여 준다. 여기서 지어내지 않는 게 핵심이다.
+   */
+  async getRegimeSeries(ctx: AdapterContext): Promise<{ series: RegimeSeries; sources: DataSource[] }> {
+    const key = getKeys().macro;
+    if (!key) throw new AdapterNotConfiguredError('국면 전광판(FRED)', ['MACRO_API_KEY']);
+    const cfg = fredConfig(key, envUrl('MACRO_BASE_URL'));
+    const start = new Date(ctx.now.getTime() - 21 * 365.25 * 86_400_000).toISOString().slice(0, 10);
+
+    const series: RegimeSeries = {};
+    const sources: DataSource[] = [];
+
+    const [vix, hy, spx] = await Promise.allSettled([
+      fetchSeries(cfg, 'vix', { start }),
+      fetchSeries(cfg, 'hy_oas', { start }),
+      fetchDailySeries(stooqConfig(envUrl('US_MARKET_BASE_URL')), 'spx', 21 * 366),
+    ]);
+
+    if (vix.status === 'fulfilled' && vix.value.length > 0) series.vol = vix.value;
+    if (hy.status === 'fulfilled' && hy.value.length > 0) series.credit = hy.value;
+    if (vix.status === 'fulfilled' || hy.status === 'fulfilled') sources.push({ ...FRED_SOURCE });
+
+    if (spx.status === 'fulfilled' && spx.value.length > 60) {
+      const closes = spx.value;
+      const drawdown: SeriesPoint[] = [];
+      const trend: SeriesPoint[] = [];
+      let peak = -Infinity;
+      for (let i = 0; i < closes.length; i += 1) {
+        const p = closes[i];
+        peak = Math.max(peak, p.v);
+        drawdown.push({ t: p.t, v: (p.v / peak - 1) * 100 });
+        // 1년 이동평균. 앞쪽 250개는 평균을 만들 수 없어 아예 넣지 않는다.
+        if (i >= 249) {
+          const w = closes.slice(i - 249, i + 1);
+          const ma = w.reduce((a, b) => a + b.v, 0) / w.length;
+          trend.push({ t: p.t, v: (p.v / ma - 1) * 100 });
+        }
+      }
+      series.drawdown = drawdown;
+      series.trend = trend;
+      sources.push({ ...STOOQ_SOURCE });
+    }
+
+    if (Object.keys(series).length === 0) {
+      throw new SeriesUnavailableError('국면 전광판에 쓸 20년치 자료를 한 축도 받지 못했습니다.');
+    }
+    return { series, sources };
   }
 
   /* --------------------------- 거시 지표 --------------------------- */

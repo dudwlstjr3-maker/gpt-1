@@ -84,6 +84,8 @@ export const SECTION_TTL: Record<SectionKey, number> = {
   // 예측시장은 계속 바뀐다. 다른 섹션보다 짧게 잡는다
   prediction: 60_000,
   risk: 120_000,
+  // 20년 분포를 다시 만드는 계산이라 자주 돌릴 이유가 없다
+  regime: 6 * 3600_000,
   calendar: 900_000,
   news: 300_000,
   summary: 300_000,
@@ -100,6 +102,7 @@ export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
   basics: 30 * 24 * 3600_000,
   prediction: 20 * 60_000,
   risk: 900_000,
+  regime: 48 * 3600_000,
   calendar: 6 * 3600_000,
   news: 3 * 3600_000,
   summary: 3 * 3600_000,

@@ -43,7 +43,9 @@ async function getJson(path) {
  */
 async function unitTests() {
   console.log('[0] 순수 로직 단위 테스트 (node --test)');
-  const files = ['scripts/fred-calendar.test.mjs', 'scripts/criteria.test.mjs'].filter((f) => existsSync(f));
+  const files = ['scripts/fred-calendar.test.mjs', 'scripts/criteria.test.mjs', 'scripts/regime.test.mjs'].filter(
+    (f) => existsSync(f),
+  );
   if (files.length === 0) {
     check('단위 테스트 파일이 있음', false, '없음');
     return;
@@ -1017,6 +1019,99 @@ async function main() {
       board.includes('사거나 팔라는 신호가 아닙니다') && card.includes('사거나 팔라는 신호가 아닙니다'));
     check('과거 성과 표를 붙이지 않는 이유를 밝힘',
       /지난[\s\S]{0,20}결과가 다음을 보장하지 않고/.test(board));
+  }
+
+
+  /* ---------------- 8-11. 국면 전광판 ---------------- */
+  console.log('\n[8-11] 국면 전광판');
+  {
+    /*
+     * 이 화면은 내 기준보다도 선을 넘기 쉽다. "20년 만의 공포" 라는 큰 문장을
+     * 띄우고 알림까지 나가기 때문이다. 그래서 세 가지를 기계로 막는다.
+     *   ① 매수·매도라는 말이 없을 것
+     *   ② 그 말을 안 쓰는 이유(검증 결과)가 화면에 함께 있을 것
+     *   ③ "N년 만" 을 과장하지 않을 것
+     */
+    const rules = await readFile('src/lib/regimeRules.mjs', 'utf8');
+    const evidence = await readFile('src/lib/regimeEvidence.mjs', 'utf8');
+    const board = await readFile('src/components/market/RegimeBoard.tsx', 'utf8');
+    const detail = await readFile('src/components/market/RegimeDetail.tsx', 'utf8');
+    const page = await (await fetch(`${BASE}/regime`)).text();
+
+    check('전광판 화면이 있음', page.includes('>국면 전광판</h1>'));
+
+    const sec = snap.sections?.regime;
+    check('홈 스냅샷에 전광판 섹션이 있음', !!sec, sec ? `status=${sec.status}` : '없음');
+    const digest = sec?.data;
+    const bd = digest?.board;
+    check('전광판이 점수 또는 산출 불가 사유를 냄',
+      !!bd && (typeof bd.score === 'number' || typeof bd.unavailableReason === 'string'));
+
+    if (bd) {
+      check('점수가 0~100 안에 있음',
+        bd.score === null || (bd.score >= 0 && bd.score <= 100), String(bd.score));
+      check('되돌아보는 기간이 20년', bd.lookbackYears === 20, String(bd.lookbackYears));
+      check('축이 네 개', Array.isArray(bd.axes) && bd.axes.length === 4, String(bd.axes?.length));
+      check('구간에 글리프와 이름이 함께 있음',
+        bd.score === null || (!!bd.band?.glyph && !!bd.band?.label), `${bd.band?.glyph} ${bd.band?.label}`);
+      // 커버리지가 모자라면 점수를 내면 안 된다
+      check('커버리지 70% 미만이면 점수를 내지 않음',
+        bd.coverage >= 0.7 ? bd.score !== null : bd.score === null, `coverage=${Math.round((bd.coverage ?? 0) * 100)}%`);
+      // 빠진 축을 0 으로 세지 않는다 — percentile 이 null 로 와야 한다
+      const zeroed = (bd.axes ?? []).filter((a) => a.percentile === 0 && a.value === null);
+      check('결측 축을 0점으로 채우지 않음', zeroed.length === 0, zeroed.map((a) => a.id).join(', ') || '없음');
+    }
+
+    if (digest?.history?.length) {
+      const h = digest.history;
+      check('20년 곡선이 시간순으로 정렬돼 있음', h.every((p, i) => i === 0 || p.t >= h[i - 1].t));
+      check('곡선 점수도 0~100 안에 있음', h.every((p) => p.score >= 0 && p.score <= 100));
+    }
+
+    // ① 매매를 권하는 말이 없어야 한다
+    const bannedR = ['매수', '매도', '사세요', '파세요', '매매 신호', '추천합니다', '유리합니다', '지금이 기회'];
+    const stripR = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const [name, src] of [['국면 로직', stripR(rules)], ['전광판', stripR(board)], ['상세 화면', stripR(detail)], ['검증 자료', stripR(evidence)]]) {
+      const hit = bannedR.filter((w) => src.includes(w));
+      check(`${name}에 매매를 권하는 말이 없음`, hit.length === 0, hit.join(', ') || '없음');
+    }
+    // 주석에는 "'매수 구간' 같은 이름은 쓰지 않는다" 는 설명이 있다. 걷어내고 본다.
+    check('구간 이름이 행동이 아니라 시장 상태를 가리킴',
+      /'극단적 공포'/.test(rules) && !/매수 구간|매도 구간|진입|청산/.test(stripR(rules)));
+
+    // ② 왜 그 말을 안 쓰는지가 화면에 있어야 한다
+    check('신호가 아니라는 말이 전광판에 있음', board.includes('사거나 팔라는 신호가 아닙니다'));
+    check('그 말을 쓰지 않는 이유가 숫자로 붙어 있음',
+      board.includes('점수가 낮았다고') && detail.includes('성립하지 않습니다'));
+    check('검증 결과로 들어가는 길이 전광판에 있음', board.includes("href=\"/regime\"") || board.includes('검증 결과 보기'));
+    check('상세 화면이 좋았던 경우와 나빴던 경우를 함께 보여 줌',
+      detail.includes('EXTREME_FEAR_EPISODES') && detail.includes('HOT_EPISODES') && detail.includes('EVIDENCE_LIMITS'));
+    check('검증에 쓴 자료의 출처를 밝힘', detail.includes('EVIDENCE_SOURCES') && evidence.includes('finance-vix'));
+    check('검증과 실서비스의 자료가 다르다는 것을 밝힘', /LIVE_VS_BACKTEST/.test(detail) && /FRED 와 Stooq/.test(evidence));
+
+    // ③ 희소성을 과장하지 않는다
+    check('과거에 그런 날이 없으면 "N년 만" 이라고 쓰지 않음',
+      rules.includes('자료가 있는 ${Math.floor(spanYears)}년 중 가장'));
+    check('남은 개월을 올림하지 않음', /Math\.floor\(months \/ 12\)/.test(rules));
+    check('1년 미만은 크게 띄우지 않음(notable)',
+      /notable:\s*months >= 12/.test(rules) && board.includes('rarity?.notable'));
+
+    // 발표가 멈춘 축을 오늘 값처럼 쓰지 않는다
+    check('오래된 값을 오늘 값으로 쓰지 않음', /MAX_STALE_DAYS/.test(rules) && /오늘 값으로 쓰지 않습니다/.test(rules));
+
+    // 알림도 같은 규칙을 따른다
+    const engine = await readFile('src/components/alerts/AlertsEngine.tsx', 'utf8');
+    check('국면 알림이 있음', engine.includes("case 'regime_rarity'"));
+    check('국면 알림은 1년 이상 만일 때만 울림', /rarity\?\.notable/.test(engine));
+    check('알림 문구도 신호가 아니라고 밝힘', engine.includes('매매 신호가 아닙니다'));
+
+    // 세 곳 규칙 — 미리보기 템플릿도 같이 갖고 있어야 한다
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기에도 전광판이 있음', tpl.includes('function regimeBlock()') && tpl.includes('function viewRegime()'));
+    check('미리보기가 검증 숫자를 손으로 베끼지 않음',
+      tpl.includes('DATA.regimeEvidence') && !/fwd12Mean:\s*-?\d/.test(tpl));
+    const buildSrc = await readFile('tools/preview/build.mjs', 'utf8');
+    check('미리보기 빌드가 원본 모듈에서 검증 결과를 읽음', buildSrc.includes("import('../../src/lib/regimeEvidence.mjs')"));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

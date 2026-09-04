@@ -60,6 +60,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
     const id = `c${Date.now().toString(36)}`;
     const base = { id, comparator, value: num };
     if (kind === 'fng') onAdd({ ...base, kind: 'fng', market });
+    else if (kind === 'regime') onAdd({ ...base, kind: 'regime' });
     else if (kind === 'risk_count') onAdd({ ...base, kind: 'risk_count', level });
     else onAdd({ ...base, kind: 'risk_value', indicatorId });
     setValue('30');
@@ -76,6 +77,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
           <span className="mb-1 block text-[11px] text-muted">무엇을 볼까요</span>
           <select className={sel} value={kind} onChange={(e) => setKind(e.target.value as Criterion['kind'])}>
             <option value="fng">시장 심리 점수</option>
+            <option value="regime">국면 점수 (20년 기준)</option>
             <option value="risk_count">위험 신호등 개수</option>
             <option value="risk_value">개별 위험 지표 값</option>
           </select>
@@ -92,6 +94,12 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
               ))}
             </select>
           </label>
+        ) : null}
+
+        {kind === 'regime' ? (
+          <p className="text-[10.5px] leading-relaxed break-keep text-subtle">
+            변동성·신용 스프레드·낙폭·추세를 지난 20년 분포와 견준 0~100 점수입니다. 낮을수록 공포 쪽입니다.
+          </p>
         ) : null}
 
         {kind === 'risk_count' ? (

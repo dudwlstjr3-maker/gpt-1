@@ -103,6 +103,27 @@ async function main() {
     }
   }
 
+  /**
+   * 검증 결과는 손으로 베끼지 않고 원본 모듈에서 그대로 가져온다.
+   * regimeEvidence.mjs 는 의존성이 없는 순수 모듈이라 여기서 바로 읽을 수 있고,
+   * 그래야 미리보기의 숫자가 앱과 어긋날 일이 없다.
+   */
+  const evidence = await import('../../src/lib/regimeEvidence.mjs');
+  const regimeEvidence = {
+    sources: evidence.EVIDENCE_SOURCES,
+    liveVsBacktest: evidence.LIVE_VS_BACKTEST,
+    sample: evidence.EVIDENCE_SAMPLE,
+    buckets: evidence.EVIDENCE_BUCKETS,
+    extremeFear: evidence.EXTREME_FEAR_EPISODES,
+    fear: evidence.FEAR_EPISODES,
+    hot: evidence.HOT_EPISODES,
+    findings: evidence.EVIDENCE_FINDINGS,
+    limits: evidence.EVIDENCE_LIMITS,
+  };
+  if (!regimeEvidence.buckets?.length || !regimeEvidence.findings?.length) {
+    throw new Error('regimeEvidence.mjs 에서 검증 결과를 읽지 못했습니다.');
+  }
+
   const indices = readIndexCatalog();
   // 목록에 있는 지수는 스냅샷에도 있어야 한다. 없으면 미리보기에 빈 줄이 남는다.
   for (const [market, list] of Object.entries(indices)) {
@@ -111,7 +132,10 @@ async function main() {
     if (missing.length) throw new Error(`스냅샷에 ${market} 지수가 없습니다: ${missing.join(', ')}`);
   }
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices };
+  // 전광판이 스냅샷에 없으면 미리보기에 빈 화면이 남는다. 조용히 넘기지 않는다.
+  if (!snapshot.sections.regime) throw new Error('스냅샷에 regime 섹션이 없습니다.');
+
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, regimeEvidence };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');

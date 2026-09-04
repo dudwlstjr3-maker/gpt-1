@@ -15,6 +15,7 @@ import { MARKET_IDS, MARKET_LABEL, type AlertEvent, type AlertRule, type AlertRu
 const RULE_META: Record<AlertRuleType, { label: string; desc: string; needsTargetQuote: boolean; unit: string }> = {
   fng_stage_change: { label: 'Fear & Greed 단계 변경', desc: '공포↔중립↔탐욕 단계가 바뀌면 알립니다.', needsTargetQuote: false, unit: '' },
   fng_threshold: { label: '점수 돌파', desc: '지정한 점수를 넘거나 밑돌면 알립니다.', needsTargetQuote: false, unit: '점' },
+  regime_rarity: { label: '국면이 1년 이상 만의 극단에 들어갈 때', desc: '국면 점수가 최소 1년 만의 공포·과열 수준에 닿으면 알립니다. 몇 개월 만인 정도로는 울리지 않습니다.', needsTargetQuote: false, unit: '' },
   price_target: { label: '목표 가격 도달', desc: '지정한 가격에 도달하면 알립니다.', needsTargetQuote: true, unit: '' },
   price_move: { label: '급등락', desc: '당일 등락률이 기준을 넘으면 알립니다.', needsTargetQuote: true, unit: '%' },
   risk_spike: { label: '위험 지표 급변', desc: 'VIX·VKOSPI·환율이 기준 이상 상승하면 알립니다.', needsTargetQuote: true, unit: '%' },
@@ -167,7 +168,9 @@ export default function AlertsPage() {
             <span className="mt-1 block text-[10px] break-keep text-subtle">{meta.desc}</span>
           </label>
 
-          {type !== 'calendar_reminder' ? (
+          {/* 국면 알림은 대상도 기준값도 없다 — 시장 하나가 아니라 전체 국면 하나뿐이고,
+              문턱은 '1년 이상 만' 이라는 희소성으로 고정돼 있다. */}
+          {type !== 'calendar_reminder' && type !== 'regime_rarity' ? (
             <label className="block">
               <span className="mb-1 block text-[11px] text-muted">대상</span>
               <select
@@ -190,7 +193,7 @@ export default function AlertsPage() {
             </label>
           ) : null}
 
-          {type !== 'fng_stage_change' ? (
+          {type !== 'fng_stage_change' && type !== 'regime_rarity' ? (
             <div className="flex gap-2">
               <label className="flex-1">
                 <span className="mb-1 block text-[11px] text-muted">기준값 ({meta.unit || '값'})</span>

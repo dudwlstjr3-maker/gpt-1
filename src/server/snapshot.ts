@@ -14,6 +14,7 @@ import { computeFng } from './fng/engine';
 import { FORMULA_VERSION } from './fng/definitions';
 import { buildSummary } from './summary';
 import { buildRiskDigest } from './risk';
+import { buildRegimeDigest, regimeMeta } from './regime';
 import { getAllSessions } from '@/lib/marketHours';
 import { kstDateKey } from '@/lib/format';
 import { ValidationCollector, sanitizeSeries, score100 } from '@/lib/validate';
@@ -292,6 +293,20 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
+  /* -------- 국면 전광판 -------- */
+  /* 20년 분포를 다시 만드는 계산이라 TTL 이 길다. 실패해도 다른 섹션은 그대로 나온다. */
+  const regime = await section(
+    'regime',
+    `${ns}:regime`,
+    async () => {
+      const { series, sources } = await adapter.getRegimeSeries(ctx);
+      const digest = buildRegimeDigest(series, sources, now);
+      return { data: digest, meta: regimeMeta(digest, now) };
+    },
+    now,
+    (d) => d.board.score === null && d.history.length === 0,
+  );
+
   /* -------- 뉴스 -------- */
   const news = await section(
     'news',
@@ -328,7 +343,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, regime, calendar, news, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -416,6 +431,7 @@ function errorSections(now: Date, message: string): SnapshotSections {
     basics: blankSection(now, 'error', message),
     prediction: blankSection(now, 'error', message),
     risk: blankSection(now, 'error', message),
+    regime: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
     summary: blankSection(now, 'error', message),
@@ -432,6 +448,7 @@ function loadingSections(now: Date): SnapshotSections {
     basics: blankSection(now, 'loading'),
     prediction: blankSection(now, 'loading'),
     risk: blankSection(now, 'loading'),
+    regime: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),
     summary: blankSection(now, 'loading'),

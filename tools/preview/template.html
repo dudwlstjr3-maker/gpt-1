@@ -2073,6 +2073,253 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
+  /* ---------------------------------------------------------------- */
+  /* 국면 전광판                                                        */
+  /*                                                                    */
+  /* 앱의 RegimeBoard.tsx / RegimeDetail.tsx 를 손으로 한 벌 더 옮긴 것.  */
+  /* 검증 숫자는 베끼지 않고 build.mjs 가 regimeEvidence.mjs 에서 그대로   */
+  /* 실어 온다 — 손으로 옮기면 언젠가 앱과 어긋난다.                       */
+  /* ---------------------------------------------------------------- */
+
+  const BAND_COLOR = {
+    extreme_fear: 'var(--tl-red)',
+    fear: 'var(--tl-orange)',
+    caution: 'var(--tl-yellow)',
+    middle: 'var(--muted)',
+    calm: 'var(--tl-lime)',
+    hot: 'var(--tl-orange)',
+    extreme_hot: 'var(--tl-red)',
+  };
+  function bandColor(band) { return (band && BAND_COLOR[band.id]) || 'var(--muted)'; }
+
+  /** 0~100 눈금 띠 */
+  function regimeScale(score, band) {
+    const x = Math.min(100, Math.max(0, score));
+    return (
+      '<div style="margin-top:12px">' +
+      '<div style="position:relative;height:10px;width:100%;overflow:hidden;border-radius:999px;background:var(--surface-3)">' +
+      [10, 25, 45, 55, 75, 90].map((b) =>
+        '<span style="position:absolute;top:0;height:100%;width:1px;left:' + b + '%;background:var(--border-strong)"></span>').join('') +
+      '<span style="position:absolute;top:50%;height:16px;width:6px;transform:translate(-50%,-50%);border-radius:999px;left:' +
+      x + '%;background:' + bandColor(band) + ';box-shadow:0 0 0 2px var(--surface)"></span>' +
+      '</div>' +
+      '<div class="tnum" style="margin-top:4px;display:flex;justify-content:space-between;font-size:9.5px;color:var(--subtle)">' +
+      '<span>0 공포</span><span>50</span><span>과열 100</span></div></div>'
+    );
+  }
+
+  /** 20년 점수 곡선 (앱과 같은 방식으로 직접 그린 SVG) */
+  function regimeSpark(history, band, big) {
+    if (!history || history.length < 8) return '';
+    const W = big ? 320 : 300, H = big ? 130 : 44, PAD = 3;
+    const L = big ? 22 : PAD, B = big ? 16 : PAD;
+    const t0 = history[0].t, t1 = history[history.length - 1].t;
+    const span = Math.max(1, t1 - t0);
+    const X = (t) => L + ((t - t0) / span) * (W - L - 4);
+    const Y = (v) => (H - B) - (Math.min(100, Math.max(0, v)) / 100) * (H - B - PAD * 2);
+    const d = history.map((h, i) => (i === 0 ? 'M' : 'L') + X(h.t).toFixed(1) + ',' + Y(h.score).toFixed(1)).join(' ');
+    const last = history[history.length - 1];
+    const years = Math.round((t1 - t0) / (365.25 * 86400000));
+    const lines = big ? [0, 25, 50, 75, 100] : [25, 75];
+    const yearTicks = [];
+    if (big) {
+      const y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear();
+      for (let yr = Math.ceil(y0 / 5) * 5; yr <= y1; yr += 5) yearTicks.push(yr);
+    }
+    return (
+      '<div style="margin-top:' + (big ? 0 : 12) + 'px">' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:' + (big ? 'auto' : '44px') + '" role="img" aria-label="최근 ' + years + '년 국면 점수 곡선">' +
+      lines.map((v) =>
+        '<line x1="' + L + '" x2="' + (W - 4) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="var(--border)" stroke-width="1"' +
+        (big && v === 50 ? '' : ' stroke-dasharray="3 3"') + '></line>' +
+        (big ? '<text x="' + (L - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end" font-size="7.5" fill="var(--subtle)">' + v + '</text>' : '')).join('') +
+      yearTicks.map((yr) => {
+        const t = Date.UTC(yr, 0, 1);
+        if (t < t0 || t > t1) return '';
+        return '<text x="' + X(t) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="7.5" fill="var(--subtle)">' + String(yr).slice(2) + '</text>';
+      }).join('') +
+      '<path d="' + d + '" fill="none" stroke="' + (big ? 'var(--accent)' : 'var(--muted)') + '" stroke-width="' + (big ? 1.3 : 1.2) + '" stroke-linejoin="round"></path>' +
+      '<circle cx="' + X(last.t) + '" cy="' + Y(last.score) + '" r="' + (big ? 3 : 2.8) + '" fill="' + bandColor(band) + '"></circle>' +
+      '</svg>' +
+      (big ? '' : '<p class="tnum" style="margin:2px 0 0;font-size:9.5px;color:var(--subtle)">최근 ' + years + '년 · 점선은 25점과 75점</p>') +
+      '</div>'
+    );
+  }
+
+  function regimeAxes(board) {
+    return '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px">' +
+      board.axes.map((a) =>
+        '<li style="display:flex;align-items:center;gap:8px">' +
+        '<span style="width:42px;flex-shrink:0;font-size:11px;white-space:nowrap;color:var(--muted)" title="' + esc(a.label) + '">' + esc(a.short || a.label) + '</span>' +
+        '<span style="position:relative;height:6px;min-width:0;flex:1;overflow:hidden;border-radius:999px;background:var(--surface-3)">' +
+        (a.percentile === null ? '' :
+          '<span style="position:absolute;top:0;left:0;height:100%;border-radius:999px;background:var(--muted);width:' +
+          Math.min(100, Math.max(2, a.percentile)) + '%"></span>') +
+        '</span>' +
+        '<span class="tnum" style="width:52px;flex-shrink:0;text-align:right;font-size:11px;font-weight:600;color:var(--fg)">' +
+        (a.percentile === null ? '<span style="color:var(--subtle)">산출 불가</span>' : a.percentile.toFixed(0) + '점') + '</span></li>').join('') +
+      '</ul>';
+  }
+
+  /** 전광판 본체 */
+  function regimeBody(digest, compact) {
+    const board = digest.board;
+    if (board.score === null) {
+      return '<div class="card" style="padding:14px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' + badge('b-warn', '? 산출 불가') +
+        '<span style="font-size:12px;font-weight:600;color:var(--fg-strong)">국면 점수를 낼 수 없습니다</span></div>' +
+        '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(board.unavailableReason || '') + '</p>' +
+        regimeAxes(board) + '</div>';
+    }
+    const band = board.band;
+    const missing = board.axes.filter((a) => a.percentile === null);
+    const notable = board.rarity && board.rarity.notable && board.rarity.headline;
+    return (
+      '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+      '<div style="min-width:0">' +
+      '<div style="display:flex;align-items:center;gap:6px;color:' + bandColor(band) + '">' +
+      '<span aria-hidden="true" style="font-size:13px">' + esc(band ? band.glyph : '') + '</span>' +
+      '<span style="font-size:13px;font-weight:700">' + esc(band ? band.label : '') + '</span></div>' +
+      '<p style="margin:4px 0 0;font-size:19px;line-height:1.2;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' +
+      (notable ? esc(board.rarity.headline) : '지난 ' + board.lookbackYears + '년 기준 ' + board.score.toFixed(0) + '점') + '</p>' +
+      (board.rarity && board.rarity.text
+        ? '<p class="tnum" style="margin:4px 0 0;font-size:11.5px;word-break:keep-all;color:var(--muted)">' + esc(board.rarity.text) + '</p>' : '') +
+      '</div>' +
+      '<div style="flex-shrink:0;text-align:right">' +
+      '<p class="tnum" style="margin:0;font-size:30px;line-height:1;font-weight:700;color:' + bandColor(band) + '">' + board.score.toFixed(0) + '</p>' +
+      '<p style="margin:0;font-size:9.5px;color:var(--subtle)">/ 100</p></div></div>' +
+      regimeScale(board.score, band) +
+      (compact ? '' : regimeSpark(digest.history, band, false)) +
+      regimeAxes(board) +
+      (missing.length
+        ? '<p style="margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+          esc(missing.map((m) => m.label + ' 제외 — ' + (m.reason || '자료 없음')).join(' · ')) +
+          ' · 남은 축의 가중치 ' + Math.round(board.coverage * 100) + '% 로 계산했습니다.</p>'
+        : '') +
+      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '지금이 역사적으로 어디쯤인지만 보여 줍니다. <b>사거나 팔라는 신호가 아닙니다</b> — 지난 26년 자료에서 점수가 낮았다고 해서 그 뒤 12개월이 좋았던 것은 아니었습니다. ' +
+      '<button type="button" class="linkbtn" data-go="regime">검증 결과 보기 →</button></p>' +
+      '</div>'
+    );
+  }
+
+  function regimeBlock() {
+    const sec = snap().sections.regime;
+    if (!sec || !sec.data) return '';
+    return (
+      '<section class="block"><div class="block-head"><h2>국면 전광판</h2>' +
+      '<button type="button" class="linkbtn" data-go="regime">자세히 →</button></div>' +
+      regimeBody(sec.data, false) + '</section>'
+    );
+  }
+
+  /* ---- 전용 화면 ---- */
+
+  function evSign(v) { return (v > 0 ? '+' : '') + v.toFixed(1); }
+  function evColor(v) { return v >= 0 ? 'var(--tl-green)' : 'var(--tl-red)'; }
+
+  function regimeBucketTable() {
+    const ev = DATA.regimeEvidence;
+    return '<div class="card" style="padding:0;overflow-x:auto">' +
+      '<table style="width:100%;min-width:420px;font-size:11px;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--subtle);text-align:left">' +
+      ['점수 구간', '국면 수', '12개월 뒤 평균', '플러스 비율', '그 사이 최대 낙폭'].map((h, i) =>
+        '<th style="padding:8px ' + (i === 0 ? '12px' : '8px') + ';font-weight:600;text-align:' + (i === 0 ? 'left' : 'right') + '">' + h + '</th>').join('') +
+      '</tr></thead><tbody class="tnum">' +
+      ev.buckets.map((b) =>
+        '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 12px;white-space:nowrap;color:var(--fg)"><span style="color:var(--subtle)">' + b.from + '–' + (b.to === 101 ? 100 : b.to) + '</span> ' + esc(b.label) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:var(--muted)">' + b.episodes + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:600;color:' + (b.sample === 0 ? 'var(--subtle)' : evColor(b.fwd12Mean)) + '">' +
+        (b.sample === 0 ? '표본 없음' : evSign(b.fwd12Mean) + '%') + '</td>' +
+        '<td style="padding:8px;text-align:right;color:var(--muted)">' + (b.sample === 0 ? '—' : b.positiveShare + '%') + '</td>' +
+        '<td style="padding:8px 12px;text-align:right;color:var(--muted)">' + (b.sample === 0 ? '—' : b.deepestDip.toFixed(1) + '%') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+  }
+
+  function regimeEpisodeTable(title, note, list) {
+    return '<div style="margin-top:12px">' +
+      '<h3 style="margin:0;font-size:12.5px;font-weight:700;color:var(--fg-strong)">' + esc(title) + '</h3>' +
+      '<p style="margin:2px 0 6px;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(note) + '</p>' +
+      '<div class="card" style="padding:0;overflow-x:auto">' +
+      '<table style="width:100%;min-width:420px;font-size:11px;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--subtle)">' +
+      ['국면', '최저 점수', '그 뒤 12개월', '그 사이 최대 낙폭'].map((h, i) =>
+        '<th style="padding:8px ' + (i === 0 ? '12px' : '8px') + ';font-weight:600;text-align:' + (i === 0 ? 'left' : 'right') + '">' + h + '</th>').join('') +
+      '</tr></thead><tbody class="tnum">' +
+      list.map((e) =>
+        '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px 12px;white-space:nowrap;color:var(--fg)">' + esc(e.from + (e.to !== e.from ? ' ~ ' + e.to : '')) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:var(--muted)">' + e.troughScore.toFixed(1) + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:600;color:' + (e.fwd12 === null ? 'var(--subtle)' : evColor(e.fwd12)) + '">' +
+        (e.fwd12 === null ? '진행 중' : evSign(e.fwd12) + '%') + '</td>' +
+        '<td style="padding:8px 12px;text-align:right;color:var(--muted)">' + (e.deepestDip === null ? '—' : e.deepestDip.toFixed(1) + '%') + '</td></tr>').join('') +
+      '</tbody></table></div></div>';
+  }
+
+  function viewRegime() {
+    const sec = snap().sections.regime;
+    const ev = DATA.regimeEvidence;
+    const digest = sec && sec.data;
+    return (
+      '<section class="block"><div class="block-head"><div style="min-width:0">' +
+      '<h2>국면 전광판</h2>' +
+      '<div class="sub" style="margin-top:2px">변동성·신용 스프레드·고점 대비 낙폭·추세를 지난 20년 분포와 견줘, 지금이 역사적으로 어디쯤인지 한 숫자로 보여 줍니다.</div>' +
+      '</div></div>' +
+      (digest
+        ? regimeBody(digest, true) +
+          '<div class="card" style="padding:14px;margin-top:12px">' + regimeSpark(digest.history, digest.board.band, true) +
+          '<p style="margin:4px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+          '매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은 기간과 비교한 값입니다.</p></div>' +
+          '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:4px">' +
+          digest.board.axes.map((a) =>
+            '<li class="card" style="padding:10px;display:flex;gap:8px;align-items:flex-start">' +
+            '<span style="width:74px;flex-shrink:0;font-size:11.5px;font-weight:600;color:var(--fg-strong)">' + esc(a.label) + '</span>' +
+            '<div style="min-width:0;flex:1">' +
+            '<p class="tnum" style="margin:0;font-size:11.5px;color:var(--fg)">' +
+            (a.value === null ? '값 없음' : esc(a.value.toFixed(a.precision) + a.unit)) +
+            (a.percentile === null ? '' : '<span style="color:var(--muted)"> · 최근 ' + a.years + '년 중 ' + a.percentile.toFixed(0) + '점</span>') + '</p>' +
+            '<p style="margin:2px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(a.reason || a.hint) + '</p>' +
+            '</div></li>').join('') + '</ul>'
+        : '<p class="notice n-warn">전광판 데이터를 받지 못했습니다.</p>') +
+      '</section>' +
+
+      '<section class="block"><div class="block-head"><h2>이게 주가 흐름과 맞나</h2>' + badge('b-accent', '▪ 검증') + '</div>' +
+      '<p style="margin:0 0 12px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+      esc(ev.sample.from) + '부터 ' + esc(ev.sample.to) + '까지 ' + ev.sample.months + '개월을 같은 산식으로 다시 계산해, ' +
+      '점수가 나온 달마다 S&amp;P 500 의 이후 12개월을 붙여 봤습니다. 결론부터 적으면 ' +
+      '<b style="color:var(--fg-strong)">"공포면 사고 과열이면 판다"는 이 자료에서 성립하지 않습니다.</b></p>' +
+      regimeBucketTable() +
+      '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:8px">' +
+      ev.findings.map((f) =>
+        '<li class="card" style="padding:12px">' +
+        '<p style="margin:0;font-size:12.5px;font-weight:700;color:var(--fg-strong)">' + esc(f.title) + '</p>' +
+        '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(f.body) + '</p></li>').join('') +
+      '</ul>' +
+      regimeEpisodeTable('극단적 공포 국면 — 26년에 네 번', '점수가 10 아래로 내려간 국면 전부입니다. 네 번 중 두 번은 12개월 뒤에도 손실이었습니다.', ev.extremeFear) +
+      regimeEpisodeTable('공포 국면 — 성적이 가장 나빴던 구간', '10~25점 구간입니다. 2008년 3월이 여기 있었고 12개월 뒤 -42.5% 였습니다.', ev.fear) +
+      regimeEpisodeTable('과열 국면 — 대체로 더 올랐다', '75점 이상 국면입니다. 11번 중 8번은 12개월 뒤 플러스였습니다.', ev.hot) +
+      '</section>' +
+
+      '<section class="block"><div class="block-head"><h2>이 검증이 못 하는 것</h2></div>' +
+      '<div class="card" style="padding:14px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:8px">' +
+      ev.limits.map((l) =>
+        '<li style="display:flex;gap:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+        '<span aria-hidden="true" style="flex-shrink:0;color:var(--subtle)">▪</span><span>' + esc(l) + '</span></li>').join('') +
+      '</ul></div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>검증에 쓴 자료</h2></div>' +
+      '<div class="card" style="padding:14px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:10px">' +
+      ev.sources.map((sc) =>
+        '<li><p style="margin:0;font-size:11.5px;font-weight:600;color:var(--fg)">' + esc(sc.label) + '</p>' +
+        '<p style="margin:2px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(sc.origin) + ' · ' + esc(sc.via) + '</p></li>').join('') +
+      '</ul></div>' +
+      '<p style="margin:8px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(ev.liveVsBacktest) + '</p>' +
+      '</section>'
+    );
+  }
+
   function dailyBasicBlock() {
     const sec = snap().sections.basics || {};
     const list = sec.data || [];
@@ -2137,6 +2384,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<div class="fng-scroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
       '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
       '</section>' +
+
+      /* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다. */
+      regimeBlock() +
 
       '<section class="block"><div class="block-head"><h2>시장 위험 신호등</h2>' +
       '<button type="button" class="linkbtn" data-go="risk">기준과 해설 →</button></div>' +
@@ -3227,6 +3477,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       calendar: viewCalendar,
       indicators: viewIndicators,
       fng: viewFng,
+      regime: viewRegime,
     }[state.view];
     document.getElementById('view').innerHTML = v();
     renderNav();

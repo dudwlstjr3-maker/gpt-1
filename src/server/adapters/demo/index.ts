@@ -31,6 +31,8 @@ import type {
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import { COMPONENTS } from '@/server/fng/definitions';
+import type { RegimeSeriesPoint } from '@/lib/regimeRules.d.mts';
+import type { RegimeSeries } from '@/server/regime';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
 import { getWorld, type DemoWorld } from './world';
 
@@ -1394,6 +1396,74 @@ export class DemoAdapter implements MarketAdapter {
       unit: 'krw_100m',
       meta: makeMeta(ctx, 'kr', missing ? ['투자자별 매매동향 수집 실패 (DEMO 재현)'] : undefined),
     };
+  }
+
+  /**
+   * 국면 전광판용 21년치 합성 시계열.
+   *
+   * 주 단위로 만든다. 20년 분포를 만드는 게 목적이라 일별까지 갈 이유가 없고,
+   * 스냅샷이 무거워진다. 과거에 두 번의 급락 국면을 심어 둬서 DEMO 에서도
+   * "N년 만의 공포" 문장이 어떻게 생겼는지 볼 수 있게 했다.
+   *
+   * 당연히 실제 시장 자료가 아니다. LIVE 와 절대 섞이지 않는다.
+   */
+  async getRegimeSeries(ctx: AdapterContext): Promise<{ series: RegimeSeries; sources: DataSource[] }> {
+    const rnd = mulberry32(hashSeed(`regime:${ctx.scenario}`));
+    const gauss = gaussianFrom(rnd);
+    const WEEK = 7 * 86_400_000;
+    const weeks = 52 * 21;
+    const end = ctx.now.getTime();
+
+    /**
+     * 과거에 심어 둔 급락 국면 (지금으로부터 N주 전이 바닥).
+     *
+     * 마지막 하나는 '최근'에 둔다. DEMO 로 앱을 처음 열어 본 사람이
+     * 전광판이 조용할 때 말고 **말을 할 때** 어떻게 생겼는지 봐야 하기 때문이다.
+     */
+    const crashes = [
+      { at: weeks - 8, depth: 0.45 },
+      { at: weeks - 52 * 3, depth: 1.0 },
+      { at: weeks - 52 * 9, depth: 0.75 },
+      { at: weeks - 52 * 17, depth: 0.9 },
+    ];
+    /** 해당 주가 급락 국면에서 얼마나 깊은가 (0~1) */
+    const stress = (i: number) => {
+      let s = 0;
+      for (const c of crashes) {
+        const d = Math.abs(i - c.at);
+        if (d < 30) s = Math.max(s, c.depth * Math.exp(-(d * d) / 200));
+      }
+      return s;
+    };
+
+    const vol: RegimeSeriesPoint[] = [];
+    const credit: RegimeSeriesPoint[] = [];
+    const drawdown: RegimeSeriesPoint[] = [];
+    const trend: RegimeSeriesPoint[] = [];
+
+    let price = 1000;
+    let peak = price;
+    const closes: number[] = [];
+
+    for (let i = 0; i <= weeks; i += 1) {
+      const t = end - (weeks - i) * WEEK;
+      const st = stress(i);
+      // 급락 구간에서는 수익률 평균이 내려가고 변동성이 커진다
+      const drift = 0.0016 - st * 0.03;
+      const shock = (0.016 + st * 0.05) * gauss();
+      price = Math.max(50, price * (1 + drift + shock));
+      closes.push(price);
+      peak = Math.max(peak, price);
+
+      vol.push({ t, v: round(11 + st * 45 + Math.abs(gauss()) * 3.5, 2) });
+      credit.push({ t, v: round(2.9 + st * 12 + Math.abs(gauss()) * 0.35, 2) });
+      drawdown.push({ t, v: round((price / peak - 1) * 100, 2) });
+      const window = closes.slice(Math.max(0, closes.length - 52));
+      const ma = window.reduce((a, b) => a + b, 0) / window.length;
+      trend.push({ t, v: round((price / ma - 1) * 100, 2) });
+    }
+
+    return { series: { vol, credit, drawdown, trend }, sources: [DEMO_SOURCE] };
   }
 
   async getMacro(ctx: AdapterContext): Promise<MacroIndicator[]> {

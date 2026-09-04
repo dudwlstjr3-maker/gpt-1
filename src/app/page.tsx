@@ -14,6 +14,7 @@
 
 import { useData } from '@/components/providers/DataProvider';
 import { FngSection } from '@/components/market/FngSection';
+import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskSevenSection } from '@/components/market/RiskSeven';
@@ -50,6 +51,9 @@ export default function HomePage() {
     <div className="pt-2">
       <h1 className="sr-only">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>
       <FngSection />
+      {/* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다.
+          같은 질문이 아니라서 나란히 둔다. */}
+      <RegimeBoardCard />
       <RiskSevenSection />
       <HomePrices />
 

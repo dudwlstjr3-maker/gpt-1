@@ -783,6 +783,7 @@ export interface SnapshotSections {
   basics: Section<EconomyBasic[]>;
   prediction: Section<PredictionDigest>;
   risk: Section<RiskDigest>;
+  regime: Section<RegimeDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;
   summary: Section<MarketSummary>;
@@ -864,6 +865,88 @@ export interface AssetDetail {
 /* 얼마인가" 만 답한다. 그래서 결과에 등급이 없고 개수만 있다.            */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* 국면 전광판                                                          */
+/* ------------------------------------------------------------------ */
+
+export type RegimeAxisId = 'vol' | 'credit' | 'drawdown' | 'trend';
+
+export type RegimeBandId =
+  | 'extreme_fear'
+  | 'fear'
+  | 'caution'
+  | 'middle'
+  | 'calm'
+  | 'hot'
+  | 'extreme_hot';
+
+export interface RegimeAxisDef {
+  id: RegimeAxisId;
+  label: string;
+  /** 좁은 자리(막대 옆 이름표)용 짧은 이름 */
+  short: string;
+  weight: number;
+  invert: boolean;
+  unit: string;
+  precision: number;
+  hint: string;
+}
+
+export interface RegimeAxisResult extends RegimeAxisDef {
+  /** 0~100. 높을수록 과열 쪽. 산출 못 하면 null */
+  percentile: number | null;
+  value: number | null;
+  /** 분포를 만드는 데 쓴 햇수 */
+  years: number;
+  asOf?: number;
+  /** percentile 이 null 인 이유 */
+  reason?: string;
+}
+
+export interface RegimeBand {
+  id: RegimeBandId;
+  max: number;
+  label: string;
+  glyph: string;
+  tone: 'danger' | 'warn' | 'neutral' | 'ok';
+}
+
+export interface RegimeRarity {
+  /** 아래쪽 극단인지 위쪽 극단인지. 가운데면 null */
+  side: 'low' | 'high' | null;
+  band: RegimeBand | null;
+  recordYears?: number;
+  /** 이보다 극단이었던 마지막 시점. 그런 날이 없으면 null */
+  sinceT?: number | null;
+  months?: number | null;
+  text: string | null;
+  headline?: string;
+  /** 1년 이상 만이거나 기록상 최초일 때만 true. 화면·알림은 이때만 크게 쓴다 */
+  notable: boolean;
+}
+
+export interface RegimeBoard {
+  asOf: number | null;
+  /** 0~100. 낮을수록 공포. 못 내면 null */
+  score: number | null;
+  coverage: number;
+  axes: RegimeAxisResult[];
+  band: RegimeBand | null;
+  unavailableReason?: string;
+  rarity: RegimeRarity | null;
+  lookbackYears: number;
+}
+
+/** 전광판 섹션이 실어 나르는 것 — 지금 값 + 20년 곡선 */
+export interface RegimeDigest {
+  board: RegimeBoard;
+  /** 20년 점수 곡선 (주 단위로 솎아냄) */
+  history: { t: number; score: number }[];
+  /** 축별 원자료 출처 */
+  sources: DataSource[];
+  generatedAt: string;
+}
+
 export type CriterionComparator = 'gte' | 'lte';
 
 export type Criterion =
@@ -872,11 +955,14 @@ export type Criterion =
   /** 위험 신호등에서 특정 단계인 지표의 개수 */
   | { id: string; kind: 'risk_count'; level: RiskLevel; comparator: CriterionComparator; value: number }
   /** 특정 위험 지표의 값 */
-  | { id: string; kind: 'risk_value'; indicatorId: string; comparator: CriterionComparator; value: number };
+  | { id: string; kind: 'risk_value'; indicatorId: string; comparator: CriterionComparator; value: number }
+  /** 국면 점수 (지난 20년 분포 기준) */
+  | { id: string; kind: 'regime'; comparator: CriterionComparator; value: number };
 
 export type AlertRuleType =
   | 'fng_stage_change'
   | 'fng_threshold'
+  | 'regime_rarity'
   | 'price_target'
   | 'price_move'
   | 'risk_spike'

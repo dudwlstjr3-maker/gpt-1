@@ -8,6 +8,7 @@
 import type {
   CalendarEvent,
   DataMode,
+  DataSource,
   DemoScenario,
   EconomyBasic,
   FlowSummary,
@@ -20,6 +21,7 @@ import type {
   SeriesPoint,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
+import type { RegimeSeries } from '@/server/regime';
 
 export interface AdapterContext {
   now: Date;
@@ -53,6 +55,15 @@ export interface MarketAdapter {
 
   /** 거시·위험 지표 */
   getMacro(ctx: AdapterContext): Promise<MacroIndicator[]>;
+
+  /**
+   * 국면 전광판이 쓰는 20년치 원자료.
+   *
+   * 다른 메서드와 달리 **길이가 길다**. 20년 분포를 만드는 게 목적이라
+   * 최근 값만 주면 안 된다. 축 하나가 통째로 없으면 그냥 빼고 주면 되고,
+   * 그건 커버리지 규칙이 알아서 처리한다.
+   */
+  getRegimeSeries(ctx: AdapterContext): Promise<{ series: RegimeSeries; sources: DataSource[] }>;
 
   /** 생활 속 경제 이야기 (1인당 GDP, 빅맥지수 등) */
   getBasics(ctx: AdapterContext): Promise<EconomyBasic[]>;

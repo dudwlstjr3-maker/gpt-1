@@ -54,6 +54,23 @@ function evaluate(rule: AlertRule, snapshot: Snapshot, prevStage: Record<string,
         dedupeKey: `${rule.id}:${above ? 'above' : 'below'}`,
       };
     }
+    /**
+     * 국면이 '1년 이상 만의 극단' 에 들어갔을 때만 울린다.
+     *
+     * 문턱을 사용자에게 받지 않는 이유: 이 알림의 값어치는 숫자가 아니라 **희소성**에 있다.
+     * 그리고 rarity.notable 이 false 인 것(몇 개월 만)까지 울리면 매달 울려서
+     * 알림 자체가 무의미해진다. 울릴 때 하는 말도 사실뿐이다 — 무엇을 하라고 하지 않는다.
+     */
+    case 'regime_rarity': {
+      const board = snapshot.sections.regime.data?.board;
+      if (!board || board.score === null || !board.rarity?.notable || !board.rarity.headline) return null;
+      const bandId = board.band?.id ?? 'unknown';
+      return {
+        title: `국면 전광판 · ${board.rarity.headline}`,
+        body: `국면 점수 ${formatScore(board.score)}점 (${board.band?.label ?? ''}) · ${board.rarity.text ?? ''}. 지금이 20년 중 어디쯤인지 알리는 것이며 매매 신호가 아닙니다.`,
+        dedupeKey: `${rule.id}:${bandId}:${board.rarity.headline}`,
+      };
+    }
     case 'price_target': {
       const q = findQuote(rule.target);
       if (!q || q.price === null || rule.threshold === undefined) return null;

@@ -9,11 +9,13 @@
  * 쪽은 한 해의 살림 — 같은 자리에 두면 무엇을 보고 있는지가 흐려졌다.
  */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { MarketIndexBoard } from '@/components/market/MarketIndexBoard';
 
 export default function IndicesPage() {
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">시장 지수</h1>
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">

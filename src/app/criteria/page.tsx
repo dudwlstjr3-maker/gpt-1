@@ -8,11 +8,13 @@
  * 한 번 정해 두고 가끔 확인하는 쪽에 가깝다.
  */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { CriteriaBoard } from '@/components/market/CriteriaBoard';
 
 export default function CriteriaPage() {
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">내 기준</h1>
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">

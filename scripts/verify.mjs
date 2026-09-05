@@ -1271,6 +1271,58 @@ async function main() {
       /크립토 \| \*\*63%\*\* \| ❌ 산출 불가/.test(readme));
   }
 
+
+  /* ---------------- 8-14. 화면 이동 ---------------- */
+  console.log('\n[8-14] 화면 이동 — 부드러운가, 길을 잃지 않는가');
+  {
+    /*
+     * 사용자가 실제로 겪은 문제 두 가지를 여기서 막는다.
+     *  ① "눌렀을 때 너무 빨리 넘어가서 가독성이 떨어진다"
+     *     → 전환 효과가 아예 없었다. innerHTML 즉시 교체 + scrollTo instant.
+     *  ② "이쪽 저쪽 페이지를 옮겨다녀서 뭐가 뭔지 모르겠다"
+     *     → 홈 하나에 나가는 링크가 서른 개인데, 상세 화면 여섯 곳에 돌아갈 길이 없었다.
+     */
+    const shell = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const backBar = await readFile('src/components/nav/BackBar.tsx', 'utf8');
+    const tiles = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    const tpl3 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 전환 */
+    check('화면이 바뀔 때 전환 효과가 있음', /view-enter/.test(shell) && /@keyframes view-enter/.test(css));
+    check('경로가 바뀔 때만 재생됨(값 갱신에는 안 돌음)', /key=\{pathname\}/.test(shell));
+    check('축소 모션이면 전환을 생략함', /prefers-reduced-motion/.test(css) && /animation-duration: 0\.001ms/.test(css));
+    // 너무 길면 기다리는 느낌이 든다. 200~320ms 사이로 묶어 둔다.
+    const dur = Number(css.match(/animation: view-enter (\d+)ms/)?.[1] ?? 0);
+    check('전환 길이가 200~320ms', dur >= 200 && dur <= 320, `${dur}ms`);
+
+    /* ② 돌아갈 길 */
+    check('돌아갈 길 컴포넌트가 있음', backBar.includes('export function BackBar'));
+    check('앱 안에서 왔으면 눌렀던 자리로 보냄', /router\.back\(\)/.test(backBar));
+    check('주소를 직접 열었으면 앱 밖으로 안 나감', /router\.push\(fallback\)/.test(backBar));
+    // 주석에는 "history.length 로 짐작하지 않는다" 는 설명이 있다. 걷어내고 본다.
+    const stripB = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    check('history.length 로 짐작하지 않음', !/history\.length/.test(stripB(backBar)));
+    for (const page of ['regime', 'criteria', 'indices', 'basics', 'indicators', 'calendar']) {
+      const src = await readFile(`src/app/${page}/page.tsx`, 'utf8');
+      check(`/${page} 에 돌아갈 길이 있음`, src.includes('<BackBar'));
+    }
+
+    /* ③ 그 자리에서 해결 */
+    check('신호등 타일이 다른 화면으로 나가지 않음',
+      /aria-expanded=\{open\}/.test(tiles) && !/<Link\s+href="\/indicators"\s+className="card/.test(tiles));
+    check('타일이 그 자리에서 해설을 펼침', tiles.includes('guideFor(indicator.id)') && tiles.includes('무슨 뜻인가요'));
+    check('펼친 뒤에도 더 볼 길은 남겨 둠', tiles.includes('구간 기준과 다른 지표 보기'));
+    check('펼침 상태를 스크린리더에 알림', /aria-controls=/.test(tiles) && /aria-expanded/.test(tiles));
+
+    /* 미리보기도 같은 것을 갖고 있어야 한다 */
+    check('미리보기에도 전환 효과가 있음', /@keyframes view-enter/.test(tpl3) && /classList\.add\('view-enter'\)/.test(tpl3));
+    check('미리보기도 같은 화면 안에서는 재생하지 않음', /const moved = state\.view !== lastView/.test(tpl3));
+    check('미리보기에도 돌아갈 길이 있음', /function backBar\(\)/.test(tpl3) && /data-back/.test(tpl3));
+    check('미리보기 홈에는 돌아갈 길을 붙이지 않음', /TAB_VIEWS\.indexOf\(state\.view\) < 0/.test(tpl3));
+    check('미리보기 타일도 그 자리에서 펼침', /data-tile=/.test(tpl3) && /state\.openTile/.test(tpl3));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

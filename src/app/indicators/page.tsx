@@ -2,6 +2,7 @@
 
 /** 경제·위험 지표 전체 — 홈에서 요약한 항목의 상세 화면. */
 
+import { BackBar } from '@/components/nav/BackBar';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
@@ -119,6 +120,7 @@ export default function IndicatorsPage() {
 
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
         <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">

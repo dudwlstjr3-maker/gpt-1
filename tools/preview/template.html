@@ -400,6 +400,22 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
 }
 .zoomable:hover .zoomhint, .zoomable:focus-visible .zoomhint { opacity: 1; }
 
+/* 화면 전환 — 6px 만 움직인다. 더 크게 주면 글보다 움직임이 먼저 눈에 든다. */
+.view-enter { animation: view-enter 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 돌아갈 길 — 하단 탭에 없는 화면에서 길을 잃지 않게 */
+.backbar { padding: 8px 12px 0; }
+.backbar button {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: -6px; padding: 4px 6px; border: 0; background: none;
+  border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--muted); font-family: inherit;
+}
+.backbar button:hover { color: var(--fg); }
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -790,6 +806,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     scenario: 'normal',
     watch: new Set(['spx', 'kospi', 'btc', 'usdkrw', 'vix']),
     openComp: null,
+    openTile: null,
     calMarket: 'all',
     region: 'us',
     riskScope: 'us',
@@ -1723,10 +1740,20 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     );
   }
 
+  /**
+   * 신호등 타일 — 누르면 **그 자리에서** 해설이 열린다 (앱의 RiskTile 과 같다).
+   *
+   * 예전에는 여섯 장이 전부 지표 화면으로 나갔다. 바로 위 '기준과 해설 →' 도 같은 곳이라
+   * 홈 한 화면에서 같은 데로 가는 링크가 일곱 개였다. 해설은 이미 갖고 있으니
+   * 다른 화면에 가서 읽을 이유가 없다.
+   */
   function riskTile(i) {
     const un = i.value === null;
+    const open = state.openTile === i.id;
+    const g = INDICATOR_GUIDE[i.id];
     return (
-      '<button type="button" class="card risktile" data-go-risk style="text-align:left;border-width:1px" aria-label="' + esc(i.name + ' 상세 보기') + '">' +
+      '<div class="card" style="padding:10px">' +
+      '<button type="button" data-tile="' + esc(i.id) + '" aria-expanded="' + open + '" style="display:block;width:100%;text-align:left;border:0;background:none;padding:0;color:inherit">' +
       '<div style="display:flex;align-items:flex-start;gap:6px">' + lamp(riskSignal(i.level), 'sm', i.shortName) +
       '<div style="min-width:0;flex:1"><div style="font-size:11px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</div>' +
       '<div style="font-size:9.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
@@ -1737,7 +1764,25 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '<span class="tnum" style="font-size:15px;font-weight:700;color:var(--fg-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(riskValue(i.value, i)) + '</span>' +
           '<span class="tnum" style="flex-shrink:0;font-size:10px;color:' + dirColor(i.change) + '">' + dirGlyph(i.change) + ' ' + esc(riskChange(i.change, i)) + '</span></div>') +
       '<div style="margin-top:8px">' + bandBar(i, false) + '</div>' +
-      '</button>'
+      '<p style="margin:6px 0 0;display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:9.5px;color:var(--subtle)">' +
+      (open ? '접기' : '무슨 뜻인가요') + '<span aria-hidden="true">' + (open ? '⌃' : '⌄') + '</span></p>' +
+      '</button>' +
+      (open && g
+        ? '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
+          '<p style="margin:0;font-size:11px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
+          '<div style="margin-top:8px;display:grid;gap:6px">' +
+          '<div><div style="font-size:10px;font-weight:600;color:var(--tl-red)">올라가면</div>' +
+          '<div style="font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(g.whenUp) + '</div></div>' +
+          '<div><div style="font-size:10px;font-weight:600;color:var(--tl-green)">내려가면</div>' +
+          '<div style="font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(g.whenDown) + '</div></div>' +
+          '</div>' +
+          '<button type="button" class="linkbtn" data-go-risk style="margin-top:8px;font-size:10.5px">구간 기준과 다른 지표 보기 →</button>' +
+          '</div>'
+        : '') +
+      (open && !g
+        ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:10.5px;color:var(--subtle)">이 지표의 해설은 아직 준비되지 않았습니다.</p>'
+        : '') +
+      '</div>'
     );
   }
 
@@ -3630,10 +3675,29 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<li><button type="button" data-go="' + n.id + '"' + (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('');
   }
 
+  let lastView = null;
+  /** 앞서 보던 화면. 돌아갈 길 버튼이 이걸 쓴다. */
+  let prevView = null;
+
+  /**
+   * 돌아갈 길.
+   *
+   * 하단 탭에 없는 화면에 들어가면 나가는 길이 없었다. 홈 하나에 나가는 링크가
+   * 서른 개인데 돌아오는 길이 화면에 없으니, 몇 번 누르면 여기가 어디인지 모르게 된다.
+   */
+  function backBar() {
+    const label = prevView && prevView !== state.view ? '이전 화면' : '홈';
+    return '<div class="backbar"><button type="button" data-back="1">' +
+      '<span aria-hidden="true" style="font-size:14px;line-height:1">‹</span>' + label + '</button></div>';
+  }
+
   function render() {
     closeZoom();
     document.documentElement.setAttribute('data-cm', state.colorMode);
     document.getElementById('statusbar').innerHTML = statusBar();
+    /* 하단 탭으로 갈 수 있는 화면은 길을 잃지 않는다. 나머지에만 붙인다. */
+    const TAB_VIEWS = ['home', 'indices', 'basics', 'calendar', 'fng'];
+    const needsBack = TAB_VIEWS.indexOf(state.view) < 0;
     const v = {
       home: viewHome,
       indices: viewIndices,
@@ -3644,7 +3708,22 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       fng: viewFng,
       regime: viewRegime,
     }[state.view];
-    document.getElementById('view').innerHTML = v();
+    /*
+     * 새 내용이 살짝 아래에서 올라오며 나타난다.
+     * 예전에는 innerHTML 을 통째로 갈아치워서, 어디로 왔는지 알아채기 전에 이미
+     * 다른 화면이었다. 같은 화면 안에서 값만 바뀔 때(타일 펼치기·탭 전환)는
+     * 재생하지 않는다 — 그때도 들썩이면 오히려 산만하다.
+     */
+    const viewEl = document.getElementById('view');
+    const moved = state.view !== lastView;
+    if (moved) prevView = lastView;
+    lastView = state.view;
+    viewEl.innerHTML = (needsBack ? backBar() : '') + v();
+    if (moved) {
+      viewEl.classList.remove('view-enter');
+      void viewEl.offsetWidth; // 애니메이션을 다시 재생시키려면 한 번 리플로우가 필요하다
+      viewEl.classList.add('view-enter');
+    }
     renderNav();
     Object.keys(CHARTS).forEach((id) => { if (document.getElementById(id)) drawChart(id); else delete CHARTS[id]; });
     document.querySelectorAll('.preview [data-scenario]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scenario === state.scenario)));
@@ -3662,6 +3741,12 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     if (!t) return;
     const d = t.dataset;
 
+    if (d.back) {
+      state.view = prevView && prevView !== state.view ? prevView : 'home';
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return render();
+    }
+    if (d.tile !== undefined) { state.openTile = state.openTile === d.tile ? null : d.tile; return render(); }
     if (d.zoomOpen) { e.preventDefault(); return openZoom(d.zoomOpen); }
     if (d.zoomClose) { e.preventDefault(); return closeZoom(); }
 

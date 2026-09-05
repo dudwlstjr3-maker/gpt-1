@@ -8,11 +8,13 @@
  * 살림살이를 견줘 보러 온 사람은 애초에 다른 걸 찾으러 온 사람이기 때문이다.
  */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { BasicsBoard } from '@/components/market/BasicsBoard';
 
 export default function BasicsPage() {
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">생활 경제 지수</h1>
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">

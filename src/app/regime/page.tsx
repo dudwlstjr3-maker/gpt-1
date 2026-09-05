@@ -7,11 +7,13 @@
  * 여덟 칸은 넘친다. 홈 맨 위 카드와 더보기에서 들어간다.
  */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { RegimeDetail } from '@/components/market/RegimeDetail';
 
 export default function RegimePage() {
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">국면 전광판</h1>
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">

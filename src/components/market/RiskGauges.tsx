@@ -11,7 +11,9 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { buildRiskHeadline } from '@/lib/riskHeadline';
+import { guideFor } from '@/lib/indicatorGuide';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, Skeleton, EmptyState } from '@/components/ui/States';
 import { Badge, type Tone } from '@/components/ui/Badge';
@@ -261,15 +263,31 @@ function RiskZoneList({ indicator }: { indicator: RiskIndicator }) {
 /* 컴팩트 타일 (홈)                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 신호등 타일 — 누르면 **그 자리에서** 해설이 열린다.
+ *
+ * 예전에는 타일 여섯 장이 전부 /indicators 로 나갔다. 바로 위 '기준과 해설 →' 도
+ * 같은 곳이라, 홈 한 화면에서 같은 데로 가는 링크가 일곱 개였다. 궁금해서 눌렀는데
+ * 화면이 통째로 바뀌고 돌아올 길은 없으니, 몇 번 하면 여기가 어디인지 모르게 된다.
+ *
+ * 해설은 이미 indicatorGuide 에 있다. 다른 화면에 가서 읽을 이유가 없다.
+ * 그래서 타일을 누르면 아래로 펼쳐지고, 다시 누르면 접힌다. 화면은 그대로다.
+ */
 export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
   const c = useChangeColor();
   const unavailable = indicator.value === null;
+  const [open, setOpen] = useState(false);
+  const guide = guideFor(indicator.id);
+  const panelId = `risk-tile-${indicator.id}`;
 
   return (
-    <Link
-      href="/indicators"
-      className="card block p-2.5 transition-colors hover:bg-surface-2"
-      aria-label={`${indicator.name} 상세 보기`}
+    <div className="card p-2.5">
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      aria-expanded={open}
+      aria-controls={guide ? panelId : undefined}
+      className="block w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
     >
       <div className="flex items-start gap-1.5">
         <SignalLight signal={riskSignal(indicator.level)} size="sm" label={indicator.shortName} />
@@ -304,7 +322,48 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
       <div className="mt-2">
         <RiskBandBar indicator={indicator} showLabels={false} height={10} />
       </div>
-    </Link>
+
+      <p className="mt-1.5 flex items-center justify-end gap-1 text-[9.5px] text-subtle">
+        {open ? '접기' : '무슨 뜻인가요'}
+        <span aria-hidden="true" className={open ? 'rotate-180 transition-transform' : 'transition-transform'}>
+          ⌄
+        </span>
+      </p>
+    </button>
+
+    {open && guide ? (
+      <div id={panelId} className="mt-2 border-t border-border pt-2">
+        <p className="text-[11px] leading-relaxed break-keep text-fg">{guide.plain}</p>
+        <dl className="mt-2 grid gap-1.5">
+          <div>
+            <dt className="text-[10px] font-semibold" style={{ color: 'var(--tl-red)' }}>
+              올라가면
+            </dt>
+            <dd className="m-0 text-[10.5px] leading-relaxed break-keep text-muted">{guide.whenUp}</dd>
+          </div>
+          <div>
+            <dt className="text-[10px] font-semibold" style={{ color: 'var(--tl-green)' }}>
+              내려가면
+            </dt>
+            <dd className="m-0 text-[10.5px] leading-relaxed break-keep text-muted">{guide.whenDown}</dd>
+          </div>
+        </dl>
+        {/* 구간 기준까지 보려면 그때 나가면 된다. 먼저 나가게 만들지는 않는다. */}
+        <Link
+          href="/indicators"
+          className="mt-2 inline-block text-[10.5px] font-semibold text-accent hover:underline"
+        >
+          구간 기준과 다른 지표 보기 →
+        </Link>
+      </div>
+    ) : null}
+
+    {open && !guide ? (
+      <p className="mt-2 border-t border-border pt-2 text-[10.5px] text-subtle">
+        이 지표의 해설은 아직 준비되지 않았습니다.
+      </p>
+    ) : null}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@
 
 /** 경제 캘린더 — 미국·한국·크립토 시장별 + 중요도·카테고리 필터, 날짜별 그룹. */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
@@ -86,6 +87,7 @@ export default function CalendarPage() {
 
   return (
     <div className="pt-2">
+      <BackBar />
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
       <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
         모든 시각은 KST 기준입니다. 전체를 고르면 세 시장을 한 번에, 시장을 고르면 그 시장과 글로벌 일정을 봅니다.

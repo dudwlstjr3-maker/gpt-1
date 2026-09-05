@@ -6,12 +6,23 @@
  *   npm run verify
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+
+/** 폴더를 훑어 조건에 맞는 파일 경로를 모은다 (글자 크기 검사에 쓴다) */
+async function listFiles(dir, re) {
+  const out = [];
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    const full = `${dir}/${e.name}`;
+    if (e.isDirectory()) out.push(...(await listFiles(full, re)));
+    else if (re.test(e.name)) out.push(full);
+  }
+  return out;
+}
 
 const BASE = process.env.VERIFY_BASE_URL ?? 'http://localhost:3000';
 
@@ -1169,7 +1180,7 @@ async function main() {
 
     /* 지연·실시간 배지는 카드에서 제일 작은 글씨 */
     const badge = await readFile('src/components/ui/Badge.tsx', 'utf8');
-    check('지연·실시간이 가장 작은 크기', /size = '2xs'/.test(badge) && /text-\[9\.5px\]/.test(badge));
+    check('지연·실시간이 가장 작은 크기', /size = '2xs'/.test(badge) && /text-\[10\.5px\]/.test(badge));
     check("'오래된 데이터' 는 한 단계 크게 둠", badge.includes("size === '2xs' ? 'xs' : size"));
 
     /* 지수 이름 — 한국에서 쓰는 말이 있으면 한글로 */
@@ -1445,6 +1456,77 @@ async function main() {
     check('미리보기 마우스·터치·짚기가 모두 세로를 넘김',
       (tpl6.match(/chartCursor\([^)]*,[^,)]*,[^,)]*\)/g) ?? []).length >= 4);
     check('미리보기 툴팁에도 사건 줄이 있음', /tt-mark/.test(tpl6) && /onMark\.label/.test(tpl6));
+  }
+
+  /* ---------------- 8-18. 읽을 수 있는 크기인가 · 누를 수 있는 크기인가 ---------------- */
+  console.log('\n[8-18] 가독성 — 글자 크기와 누를 자리');
+  {
+    /*
+     * 최종 검토에서 잰 것.
+     *   화면 열한 곳의 글자를 전부 세어 보니 11px 미만이 40.2% 였고, 제일 흔한
+     *   크기가 10px(전체의 30%)였다. 라벨만 작은 게 아니라 134자짜리 설명 문장이
+     *   10px 이었다. 한글은 같은 크기에서 라틴 문자보다 획이 빽빽해 더 안 읽힌다.
+     *   법적 고지문("투자 조언이 아닙니다")조차 화면에서 제일 작은 글씨였다.
+     *
+     * 그래서 아래쪽 눈금만 올렸다 (13.5px 이상 제목은 그대로).
+     *   8·9·9.5 → 10.5   10·10.5 → 11.5   11·11.5 → 12.5   12·12.5·13 → 13
+     *   결과: 11px 미만 40.2% → 2.9% (남은 것은 배지뿐), 최소 10.5px.
+     */
+    const SRC_SIZES = [];
+    for (const f of await listFiles('src', /\.tsx?$/)) {
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) SRC_SIZES.push({ f, v: Number(m[1]) });
+    }
+    const tooSmall = SRC_SIZES.filter((x) => x.v < 10.5);
+    check(
+      '앱에 10.5px 보다 작은 글씨가 없음',
+      tooSmall.length === 0,
+      tooSmall.length ? `${tooSmall.length}곳 (예: ${tooSmall[0].f} ${tooSmall[0].v}px)` : `${SRC_SIZES.length}곳 검사`,
+    );
+    const tpl7 = await readFile('tools/preview/template.html', 'utf8');
+    const tplSmall = [...tpl7.matchAll(/font-size: ?(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1])).filter((v) => v < 10.5);
+    check('미리보기도 10.5px 아래가 없음', tplSmall.length === 0, tplSmall.length ? `${tplSmall.length}곳` : '');
+    // 본문용 크기가 실제로 쓰이는지 — 눈금만 정의하고 안 쓰면 의미가 없다
+    check('본문이 11.5px 이상에 놓임', SRC_SIZES.filter((x) => x.v >= 11.5).length > SRC_SIZES.length * 0.7);
+
+    /* 손가락으로 누를 자리 */
+    const price = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    check('관심 별표를 손가락으로 누를 수 있음(16px 글리프에 36×44 자리)',
+      /after:-inset-x-2\.5 after:-inset-y-\[14px\]/.test(price) && /after:content-\[''\]/.test(price));
+    check('넓힌 자리가 이름 링크를 덮지 않음', /items-center gap-2\.5/.test(price));
+    check('미리보기 별표도 같은 자리', /\.star::after \{ content: ''; position: absolute; inset: -14px -10px; \}/.test(tpl7));
+    for (const f of ['src/app/watchlist/page.tsx', 'src/app/more/page.tsx']) {
+      const t = await readFile(f, 'utf8');
+      check(`${f.split('/')[2]} 의 순서·삭제 버튼이 40px`, !/h-7 w-7/.test(t) && /h-10 w-10/.test(t));
+    }
+
+    /* 첫 숫자까지 가는 길 — 안내를 지우지 않고 접었는가 */
+    const guide = await readFile('src/components/ui/ReadingGuide.tsx', 'utf8');
+    const board = await readFile('src/components/market/RiskBoard.tsx', 'utf8');
+    check('읽는 법을 접어 두는 상자가 있음', /export function ReadingGuide/.test(guide));
+    check('접혀 있어도 한 줄은 남음', /lead/.test(guide) && /aria-expanded=\{open\}/.test(guide));
+    check('지표 화면이 그걸 씀', /<ReadingGuide/.test(board));
+    // 접었다고 문장을 지우면 안 된다 — 셋 다 그대로 있어야 한다
+    for (const [what, needle] of [
+      ['구성요소가 아니라는 설명', '투자심리 점수의 구성요소가 아닙니다'],
+      ['구간 기준 출처', '구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다'],
+      ['색 범례', '<SignalLegend'],
+    ]) {
+      check(`접으면서 ${what}을 지우지 않음`, board.includes(needle));
+    }
+    check('미리보기도 접어 두고 같은 문장을 갖고 있음',
+      /data-rguide=/.test(tpl7) && tpl7.includes('구간 기준은 이 앱이 정한 값이며'));
+
+    /*
+     * 320px 에서 페이지가 통째로 옆으로 밀리던 것.
+     * 더보기 화면의 '모드 사유' 줄이 원인이었다 — dt 는 shrink-0 인데 dd 에
+     * min-w-0 이 없어서 flex 자식이 내용보다 좁아지지 못했다. 글자를 키우기 전에도
+     * 25px 밀려 있었고, 키우고 나서 51px 이 됐다. 화면 열두 곳을 320px 로 재서
+     * 지금은 전부 0px 이다. 가로 스크롤은 어떤 화면에서도 생기면 안 된다.
+     */
+    const more = await readFile('src/app/more/page.tsx', 'utf8');
+    check('좁아질 수 있는 칸으로 두어 가로 스크롤을 막음',
+      /min-w-0 text-right break-words/.test(more) && /tnum min-w-0 text-right/.test(more));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

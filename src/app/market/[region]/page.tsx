@@ -120,13 +120,13 @@ export default function MarketRegionPage() {
           </Link>
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-fg-strong">{MARKET_LABEL[region]} 시장</h1>
-            <p className="mt-0.5 truncate text-[11px] text-subtle">{SUBTITLE[region]}</p>
+            <p className="mt-0.5 truncate text-[12.5px] text-subtle">{SUBTITLE[region]}</p>
           </div>
         </div>
         {session ? (
           <div className="flex shrink-0 flex-col items-end gap-1">
             <SessionBadge phase={session.phase} size="sm" />
-            <span className="text-[10px] text-subtle">{sessionHint(session)}</span>
+            <span className="text-[11.5px] text-subtle">{sessionHint(session)}</span>
           </div>
         ) : null}
       </div>
@@ -166,14 +166,14 @@ export default function MarketRegionPage() {
                       ] as const
                     ).map(([label, v]) => (
                       <div key={label} className="rounded-lg bg-surface-2 p-2 text-center">
-                        <p className="text-[10px] text-muted">{label}</p>
+                        <p className="text-[11.5px] text-muted">{label}</p>
                         <p className="tnum mt-0.5 text-[13px] font-bold" style={{ color: flowColor.color(v) }}>
                           {v === null ? NO_VALUE : `${v > 0 ? '+' : '-'}${formatKoreanCompact(Math.abs(v) * 1e8, 1)}원`}
                         </p>
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-[10px] text-subtle">
+                  <p className="mt-2 text-[11.5px] text-subtle">
                     기준 {formatRelative(flows.meta.asOf)} · 외국인 순매수는 원화 강세·지수 방어와 함께 나타나는 경우가 많습니다.
                   </p>
                 </>
@@ -195,12 +195,12 @@ export default function MarketRegionPage() {
                   return (
                     <li key={q.id}>
                       <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-1.5 hover:opacity-80">
-                        <span className="truncate text-[12px] text-fg">{q.name}</span>
+                        <span className="truncate text-[13px] text-fg">{q.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
-                          <span className="tnum text-[12px] font-semibold text-fg-strong">
+                          <span className="tnum text-[13px] font-semibold text-fg-strong">
                             {q.price === null ? NO_VALUE : f.price(q)}
                           </span>
-                          <span className="tnum text-[11px]" style={{ color: f.color(dir) }}>
+                          <span className="tnum text-[12.5px]" style={{ color: f.color(dir) }}>
                             {f.glyph(dir)} {f.changePct(q)}
                           </span>
                         </span>
@@ -221,7 +221,7 @@ export default function MarketRegionPage() {
               type="button"
               onClick={() => setOnlyWatched((v) => !v)}
               aria-pressed={onlyWatched}
-              className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold"
+              className="rounded-lg border border-border px-2.5 py-1 text-[12.5px] font-semibold"
               style={{
                 background: onlyWatched ? 'var(--surface-3)' : 'var(--surface-2)',
                 color: onlyWatched ? 'var(--accent)' : 'var(--muted-fg)',
@@ -265,10 +265,10 @@ export default function MarketRegionPage() {
           {events.length > 0 ? (
             <section className="mt-4" aria-labelledby={`cal-${region}`}>
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <h2 id={`cal-${region}`} className="text-[12px] font-bold text-muted">
+                <h2 id={`cal-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 일정
                 </h2>
-                <Link href="/calendar" className="text-[11px] font-semibold text-accent hover:underline">
+                <Link href="/calendar" className="text-[12.5px] font-semibold text-accent hover:underline">
                   전체 캘린더 →
                 </Link>
               </div>
@@ -286,7 +286,7 @@ export default function MarketRegionPage() {
           {news.length > 0 ? (
             <section className="mt-4" aria-labelledby={`news-${region}`}>
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <h2 id={`news-${region}`} className="text-[12px] font-bold text-muted">
+                <h2 id={`news-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 뉴스
                 </h2>
                 {snapshot?.mode === 'DEMO' ? (
@@ -299,9 +299,9 @@ export default function MarketRegionPage() {
                 <ul className="space-y-2.5">
                   {news.map((n) => (
                     <li key={n.id} className="border-b border-border pb-2.5 last:border-b-0 last:pb-0">
-                      <p className="text-[12px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
-                      <p className="mt-1 truncate text-[10px] text-subtle">{n.titleOriginal}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-subtle">
+                      <p className="text-[13px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
+                      <p className="mt-1 truncate text-[11.5px] text-subtle">{n.titleOriginal}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
                         <span>{n.outlet}</span>
                         <span>{formatRelative(n.publishedAt)}</span>
                         {n.url ? (
@@ -319,7 +319,7 @@ export default function MarketRegionPage() {
             </section>
           ) : null}
 
-          <p className="mt-4 text-[10px] text-subtle">
+          <p className="mt-4 text-[11.5px] text-subtle">
             표시 종목 {formatNumber(list.length, 0)}개 · 기준 시각과 지연 여부는 각 카드에 표시됩니다.
           </p>
         </div>

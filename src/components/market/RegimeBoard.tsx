@@ -52,7 +52,7 @@ function ScaleStrip({ score, band }: { score: number; band: RegimeBand | null })
           style={{ left: `${x}%`, background: color, boxShadow: '0 0 0 2px var(--surface)' }}
         />
       </div>
-      <div className="tnum mt-1 flex justify-between text-[9.5px] text-subtle">
+      <div className="tnum mt-1 flex justify-between text-[10.5px] text-subtle">
         <span>0 공포</span>
         <span>50</span>
         <span>과열 100</span>
@@ -120,7 +120,7 @@ function HistorySpark({ history, band }: { history: { t: number; score: number }
         <circle cx={last[0]} cy={last[1]} r="2.8" fill={bandColor(band)} />
       </svg>
       </ExpandTrigger>
-      <p className="tnum mt-0.5 text-[9.5px] text-subtle">최근 {years}년 · 점선은 25점과 75점 · 누르면 크게 볼 수 있습니다</p>
+      <p className="tnum mt-0.5 text-[10.5px] text-subtle">최근 {years}년 · 점선은 25점과 75점 · 누르면 크게 볼 수 있습니다</p>
       <ChartModal
         open={big}
         onClose={() => setBig(false)}
@@ -139,7 +139,7 @@ function AxisRows({ board }: { board: Board }) {
     <ul className="mt-3 space-y-1.5">
       {board.axes.map((a) => (
         <li key={a.id} className="flex items-center gap-2">
-          <span className="w-[42px] shrink-0 text-[11px] whitespace-nowrap text-muted" title={a.label}>
+          <span className="w-[42px] shrink-0 text-[12.5px] whitespace-nowrap text-muted" title={a.label}>
             {a.short}
           </span>
           <span className="relative h-1.5 min-w-0 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--surface-3)' }}>
@@ -150,7 +150,7 @@ function AxisRows({ board }: { board: Board }) {
               />
             )}
           </span>
-          <span className="tnum w-[52px] shrink-0 text-right text-[11px] font-semibold text-fg">
+          <span className="tnum w-[52px] shrink-0 text-right text-[12.5px] font-semibold text-fg">
             {a.percentile === null ? <span className="text-subtle">산출 불가</span> : `${a.percentile.toFixed(0)}점`}
           </span>
         </li>
@@ -171,9 +171,9 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
           <Badge tone="warn" size="xs">
             <span aria-hidden="true">?</span>산출 불가
           </Badge>
-          <span className="text-[12px] font-semibold text-fg-strong">국면 점수를 낼 수 없습니다</span>
+          <span className="text-[13px] font-semibold text-fg-strong">국면 점수를 낼 수 없습니다</span>
         </div>
-        <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-muted">{board.unavailableReason}</p>
+        <p className="mt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">{board.unavailableReason}</p>
         <AxisRows board={board} />
       </div>
     );
@@ -201,13 +201,13 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
               지난 {board.lookbackYears}년 기준 {board.score.toFixed(0)}점
             </p>
           )}
-          {board.rarity?.text && <p className="tnum mt-1 text-[11.5px] break-keep text-muted">{board.rarity.text}</p>}
+          {board.rarity?.text && <p className="tnum mt-1 text-[12.5px] break-keep text-muted">{board.rarity.text}</p>}
         </div>
         <div className="shrink-0 text-right">
           <p className="tnum text-[30px] leading-none font-bold" style={{ color: bandColor(band) }}>
             {board.score.toFixed(0)}
           </p>
-          <p className="text-[9.5px] text-subtle">/ 100</p>
+          <p className="text-[10.5px] text-subtle">/ 100</p>
         </div>
       </div>
 
@@ -216,14 +216,14 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
       <AxisRows board={board} />
 
       {missing.length > 0 && (
-        <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+        <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
           {missing.map((m) => `${m.label} 제외 — ${m.reason ?? '자료 없음'}`).join(' · ')} · 남은 축의 가중치{' '}
           {Math.round(board.coverage * 100)}% 로 계산했습니다.
         </p>
       )}
 
       {/* 이 문장은 접거나 아래로 밀지 않는다. 전광판에서 제일 중요한 줄이다. */}
-      <p className="mt-2.5 border-t border-border pt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
         지금이 역사적으로 어디쯤인지만 보여 줍니다. 사거나 팔라는 신호가 아닙니다 — 지난 26년 자료에서 점수가 낮았다고
         해서 그 뒤 12개월이 좋았던 것은 아니었습니다.{' '}
         <Link href="/regime" className="font-semibold text-accent hover:underline">
@@ -245,7 +245,7 @@ export function RegimeBoardCard() {
         <h2 id="regime-title" className="text-base font-bold text-fg-strong">
           국면 전광판
         </h2>
-        <Link href="/regime" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/regime" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           자세히 →
         </Link>
       </div>

@@ -14,7 +14,7 @@ function FlowBar({ label, value }: { label: string; value: number | null }) {
   const dir = c.direction(value);
   return (
     <div className="flex items-center justify-between gap-2 py-1.5">
-      <span className="text-[12px] text-fg">{label}</span>
+      <span className="text-[13px] text-fg">{label}</span>
       <span className="tnum flex items-center gap-1 text-[13px] font-bold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
         {value === null ? NO_VALUE : `${formatKoreanCompact(Math.abs(value) * 1e8, 1)}원`}
@@ -45,7 +45,7 @@ function FlowsCard({ flows }: { flows: FlowSummary }) {
           <FlowBar label="개인" value={flows.individual} />
         </div>
       )}
-      <p className="mt-2 border-t border-border pt-1.5 text-[10px] text-subtle">
+      <p className="mt-2 border-t border-border pt-1.5 text-[11.5px] text-subtle">
         기준 {formatRelative(flows.meta.asOf)} · 출처 {flows.meta.sources[0]?.name ?? '알 수 없음'}
       </p>
     </div>
@@ -86,16 +86,16 @@ export function FlowsNewsSection() {
                 ) : null}
               </div>
               {isDemo ? (
-                <p className="mb-2 text-[10px] text-subtle">
+                <p className="mb-2 text-[11.5px] text-subtle">
                   DEMO 모드에서는 실제 기사가 아닌 가상의 샘플 매체·헤드라인을 보여줍니다.
                 </p>
               ) : null}
               <ul className="space-y-2.5">
                 {items.slice(0, 5).map((n) => (
                   <li key={n.id} className="border-b border-border pb-2.5 last:border-b-0 last:pb-0">
-                    <p className="text-[12px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
-                    <p className="mt-1 truncate text-[10px] text-subtle">{n.titleOriginal}</p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-subtle">
+                    <p className="text-[13px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
+                    <p className="mt-1 truncate text-[11.5px] text-subtle">{n.titleOriginal}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
                       <span>{n.outlet}</span>
                       <span>{formatRelative(n.publishedAt)}</span>
                       {n.markets.map((m) => (

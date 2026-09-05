@@ -114,7 +114,7 @@ export default function AlertsPage() {
               {permission === 'unsupported' ? (
                 <Notice tone="neutral">이 브라우저는 시스템 알림을 지원하지 않습니다. 앱 내 알림만 표시됩니다.</Notice>
               ) : permission === 'granted' ? (
-                <p className="text-[11px]" style={{ color: 'var(--ok)' }}>
+                <p className="text-[12.5px]" style={{ color: 'var(--ok)' }}>
                   ✓ 시스템 알림 권한이 허용되었습니다.
                 </p>
               ) : permission === 'denied' ? (
@@ -124,13 +124,13 @@ export default function AlertsPage() {
                 </Notice>
               ) : (
                 <div>
-                  <p className="mb-1.5 text-[11px] break-keep text-muted">
+                  <p className="mb-1.5 text-[12.5px] break-keep text-muted">
                     시스템 알림을 받으려면 권한이 필요합니다. 권한 요청은 이 버튼을 눌렀을 때만 발생합니다.
                   </p>
                   <button
                     type="button"
                     onClick={requestPermission}
-                    className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-fg"
+                    className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[13px] font-semibold text-fg"
                   >
                     알림 권한 요청
                   </button>
@@ -143,12 +143,12 @@ export default function AlertsPage() {
 
       {/* 규칙 추가 */}
       <section className="mt-4 px-3" aria-labelledby="alert-add-title">
-        <h2 id="alert-add-title" className="mb-1.5 text-[12px] font-bold text-muted">
+        <h2 id="alert-add-title" className="mb-1.5 text-[13px] font-bold text-muted">
           알림 규칙 추가
         </h2>
         <form onSubmit={submit} className="card space-y-2.5 p-3">
           <label className="block">
-            <span className="mb-1 block text-[11px] text-muted">알림 종류</span>
+            <span className="mb-1 block text-[12.5px] text-muted">알림 종류</span>
             <select
               value={type}
               onChange={(e) => {
@@ -165,14 +165,14 @@ export default function AlertsPage() {
                 </option>
               ))}
             </select>
-            <span className="mt-1 block text-[10px] break-keep text-subtle">{meta.desc}</span>
+            <span className="mt-1 block text-[11.5px] break-keep text-subtle">{meta.desc}</span>
           </label>
 
           {/* 국면 알림은 대상도 기준값도 없다 — 시장 하나가 아니라 전체 국면 하나뿐이고,
               문턱은 '1년 이상 만' 이라는 희소성으로 고정돼 있다. */}
           {type !== 'calendar_reminder' && type !== 'regime_rarity' ? (
             <label className="block">
-              <span className="mb-1 block text-[11px] text-muted">대상</span>
+              <span className="mb-1 block text-[12.5px] text-muted">대상</span>
               <select
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
@@ -196,7 +196,7 @@ export default function AlertsPage() {
           {type !== 'fng_stage_change' && type !== 'regime_rarity' ? (
             <div className="flex gap-2">
               <label className="flex-1">
-                <span className="mb-1 block text-[11px] text-muted">기준값 ({meta.unit || '값'})</span>
+                <span className="mb-1 block text-[12.5px] text-muted">기준값 ({meta.unit || '값'})</span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -209,7 +209,7 @@ export default function AlertsPage() {
               </label>
               {type === 'fng_threshold' || type === 'price_target' ? (
                 <label className="flex-1">
-                  <span className="mb-1 block text-[11px] text-muted">조건</span>
+                  <span className="mb-1 block text-[12.5px] text-muted">조건</span>
                   <select
                     value={direction}
                     onChange={(e) => setDirection(e.target.value as 'above' | 'below' | 'both')}
@@ -225,7 +225,7 @@ export default function AlertsPage() {
           ) : null}
 
           <label className="block">
-            <span className="mb-1 block text-[11px] text-muted">쿨다운 (분) — 같은 조건의 반복 알림을 막습니다</span>
+            <span className="mb-1 block text-[12.5px] text-muted">쿨다운 (분) — 같은 조건의 반복 알림을 막습니다</span>
             <input
               type="number"
               min={5}
@@ -248,7 +248,7 @@ export default function AlertsPage() {
 
       {/* 규칙 목록 */}
       <section className="mt-4 px-3" aria-labelledby="alert-rules-title">
-        <h2 id="alert-rules-title" className="mb-1.5 text-[12px] font-bold text-muted">
+        <h2 id="alert-rules-title" className="mb-1.5 text-[13px] font-bold text-muted">
           등록된 규칙 ({settings.alertRules.length})
         </h2>
         {settings.alertRules.length === 0 ? (
@@ -259,7 +259,7 @@ export default function AlertsPage() {
               <li key={r.id} className="flex items-center gap-2 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold text-fg">{r.label}</p>
-                  <p className="text-[10px] text-subtle">
+                  <p className="text-[11.5px] text-subtle">
                     {RULE_META[r.type].label} · 쿨다운 {r.cooldownMinutes}분
                   </p>
                 </div>
@@ -268,7 +268,7 @@ export default function AlertsPage() {
                   role="switch"
                   aria-checked={r.enabled}
                   onClick={() => updateAlertRule(r.id, { enabled: !r.enabled })}
-                  className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] font-semibold"
+                  className="shrink-0 rounded-md border border-border px-2 py-1 text-[12.5px] font-semibold"
                   style={{ color: r.enabled ? 'var(--ok)' : 'var(--muted-fg)' }}
                 >
                   {r.enabled ? '켜짐' : '꺼짐'}
@@ -291,15 +291,15 @@ export default function AlertsPage() {
       {/* 발생 이력 */}
       <section className="mt-4 px-3" aria-labelledby="alert-log-title">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <h2 id="alert-log-title" className="text-[12px] font-bold text-muted">
+          <h2 id="alert-log-title" className="text-[13px] font-bold text-muted">
             발생 이력
           </h2>
           {events.length > 0 ? (
             <div className="flex gap-1.5">
-              <button type="button" onClick={markAllRead} className="text-[11px] font-semibold text-accent">
+              <button type="button" onClick={markAllRead} className="text-[12.5px] font-semibold text-accent">
                 모두 읽음
               </button>
-              <button type="button" onClick={clearEvents} className="text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
+              <button type="button" onClick={clearEvents} className="text-[12.5px] font-semibold" style={{ color: 'var(--danger)' }}>
                 기록 삭제
               </button>
             </div>
@@ -319,10 +319,10 @@ export default function AlertsPage() {
                         새 알림
                       </Badge>
                     ) : null}
-                    <span className="text-[10px] text-subtle">{formatRelative(e.firedAt)}</span>
+                    <span className="text-[11.5px] text-subtle">{formatRelative(e.firedAt)}</span>
                   </div>
                 </div>
-                <p className="mt-0.5 text-[11px] break-keep text-muted">{e.body}</p>
+                <p className="mt-0.5 text-[12.5px] break-keep text-muted">{e.body}</p>
               </li>
             ))}
           </ul>

@@ -29,7 +29,7 @@ export function Sparkline({
   if (data.length < 2) {
     return (
       <div
-        className="flex items-center justify-center rounded text-[10px] text-subtle"
+        className="flex items-center justify-center rounded text-[11.5px] text-subtle"
         style={{ width, height }}
         aria-label="차트를 그릴 데이터가 부족합니다"
         role="img"
@@ -88,7 +88,7 @@ export function ScoreSparkline({
   if (data.length < 2) {
     return (
       <div
-        className="flex items-center justify-center text-[10px] text-subtle"
+        className="flex items-center justify-center text-[11.5px] text-subtle"
         style={{ width, height }}
         role="img"
         aria-label="점수 추이 데이터가 부족합니다"

@@ -17,7 +17,7 @@ export default function CriteriaPage() {
       <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">내 기준</h1>
-        <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">
           무엇을 볼지 직접 정해 두면, 지금 그 조건이 맞는지 한 자리에서 확인할 수 있습니다.
         </p>
       </header>

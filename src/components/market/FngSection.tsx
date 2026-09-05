@@ -22,9 +22,9 @@ export function FngSection() {
             시장별 투자심리
           </h2>
           {/* 카드마다 되풀이하던 줄. 셋이 같은 값이라 머리에 한 번만 적는다. */}
-          <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {version}</p>
+          <p className="mt-0.5 text-[11.5px] text-subtle">자체 산출 지수 · {version}</p>
         </div>
-        <span className="shrink-0 text-[11px] text-subtle">0=극단적 공포 · 100=극단적 탐욕</span>
+        <span className="shrink-0 text-[12.5px] text-subtle">0=극단적 공포 · 100=극단적 탐욕</span>
       </div>
 
       <SectionGate

@@ -18,7 +18,7 @@ export default function IndicesPage() {
       <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">시장 지수</h1>
-        <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">
           시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.
         </p>
       </header>

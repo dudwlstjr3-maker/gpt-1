@@ -96,14 +96,14 @@ export function ChartModal({
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <h2 className="truncate text-[14px] font-bold text-fg-strong">{title}</h2>
-            {subtitle ? <p className="mt-0.5 text-[11px] break-keep text-muted">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-0.5 text-[12.5px] break-keep text-muted">{subtitle}</p> : null}
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="-mt-0.5 shrink-0 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-[12px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
+            className="-mt-0.5 shrink-0 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-[13px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
           >
             닫기 <span aria-hidden="true">✕</span>
           </button>
@@ -139,7 +139,7 @@ export function ExpandTrigger({
       {children}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-1 right-1 rounded border border-border bg-surface-2/85 px-1 text-[10px] leading-[15px] font-semibold text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        className="pointer-events-none absolute top-1 right-1 rounded border border-border bg-surface-2/85 px-1 text-[11.5px] leading-[15px] font-semibold text-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       >
         ⤢
       </span>

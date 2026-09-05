@@ -123,18 +123,18 @@ export function SignalTally({ items, total }: { items: SignalTallyItem[]; total:
             >
               <span className="flex items-center justify-center gap-1.5">
                 <SignalDot signal={s} size={9} />
-                <span className="text-[10.5px] font-semibold" style={{ color: signalColor(s) }}>
+                <span className="text-[11.5px] font-semibold" style={{ color: signalColor(s) }}>
                   {SIGNAL_COLOR_LABEL[s]}
                 </span>
               </span>
               <p className="tnum mt-0.5 text-[19px] leading-none font-bold" style={{ color: signalColor(s) }}>
                 {count}
-                <span className="ml-0.5 text-[10px] font-normal text-subtle">개</span>
+                <span className="ml-0.5 text-[11.5px] font-normal text-subtle">개</span>
               </p>
               {/* 어느 지표인지는 바로 아래 게이지들이 이름으로 댄다.
                   여기까지 이름을 늘어놓으면 한 화면에서 일곱 이름을 세 번 읽게 된다.
                   집계 칸은 '몇 개가 어느 수준인가' 만 말한다. */}
-              <p className="mt-1 text-[9.5px] leading-tight break-keep text-subtle">
+              <p className="mt-1 text-[10.5px] leading-tight break-keep text-subtle">
                 {SIGNAL_MEANING[s]}
               </p>
             </li>
@@ -159,7 +159,7 @@ export function SignalLegend({ note }: { note?: string }) {
         {SIGNAL_ORDER.slice()
           .reverse()
           .map((s) => (
-            <li key={s} className="flex items-center gap-1.5 text-[10.5px]">
+            <li key={s} className="flex items-center gap-1.5 text-[11.5px]">
               <SignalDot signal={s} size={8} />
               <span className="font-semibold" style={{ color: signalColor(s) }}>
                 {SIGNAL_COLOR_LABEL[s]}
@@ -168,7 +168,7 @@ export function SignalLegend({ note }: { note?: string }) {
             </li>
           ))}
       </ul>
-      <p className="mt-1.5 text-[10px] leading-relaxed break-keep text-subtle">
+      <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-subtle">
         {note ?? '색은 지금 수치가 평소보다 얼마나 벗어나 있는지를 뜻합니다. 사라·팔라는 신호가 아닙니다.'}
       </p>
     </div>

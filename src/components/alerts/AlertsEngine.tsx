@@ -208,7 +208,7 @@ export function AlertsEngine() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-fg-strong">{t.title}</p>
-            <p className="mt-0.5 text-[11px] break-keep text-muted">{t.body}</p>
+            <p className="mt-0.5 text-[12.5px] break-keep text-muted">{t.body}</p>
           </div>
           <button
             type="button"

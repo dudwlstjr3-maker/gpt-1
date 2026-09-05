@@ -265,7 +265,7 @@ export function BasicTrend({
         <button
           type="button"
           onClick={() => setShowTable((v) => !v)}
-          className="text-[10px] font-semibold text-muted hover:text-fg"
+          className="text-[11.5px] font-semibold text-muted hover:text-fg"
           aria-expanded={showTable}
         >
           {showTable ? '그래프로 보기' : '표로 보기'}

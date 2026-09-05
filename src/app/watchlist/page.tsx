@@ -35,7 +35,7 @@ export default function WatchlistPage() {
     <div className="pt-2">
       <div className="flex items-baseline justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">관심목록</h1>
-        <Link href="/market/us" className="text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/market/us" className="text-[12.5px] font-semibold text-accent hover:underline">
           종목 추가 →
         </Link>
       </div>
@@ -56,7 +56,7 @@ export default function WatchlistPage() {
         <>
           {/* 순서 편집 */}
           <section aria-labelledby="watch-order-title" className="mt-3 px-3">
-            <h2 id="watch-order-title" className="mb-1.5 text-[12px] font-bold text-muted">
+            <h2 id="watch-order-title" className="mb-1.5 text-[13px] font-bold text-muted">
               표시 순서
             </h2>
             <ul className="card divide-y divide-[var(--border)] overflow-hidden">
@@ -64,10 +64,10 @@ export default function WatchlistPage() {
                 const item = CATALOG_BY_ID.get(id);
                 return (
                   <li key={id} className="flex items-center gap-2 px-3 py-2">
-                    <span className="tnum w-5 shrink-0 text-[11px] text-subtle">{idx + 1}</span>
+                    <span className="tnum w-5 shrink-0 text-[12.5px] text-subtle">{idx + 1}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold text-fg">{item?.name ?? id}</p>
-                      <p className="text-[10px] text-subtle">
+                      <p className="text-[11.5px] text-subtle">
                         {item ? `${MARKET_LABEL[item.market]} · ${item.symbol}` : '카탈로그에 없는 항목'}
                       </p>
                     </div>
@@ -77,7 +77,7 @@ export default function WatchlistPage() {
                         onClick={() => move(id, -1)}
                         disabled={idx === 0}
                         aria-label={`${item?.name ?? id} 위로 이동`}
-                        className="h-7 w-7 rounded-md border border-border text-xs text-muted disabled:opacity-35"
+                        className="h-10 w-10 rounded-md border border-border text-[13px] text-muted disabled:opacity-35"
                       >
                         ↑
                       </button>
@@ -86,7 +86,7 @@ export default function WatchlistPage() {
                         onClick={() => move(id, 1)}
                         disabled={idx === settings.watchlist.length - 1}
                         aria-label={`${item?.name ?? id} 아래로 이동`}
-                        className="h-7 w-7 rounded-md border border-border text-xs text-muted disabled:opacity-35"
+                        className="h-10 w-10 rounded-md border border-border text-[13px] text-muted disabled:opacity-35"
                       >
                         ↓
                       </button>
@@ -94,7 +94,7 @@ export default function WatchlistPage() {
                         type="button"
                         onClick={() => toggleWatch(id)}
                         aria-label={`${item?.name ?? id} 관심목록에서 제거`}
-                        className="h-7 w-7 rounded-md border border-border text-xs"
+                        className="h-10 w-10 rounded-md border border-border text-[13px]"
                         style={{ color: 'var(--danger)' }}
                       >
                         ✕
@@ -107,7 +107,7 @@ export default function WatchlistPage() {
           </section>
 
           <section aria-labelledby="watch-quotes-title" className="mt-4 px-3">
-            <h2 id="watch-quotes-title" className="mb-1.5 text-[12px] font-bold text-muted">
+            <h2 id="watch-quotes-title" className="mb-1.5 text-[13px] font-bold text-muted">
               현재 시세
             </h2>
             <SectionGate

@@ -59,7 +59,7 @@ export function BackBar({
       <button
         type="button"
         onClick={() => (canGoBack ? router.back() : router.push(fallback))}
-        className="-ml-1.5 inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[12px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
+        className="-ml-1.5 inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
       >
         <span aria-hidden="true" className="text-[14px] leading-none">
           ‹

@@ -26,14 +26,19 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
   return (
     <article className="card relative p-3" aria-label={`${quote.name} 시세`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           {showStar ? (
+            /*
+             * 별표는 글자로는 작아야 맞지만 손가락에는 14px 이 너무 작았다.
+             * 글리프는 그대로 두고 ::after 로 누를 자리만 36×44 로 넓힌다.
+             * 가로로 넓힌 만큼은 옆 칸과의 간격(gap-2.5)이라, 이름 링크를 덮지 않는다.
+             */
             <button
               type="button"
               onClick={() => toggleWatch(quote.id)}
               aria-pressed={watched}
               aria-label={watched ? `${quote.name} 관심목록에서 제거` : `${quote.name} 관심목록에 추가`}
-              className="shrink-0 text-sm leading-none"
+              className="relative shrink-0 text-base leading-none after:absolute after:-inset-x-2.5 after:-inset-y-[14px] after:content-['']"
               style={{ color: watched ? 'var(--warn)' : 'var(--subtle-fg)' }}
             >
               {watched ? '★' : '☆'}
@@ -45,7 +50,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
             </Link>
             {/* 기준 시각을 기호 옆에 붙인다. 예전에는 카드마다 아래에 구분선을 긋고
                 시각 하나만 적은 줄이 따로 있었다 — 여덟 장이면 줄 여덟, 선 여덟이었다. */}
-            <p className="truncate text-[10px] text-subtle">
+            <p className="truncate text-[11.5px] text-subtle">
               {quote.symbol} <span className="tnum">· {formatKstTime(quote.meta.asOf)}</span>
             </p>
           </div>
@@ -58,7 +63,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
 
       {unavailable ? (
         <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)' }}>
-          <p className="text-[11px] break-keep" style={{ color: 'var(--warn)' }}>
+          <p className="text-[12.5px] break-keep" style={{ color: 'var(--warn)' }}>
             {quote.unavailableReason ?? '값을 받지 못했습니다.'}
           </p>
         </div>
@@ -89,7 +94,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
        * 이용 조건은 종목 상세 화면이 말한다. 값을 잘못 읽게 만드는 것(환산 불가)만 띄운다.
        */}
       {quote.volume !== null || f.conversionUnavailable(quote) ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-subtle">
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
           {quote.volume !== null ? <span>거래량 {formatKoreanCompact(quote.volume, 1)}</span> : null}
           {f.conversionUnavailable(quote) ? (
             <span style={{ color: 'var(--warn)' }}>환율 없음 — 환산 불가</span>
@@ -113,7 +118,7 @@ export function PriceRow({ quote }: { quote: Quote }) {
     >
       <div className="min-w-0">
         <p className="truncate text-[13px] font-semibold text-fg">{quote.name}</p>
-        <p className="text-[10px] text-subtle">
+        <p className="text-[11.5px] text-subtle">
           {quote.symbol} · 기준 {formatKstTime(quote.meta.asOf)}
         </p>
       </div>
@@ -122,7 +127,7 @@ export function PriceRow({ quote }: { quote: Quote }) {
         <p className="tnum text-[13px] font-bold text-fg-strong">
           {quote.price === null ? NO_VALUE : f.price(quote)}
         </p>
-        <p className="tnum text-[11px] font-semibold" style={{ color }}>
+        <p className="tnum text-[12.5px] font-semibold" style={{ color }}>
           <span aria-hidden="true">{f.glyph(dir)}</span> {f.changePct(quote)}
         </p>
       </div>
@@ -149,12 +154,12 @@ export function StatTile({
   const toneLabel = tone === 'alert' ? '주의' : tone === 'watch' ? '관찰' : tone === 'unknown' ? '정보 없음' : '정상';
   return (
     <div className="card-flat min-w-0 p-2.5">
-      <p className="truncate text-[10px] text-muted">{label}</p>
+      <p className="truncate text-[11.5px] text-muted">{label}</p>
       <p className="tnum mt-0.5 truncate text-sm font-bold" style={{ color }}>
         {value}
       </p>
-      {sub ? <p className="tnum truncate text-[10px] text-subtle">{sub}</p> : null}
-      <p className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: tone === 'normal' ? 'var(--subtle-fg)' : color }}>
+      {sub ? <p className="tnum truncate text-[11.5px] text-subtle">{sub}</p> : null}
+      <p className="mt-1 flex items-center gap-1 text-[11.5px]" style={{ color: tone === 'normal' ? 'var(--subtle-fg)' : color }}>
         <span aria-hidden="true">{tone === 'alert' ? '▲' : tone === 'watch' ? '△' : '·'}</span>
         <span className="truncate">
           {toneLabel}

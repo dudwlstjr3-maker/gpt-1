@@ -68,7 +68,7 @@ export function BottomTabs() {
               <Link
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="flex min-w-0 flex-col items-center gap-0.5 px-px py-2 text-[9.5px] font-semibold whitespace-nowrap transition-colors"
+                className="flex min-w-0 flex-col items-center gap-0.5 px-px py-2 text-[10.5px] font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)' }}
               >
                 {item.icon}
@@ -88,7 +88,7 @@ export function DesktopSidebar() {
     <aside className="sticky top-0 hidden h-screen w-56 shrink-0 border-r border-border px-3 py-4 lg:block">
       <div className="mb-5 px-2">
         <p className="text-base font-bold text-fg-strong">Market Mood 3</p>
-        <p className="mt-0.5 text-[11px] text-subtle">미국 · 크립토 투자심리와 지수</p>
+        <p className="mt-0.5 text-[12.5px] text-subtle">미국 · 크립토 투자심리와 지수</p>
       </div>
       <nav aria-label="주요 메뉴">
         <ul className="space-y-0.5">
@@ -115,7 +115,7 @@ export function DesktopSidebar() {
       </nav>
       {/* 지수 화면에서도 들어갈 수 있지만, 데스크톱에서는 한 번에 가는 길을 남겨 둔다 */}
       <div className="mt-4 border-t border-border pt-3">
-        <p className="mb-1 px-2.5 text-[10px] font-semibold tracking-wide text-subtle">시장별 화면</p>
+        <p className="mb-1 px-2.5 text-[11.5px] font-semibold tracking-wide text-subtle">시장별 화면</p>
         <ul className="space-y-0.5">
           {[
             { href: '/market/us', label: '미국' },
@@ -127,7 +127,7 @@ export function DesktopSidebar() {
                 <Link
                   href={m.href}
                   aria-current={active ? 'page' : undefined}
-                  className="block rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-surface-2"
+                  className="block rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
                   style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)', background: active ? 'var(--surface-2)' : undefined }}
                 >
                   {m.label}
@@ -144,7 +144,7 @@ export function DesktopSidebar() {
             <li key={s.href}>
               <Link
                 href={s.href}
-                className="block rounded-lg px-2.5 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="block rounded-lg px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 {s.label}
               </Link>

@@ -41,7 +41,7 @@ export function SummaryCard() {
                 );
               })}
             </ul>
-            <p className="mt-2.5 border-t border-border pt-2 text-[10px] text-subtle">
+            <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] text-subtle">
               생성 {formatKstTime(summary.generatedAt)} · 실제 가격·지표 값에 근거해 규칙 기반으로 작성되며, 근거가 없으면
               원인을 추정하지 않습니다.
             </p>

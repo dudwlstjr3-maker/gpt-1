@@ -43,7 +43,7 @@ export function SegmentedControl<T extends string>({
             aria-label={o.srLabel}
             onClick={() => onChange(o.value)}
             className={`${full ? 'flex-1' : ''} rounded-md font-semibold transition-colors ${
-              size === 'xs' ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
+              size === 'xs' ? 'px-2 py-1 text-[12.5px]' : 'px-2.5 py-1.5 text-xs'
             } ${active ? 'text-fg-strong' : 'text-muted hover:text-fg'}`}
             style={active ? { background: 'var(--surface-3)' } : undefined}
           >

@@ -40,7 +40,7 @@ import type { RegimeDigest } from '@/types';
  */
 function BigChart({ history }: { history: { t: number; score: number }[] }) {
   if (history.length < 8) {
-    return <p className="card p-3.5 text-[12px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
+    return <p className="card p-3.5 text-[13px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
   }
   const years = Math.round((history[history.length - 1].t - history[0].t) / (365.25 * 86_400_000));
   const series: ChartSeries[] = [
@@ -58,7 +58,7 @@ function BigChart({ history }: { history: { t: number; score: number }[] }) {
   return (
     <div className="card p-3.5">
       <InteractiveChart series={series} height={190} label={`국면 점수 ${years}년 추이`} />
-      <p className="mt-1 text-[10.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
         매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은
         기간과 비교한 값입니다.
       </p>
@@ -73,7 +73,7 @@ const sign = (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1));
 function BucketTable() {
   return (
     <div className="card overflow-x-auto p-0">
-      <table className="w-full min-w-[420px] text-[11px]">
+      <table className="w-full min-w-[420px] text-[12.5px]">
         <thead>
           <tr className="border-b border-border text-left text-subtle">
             <th className="px-3 py-2 font-semibold">점수 구간</th>
@@ -112,10 +112,10 @@ function BucketTable() {
 function EpisodeTable({ title, note, episodes }: { title: string; note: string; episodes: EvidenceEpisode[] }) {
   return (
     <div className="mt-3">
-      <h3 className="text-[12.5px] font-bold text-fg-strong">{title}</h3>
-      <p className="mt-0.5 mb-1.5 text-[11px] leading-relaxed break-keep text-muted">{note}</p>
+      <h3 className="text-[13px] font-bold text-fg-strong">{title}</h3>
+      <p className="mt-0.5 mb-1.5 text-[12.5px] leading-relaxed break-keep text-muted">{note}</p>
       <div className="card overflow-x-auto p-0">
-        <table className="w-full min-w-[420px] text-[11px]">
+        <table className="w-full min-w-[420px] text-[12.5px]">
           <thead>
             <tr className="border-b border-border text-left text-subtle">
               <th className="px-3 py-2 font-semibold">국면</th>
@@ -170,9 +170,9 @@ export function RegimeDetail() {
               <ul className="mt-3 space-y-1">
                 {digest.board.axes.map((a) => (
                   <li key={a.id} className="card flex items-start gap-2 p-2.5">
-                    <span className="w-[74px] shrink-0 text-[11.5px] font-semibold text-fg-strong">{a.label}</span>
+                    <span className="w-[74px] shrink-0 text-[12.5px] font-semibold text-fg-strong">{a.label}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="tnum text-[11.5px] text-fg">
+                      <p className="tnum text-[12.5px] text-fg">
                         {a.value === null ? '값 없음' : `${a.value.toFixed(a.precision)}${a.unit}`}
                         {a.percentile !== null && (
                           <span className="text-muted">
@@ -181,7 +181,7 @@ export function RegimeDetail() {
                           </span>
                         )}
                       </p>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed break-keep text-subtle">
+                      <p className="mt-0.5 text-[11.5px] leading-relaxed break-keep text-subtle">
                         {a.reason ? a.reason : a.hint}
                       </p>
                     </div>
@@ -203,7 +203,7 @@ export function RegimeDetail() {
             <span aria-hidden="true">▪</span>검증
           </Badge>
         </div>
-        <p className="mb-3 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mb-3 text-[12.5px] leading-relaxed break-keep text-muted">
           {EVIDENCE_SAMPLE.from}부터 {EVIDENCE_SAMPLE.to}까지 {EVIDENCE_SAMPLE.months}개월을 같은 산식으로 다시 계산해,
           점수가 나온 달마다 S&amp;P 500 의 이후 12개월을 붙여 봤습니다. 결론부터 적으면{' '}
           <strong className="text-fg-strong">&quot;공포면 사고 과열이면 판다&quot;는 이 자료에서 성립하지 않습니다.</strong>
@@ -214,8 +214,8 @@ export function RegimeDetail() {
         <ul className="mt-3 space-y-2">
           {EVIDENCE_FINDINGS.map((f) => (
             <li key={f.id} className="card p-3">
-              <p className="text-[12.5px] font-bold text-fg-strong">{f.title}</p>
-              <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">{f.body}</p>
+              <p className="text-[13px] font-bold text-fg-strong">{f.title}</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">{f.body}</p>
             </li>
           ))}
         </ul>
@@ -244,7 +244,7 @@ export function RegimeDetail() {
         </h2>
         <ul className="card space-y-2 p-3.5">
           {EVIDENCE_LIMITS.map((l, i) => (
-            <li key={i} className="flex items-start gap-2 text-[11.5px] leading-relaxed break-keep text-muted">
+            <li key={i} className="flex items-start gap-2 text-[12.5px] leading-relaxed break-keep text-muted">
               <span aria-hidden="true" className="mt-[3px] shrink-0 text-subtle">
                 ▪
               </span>
@@ -262,14 +262,14 @@ export function RegimeDetail() {
         <ul className="card space-y-2.5 p-3.5">
           {EVIDENCE_SOURCES.map((s) => (
             <li key={s.id}>
-              <p className="text-[11.5px] font-semibold text-fg">{s.label}</p>
-              <p className="mt-0.5 text-[10.5px] leading-relaxed break-keep text-subtle">
+              <p className="text-[12.5px] font-semibold text-fg">{s.label}</p>
+              <p className="mt-0.5 text-[11.5px] leading-relaxed break-keep text-subtle">
                 {s.origin} · {s.via}
               </p>
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">{LIVE_VS_BACKTEST}</p>
+        <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">{LIVE_VS_BACKTEST}</p>
       </section>
     </div>
   );

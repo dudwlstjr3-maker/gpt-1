@@ -17,7 +17,7 @@ export default function BasicsPage() {
       <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">생활 경제 지수</h1>
-        <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">
           시세가 아니라 살림살이의 크기를 재는 숫자들입니다. 한국·중국·일본·미국을 나란히 놓았습니다.
         </p>
       </header>

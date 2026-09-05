@@ -407,7 +407,7 @@ export function InteractiveChart({
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {series.map((s) => (
-            <li key={s.id} className="flex items-center gap-1.5 text-[11px] text-muted">
+            <li key={s.id} className="flex items-center gap-1.5 text-[12.5px] text-muted">
               <span
                 aria-hidden="true"
                 className="inline-block h-0.5 w-4 rounded-full"
@@ -439,7 +439,7 @@ export function InteractiveChart({
             <button
               type="button"
               onClick={() => setBig(true)}
-              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
             >
               크게
             </button>
@@ -448,7 +448,7 @@ export function InteractiveChart({
             type="button"
             onClick={() => setShowTable((v) => !v)}
             aria-expanded={showTable}
-            className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+            className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
           >
             {showTable ? '차트로 보기' : '표로 보기'}
           </button>
@@ -458,7 +458,7 @@ export function InteractiveChart({
       {showTable ? (
         <div>
           <SeriesTable series={tableSeries} caption={label} />
-          <p className="mt-2 text-[11px] leading-relaxed break-keep text-muted">{textSummary}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">{textSummary}</p>
         </div>
       ) : (
         <div ref={wrapRef} className="relative w-full" style={{ height }}>
@@ -651,7 +651,7 @@ export function InteractiveChart({
           {/* 툴팁 */}
           {cursorPoint && geometry ? (
             <div
-              className="pointer-events-none absolute top-1 rounded-lg border border-border px-2 py-1.5 text-[11px] shadow-lg"
+              className="pointer-events-none absolute top-1 rounded-lg border border-border px-2 py-1.5 text-[12.5px] shadow-lg"
               style={{
                 background: 'var(--bg-elevated)',
                 left: Math.max(0, Math.min(geometry.w - 172, geometry.x(cursorPoint.t) - 86)),
@@ -663,17 +663,17 @@ export function InteractiveChart({
                 <div className="mb-1 flex items-start gap-1.5 border-b border-border pb-1">
                   <span
                     aria-hidden="true"
-                    className="mt-px inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+                    className="mt-px inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"
                     style={{ background: cursorMarker.color, color: 'var(--bg)' }}
                   >
                     {cursorMarker.index}
                   </span>
-                  <span className="min-w-0 text-[10.5px] leading-snug font-semibold break-keep text-fg">
+                  <span className="min-w-0 text-[11.5px] leading-snug font-semibold break-keep text-fg">
                     {cursorMarker.label}
                   </span>
                 </div>
               ) : null}
-              <div className="mb-0.5 text-[10px] text-subtle">
+              <div className="mb-0.5 text-[11.5px] text-subtle">
                 {/* 툴팁은 어느 구간을 보고 있든 연도를 함께 보여 준다 */}
                 {longSpan ? formatKstYmd(cursorPoint.t) : formatKstYmdTime(cursorPoint.t)}
               </div>
@@ -681,7 +681,7 @@ export function InteractiveChart({
                 <div key={s.id} className="flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-1 text-muted">
                     <span aria-hidden="true" className="inline-block h-0.5 w-2.5 shrink-0 rounded" style={{ background: s.color }} />
-                    <span className="truncate text-[10px]">{s.name}</span>
+                    <span className="truncate text-[11.5px]">{s.name}</span>
                   </span>
                   <span className="tnum font-semibold text-fg">
                     {formatNumber(valueAt(s, cursorPoint.t), s.precision)}
@@ -698,7 +698,7 @@ export function InteractiveChart({
         {liveText}
       </p>
       {!showTable ? (
-        <p className="mt-1 text-[10px] leading-relaxed break-keep text-subtle">
+        <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
           {vp.zoomed
             ? '끌어서 좌우로 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다.'
             : '끌어서 구간을 고르면 그 구간만 확대됩니다. 확대한 뒤에는 끌어서 좌우로 옮길 수 있습니다. 휠이나 두 손가락으로도 확대·축소할 수 있습니다.'}{' '}

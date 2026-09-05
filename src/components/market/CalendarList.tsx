@@ -38,7 +38,7 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
             {/* 시장 배지에 그 시장 색을 입힌다. 여러 시장이 섞인 목록에서 눈으로 훑는 데 쓰는
                 표식일 뿐, 어느 시장인지는 배지 안의 글자가 말한다. */}
             <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] font-semibold"
               style={{
                 borderColor: `color-mix(in srgb, ${marketColor(event.market)} 45%, var(--border))`,
                 background: `color-mix(in srgb, ${marketColor(event.market)} 12%, transparent)`,
@@ -58,11 +58,11 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
             </Badge>
             {/* 크립토 일정은 배지와 분류명이 같아 두 번 적히므로 하나만 남긴다 */}
             {EVENT_CATEGORY_LABEL[event.category] !== MARKET_BADGE[event.market] ? (
-              <span className="text-[10px] text-subtle">{EVENT_CATEGORY_LABEL[event.category]}</span>
+              <span className="text-[11.5px] text-subtle">{EVENT_CATEGORY_LABEL[event.category]}</span>
             ) : null}
           </div>
           <p className="mt-1 text-[13px] leading-snug font-semibold break-keep text-fg">{event.title}</p>
-          {event.note ? <p className="mt-0.5 text-[10px] text-subtle">{event.note}</p> : null}
+          {event.note ? <p className="mt-0.5 text-[11.5px] text-subtle">{event.note}</p> : null}
         </div>
         <div className="shrink-0 text-right">
           {/*
@@ -71,21 +71,21 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
             "00:00 에 발표" 로 읽혔다. FRED 처럼 날짜만 주는 제공사가 붙으면서
             그런 일정이 실제로 생겼다 — 모르면 모른다고 적는다.
           */}
-          <p className="tnum text-[12px] font-semibold text-fg-strong">
+          <p className="tnum text-[13px] font-semibold text-fg-strong">
             {event.timeTbd ? (
-              <span className="text-[11px] text-muted">시각 미정</span>
+              <span className="text-[12.5px] text-muted">시각 미정</span>
             ) : (
               formatKstTime(event.scheduledAt)
             )}
           </p>
-          <p className="tnum text-[10px] text-subtle">{formatKstDate(event.scheduledAt)} KST</p>
-          <p className="tnum mt-0.5 text-[10px]" style={{ color: past ? 'var(--subtle-fg)' : 'var(--accent)' }}>
+          <p className="tnum text-[11.5px] text-subtle">{formatKstDate(event.scheduledAt)} KST</p>
+          <p className="tnum mt-0.5 text-[11.5px]" style={{ color: past ? 'var(--subtle-fg)' : 'var(--accent)' }}>
             {now === null ? '—' : formatCountdown(t - now)}
           </p>
         </div>
       </div>
 
-      <dl className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+      <dl className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px]">
         <div className="flex gap-1">
           <dt className="text-subtle">예상</dt>
           <dd className="tnum text-fg">{event.forecast ?? NO_VALUE}</dd>
@@ -117,7 +117,7 @@ export function CalendarPreview() {
         <h2 id="calendar-preview-title" className="text-base font-bold text-fg-strong">
           오늘의 경제 일정
         </h2>
-        <Link href="/calendar" className="text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/calendar" className="text-[12.5px] font-semibold text-accent hover:underline">
           전체 캘린더 →
         </Link>
       </div>

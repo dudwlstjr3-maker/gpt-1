@@ -32,7 +32,7 @@ function Clock() {
   return (
     <span className="tnum text-sm font-semibold text-fg-strong" aria-live="off">
       {now ? formatKstTimeSec(now) : '--:--:--'}
-      <span className="ml-1 text-[10px] font-normal text-muted">KST</span>
+      <span className="ml-1 text-[11.5px] font-normal text-muted">KST</span>
     </span>
   );
 }
@@ -45,8 +45,8 @@ function SessionChip({ session }: { session: MarketSession }) {
       title={hint}
     >
       <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: PHASE_COLOR[session.phase] }} />
-      <span className="text-[11px] font-semibold text-fg">{MARKET_LABEL[session.market]}</span>
-      <span className="text-[11px]" style={{ color: PHASE_COLOR[session.phase] }}>
+      <span className="text-[12.5px] font-semibold text-fg">{MARKET_LABEL[session.market]}</span>
+      <span className="text-[12.5px]" style={{ color: PHASE_COLOR[session.phase] }}>
         {SESSION_LABEL[session.phase]}
       </span>
       <span className="sr-only">{hint}</span>
@@ -102,7 +102,7 @@ export function StatusBar() {
               </Badge>
             ) : null}
             {/* 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다. */}
-            <span className="tnum truncate text-[11px] text-subtle">
+            <span className="tnum truncate text-[12.5px] text-subtle">
               {snapshot ? formatRelative(snapshot.lastFullUpdate) : '—'} 갱신
             </span>
           </div>
@@ -110,7 +110,7 @@ export function StatusBar() {
           <button
             type="button"
             onClick={refresh}
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface-2 px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
             aria-label="지금 새로고침"
           >
             <span aria-hidden="true" className={revalidating ? 'animate-spin' : ''}>
@@ -138,7 +138,7 @@ export function StatusBar() {
          * 두 개를 나란히 두면 무엇이 다른지 알 수 없다.
          */}
         {error ? (
-          <p className="mt-1.5 text-[11px]" style={{ color: 'var(--warn)' }} role="status">
+          <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--warn)' }} role="status">
             최신 데이터를 받지 못해 마지막 정상 데이터를 표시하고 있습니다. ({error})
           </p>
         ) : null}

@@ -13,6 +13,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { SignalDot, SignalLegend, SignalLight, SignalTally } from '@/components/ui/Signal';
+import { ReadingGuide } from '@/components/ui/ReadingGuide';
 import { RiskCard, RISK_COLOR, formatRiskValue, tallyRisk } from '@/components/market/RiskGauges';
 import { formatKstFull } from '@/lib/format';
 import { riskSignal } from '@/lib/scale';
@@ -95,45 +96,52 @@ export function RiskBoard({ market }: { market: MarketId }) {
                     {byLevel.map((g) => (
                       <div key={g.level} className="min-w-0">
                         <div
-                          className="flex items-center gap-1.5 text-[11px] font-semibold"
+                          className="flex items-center gap-1.5 text-[12.5px] font-semibold"
                           style={{ color: RISK_COLOR[g.level] }}
                         >
                           <SignalDot signal={riskSignal(g.level)} size={7} />
                           <span aria-hidden="true">{RISK_LEVEL_GLYPH[g.level]}</span>
                           {RISK_LEVEL_LABEL[g.level]} {g.items.length}
                         </div>
-                        <p className="mt-0.5 text-[10px] break-keep text-subtle">{RISK_LEVEL_NOTE[g.level]}</p>
+                        <p className="mt-0.5 text-[11.5px] break-keep text-subtle">{RISK_LEVEL_NOTE[g.level]}</p>
                       </div>
                     ))}
                   </div>
 
-                  <p className="mt-2.5 border-t border-border pt-2 text-[10px] text-subtle">
+                  <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] text-subtle">
                     산출 {formatKstFull(digest.generatedAt)} · {MARKET_LABEL[market]} 관련 {items.length}개 중{' '}
                     {available.length}개 값 확보
                   </p>
                 </div>
 
-                {/* 헷갈리기 쉬운 지점 — 이름이 비슷한 다른 화면과 구분해 준다 */}
+                {/*
+                 * 안내 상자가 셋이었다. 첫 지표 카드까지 250자를 넘겨야 했다.
+                 * 지우지 않고 접는다 — 제일 오해하기 쉬운 한 줄만 남긴다.
+                 */}
                 <div className="mt-2.5">
-                  <Notice tone="neutral">
-                    이 지표들은 <strong>투자심리 점수의 구성요소가 아닙니다.</strong> 시장이 지금 얼마나 불안한지를
-                    보는 별도의 게이지입니다. 심리 점수를 무엇으로 계산하는지는{' '}
-                    <Link href={`/fng/${market}`} className="font-semibold text-accent hover:underline">
-                      투자심리 상세
-                    </Link>{' '}
-                    화면의 구성요소에서 볼 수 있습니다.
-                  </Notice>
-                </div>
-
-                {/* 구간 기준 안내 */}
-                <div className="mt-2.5">
-                  <SignalLegend note="빨간불은 '위험하니 팔아라'가 아니라 '이 지표가 평소보다 크게 벗어나 있다'는 뜻입니다. 초록불도 안전을 보장하지 않습니다." />
-                </div>
-                <div className="mt-2">
-                  <Notice tone="neutral">
-                    구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다. 각 지표 카드에 구간 경계를 그대로 표시했으니
-                    직접 확인하고 판단하세요. 단계 표시는 위험의 방향을 읽는 참고이며 매매 신호가 아닙니다.
-                  </Notice>
+                  <ReadingGuide
+                    lead={
+                      <>
+                        빨간불은 &lsquo;위험하니 팔아라&rsquo;가 아니라{' '}
+                        <strong className="text-fg">&lsquo;이 지표가 평소보다 크게 벗어나 있다&rsquo;</strong>는
+                        뜻입니다. 초록불도 안전을 보장하지 않습니다.
+                      </>
+                    }
+                  >
+                    <SignalLegend note="색은 지금 수치가 평소 범위에서 얼마나 벗어나 있는지만 뜻합니다." />
+                    <Notice tone="neutral">
+                      이 지표들은 <strong>투자심리 점수의 구성요소가 아닙니다.</strong> 시장이 지금 얼마나 불안한지를
+                      보는 별도의 게이지입니다. 심리 점수를 무엇으로 계산하는지는{' '}
+                      <Link href={`/fng/${market}`} className="font-semibold text-accent hover:underline">
+                        투자심리 상세
+                      </Link>{' '}
+                      화면의 구성요소에서 볼 수 있습니다.
+                    </Notice>
+                    <Notice tone="neutral">
+                      구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다. 각 지표 카드에 구간 경계를 그대로 표시했으니
+                      직접 확인하고 판단하세요. 단계 표시는 위험의 방향을 읽는 참고이며 매매 신호가 아닙니다.
+                    </Notice>
+                  </ReadingGuide>
                 </div>
 
                 {/* 지표 카드 */}
@@ -151,7 +159,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
 
                 {/* 표 대안 */}
                 <div className="mt-4">
-                  <h2 className="mb-1.5 text-[12px] font-bold text-muted">표로 보기</h2>
+                  <h2 className="mb-1.5 text-[13px] font-bold text-muted">표로 보기</h2>
                   <div className="scroll-x card">
                     <table className="data-table">
                       <caption className="sr-only">{MARKET_LABEL[market]} 위험 신호등 요약</caption>

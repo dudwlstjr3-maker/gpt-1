@@ -20,8 +20,8 @@ function DeltaChip({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
     <div className="mt-1 flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 py-1.5">
-      <span className="text-[10px] text-muted">{label}</span>
-      <span className="tnum flex items-center gap-0.5 text-[12px] font-semibold" style={{ color: c.color(value) }}>
+      <span className="text-[11.5px] text-muted">{label}</span>
+      <span className="tnum flex items-center gap-0.5 text-[13px] font-semibold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
         {value === null ? NO_VALUE : formatSigned(value, 1)}
         <span className="sr-only">{c.label(value)}</span>
@@ -41,14 +41,14 @@ function DriverRow({ kind, label, detail }: { kind: 'up' | 'down'; label: string
   if (!label) return null;
   return (
     <div className="flex items-baseline gap-1.5">
-      <span aria-hidden="true" className="text-[10px] font-bold" style={{ color }}>
+      <span aria-hidden="true" className="text-[11.5px] font-bold" style={{ color }}>
         {kind === 'up' ? '▲' : '▼'}
       </span>
-      <p className="min-w-0 flex-1 text-[11px] leading-tight break-keep text-fg">
+      <p className="min-w-0 flex-1 text-[12.5px] leading-tight break-keep text-fg">
         <span className="text-muted">{kind === 'up' ? '상승 ' : '하락 '}</span>
         {label}
       </p>
-      {detail ? <span className="tnum shrink-0 text-[10px] text-subtle">{detail}</span> : null}
+      {detail ? <span className="tnum shrink-0 text-[11.5px] text-subtle">{detail}</span> : null}
     </div>
   );
 }
@@ -88,7 +88,7 @@ export function FngCard({
             {standalone ? ' 투자심리' : null}
           </h3>
           {standalone ? (
-            <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
+            <p className="mt-0.5 text-[11.5px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
           ) : null}
         </div>
         <ModeBadge mode={mode} size="xs" />
@@ -112,7 +112,7 @@ export function FngCard({
 
       {unavailable ? (
         <p
-          className="mt-1 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed break-keep"
+          className="mt-1 rounded-lg px-2.5 py-2 text-[12.5px] leading-relaxed break-keep"
           style={{ background: 'color-mix(in srgb, var(--warn) 12%, transparent)', color: 'var(--warn)' }}
           role="status"
         >
@@ -125,7 +125,7 @@ export function FngCard({
       )}
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-muted">최근 30일</span>
+        <span className="text-[11.5px] text-muted">최근 30일</span>
         <ScoreSparkline
           points={score.spark}
           width={132}
@@ -152,13 +152,13 @@ export function FngCard({
       <div className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2">
         <Link
           href={`/market/${score.market}`}
-          className="flex-1 rounded-md bg-accent px-2 py-1.5 text-center text-[11px] font-semibold text-accent-fg hover:opacity-90"
+          className="flex-1 rounded-md bg-accent px-2 py-1.5 text-center text-[12.5px] font-semibold text-accent-fg hover:opacity-90"
         >
           {MARKET_LABEL[score.market]} 시장 →
         </Link>
         <Link
           href={`/fng/${score.market}`}
-          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-center text-[11px] font-semibold text-fg hover:bg-surface-3"
+          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-center text-[12.5px] font-semibold text-fg hover:bg-surface-3"
         >
           심리 상세 →
         </Link>
@@ -166,7 +166,7 @@ export function FngCard({
       {/* 갱신 시각은 상태바가 늘 들고 있다. 여기서는 충족률이 온전하지 않을 때만 말한다 —
           100% 라고 매번 적어 두면 정작 90% 로 떨어진 날을 놓친다. */}
       {score.coverage < 0.999 ? (
-        <p className="mt-1.5 text-[10px] text-subtle">
+        <p className="mt-1.5 text-[11.5px] text-subtle">
           산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
         </p>
       ) : null}

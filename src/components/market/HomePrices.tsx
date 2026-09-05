@@ -36,7 +36,7 @@ export function HomePrices() {
         <h2 id="home-prices-title" className="text-base font-bold text-fg-strong">
           관심 가격과 주요 지수
         </h2>
-        <Link href="/indices" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/indices" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           지수 전체 →
         </Link>
       </div>

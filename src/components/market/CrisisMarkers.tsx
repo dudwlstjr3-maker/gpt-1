@@ -20,7 +20,7 @@ export function MarkerIndex({ n, color, active }: { n: number; color: string; ac
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
       style={{
         background: color,
         color: 'var(--bg)',
@@ -61,8 +61,8 @@ function Row({
         <div className="flex items-start gap-2">
           <MarkerIndex n={index} color={color} active={active} />
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] leading-tight font-semibold break-keep text-fg">{marker.label}</p>
-            <p className="tnum mt-0.5 text-[10px] text-subtle">
+            <p className="text-[13px] leading-tight font-semibold break-keep text-fg">{marker.label}</p>
+            <p className="tnum mt-0.5 text-[11.5px] text-subtle">
               {formatKstDate(marker.t)}
               <span className="ml-1.5">{MARKET_EVENT_CATEGORY_LABEL[marker.category]}</span>
             </p>
@@ -71,13 +71,13 @@ function Row({
             <p className="tnum text-[16px] leading-none font-bold" style={{ color: textColor }}>
               {marker.score === null ? NO_VALUE : formatNumber(marker.score, 1)}
             </p>
-            <p className="mt-1 text-[10px] font-semibold" style={{ color: textColor }}>
+            <p className="mt-1 text-[11.5px] font-semibold" style={{ color: textColor }}>
               {marker.stageLabel ?? '산출 불가'}
             </p>
           </div>
         </div>
         {active ? (
-          <p className="mt-1.5 border-t border-border pt-1.5 text-[11px] leading-relaxed break-keep text-muted">
+          <p className="mt-1.5 border-t border-border pt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
             {marker.note}
             {marker.unavailableReason ? ` ${marker.unavailableReason}` : ''}
           </p>
@@ -102,7 +102,7 @@ export function CrisisMarkers({
     return (
       <div className="card p-3.5">
         <h3 className="text-sm font-bold text-fg-strong">과거 위기 때의 점수</h3>
-        <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
           이 시장에서 표시할 사건이 히스토리 범위 안에 없습니다.
           {events.outOfRange > 0 ? ` 범위를 벗어난 사건 ${events.outOfRange}건은 표시하지 않았습니다.` : ''}
         </p>
@@ -118,15 +118,15 @@ export function CrisisMarkers({
     <div className="card p-3.5">
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-fg-strong">과거 위기 때의 점수</h3>
-        <span className="tnum text-[10px] text-subtle">{events.markers.length}건</span>
+        <span className="tnum text-[11.5px] text-subtle">{events.markers.length}건</span>
       </div>
-      <p className="mb-2.5 text-[11px] leading-relaxed break-keep text-muted">
+      <p className="mb-2.5 text-[12.5px] leading-relaxed break-keep text-muted">
         누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.
       </p>
 
       {/* 지금과 견주기 — 숫자만으로는 감이 오지 않으므로 한 줄로 풀어 준다 */}
       {lowest && currentScore !== null ? (
-        <p className="mb-2.5 rounded-lg bg-surface-2 px-2.5 py-2 text-[11.5px] leading-relaxed break-keep text-fg">
+        <p className="mb-2.5 rounded-lg bg-surface-2 px-2.5 py-2 text-[12.5px] leading-relaxed break-keep text-fg">
           표시된 사건 중 가장 낮았던 때는 <strong style={{ color: scoreColor(lowest.score) }}>{lowest.label}</strong> 의{' '}
           <strong className="tnum" style={{ color: scoreColor(lowest.score) }}>
             {formatNumber(lowest.score, 1)}점
@@ -153,7 +153,7 @@ export function CrisisMarkers({
 
       {/* 표 대안 */}
       <details className="mt-3">
-        <summary className="cursor-pointer text-[11px] font-semibold text-muted hover:text-fg">표로 보기</summary>
+        <summary className="cursor-pointer text-[12.5px] font-semibold text-muted hover:text-fg">표로 보기</summary>
         <div className="scroll-x mt-2 rounded-lg border border-border">
           <table className="data-table">
             <caption className="sr-only">과거 위기 시점의 자체 산출 심리 점수</caption>
@@ -182,7 +182,7 @@ export function CrisisMarkers({
       </details>
 
       {events.outOfRange > 0 ? (
-        <p className="mt-2 text-[10px] break-keep text-subtle">
+        <p className="mt-2 text-[11.5px] break-keep text-subtle">
           히스토리 범위보다 앞선 사건 {events.outOfRange}건은 점수를 산출할 수 없어 표시하지 않았습니다.
         </p>
       ) : null}

@@ -58,7 +58,7 @@ function IndexRow({
     <>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13.5px] font-semibold text-fg-strong">{item.name}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-subtle">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-subtle">
           <span className="tnum">{item.symbol}</span>
           {quote ? (
             <>
@@ -86,12 +86,12 @@ function IndexRow({
         ) : hasValue ? (
           <>
             <p className="tnum text-[13.5px] leading-tight font-bold text-fg-strong">{f.price(quote)}</p>
-            <p className="tnum mt-0.5 text-[11px] font-semibold" style={{ color }}>
+            <p className="tnum mt-0.5 text-[12.5px] font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span> {f.changePct(quote)}
             </p>
           </>
         ) : (
-          <p className="text-[12px] font-semibold" style={{ color: 'var(--warn)' }}>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--warn)' }}>
             {NO_VALUE}
           </p>
         )}
@@ -117,14 +117,14 @@ function IndexRow({
 
       {/* 기준점 — "3,714" 라는 숫자는 언제를 100 으로 놓았는지 알아야 읽힌다 */}
       {item.baseline ? (
-        <p className="px-3 pb-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+        <p className="px-3 pb-2 text-[11.5px] leading-relaxed break-keep text-subtle">
           <span className="font-semibold text-muted">기준 · </span>
           {item.baseline}
         </p>
       ) : null}
       {/* 값을 못 받은 이유는 그 줄에서 밝힌다. 0 으로 채우거나 줄을 지우지 않는다. */}
       {!loading && !hasValue ? (
-        <p className="px-3 pb-2 text-[10.5px] leading-relaxed break-keep" style={{ color: 'var(--warn)' }}>
+        <p className="px-3 pb-2 text-[11.5px] leading-relaxed break-keep" style={{ color: 'var(--warn)' }}>
           {quote?.unavailableReason ?? '값을 받지 못했습니다.'}
         </p>
       ) : null}
@@ -184,14 +184,14 @@ export function MarketIndexBoard() {
                 {MARKET_IDS.includes(g.market) ? (
                   <Link
                     href={`/market/${g.market}`}
-                    className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
+                    className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline"
                   >
                     시장 화면 →
                   </Link>
                 ) : null}
               </div>
 
-              <p className="px-3 py-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+              <p className="px-3 py-2 text-[11.5px] leading-relaxed break-keep text-subtle">
                 {GROUP_NOTE[g.market]}
               </p>
 
@@ -210,7 +210,7 @@ export function MarketIndexBoard() {
           <h2 id="idx-help" className="text-[13px] font-bold text-fg-strong">
             지수 숫자를 읽는 법
           </h2>
-          <ul className="mt-2 space-y-2 text-[11.5px] leading-relaxed break-keep text-muted">
+          <ul className="mt-2 space-y-2 text-[12.5px] leading-relaxed break-keep text-muted">
             <li>
               <span className="font-semibold text-fg">기준점부터 봅니다. </span>
               KOSPI 는 1980년 1월 4일의 한국 증시를 100 으로 놓고 잰 값입니다. 지금 3,700 이라면 그때의 37배라는
@@ -225,7 +225,7 @@ export function MarketIndexBoard() {
               시장을 재는 눈금이라서, 실제로 사고파는 것은 그 지수를 따라가도록 만든 상품입니다.
             </li>
           </ul>
-          <p className="mt-2.5 border-t border-border pt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+          <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
             지수마다 산출 기관과 방식이 다릅니다. 이 화면은 값을 받아 그대로 보여줄 뿐, 다시 계산하지 않습니다.
           </p>
         </div>

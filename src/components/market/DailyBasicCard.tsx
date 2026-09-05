@@ -28,7 +28,7 @@ export function DailyBasicCard() {
         <h2 id="daily-basic-title" className="text-base font-bold text-fg-strong">
           오늘의 경제 이야기
         </h2>
-        <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/basics" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           전체 보기 →
         </Link>
       </div>
@@ -49,7 +49,7 @@ export function DailyBasicCard() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-fg-strong">{item.name}</p>
-                  <p className="mt-0.5 text-[10px] text-subtle">
+                  <p className="mt-0.5 text-[11.5px] text-subtle">
                     {item.englishName}
                     {group ? ` · ${group.label}` : ''}
                   </p>
@@ -61,19 +61,19 @@ export function DailyBasicCard() {
               </div>
 
               {guide ? (
-                <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-fg">{guide.headline}</p>
+                <p className="mt-2 text-[13px] leading-relaxed break-keep text-fg">{guide.headline}</p>
               ) : null}
 
               <div className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-border pt-2.5">
                 <p className="tnum text-[20px] leading-none font-bold text-fg-strong">
                   {item.value === null ? NO_VALUE : `${formatNumber(item.value, item.precision)}${item.suffix}`}
                 </p>
-                <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+                <Link href="/basics" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
                   읽는 법 보기 →
                 </Link>
               </div>
 
-              <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+              <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
                 하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 생활 탭에 있습니다.
               </p>
             </div>

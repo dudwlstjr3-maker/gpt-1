@@ -37,7 +37,7 @@ function OutcomeBar({ market }: { market: PredictionMarket }) {
         const top = i === 0;
         return (
           <li key={`${o.label}-${i}`} className="grid grid-cols-[52px_1fr_auto] items-center gap-2">
-            <span className={`truncate text-[11px] ${top ? 'font-semibold text-fg' : 'text-muted'}`}>{name}</span>
+            <span className={`truncate text-[12.5px] ${top ? 'font-semibold text-fg' : 'text-muted'}`}>{name}</span>
             <span className="block h-2 rounded-full bg-surface-3" aria-hidden="true">
               <span
                 className="block h-2 rounded-full"
@@ -47,7 +47,7 @@ function OutcomeBar({ market }: { market: PredictionMarket }) {
                 }}
               />
             </span>
-            <span className={`tnum shrink-0 text-right text-[12px] ${top ? 'font-bold text-fg-strong' : 'text-muted'}`}>
+            <span className={`tnum shrink-0 text-right text-[13px] ${top ? 'font-bold text-fg-strong' : 'text-muted'}`}>
               {formatNumber(o.price, 0)}¢
             </span>
           </li>
@@ -64,19 +64,19 @@ function MarketCard({ market }: { market: PredictionMarket }) {
 
   return (
     <li className="card p-3">
-      <p className="text-[12.5px] leading-relaxed font-semibold break-keep text-fg">{title || NO_VALUE}</p>
+      <p className="text-[13px] leading-relaxed font-semibold break-keep text-fg">{title || NO_VALUE}</p>
 
       {/* 원문 그대로 보여줄 때는 그 사실을 적는다. 뉴스 섹션과 같은 규칙이다. */}
       {market.questionKo === null && market.question ? (
-        <p className="mt-0.5 text-[10px] text-subtle">원문 그대로 표시 (번역하지 않음)</p>
+        <p className="mt-0.5 text-[11.5px] text-subtle">원문 그대로 표시 (번역하지 않음)</p>
       ) : market.questionOrigin === 'derived' ? (
-        <p className="mt-0.5 text-[10px] text-subtle">
+        <p className="mt-0.5 text-[11.5px] text-subtle">
           원문 “{market.question}” · 한국어는 이 앱이 옮긴 것입니다
         </p>
       ) : null}
 
       {market.unavailableReason ? (
-        <p className="mt-2 text-[11px] break-keep" style={{ color: 'var(--warn)' }}>
+        <p className="mt-2 text-[12.5px] break-keep" style={{ color: 'var(--warn)' }}>
           <span aria-hidden="true">△ </span>
           {market.unavailableReason}
         </p>
@@ -87,12 +87,12 @@ function MarketCard({ market }: { market: PredictionMarket }) {
               <p className="tnum text-[24px] leading-none font-bold text-fg-strong">
                 {top?.price === null || top === null ? NO_VALUE : `${formatNumber(top.price, 0)}¢`}
               </p>
-              <p className="mt-1 text-[10.5px] break-keep text-muted">
+              <p className="mt-1 text-[11.5px] break-keep text-muted">
                 ‘{top?.labelKo ?? top?.label ?? '—'}’ 쪽에 매겨진 값 (1달러 = 100¢)
               </p>
             </div>
-            <p className="shrink-0 text-right text-[11px] text-muted">
-              <span className="block text-[9.5px] text-subtle">같은 쪽 24시간</span>
+            <p className="shrink-0 text-right text-[12.5px] text-muted">
+              <span className="block text-[10.5px] text-subtle">같은 쪽 24시간</span>
               <span className="tnum">
                 {market.changeDay === null ? NO_VALUE : `${formatSigned(market.changeDay, 1)}¢`}
               </span>
@@ -103,7 +103,7 @@ function MarketCard({ market }: { market: PredictionMarket }) {
         </>
       )}
 
-      <p className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px] text-subtle">
+      <p className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 text-[11.5px] text-subtle">
         <span className="tnum">
           24시간 거래 {market.volume24h === null ? NO_VALUE : `$${formatCompactEn(market.volume24h, 1)}`}
         </span>
@@ -138,7 +138,7 @@ export function PredictionSection() {
         <h2 id="prediction-title" className="text-base font-bold text-fg-strong">
           예측시장에서 화제인 질문
         </h2>
-        <span className="shrink-0 text-[10.5px] text-subtle">계속 바뀝니다</span>
+        <span className="shrink-0 text-[11.5px] text-subtle">계속 바뀝니다</span>
       </div>
 
       <SectionGate
@@ -159,7 +159,7 @@ export function PredictionSection() {
                 <span aria-hidden="true">◈</span>
                 {digest.venue}
               </Badge>
-              <span className="tnum text-[10px] text-subtle">{formatKstTime(digest.meta.fetchedAt)} 기준</span>
+              <span className="tnum text-[11.5px] text-subtle">{formatKstTime(digest.meta.fetchedAt)} 기준</span>
             </div>
 
             {digest.markets.length === 0 ? (

@@ -51,7 +51,7 @@ function DeltaBox({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
     <div className="flex-1 rounded-lg bg-surface-2 px-2 py-2 text-center">
-      <p className="text-[10px] text-muted">{label}</p>
+      <p className="text-[11.5px] text-muted">{label}</p>
       <p className="tnum mt-0.5 flex items-center justify-center gap-0.5 text-[13px] font-bold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
         {value === null ? NO_VALUE : formatSigned(value, 1)}
@@ -172,7 +172,7 @@ export default function FngDetailPage() {
     return (
       <div className="px-3 pt-3">
         <ErrorState title="점수 상세를 불러오지 못했습니다" message={error} onRetry={load} />
-        <Link href="/" className="mt-3 inline-block text-[12px] font-semibold text-accent">
+        <Link href="/" className="mt-3 inline-block text-[13px] font-semibold text-accent">
           ← 홈으로
         </Link>
       </div>
@@ -223,7 +223,7 @@ export default function FngDetailPage() {
                   <DeltaBox label="1개월 대비" value={detail.deltaMonth} />
                 </div>
               )}
-              <dl className="mt-3 space-y-1 text-[12px]">
+              <dl className="mt-3 space-y-1 text-[13px]">
                 <div className="flex justify-between gap-2">
                   <dt className="text-muted">신뢰도</dt>
                   <dd className="flex items-center gap-1 font-semibold text-fg">
@@ -252,7 +252,7 @@ export default function FngDetailPage() {
                   <dd className="tnum text-right text-fg">{formatKstFull(detail.computedAt)}</dd>
                 </div>
               </dl>
-              <p className="mt-2 text-[11px] break-keep text-subtle">{detail.confidenceReason}</p>
+              <p className="mt-2 text-[12.5px] break-keep text-subtle">{detail.confidenceReason}</p>
             </div>
           </div>
           <div className="mt-3 border-t border-border pt-2.5">
@@ -290,7 +290,7 @@ export default function FngDetailPage() {
             markers={chartMarkers}
             focusT={focusT}
           />
-          <p className="mt-2 text-[10px] break-keep text-subtle">
+          <p className="mt-2 text-[11.5px] break-keep text-subtle">
             좌축은 0~100 심리 점수, 우축은 {detail.benchmark?.name ?? '대표 지수'} 가격입니다. 점수가 산출되지 않은 날은
             선이 이어지지 않습니다.
             {chartMarkers.length > 0
@@ -329,7 +329,7 @@ export default function FngDetailPage() {
           ) : (
             <div className="card p-3.5">
               <h3 className="text-sm font-bold text-fg-strong">구간별 과거 통계</h3>
-              <p className="mt-2 text-[11px] break-keep text-muted">
+              <p className="mt-2 text-[12.5px] break-keep text-muted">
                 통계를 낼 만큼 히스토리가 쌓이지 않았거나 비교할 대표 지수가 없습니다.
               </p>
             </div>
@@ -353,18 +353,18 @@ export default function FngDetailPage() {
           />
           <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-2.5 sm:grid-cols-2">
             <div className="rounded-lg bg-surface-2 p-2.5">
-              <p className="text-[10px] text-muted">가장 큰 상승 요인</p>
-              <p className="mt-0.5 text-[12px] font-semibold break-keep text-fg">
+              <p className="text-[11.5px] text-muted">가장 큰 상승 요인</p>
+              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
                 {detail.topPositive?.label ?? '해당 없음'}
               </p>
-              {detail.topPositive ? <p className="text-[10px] text-subtle">{detail.topPositive.detail}</p> : null}
+              {detail.topPositive ? <p className="text-[11.5px] text-subtle">{detail.topPositive.detail}</p> : null}
             </div>
             <div className="rounded-lg bg-surface-2 p-2.5">
-              <p className="text-[10px] text-muted">가장 큰 하락 요인</p>
-              <p className="mt-0.5 text-[12px] font-semibold break-keep text-fg">
+              <p className="text-[11.5px] text-muted">가장 큰 하락 요인</p>
+              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
                 {detail.topNegative?.label ?? '해당 없음'}
               </p>
-              {detail.topNegative ? <p className="text-[10px] text-subtle">{detail.topNegative.detail}</p> : null}
+              {detail.topNegative ? <p className="text-[11.5px] text-subtle">{detail.topNegative.detail}</p> : null}
             </div>
           </div>
         </div>
@@ -376,7 +376,7 @@ export default function FngDetailPage() {
           <h2 id="fng-comp-title" className="text-base font-bold text-fg-strong">
             구성요소와 가중치
           </h2>
-          <span className="tnum text-[11px] text-subtle">
+          <span className="tnum text-[12.5px] text-subtle">
             합계 {formatNumber(detail.components.reduce((a, c) => a + c.weight, 0), 0)}%
           </span>
         </div>
@@ -420,7 +420,7 @@ export default function FngDetailPage() {
                         ) : null}
                       </div>
                       {!c.available && c.missingReason ? (
-                        <p className="mt-0.5 text-[10px] break-keep" style={{ color: 'var(--warn)' }}>
+                        <p className="mt-0.5 text-[11.5px] break-keep" style={{ color: 'var(--warn)' }}>
                           {c.missingReason}
                         </p>
                       ) : null}
@@ -429,7 +429,7 @@ export default function FngDetailPage() {
                       <p className="tnum text-[15px] font-bold" style={{ color: scoreColor(c.score) }}>
                         {c.score === null ? NO_VALUE : formatNumber(c.score, 1)}
                       </p>
-                      <p className="tnum text-[10px] text-muted">
+                      <p className="tnum text-[11.5px] text-muted">
                         전일 {c.deltaDay === null ? NO_VALUE : formatSigned(c.deltaDay, 1)}
                       </p>
                     </div>
@@ -440,7 +440,7 @@ export default function FngDetailPage() {
 
                   {open ? (
                     <div className="border-t border-border bg-surface-2 px-3 py-2.5">
-                      <p className="text-[11px] leading-relaxed break-keep text-muted">{c.description}</p>
+                      <p className="text-[12.5px] leading-relaxed break-keep text-muted">{c.description}</p>
 
                       <div className="scroll-x mt-2 rounded-lg border border-border bg-surface">
                         <table className="data-table">
@@ -459,12 +459,12 @@ export default function FngDetailPage() {
                                 <th scope="row" className="font-normal">
                                   <span className="text-fg">{s.label}</span>
                                   {s.inverted ? (
-                                    <span className="ml-1 text-[10px] text-subtle" title="값이 클수록 공포 → 점수 반전">
+                                    <span className="ml-1 text-[11.5px] text-subtle" title="값이 클수록 공포 → 점수 반전">
                                       (반전)
                                     </span>
                                   ) : null}
                                   {s.missingReason ? (
-                                    <span className="block text-[10px]" style={{ color: 'var(--warn)' }}>
+                                    <span className="block text-[11.5px]" style={{ color: 'var(--warn)' }}>
                                       {s.missingReason}
                                     </span>
                                   ) : null}
@@ -480,7 +480,7 @@ export default function FngDetailPage() {
                         </table>
                       </div>
 
-                      <p className="mt-2 text-[10px] text-subtle">
+                      <p className="mt-2 text-[11.5px] text-subtle">
                         출처: {c.sources.map((s) => s.name).join(', ') || '알 수 없음'}
                         {c.asOf ? ` · 기준 ${formatKstFull(c.asOf)}` : ''}
                       </p>
@@ -499,20 +499,20 @@ export default function FngDetailPage() {
           산출 방법
         </h2>
         <div className="card space-y-2.5 p-3.5">
-          <p className="text-[12px] leading-relaxed break-keep text-fg">{detail.methodology.summary}</p>
+          <p className="text-[13px] leading-relaxed break-keep text-fg">{detail.methodology.summary}</p>
           <ol className="space-y-1.5">
             {detail.methodology.steps.map((s, i) => (
-              <li key={i} className="text-[11px] leading-relaxed break-keep text-muted">
+              <li key={i} className="text-[12.5px] leading-relaxed break-keep text-muted">
                 {s}
               </li>
             ))}
           </ol>
           <div className="space-y-1.5 border-t border-border pt-2.5">
-            <p className="text-[11px] leading-relaxed break-keep text-muted">
+            <p className="text-[12.5px] leading-relaxed break-keep text-muted">
               <span className="font-semibold text-fg">극단치 처리 · </span>
               {detail.methodology.winsorization}
             </p>
-            <p className="text-[11px] leading-relaxed break-keep text-muted">
+            <p className="text-[12.5px] leading-relaxed break-keep text-muted">
               <span className="font-semibold text-fg">결측 처리 · </span>
               {detail.methodology.coverageRule}
             </p>
@@ -529,21 +529,21 @@ export default function FngDetailPage() {
         <div className="card p-3.5">
           <ul className="space-y-2">
             {detail.meta.sources.map((s, i) => (
-              <li key={i} className="text-[12px]">
+              <li key={i} className="text-[13px]">
                 <p className="font-semibold text-fg">{s.name}</p>
-                <p className="text-[10px] break-keep text-subtle">
+                <p className="text-[11.5px] break-keep text-subtle">
                   {s.delayMinutes === null ? '지연 정보 없음' : s.delayMinutes === 0 ? '실시간' : `${s.delayMinutes}분 지연`}
                   {s.terms ? ` · ${s.terms}` : ''}
                 </p>
                 {s.url ? (
-                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent hover:underline">
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[11.5px] text-accent hover:underline">
                     {s.url}
                   </a>
                 ) : null}
               </li>
             ))}
           </ul>
-          <p className="mt-2.5 border-t border-border pt-2 text-[10px] text-subtle">
+          <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] text-subtle">
             데이터 기준 시각 {formatKstFull(detail.meta.asOf)} · 수집 {formatKstFull(detail.meta.fetchedAt)}
           </p>
         </div>

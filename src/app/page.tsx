@@ -32,7 +32,7 @@ export default function HomePage() {
           message={snapshot.fatalError}
           onRetry={refresh}
         />
-        <p className="mt-3 text-[11px] text-muted">
+        <p className="mt-3 text-[12.5px] text-muted">
           더보기 → DEMO 시나리오에서 다른 상태로 전환할 수 있습니다.
         </p>
       </div>

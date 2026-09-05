@@ -115,7 +115,7 @@ export function CalendarMonth({
           <div
             key={w}
             role="columnheader"
-            className="pb-1 text-center text-[10px] font-semibold"
+            className="pb-1 text-center text-[11.5px] font-semibold"
             style={{ color: i === 0 ? 'var(--danger)' : i === 6 ? 'var(--accent)' : 'var(--subtle-fg)' }}
           >
             {w}
@@ -157,7 +157,7 @@ export function CalendarMonth({
               }}
             >
               <span
-                className="tnum text-[11.5px] leading-none font-semibold"
+                className="tnum text-[12.5px] leading-none font-semibold"
                 style={{
                   color: isSelected
                     ? 'var(--accent)'
@@ -171,7 +171,7 @@ export function CalendarMonth({
                 {day}
               </span>
               {isToday ? (
-                <span className="mt-0.5 text-[8px] leading-none font-bold text-accent">오늘</span>
+                <span className="mt-0.5 text-[10.5px] leading-none font-bold text-accent">오늘</span>
               ) : null}
 
               {/* 점 개수가 곧 건수, 색은 시장, 크기는 중요도. 3건 넘으면 숫자로 적는다. */}
@@ -189,7 +189,7 @@ export function CalendarMonth({
                   />
                 ))}
                 {list.length > 3 ? (
-                  <span className="tnum text-[8px] leading-none text-subtle">+{list.length - 3}</span>
+                  <span className="tnum text-[10.5px] leading-none text-subtle">+{list.length - 3}</span>
                 ) : null}
               </span>
             </button>
@@ -197,7 +197,7 @@ export function CalendarMonth({
         })}
       </div>
 
-      <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px] text-subtle">
+      <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[11.5px] text-subtle">
         {(['us', 'kr', 'crypto', 'global'] as const).map((m) => (
           <li key={m} className="flex items-center gap-1">
             <span

@@ -1372,6 +1372,40 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-16. 홈 아래 탭을 눌러도 화면이 안 움직이는가 ---------------- */
+  console.log('\n[8-16] 홈 아래 탭 — 눌러도 화면이 그대로인가');
+  {
+    /*
+     * 사용자가 짚은 문제: "맨 아래 일정~기준까지 눌렀을 때 화면 변하게 하지 말고
+     * 일정하게 유지되게 만들어."
+     *
+     * 재 보니 탭마다 본문이 192~780px 로 벌어졌다. 짧은 탭으로 옮기면 문서가
+     * 그만큼 짧아지고, 브라우저가 스크롤을 끝으로 당기면서 탭 줄이 화면에서
+     * 최대 247px 미끄러졌다. 방금 누른 자리에 다른 것이 와 있었다.
+     */
+    const lower = await readFile('src/components/market/HomeLower.tsx', 'utf8');
+    const tpl5 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 문서 길이를 지킨다 */
+    check('탭 본문 높이를 재고 있음', /new ResizeObserver/.test(lower) && /bodyRef/.test(lower));
+    check('지금까지 본 것 중 가장 긴 높이를 기억함', /r\.height > prev \? r\.height : prev/.test(lower));
+    check('폭이 바뀌면 최댓값을 다시 잡음', /Math\.abs\(r\.width - widthRef\.current\) > 1/.test(lower));
+
+    /* ② 남는 자리는 본문 밑이 아니라 문서 맨 끝에 — 안 그러면 고지문 위가 한 화면 빈다 */
+    check('남는 자리를 문서 맨 끝에 붙임', /createPortal\(/.test(lower) && /getElementById\('main'\)/.test(lower));
+    check('본문 상자에 min-height 를 걸지 않음(구멍 방지)', !/minHeight/.test(lower));
+    check('탭마다 다른 위 여백이 새지 않게 막음', /className="flow-root"/.test(lower));
+    check('채우는 칸은 스크린리더가 읽지 않음', /aria-hidden="true" style=\{\{ height: gap \}\}/.test(lower));
+
+    /* ③ 미리보기도 같은 규칙 */
+    check('미리보기에도 꼬리 칸이 있음', /id="tailgap"/.test(tpl5));
+    check('미리보기 꼬리 칸이 고지문 뒤에 있음',
+      tpl5.indexOf('</footer>') < tpl5.indexOf('id="tailgap"'));
+    check('미리보기도 가장 긴 본문만큼만 채움', /function holdHomeLower\(\)/.test(tpl5) && /lowerFloor - r\.height/.test(tpl5));
+    check('미리보기는 같은 화면 다시 그릴 때 보던 자리를 지킴',
+      /const keepScroll = moved \? null : window\.scrollY/.test(tpl5));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

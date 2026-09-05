@@ -772,6 +772,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         과거 수치가 미래 결과를 보장하지 않습니다. 산식 버전 v1.0.0.
       </p>
     </footer>
+    <!-- 홈 탭을 옮겨도 문서가 짧아지지 않게 맨 끝에서 모자란 만큼만 채우는 자리.
+         본문 밑이 아니라 여기에 둔다 — 본문 밑이면 짧은 탭에서 고지문 위가 한 화면쯤 빈다. -->
+    <div id="tailgap" aria-hidden="true"></div>
   </div>
 </div>
 
@@ -2622,6 +2625,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         '<button type="button" style="flex:1" data-hometab="' + v + '" aria-pressed="' + (state.homeTab === v) + '">' + l + '</button>').join('') +
       '</div></section>' +
 
+      /* 탭 본문에는 표를 달아 둔다 — render() 가 높이를 재서 문서 끝의 #tailgap 을
+         그만큼 채운다. 탭마다 길이가 192~780px 로 벌어져서, 짧은 탭으로 옮기면
+         문서가 짧아지고 브라우저가 스크롤을 끝으로 당기면서 탭 줄이 미끄러진다. */
+      '<div id="homelower-body" style="display:flow-root">' +
+
       (state.homeTab === 'calendar'
         ? '<section class="block"><div class="block-head"><h2>오늘의 경제 일정</h2>' +
           '<button type="button" class="linkbtn" data-go="calendar">전체 캘린더 →</button></div>' +
@@ -2656,6 +2664,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         n.markets.map((m) => '<span style="color:var(--muted)">#' + MARKET_LABEL[m] + '</span>').join('') +
         '<span>원문 링크 없음</span></div></li>').join('') +
       '</ul></div></div></section>') +
+      '</div>' +
       '</div>'
     );
   }
@@ -3700,6 +3709,34 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<span aria-hidden="true" style="font-size:14px;line-height:1">‹</span>' + label + '</button></div>';
   }
 
+  /*
+   * 홈 아래 탭 — 눌러도 화면이 움직이지 않게 자리를 잡아 둔다.
+   *
+   * 탭마다 본문 길이가 크게 다르다(모바일 기준 192~780px). 짧은 탭으로 옮기면
+   * 문서가 그만큼 짧아지는데, 이 탭 줄은 홈 맨 아래라 누를 때는 이미 페이지 끝
+   * 가까이 내려와 있다. 문서가 짧아지면 브라우저가 스크롤을 끝으로 당기고,
+   * 그 순간 탭 줄이 화면에서 미끄러진다. 앱의 HomeLower 와 같은 규칙이다 —
+   * 지금까지 그려 본 본문 중 가장 긴 것만큼만 자리를 잡는다.
+   */
+  let lowerFloor = 0;
+  let lowerWidth = 0;
+
+  function holdHomeLower() {
+    const tail = document.getElementById('tailgap');
+    if (!tail) return;
+    const body = document.getElementById('homelower-body');
+    if (!body) { tail.style.height = '0px'; return; }
+    const r = body.getBoundingClientRect();
+    // 폭이 바뀌면 세로도 전부 바뀐다. 옛 최댓값을 들고 있으면 빈 자리만 남는다.
+    if (Math.abs(r.width - lowerWidth) > 1) {
+      lowerWidth = r.width;
+      lowerFloor = r.height;
+    } else if (r.height > lowerFloor) {
+      lowerFloor = r.height;
+    }
+    tail.style.height = Math.max(0, Math.round(lowerFloor - r.height)) + 'px';
+  }
+
   function render() {
     closeZoom();
     document.documentElement.setAttribute('data-cm', state.colorMode);
@@ -3727,7 +3764,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     const moved = state.view !== lastView;
     if (moved) prevView = lastView;
     lastView = state.view;
+    /* 같은 화면 안에서 다시 그릴 때(홈 탭 전환·타일 펼치기)는 보던 자리를 지킨다.
+       innerHTML 을 통째로 갈아치우는 구조라, 안 지키면 눌렀던 자리가 사라진다. */
+    const keepScroll = moved ? null : window.scrollY;
     viewEl.innerHTML = (needsBack ? backBar() : '') + v();
+    holdHomeLower();
+    if (keepScroll !== null && Math.abs(window.scrollY - keepScroll) > 1) {
+      window.scrollTo({ top: keepScroll, behavior: 'instant' });
+    }
     if (moved) {
       viewEl.classList.remove('view-enter');
       void viewEl.offsetWidth; // 애니메이션을 다시 재생시키려면 한 번 리플로우가 필요하다

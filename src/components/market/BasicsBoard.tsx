@@ -183,26 +183,27 @@ function BasicCard({ item }: { item: EconomyBasic }) {
         : [];
 
   return (
-    <li className="card p-3.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-[14px] font-bold text-fg-strong">{item.name}</h3>
-          <p className="mt-0.5 text-[10px] text-subtle">{item.englishName}</p>
-        </div>
-        <Badge tone={item.official ? 'neutral' : 'warn'} size="xs">
-          <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
-          {item.official ? '공식 통계' : '비공식 개념'}
-        </Badge>
-      </div>
-
+    <li className="card flex flex-col p-3">
       {/*
-       * 큰 숫자와 지나온 선을 나란히 둔다.
-       * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
-       * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다.
+       * 이름과 값을 같은 줄에 둔다.
+       *
+       * 예전에는 이름 줄 밑에 큰 숫자를 한 줄 더 뒀는데, 숫자 오른쪽이 통째로 비어
+       * 카드 한 장이 550px 을 넘겼다. 아홉 장이면 세로로 화면 여섯 개 분량이라
+       * 훑을 수가 없다. 이름과 값은 어차피 같이 읽는 짝이라 한 줄에 둬도 무리가 없다.
        */}
-      <div className="mt-2.5 border-t border-border pt-2.5 sm:flex sm:items-start sm:gap-3">
-        <div className="shrink-0">
-          <p className="tnum text-[26px] leading-none font-bold text-fg-strong">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[14px] leading-snug font-bold break-keep text-fg-strong">{item.name}</h3>
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-subtle">
+            <span className="min-w-0 truncate">{item.englishName}</span>
+            <Badge tone={item.official ? 'neutral' : 'warn'} size="2xs">
+              <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
+              {item.official ? '공식 통계' : '비공식 개념'}
+            </Badge>
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="tnum text-[22px] leading-none font-bold text-fg-strong">
             {show(item.value, item.precision, item.suffix)}
           </p>
           <p className="tnum mt-1 text-[10.5px] text-muted">
@@ -215,12 +216,19 @@ function BasicCard({ item }: { item: EconomyBasic }) {
             직전 {show(item.previous, item.precision, item.suffix)}
           </p>
         </div>
-        {trend.length > 0 ? (
-          <div className="mt-2 min-w-0 flex-1 sm:mt-0">
-            <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
-          </div>
-        ) : null}
       </div>
+
+      {/*
+       * 지나온 선은 카드 폭을 그대로 쓴다.
+       * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
+       * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다. 숫자 옆에 끼워 두었을
+       * 때는 230px 밖에 안 되어 눈금 글씨가 뭉갰는데, 이제 두 배 가까이 넓다.
+       */}
+      {trend.length > 0 ? (
+        <div className="mt-2 border-t border-border pt-2">
+          <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
+        </div>
+      ) : null}
 
       <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-fg">{item.reading}</p>
 
@@ -302,7 +310,7 @@ export function BasicsBoard() {
             list.length === 0 ? (
               <EmptyState title="표시할 지표가 없습니다" />
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {groupList(list).map((g) => (
                   <section key={g.id} aria-labelledby={`basics-${g.id}`}>
                     <div className="mb-1.5">
@@ -314,7 +322,14 @@ export function BasicsBoard() {
                         <p className="mt-0.5 text-[10.5px] leading-relaxed break-keep text-subtle">{g.note}</p>
                       ) : null}
                     </div>
-                    <ul className="space-y-2.5">
+                    {/*
+                     * 넓은 화면에서는 두 칸으로 세운다.
+                     * 한 줄로만 세우면 카드 하나가 950px 을 차지하면서 그 안에 글자는
+                     * 350자뿐이라, 폭은 남아돌고 세로로는 4,700px 을 굴러야 했다.
+                     * 세 칸은 넣지 않는다 — 카드가 310px 밑으로 내려가면 이름과 값이
+                     * 한 줄에 못 서고 그래프 눈금이 뭉갠다.
+                     */}
+                    <ul className="grid gap-2.5 md:grid-cols-2">
                       {g.items.map((item) => (
                         <BasicCard key={item.id} item={item} />
                       ))}

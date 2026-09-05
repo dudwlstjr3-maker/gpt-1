@@ -19,7 +19,7 @@
  *  - 눈금을 두 개만 두는 것은 작은 그림에 촘촘히 넣으면 오히려 안 읽히기 때문이다.
  *  - 차트를 못 보는 사람을 위해 같은 내용을 표로도 제공한다 (이 앱의 모든 차트가 그렇다).
  *
- * 확대·축소·이동은 여기 붙이지 않는다. 104px 짜리 그림에 조작 버튼까지 넣으면
+ * 확대·축소·이동은 여기 붙이지 않는다. 90px 남짓한 그림에 조작 버튼까지 넣으면
  * 정작 선 볼 자리가 없어진다. 대신 **누르면 큰 창으로 열리고**, 거기서 끌기·휠·핀치가
  * 다 된다. 큰 창은 이 앱의 상세용 차트를 그대로 쓴다.
  */
@@ -79,7 +79,7 @@ export function BasicTrend({
   series,
   precision,
   suffix,
-  height = 104,
+  height = 92,
   label,
 }: {
   series: TrendSeries[];
@@ -138,12 +138,19 @@ export function BasicTrend({
   }));
 
   return (
-    <div>
+    /*
+     * 그림의 최대 폭을 430px 로 묶는다.
+     * 카드가 두 칸으로 서면서 그림이 카드 폭을 통째로 쓰게 됐는데, 그대로 두면
+     * 넓은 화면에서 viewBox 가 1.6배까지 늘어나 눈금 글씨가 본문보다 커진다.
+     */
+    <div className="max-w-[430px]">
       <ExpandTrigger label={label} onClick={() => setBig(true)}>
+      {/* h-auto — 높이를 px 로 못박으면 폭이 넓어져도 그림이 가운데에 작게 남는다 */}
       <svg
         viewBox={`0 0 ${VIEW_W} ${height}`}
         width="100%"
         height={height}
+        className="h-auto w-full"
         role="img"
         aria-labelledby={`${id}-t`}
       >

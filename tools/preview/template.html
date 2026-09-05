@@ -608,8 +608,11 @@ table.data-table th:first-child, table.data-table td:first-child { text-align: l
 table.data-table thead th { font-size: 10.5px; font-weight: 600; color: var(--muted); }
 
 /* 큰 숫자와 지나온 선. 좁은 화면에서는 위아래로, 넓어지면 나란히. */
-.btrend { display: flex; flex-direction: column; gap: 8px; }
-@media (min-width: 640px) { .btrend { flex-direction: row; align-items: flex-start; gap: 12px; } }
+/* 생활 경제 카드 — 넓은 화면에서는 두 칸. 한 줄로만 세우면 카드 하나가 950px 을
+   차지하면서 글자는 350자뿐이라, 폭은 남아돌고 세로로는 4,700px 을 굴러야 했다.
+   세 칸은 넣지 않는다 — 310px 밑으로 내려가면 이름과 값이 한 줄에 못 선다. */
+.bgrid { display: grid; gap: 10px; }
+@media (min-width: 768px) { .bgrid { grid-template-columns: 1fr 1fr; } }
 table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.data th, table.data td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
 table.data tr:last-child td, table.data tr:last-child th { border-bottom: 0; }
@@ -3378,7 +3381,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     if (!clean.length) return '';
     let mine = clean.filter((s) => s.label === '한국')[0] || clean[0];
 
-    const h = 104, top = 9, bottom = h - 17;
+    const h = 92, top = 9, bottom = h - 17;
     const all = clean.reduce((a, s) => a.concat(s.points), []);
     const tx = extent(all.map((p) => p.t));
     const vy = extent(all.map((p) => p.v));
@@ -3407,8 +3410,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     }));
 
     return (
-      '<div>' + zoomable(b.name,  bigSeries,
-      '<svg viewBox="0 0 ' + TREND_W + ' ' + h + '" width="100%" height="' + h + '" role="img" ' +
+      /* 최대 폭 430px — 카드가 두 칸으로 서면서 그림이 카드 폭을 다 쓰게 됐는데,
+         그대로 두면 넓은 화면에서 눈금 글씨가 본문보다 커진다.
+         height:auto — px 로 못박으면 폭이 넓어져도 그림이 가운데에 작게 남는다. */
+      '<div style="max-width:430px">' + zoomable(b.name,  bigSeries,
+      '<svg viewBox="0 0 ' + TREND_W + ' ' + h + '" width="100%" height="' + h + '" style="width:100%;height:auto" role="img" ' +
       'aria-label="' + esc(b.name + ' — ' + yr(tx[0]) + '년부터 ' + yr(tx[1]) + '년까지, ' + mine.label + ' 마지막 값 ' + fmt(last.v)) + '">' +
       // 위아래 눈금선. 눈금이 없으면 "미국이 위에 있다" 까지만 알고 얼마나 위인지는 모른다.
       [[top, vy[1]], [bottom, vy[0]]].map((g) =>
@@ -3498,7 +3504,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
       '<div style="padding:10px 12px 0"><p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span><b>여기 숫자는 투자심리 점수의 구성요소가 아닙니다.</b> 대부분 1년에 한두 번 바뀌는 값이라 그날의 시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요. <b>전부 통계기관이 발표하는 공식 지표</b>만 담았습니다 — 발표 기관이 없는 개념은 넣지 않습니다.</span></p></div>' +
       (list.length === 0
         ? '<div style="padding:12px"><p class="notice n-warn" style="margin:0">표시할 지표가 없습니다.</p></div>'
-        : '<div style="padding:12px;display:flex;flex-direction:column;gap:20px">' +
+        : '<div style="padding:12px;display:flex;flex-direction:column;gap:16px">' +
           groups.map(function (grp) {
           return '<section aria-labelledby="basics-' + grp.id + '">' +
           '<div style="margin-bottom:6px">' +
@@ -3506,22 +3512,25 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
           '<span class="tnum" style="margin-left:6px;font-weight:400;color:var(--subtle)">' + grp.items.length + '</span></h2>' +
           (grp.note ? '<p style="margin:2px 0 0;font-size:10.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(grp.note) + '</p>' : '') +
           '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<div class="bgrid">' +
           grp.items.map(function (b) {
             const t = b.value === null || b.previous === null ? null : b.value > b.previous ? '▲' : b.value < b.previous ? '▼' : '―';
+            const trend = basicTrend(b);
             return (
-              '<div class="card" style="padding:14px">' +
-              '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
-              '<div style="min-width:0"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
-              '<div style="margin-top:2px;font-size:10px;color:var(--subtle)">' + esc(b.englishName) + '</div></div>' +
-              badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div>' +
-              // 큰 숫자와 지나온 선을 나란히 둔다. 값이 1년에 한두 번만 바뀌어서,
+              // 이름과 값을 같은 줄에 둔다. 이름 줄 밑에 큰 숫자를 한 줄 더 두면
+              // 숫자 오른쪽이 통째로 비어 카드 한 장이 550px 을 넘겼다.
+              '<div class="card" style="padding:12px">' +
+              '<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">' +
+              '<div style="min-width:0"><h3 style="margin:0;font-size:14px;line-height:1.4;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
+              '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10px;color:var(--subtle)">' +
+              '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.englishName) + '</span>' +
+              badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div></div>' +
+              '<div style="flex-shrink:0;text-align:right">' +
+              '<div class="tnum" style="font-size:22px;line-height:1;font-weight:700;color:var(--fg-strong)">' + esc(basicShow(b.value, b.precision, b.suffix)) + '</div>' +
+              '<div class="tnum" style="margin-top:4px;font-size:10.5px;color:var(--muted)">' + (t ? t + ' ' : '') + '직전 ' + esc(basicShow(b.previous, b.precision, b.suffix)) + '</div></div></div>' +
+              // 지나온 선은 카드 폭을 그대로 쓴다. 값이 1년에 한두 번만 바뀌어서,
               // 숫자 하나만 보면 그게 높은 건지 낮은 건지 알 수가 없다.
-              '<div class="btrend" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
-              '<div style="flex-shrink:0">' +
-              '<div class="tnum" style="font-size:26px;line-height:1;font-weight:700;color:var(--fg-strong)">' + esc(basicShow(b.value, b.precision, b.suffix)) + '</div>' +
-              '<div class="tnum" style="margin-top:4px;font-size:10.5px;color:var(--muted)">' + (t ? t + ' ' : '') + '직전 ' + esc(basicShow(b.previous, b.precision, b.suffix)) + '</div></div>' +
-              '<div style="min-width:0;flex:1">' + basicTrend(b) + '</div></div>' +
+              (trend ? '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' + trend + '</div>' : '') +
               '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(b.reading) + '</p>' +
               basicComparisons(b.comparisons || [], b.comparisonNote, b.sameScale) +
               basicGuidePanel(b.id, b.officialNote) +

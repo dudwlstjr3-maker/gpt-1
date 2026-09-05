@@ -1323,6 +1323,55 @@ async function main() {
     check('미리보기 타일도 그 자리에서 펼침', /data-tile=/.test(tpl3) && /state\.openTile/.test(tpl3));
   }
 
+  /* ---------------- 8-15. 생활 경제 지수의 폭과 길이 ---------------- */
+  console.log('\n[8-15] 생활 경제 지수 — 쓸데없이 길고 넓지 않은가');
+  {
+    /*
+     * 사용자가 짚은 문제: "경제 생활지수가 저렇게 길게 표시될 필요가 있나?
+     * 폭이 너무 긴 거 같은데 쓸데없이."
+     *
+     * 재 보니 넓은 화면에서 카드 한 장이 952px 을 차지하면서 그 안의 글자는
+     * 350자뿐이었고, 아홉 장이 한 줄로 서서 세로로 4,727px 을 굴러야 했다.
+     * 줄이되 **내용을 지워서 줄이지는 않는다** — 아래 마지막 묶음이 그것을 지킨다.
+     */
+    const board = await readFile('src/components/market/BasicsBoard.tsx', 'utf8');
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const tpl4 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 폭 — 넓은 화면에서는 두 칸 */
+    check('생활 카드가 넓은 화면에서 두 칸으로 섬', /grid gap-[\d.]+ md:grid-cols-2/.test(board));
+    check('한 줄 세로 나열이 남아 있지 않음', !/<ul className="space-y-2\.5">/.test(board));
+    // 세 칸이면 카드가 310px 밑으로 내려가 이름과 값이 한 줄에 못 선다.
+    check('세 칸까지 쪼개지는 않음', !/grid-cols-3/.test(board));
+
+    /* ② 길이 — 이름과 값이 같은 줄 */
+    check('이름과 값이 같은 줄에 있음', /text-\[22px\] leading-none font-bold/.test(board));
+    check('값만 있는 줄을 따로 두지 않음', !/sm:flex sm:items-start sm:gap-3/.test(board));
+
+    /* ③ 그림 — 카드 폭을 따라가되 무한정 커지지 않음 */
+    check('그림이 카드 폭을 따라 늘어남', /className="h-auto w-full"/.test(trend));
+    check('그림 폭에 상한이 있음', /max-w-\[430px\]/.test(trend));
+
+    /* ④ 미리보기도 같은 모양 */
+    check('미리보기도 두 칸 격자를 씀', /\.bgrid \{ display: grid/.test(tpl4));
+    check('미리보기 두 칸 기준이 앱과 같음(768px)', /@media \(min-width: 768px\) \{ \.bgrid/.test(tpl4));
+    check('미리보기에서 옛 좌우 배치가 사라짐', !/btrend/.test(tpl4));
+    check('미리보기 그림도 폭을 따라가고 상한이 있음',
+      /style="width:100%;height:auto"/.test(tpl4) && /max-width:430px/.test(tpl4));
+    check('미리보기도 값을 이름 줄 오른쪽에 둠', /font-size:22px;line-height:1;font-weight:700/.test(tpl4));
+
+    /* ⑤ 줄이면서 내용을 지우지는 않았다 */
+    for (const [what, needle] of [
+      ['해설 문장', 'item.reading'],
+      ['나라별 비교표', '<Comparisons items={item.comparisons}'],
+      ['접힌 설명', '<GuidePanel id={item.id}'],
+      ['출처 줄', 'item.meta.sources[0]?.name'],
+      ['공식/비공식 표시', "item.official ? '공식 통계' : '비공식 개념'"],
+    ]) {
+      check(`줄이면서 ${what}을 지우지 않음`, board.includes(needle));
+    }
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

@@ -663,6 +663,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   transition: opacity 0.12s;
 }
 .tip.on { opacity: 1; }
+.tip .tt-mark { display: flex; align-items: flex-start; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 4px; font-size: 10.5px; font-weight: 600; color: var(--fg); line-height: 1.35; word-break: keep-all; }
+.tip .tt-badge { flex-shrink: 0; width: 14px; height: 14px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--bg); margin-top: 1px; }
 .tip .tt-time { font-size: 10px; color: var(--subtle); margin-bottom: 3px; }
 .tip .tt-row { display: flex; justify-content: space-between; gap: 8px; }
 .tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 5px; }
@@ -1419,18 +1421,64 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         '" stroke="var(--accent)" stroke-width="1.5"></line>').join('');
   }
 
-  function chartCursor(id, px) {
+  /** 표식(번호 붙은 세로 점선) 위에 올렸다고 볼 가로 거리 */
+  const MARKER_SNAP = 8;
+
+  /**
+   * 포인터가 무엇 위에 있는가.
+   *
+   * 예전에는 x 만 보고 크로스헤어를 세워서, 축 글씨 위든 번호 배지 띠든 그림 밖
+   * 어디에 올려도 값이 떴다. 그 자리들은 값을 읽는 자리가 아니다.
+   * 표식은 따로 잡는다 — 그 자체가 가리키는 사건이 있는데 무시되고 있었다.
+   */
+  function chartHit(c, px, py) {
+    const x0 = M.left, x1 = M.left + c.innerW, y0 = c.top, y1 = c.top + c.innerH;
+    if (py >= y0 - 17 && py <= y1) {
+      let hit = null, best = MARKER_SNAP;
+      (c.markers || []).forEach((mk) => {
+        const mx = c.x(mk.t);
+        if (mx < x0 - 1 || mx > x1 + 1) return;
+        const d = Math.abs(px - mx);
+        if (d <= best) { best = d; hit = mk; }
+      });
+      if (hit) return hit;
+    }
+    if (px < x0 || px > x1 || py < y0 || py > y1) return null;
+    return 'plot';
+  }
+
+  function chartCursorOff(box) {
+    const tip = box.querySelector('.tip'), cross = box.querySelector('.cross');
+    if (tip) tip.classList.remove('on');
+    if (cross) cross.innerHTML = '';
+  }
+
+  function chartCursor(id, px, py) {
     const c = CHARTS[id];
     const box = document.getElementById(id);
     if (!c || !box || !c.x) return;
+    /* 그래프 밖이면 아무것도 띄우지 않는다 */
+    const hit = chartHit(c, px, py);
+    if (!hit) return chartCursorOff(box);
+    /* 표식 위에서는 그 날짜에 딱 세운다 */
+    if (hit !== 'plot') px = c.x(hit.t);
     const base = c.series[0];
     let best = 0, bd = Infinity;
     base.points.forEach((p, i) => { const d = Math.abs(c.x(p.t) - px); if (d < bd) { bd = d; best = i; } });
     const pt = base.points[best];
+    /* 크로스헤어가 표식 위에 서 있으면 그 사건을 툴팁 머리에 적는다 */
+    const onMark = (c.markers || []).filter((mk) => Math.abs(c.x(mk.t) - c.x(pt.t)) <= MARKER_SNAP)[0] || null;
     const at = (s) => { let b = null, d = Infinity; for (const p of s.points) { const q = Math.abs(p.t - pt.t); if (q < d) { d = q; b = p; } } return b ? b.v : null; };
 
     const cross = box.querySelector('.cross');
     cross.innerHTML =
+      /* 올려 둔 표식은 한 번 더 굵게 그어 어느 선을 읽고 있는지 보이게 한다 */
+      (onMark
+        ? '<line x1="' + c.x(onMark.t) + '" y1="' + c.top + '" x2="' + c.x(onMark.t) + '" y2="' + (c.top + c.innerH) +
+          '" stroke="' + onMark.color + '" stroke-width="1.6" stroke-dasharray="3 3" opacity=".95"/>' +
+          '<circle cx="' + c.x(onMark.t) + '" cy="' + (c.top - 8) + '" r="8" fill="' + onMark.color + '"/>' +
+          '<text x="' + c.x(onMark.t) + '" y="' + (c.top - 8 + 3.2) + '" text-anchor="middle" font-size="9" font-weight="700" fill="var(--bg)">' + onMark.index + '</text>'
+        : '') +
       '<line x1="' + c.x(pt.t) + '" y1="' + c.top + '" x2="' + c.x(pt.t) + '" y2="' + (c.top + c.innerH) + '" stroke="var(--fg)" opacity=".45"/>' +
       c.series.map((s) => {
         const v = at(s);
@@ -1441,11 +1489,17 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
 
     const tip = box.querySelector('.tip');
     tip.innerHTML =
+      (onMark
+        ? '<div class="tt-mark"><span class="tt-badge" style="background:' + onMark.color + '">' + onMark.index + '</span>' +
+          '<span>' + esc(onMark.label) + '</span></div>'
+        : '') +
       '<div class="tt-time">' + esc(c.longSpan ? kYmd(pt.t) : kYmd(pt.t) + ' ' + kTime(pt.t)) + '</div>' +
       c.series.map((s) => '<div class="tt-row"><span><span class="swatch" style="background:' + s.color + '"></span>' + esc(s.name) + '</span><b class="tnum">' + esc(fmtNum(at(s), s.precision) + (s.suffix || '')) + '</b></div>').join('');
     tip.style.left = Math.max(0, Math.min(c.w - 168, c.x(pt.t) - 84)) + 'px';
     tip.classList.add('on');
-    box.querySelector('.sr').textContent = kYmd(pt.t) + ' ' + kTime(pt.t) + ', ' + c.series.map((s) => s.name + ' ' + fmtNum(at(s), s.precision)).join(', ');
+    box.querySelector('.sr').textContent =
+      (onMark ? onMark.index + '번 ' + onMark.label + '. ' : '') +
+      kYmd(pt.t) + ' ' + kTime(pt.t) + ', ' + c.series.map((s) => s.name + ' ' + fmtNum(at(s), s.precision)).join(', ');
     c.cursor = best;
   }
 
@@ -3861,19 +3915,19 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
   document.addEventListener('mousemove', (e) => {
     const box = e.target.closest('[data-chart]');
     if (!box) return;
-    chartCursor(box.dataset.chart, e.clientX - box.getBoundingClientRect().left);
+    const r = box.getBoundingClientRect();
+    chartCursor(box.dataset.chart, e.clientX - r.left, e.clientY - r.top);
   });
   document.addEventListener('mouseleave', (e) => {
     const box = e.target.closest && e.target.closest('[data-chart]');
     if (!box) return;
-    const tip = box.querySelector('.tip'), cross = box.querySelector('.cross');
-    if (tip) tip.classList.remove('on');
-    if (cross) cross.innerHTML = '';
+    chartCursorOff(box);
   }, true);
   document.addEventListener('touchmove', (e) => {
     const box = e.target.closest && e.target.closest('[data-chart]');
     if (!box) return;
-    chartCursor(box.dataset.chart, e.touches[0].clientX - box.getBoundingClientRect().left);
+    const r = box.getBoundingClientRect();
+    chartCursor(box.dataset.chart, e.touches[0].clientX - r.left, e.touches[0].clientY - r.top);
   }, { passive: true });
 
   document.addEventListener('keydown', (e) => {
@@ -3900,7 +3954,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
     else if (e.key === 'End') i = n - 1;
     else return;
     e.preventDefault();
-    chartCursor(box.dataset.chart, c.x(c.series[0].points[i].t));
+    chartCursor(box.dataset.chart, c.x(c.series[0].points[i].t), c.top + c.innerH / 2);
   });
 
   /* ---------------- 이동 · 확대 입력 ----------------
@@ -4004,7 +4058,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 11px; }
         return;
       }
       // 끌지 않고 짚기만 했으면 그 자리에 크로스헤어를 세운다
-      if (wasSingle && !GES.moved && box) chartCursor(GES.id, e.clientX - box.getBoundingClientRect().left);
+      if (wasSingle && !GES.moved && box) {
+        const br = box.getBoundingClientRect();
+        chartCursor(GES.id, e.clientX - br.left, e.clientY - br.top);
+      }
       GES.id = null;
     } else {
       const c = CHARTS[GES.id];

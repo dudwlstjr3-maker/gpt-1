@@ -69,8 +69,11 @@ export function useChartViewport({
   plotLeft: number;
   plotWidth: number;
   enabled: boolean;
-  /** 끌지 않고 짚기만 했을 때 (터치로 크로스헤어를 세울 때 쓴다) */
-  onTap?: (localX: number) => void;
+  /**
+   * 끌지 않고 짚기만 했을 때 (터치로 크로스헤어를 세울 때 쓴다).
+   * 세로 위치도 함께 넘긴다 — 그림 밖(축 글씨 자리)을 짚었는지 가려내야 한다.
+   */
+  onTap?: (localX: number, localY: number) => void;
 }): ChartViewport {
   const [view, setView] = useState<Viewport | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -175,6 +178,7 @@ export function useChartViewport({
     const g = gesture.current;
 
     const localX = (clientX: number) => clientX - el.getBoundingClientRect().left;
+    const localY = (clientY: number) => clientY - el.getBoundingClientRect().top;
 
     const begin = () => {
       const xs = [...g.pointers.values()];
@@ -257,7 +261,7 @@ export function useChartViewport({
           }
         }
         // 끌지 않고 짚기만 했으면 그 자리에 크로스헤어를 세운다
-        if (wasSingle && !g.moved) state.current.onTap?.(localX(e.clientX));
+        if (wasSingle && !g.moved) state.current.onTap?.(localX(e.clientX), localY(e.clientY));
       } else {
         begin();
       }

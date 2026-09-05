@@ -64,6 +64,8 @@ export interface ChartMarker {
 const MARGIN = { top: 10, right: 46, bottom: 22, left: 50 };
 /** 표식 번호 배지가 들어갈 위쪽 여백 */
 const MARKER_TOP = 15;
+/** 표식(번호 붙은 세로 점선) 위에 올렸다고 볼 가로 거리 */
+const MARKER_SNAP = 8;
 
 /**
  * 축 눈금 라벨.
@@ -155,14 +157,14 @@ export function InteractiveChart({
 
   const innerWNow = Math.max(10, size.w - MARGIN.left - MARGIN.right);
   /** 짚기만 했을 때 크로스헤어를 세우는 콜백 — geometry 가 만들어진 뒤 채워진다 */
-  const tapRef = useRef<(px: number) => void>(() => {});
+  const tapRef = useRef<(px: number, py: number) => void>(() => {});
   const vp = useChartViewport({
     ref: svgRef,
     full: fullExtent,
     plotLeft: MARGIN.left,
     plotWidth: innerWNow,
     enabled: !showTable && size.w > 0,
-    onTap: (px) => tapRef.current(px),
+    onTap: (px, py) => tapRef.current(px, py),
   });
 
   /**
@@ -226,6 +228,58 @@ export function InteractiveChart({
     [geometry, base],
   );
 
+  /**
+   * 포인터가 무엇 위에 있는가.
+   *
+   * 예전에는 x 만 보고 크로스헤어를 세웠다. 그래서 왼쪽 축 글씨 위든, 번호 배지가
+   * 앉는 위쪽 띠든, 아래 연도 글씨 위든 — 그림 안이 아닌 어디에 올려도 값이 떴다.
+   * 그 자리들은 값을 읽는 자리가 아니다.
+   *
+   * 표식은 따로 잡는다. 번호 붙은 세로 점선은 그 자체가 가리키는 사건이 있는데,
+   * 예전에는 그걸 무시하고 그냥 그날 점수만 떴다. 이제 점선이든 그 위의 번호
+   * 배지든 올리면 그 날짜에 딱 서고, 툴팁이 사건 이름부터 알려 준다.
+   */
+  const hitAt = useCallback(
+    (px: number, py: number): ChartMarker | 'plot' | null => {
+      if (!geometry) return null;
+      const x0 = MARGIN.left;
+      const x1 = MARGIN.left + geometry.innerW;
+      const y0 = geometry.top;
+      const y1 = geometry.top + geometry.innerH;
+
+      // ① 표식 — 그래프 안의 점선이든, 그 위에 앉은 번호 배지든
+      if (py >= y0 - MARKER_TOP - 2 && py <= y1) {
+        let hit: ChartMarker | null = null;
+        let best = MARKER_SNAP;
+        for (const m of markers) {
+          const mx = geometry.x(m.t);
+          if (mx < x0 - 1 || mx > x1 + 1) continue;
+          const d = Math.abs(px - mx);
+          if (d <= best) {
+            best = d;
+            hit = m;
+          }
+        }
+        if (hit) return hit;
+      }
+
+      // ② 그래프 안쪽. 그 밖은 아무것도 아니다.
+      if (px < x0 || px > x1 || py < y0 || py > y1) return null;
+      return 'plot';
+    },
+    [geometry, markers],
+  );
+
+  const moveCursor = useCallback(
+    (px: number, py: number) => {
+      const hit = hitAt(px, py);
+      if (hit === null) setCursorT(null);
+      else if (hit === 'plot') setCursorFromX(px);
+      else setCursorT(hit.t); // 표식 위에서는 그 날짜에 딱 세운다
+    },
+    [hitAt, setCursorFromX],
+  );
+
   /** 커서를 보이는 점 기준으로 한 칸 옮긴다 */
   const stepCursor = useCallback(
     (dir: 1 | -1) => {
@@ -277,7 +331,7 @@ export function InteractiveChart({
     [base, stepCursor, vp],
   );
 
-  tapRef.current = setCursorFromX;
+  tapRef.current = moveCursor;
 
   const tableSeries: TableSeries[] = series.map((s) => ({
     id: s.id,
@@ -320,6 +374,15 @@ export function InteractiveChart({
     return best;
   })();
 
+  /**
+   * 크로스헤어가 표식 위에 서 있으면 그 사건을 툴팁 머리에 적는다.
+   * 상태로 따로 들고 있지 않고 위치에서 뽑는다 — 키보드로 옮겨 가도 똑같이 따라온다.
+   */
+  const cursorMarker =
+    cursorPoint && geometry
+      ? (markers.find((m) => Math.abs(geometry.x(m.t) - geometry.x(cursorPoint.t)) <= MARKER_SNAP) ?? null)
+      : null;
+
   const valueAt = (s: ChartSeries, t: number): number | null => {
     let best: SeriesPoint | null = null;
     let dist = Infinity;
@@ -334,7 +397,7 @@ export function InteractiveChart({
   };
 
   const liveText = cursorPoint
-    ? `${formatKstYmdTime(cursorPoint.t)}, ${prepared
+    ? `${cursorMarker ? `${cursorMarker.index}번 ${cursorMarker.label}. ` : ''}${formatKstYmdTime(cursorPoint.t)}, ${prepared
         .map((s) => `${s.name} ${formatNumber(valueAt(s, cursorPoint.t), s.precision)}${s.suffix ?? ''}`)
         .join(', ')}`
     : '';
@@ -411,7 +474,7 @@ export function InteractiveChart({
               onKeyDown={onKeyDown}
               onMouseMove={(e) => {
                 // 끄는 중에는 이동이 우선이라 크로스헤어를 갱신하지 않는다
-                if (!vp.dragging) setCursorFromX(e.nativeEvent.offsetX);
+                if (!vp.dragging) moveCursor(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
               }}
               onMouseLeave={() => setCursorT(null)}
               onDoubleClick={() => vp.reset()}
@@ -533,7 +596,8 @@ export function InteractiveChart({
               {markers.map((m) => {
                 const mx = geometry.x(m.t);
                 if (mx < MARGIN.left - 1 || mx > MARGIN.left + geometry.innerW + 1) return null;
-                const active = focusT !== null && Math.abs(focusT - m.t) < 86400000;
+                const active =
+                  (focusT !== null && Math.abs(focusT - m.t) < 86400000) || cursorMarker?.id === m.id;
                 return (
                   <g key={m.id} opacity={focusT === null || active ? 1 : 0.4}>
                     <line
@@ -594,6 +658,21 @@ export function InteractiveChart({
                 width: 172,
               }}
             >
+              {/* 표식 위에 섰으면 무슨 일이 있었는지부터 알려 준다 */}
+              {cursorMarker ? (
+                <div className="mb-1 flex items-start gap-1.5 border-b border-border pb-1">
+                  <span
+                    aria-hidden="true"
+                    className="mt-px inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+                    style={{ background: cursorMarker.color, color: 'var(--bg)' }}
+                  >
+                    {cursorMarker.index}
+                  </span>
+                  <span className="min-w-0 text-[10.5px] leading-snug font-semibold break-keep text-fg">
+                    {cursorMarker.label}
+                  </span>
+                </div>
+              ) : null}
               <div className="mb-0.5 text-[10px] text-subtle">
                 {/* 툴팁은 어느 구간을 보고 있든 연도를 함께 보여 준다 */}
                 {longSpan ? formatKstYmd(cursorPoint.t) : formatKstYmdTime(cursorPoint.t)}

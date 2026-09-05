@@ -1406,6 +1406,47 @@ async function main() {
       /const keepScroll = moved \? null : window\.scrollY/.test(tpl5));
   }
 
+  /* ---------------- 8-17. 차트 위에 올렸을 때만 값이 뜨는가 ---------------- */
+  console.log('\n[8-17] 차트 커서 — 그림 위에 올렸을 때만, 표식은 표식대로');
+  {
+    /*
+     * 사용자가 짚은 문제: "점수 추이에 마우스 올리면 어느 곳이든 나오는데
+     * 그래프나 선에 올려뒀을 때만 나오게 해라. 1~7번까지의 선이 있는데
+     * 그걸 무시하고 정보가 나온다."
+     *
+     * 재 보니 x 만 보고 크로스헤어를 세우고 있었다. 왼쪽 축 글씨 위, 오른쪽 축
+     * 글씨 위, 번호 배지가 앉는 위쪽 띠, 아래 연도 글씨 띠 — 찔러 본 자리 여섯 곳이
+     * 전부 값을 띄웠다. 번호 붙은 세로 점선 위에 올려도 그 사건은 말해 주지 않고
+     * 그냥 그날 점수만 떴다.
+     */
+    const chart = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const vpHook = await readFile('src/components/charts/useChartViewport.ts', 'utf8');
+    const tpl6 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 그림 밖에서는 안 뜬다 */
+    check('포인터가 어디 있는지 가려냄', /function hitAt|const hitAt = useCallback/.test(chart));
+    check('가로만이 아니라 세로도 봄', /py < y0 \|\| py > y1/.test(chart));
+    check('마우스가 그 판정을 거침', /moveCursor\(e\.nativeEvent\.offsetX, e\.nativeEvent\.offsetY\)/.test(chart));
+    check('짚기(터치)도 같은 판정을 거침', /tapRef\.current = moveCursor/.test(chart));
+    check('짚기가 세로 위치를 넘겨받음', /onTap\?: \(localX: number, localY: number\) => void/.test(vpHook));
+
+    /* ② 표식은 표식대로 */
+    check('표식 위를 따로 잡음', /MARKER_SNAP/.test(chart));
+    check('번호 배지 띠까지 표식으로 침', /py >= y0 - MARKER_TOP/.test(chart));
+    check('표식 위에서는 그 날짜에 딱 섬', /setCursorT\(hit\.t\)/.test(chart));
+    check('툴팁이 사건 이름부터 알려 줌', /cursorMarker\.label/.test(chart));
+    check('읽어 주는 문장에도 사건이 들어감', /cursorMarker\.index\}번 \$\{cursorMarker\.label/.test(chart));
+    check('올려 둔 표식 선을 굵게 함', /cursorMarker\?\.id === m\.id/.test(chart));
+
+    /* ③ 미리보기도 같은 규칙 */
+    check('미리보기도 포인터 자리를 가려냄', /function chartHit\(c, px, py\)/.test(tpl6));
+    check('미리보기도 세로를 봄', /py < y0 \|\| py > y1/.test(tpl6));
+    check('미리보기 커서가 세로를 받음', /function chartCursor\(id, px, py\)/.test(tpl6));
+    check('미리보기 마우스·터치·짚기가 모두 세로를 넘김',
+      (tpl6.match(/chartCursor\([^)]*,[^,)]*,[^,)]*\)/g) ?? []).length >= 4);
+    check('미리보기 툴팁에도 사건 줄이 있음', /tt-mark/.test(tpl6) && /onMark\.label/.test(tpl6));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

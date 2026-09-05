@@ -133,10 +133,10 @@ export function Gauge({
 
         {showScale ? (
           <>
-            <text x={0} y={h - 1} fontSize={9} fill="var(--subtle-fg)" textAnchor="start">
+            <text x={0} y={h - 1} fontSize={11} fill="var(--subtle-fg)" textAnchor="start">
               0
             </text>
-            <text x={w} y={h - 1} fontSize={9} fill="var(--subtle-fg)" textAnchor="end">
+            <text x={w} y={h - 1} fontSize={11} fill="var(--subtle-fg)" textAnchor="end">
               100
             </text>
           </>

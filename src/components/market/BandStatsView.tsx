@@ -138,7 +138,7 @@ function Axis({ d }: { d: Domain }) {
             x={Math.min(ROW_W - 10, Math.max(10, x(v)))}
             y="12"
             textAnchor="middle"
-            fontSize="8"
+            fontSize="9.5"
             fill={v === 0 ? 'var(--muted-fg)' : 'var(--subtle-fg)'}
           >
             {v > 0 ? `+${v}` : v}

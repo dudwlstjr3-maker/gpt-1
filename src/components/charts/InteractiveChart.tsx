@@ -66,6 +66,12 @@ const MARGIN = { top: 10, right: 46, bottom: 22, left: 50 };
 const MARKER_TOP = 15;
 /** 표식(번호 붙은 세로 점선) 위에 올렸다고 볼 가로 거리 */
 const MARKER_SNAP = 8;
+/** 두 칸으로 나눌 때 칸 사이에 두는 틈 (아래 칸 눈금값이 앉을 자리) */
+const SPLIT_GAP = 16;
+/** 두 칸으로 나눌 때 더 쓰는 세로 길이 */
+const SPLIT_EXTRA = 76;
+/** 차트 안 글자 크기. 본문(11.5~12.5px)보다 작되 읽을 수는 있어야 한다. */
+const TICK_FONT = 11;
 
 /**
  * 축 눈금 라벨.
@@ -194,30 +200,70 @@ export function InteractiveChart({
 
   const base = prepared[0];
 
+  /**
+   * 단위가 다른 계열이 섞여 있으면 **한 그림에 두 눈금을 겹치지 않는다.**
+   *
+   * 예전에는 심리 점수(0~100)를 왼쪽 축에, S&P 500 가격을 오른쪽 축에 놓고 겹쳐
+   * 그렸다. 두 축을 맞추는 기준이 임의라서, 눈금을 어디에 두느냐에 따라 없던
+   * 상관관계가 보이거나 사라진다. 실제로 이 화면에서 두 선이 붙었다 벌어졌다 하는
+   * 모양은 데이터가 아니라 눈금 선택의 결과였다.
+   *
+   * 그래서 시간축만 공유하고 **위아래 두 칸으로 나눈다.** 같은 날짜가 세로로
+   * 정렬되니 흐름은 그대로 견줄 수 있고, 없던 상관관계를 지어내지 않는다.
+   */
+  const splitAxes = cleaned.some((s) => s.axis === 'left') && cleaned.some((s) => s.axis === 'right');
+  /** 두 칸이면 그만큼 더 높아야 한다. 같은 높이에 둘을 우겨넣으면 둘 다 못 읽는다. */
+  const boxH = splitAxes ? height + SPLIT_EXTRA : height;
+
   const geometry = useMemo(() => {
     if (!base || size.w === 0) return null;
     const w = size.w;
     const innerW = Math.max(10, w - MARGIN.left - MARGIN.right);
     // 표식이 있으면 번호 배지가 앉을 자리를 위에 비워 둔다
     const top = MARGIN.top + (markers.length > 0 ? MARKER_TOP : 0);
-    const innerH = Math.max(10, height - top - MARGIN.bottom);
+    const innerH = Math.max(10, boxH - top - MARGIN.bottom);
 
     // 축은 데이터 끝이 아니라 '보고 있는 구간'에 맞춘다. 데이터에 맞추면 끌 때마다 화면이 튄다.
     const x = linearScale([vp.view.t0, vp.view.t1], [MARGIN.left, MARGIN.left + innerW]);
 
-    const leftVals = prepared.filter((s) => s.axis === 'left').flatMap((s) => s.points.map((p) => p.v));
+    const leftSeries = prepared.filter((s) => s.axis === 'left');
     const rightSeries = prepared.filter((s) => s.axis === 'right');
-    const rightVals = rightSeries.flatMap((s) => s.points.map((p) => p.v));
+    const domainOf = (list: typeof prepared) =>
+      list.some((s) => s.fixed0to100)
+        ? ([0, 100] as [number, number])
+        : paddedExtent(list.flatMap((s) => s.points.map((p) => p.v)));
 
-    const yLeft = linearScale(paddedExtent(leftVals), [top + innerH, top]);
-    const rightFixed = rightSeries.some((s) => s.fixed0to100);
-    const yRight = linearScale(
-      rightFixed ? [0, 100] : paddedExtent(rightVals),
-      [top + innerH, top],
-    );
+    if (!splitAxes) {
+      const only = prepared;
+      const band = {
+        id: 'left' as const,
+        top,
+        h: innerH,
+        y: linearScale(domainOf(only), [top + innerH, top]),
+        series: only,
+      };
+      return { w, innerW, innerH, top, x, bands: [band], plotBottom: top + innerH, split: false };
+    }
 
-    return { w, innerW, innerH, top, x, yLeft, yRight, hasRight: rightSeries.length > 0 };
-  }, [base, prepared, size.w, height, markers.length, vp.view]);
+    const upperH = Math.max(40, Math.round((innerH - SPLIT_GAP) * 0.56));
+    const lowerTop = top + upperH + SPLIT_GAP;
+    const lowerH = Math.max(30, top + innerH - lowerTop);
+    const bands = [
+      { id: 'left' as const, top, h: upperH, y: linearScale(domainOf(leftSeries), [top + upperH, top]), series: leftSeries },
+      {
+        id: 'right' as const,
+        top: lowerTop,
+        h: lowerH,
+        y: linearScale(domainOf(rightSeries), [lowerTop + lowerH, lowerTop]),
+        series: rightSeries,
+      },
+    ];
+    return { w, innerW, innerH, top, x, bands, plotBottom: lowerTop + lowerH, split: true };
+  }, [base, prepared, size.w, boxH, markers.length, vp.view, splitAxes]);
+
+  /** 계열이 그려질 칸 */
+  const bandFor = (axis: 'left' | 'right') =>
+    geometry ? (geometry.bands.find((b) => b.id === axis) ?? geometry.bands[0]) : null;
 
   const setCursorFromX = useCallback(
     (px: number) => {
@@ -245,7 +291,7 @@ export function InteractiveChart({
       const x0 = MARGIN.left;
       const x1 = MARGIN.left + geometry.innerW;
       const y0 = geometry.top;
-      const y1 = geometry.top + geometry.innerH;
+      const y1 = geometry.plotBottom;
 
       // ① 표식 — 그래프 안의 점선이든, 그 위에 앉은 번호 배지든
       if (py >= y0 - MARKER_TOP - 2 && py <= y1) {
@@ -417,7 +463,7 @@ export function InteractiveChart({
                 }}
               />
               {s.name}
-              {s.axis === 'right' ? <span className="text-subtle">(우축)</span> : null}
+              {s.axis === 'right' ? <span className="text-subtle">(아래 칸)</span> : null}
             </li>
           ))}
         </ul>
@@ -461,13 +507,13 @@ export function InteractiveChart({
           <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">{textSummary}</p>
         </div>
       ) : (
-        <div ref={wrapRef} className="relative w-full" style={{ height }}>
+        <div ref={wrapRef} className="relative w-full" style={{ height: boxH }}>
           {geometry ? (
             <svg
               ref={svgRef}
               width={geometry.w}
-              height={height}
-              viewBox={`0 0 ${geometry.w} ${height}`}
+              height={boxH}
+              viewBox={`0 0 ${geometry.w} ${boxH}`}
               role="img"
               aria-label={`${label}. ${textSummary}${markerSummary}`}
               tabIndex={0}
@@ -482,38 +528,45 @@ export function InteractiveChart({
               /* 세로 스크롤은 브라우저에 넘기고, 가로 끌기·핀치는 우리가 처리한다 */
               style={{ touchAction: 'pan-y', cursor: vp.dragging ? 'grabbing' : 'grab' }}
             >
-              {/* 가로 그리드 + 좌축 라벨 */}
-              {[0, 0.25, 0.5, 0.75, 1].map((f) => {
-                const y = geometry.top + geometry.innerH * f;
-                const domain = geometry.yLeft.domain;
-                const v = domain[1] - (domain[1] - domain[0]) * f;
+              {/* 가로 그리드 + 눈금값. 칸마다 자기 눈금을 왼쪽에 붙인다 —
+                  칸을 나눈 이유가 눈금을 겹치지 않으려는 것이므로 오른쪽 축은 없다. */}
+              {geometry.bands.map((band) => {
+                const head = band.series[0] ?? base;
+                const fracs = geometry.split ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1];
                 return (
-                  <g key={f}>
-                    <line
-                      x1={MARGIN.left}
-                      y1={y}
-                      x2={MARGIN.left + geometry.innerW}
-                      y2={y}
-                      stroke="var(--border)"
-                      strokeWidth={1}
-                      opacity={0.5}
-                    />
-                    <text x={MARGIN.left - 6} y={y + 3} textAnchor="end" fontSize={9} fill="var(--subtle-fg)" className="tnum">
-                      {axisLabel(v, base.precision, base.suffix === '원')}
-                    </text>
-                    {geometry.hasRight ? (
-                      <text
-                        x={MARGIN.left + geometry.innerW + 6}
-                        y={y + 3}
-                        fontSize={9}
-                        fill="var(--subtle-fg)"
-                        className="tnum"
-                      >
-                        {axisLabel(
-                          geometry.yRight.domain[1] - (geometry.yRight.domain[1] - geometry.yRight.domain[0]) * f,
-                          0,
-                          false,
-                        )}
+                  <g key={band.id}>
+                    {fracs.map((f) => {
+                      const y = band.top + band.h * f;
+                      const d = band.y.domain;
+                      const v = d[1] - (d[1] - d[0]) * f;
+                      return (
+                        <g key={f}>
+                          <line
+                            x1={MARGIN.left}
+                            y1={y}
+                            x2={MARGIN.left + geometry.innerW}
+                            y2={y}
+                            stroke="var(--border)"
+                            strokeWidth={1}
+                            opacity={0.5}
+                          />
+                          <text
+                            x={MARGIN.left - 6}
+                            y={y + 4}
+                            textAnchor="end"
+                            fontSize={TICK_FONT}
+                            fill="var(--subtle-fg)"
+                            className="tnum"
+                          >
+                            {axisLabel(v, head.precision, head.suffix === '원')}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* 어느 칸이 무엇인지 칸 안에 직접 적는다 — 범례만 두면 눈이 한 번 더 오간다 */}
+                    {geometry.split ? (
+                      <text x={MARGIN.left + 5} y={band.top + 12} fontSize={TICK_FONT} fontWeight={600} fill={head.color}>
+                        {head.name}
                       </text>
                     ) : null}
                   </g>
@@ -527,9 +580,9 @@ export function InteractiveChart({
                   <text
                     key={f}
                     x={geometry.x(t)}
-                    y={height - 6}
+                    y={boxH - 6}
                     textAnchor={f === 0 ? 'start' : f === 1 ? 'end' : 'middle'}
-                    fontSize={9}
+                    fontSize={TICK_FONT}
                     fill="var(--subtle-fg)"
                   >
                     {longSpan ? formatKstYearMonth(t) : formatKstDate(t)}
@@ -539,19 +592,20 @@ export function InteractiveChart({
 
               {/* 시리즈 */}
               {prepared.map((s) => {
-                const y = s.axis === 'right' ? geometry.yRight : geometry.yLeft;
-                const pts = s.points.map((p) => ({ x: geometry.x(p.t), y: y(p.v) }));
+                const band = bandFor(s.axis);
+                if (!band) return null;
+                const pts = s.points.map((p) => ({ x: geometry.x(p.t), y: band.y(p.v) }));
                 return (
                   <g key={s.id}>
-                    {s.area ? (
-                      <path d={areaPath(pts, geometry.top + geometry.innerH)} fill={s.color} opacity={0.12} />
-                    ) : null}
+                    {s.area ? <path d={areaPath(pts, band.top + band.h)} fill={s.color} opacity={0.12} /> : null}
                     <path
                       d={linePath(pts)}
                       fill="none"
                       stroke={s.color}
-                      strokeWidth={s.axis === 'right' ? 1.5 : 1.9}
-                      strokeDasharray={s.dashed ? '4 3' : undefined}
+                      strokeWidth={2}
+                      /* 칸을 나눈 뒤에는 선을 끊어 그릴 이유가 없다 — 서로 겹치지 않으므로
+                         실선이 더 잘 읽힌다 */
+                      strokeDasharray={!geometry.split && s.dashed ? '4 3' : undefined}
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
@@ -571,18 +625,18 @@ export function InteractiveChart({
                     <g aria-hidden="true">
                       <rect
                         x={x0}
-                        y={MARGIN.top}
+                        y={geometry.top}
                         width={x1 - x0}
-                        height={geometry.innerH}
+                        height={geometry.plotBottom - geometry.top}
                         fill="color-mix(in srgb, var(--accent) 16%, transparent)"
                       />
                       {[x0, x1].map((x, i) => (
                         <line
                           key={i}
                           x1={x}
-                          y1={MARGIN.top}
+                          y1={geometry.top}
                           x2={x}
-                          y2={MARGIN.top + geometry.innerH}
+                          y2={geometry.plotBottom}
                           stroke="var(--accent)"
                           strokeWidth={1.5}
                         />
@@ -604,7 +658,7 @@ export function InteractiveChart({
                       x1={mx}
                       y1={geometry.top}
                       x2={mx}
-                      y2={geometry.top + geometry.innerH}
+                      y2={geometry.plotBottom}
                       stroke={m.color}
                       strokeWidth={active ? 1.6 : 1}
                       strokeDasharray="3 3"
@@ -615,7 +669,7 @@ export function InteractiveChart({
                       x={mx}
                       y={geometry.top - 8 + 3.2}
                       textAnchor="middle"
-                      fontSize={9}
+                      fontSize={TICK_FONT}
                       fontWeight={700}
                       fill="var(--bg)"
                     >
@@ -632,16 +686,27 @@ export function InteractiveChart({
                     x1={geometry.x(cursorPoint.t)}
                     y1={geometry.top}
                     x2={geometry.x(cursorPoint.t)}
-                    y2={geometry.top + geometry.innerH}
+                    y2={geometry.plotBottom}
                     stroke="var(--fg)"
                     strokeWidth={1}
                     opacity={0.45}
                   />
                   {prepared.map((s) => {
                     const v = valueAt(s, cursorPoint.t);
-                    if (v === null) return null;
-                    const y = s.axis === 'right' ? geometry.yRight : geometry.yLeft;
-                    return <circle key={s.id} cx={geometry.x(cursorPoint.t)} cy={y(v)} r={3.2} fill={s.color} stroke="var(--surface)" strokeWidth={1.2} />;
+                    const band = bandFor(s.axis);
+                    if (v === null || !band) return null;
+                    /* 점은 지름 8px, 바탕색 2px 테두리 — 선 위에 겹쳐도 묻히지 않는다 */
+                    return (
+                      <circle
+                        key={s.id}
+                        cx={geometry.x(cursorPoint.t)}
+                        cy={band.y(v)}
+                        r={4}
+                        fill={s.color}
+                        stroke="var(--surface)"
+                        strokeWidth={2}
+                      />
+                    );
                   })}
                 </g>
               ) : null}

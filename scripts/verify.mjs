@@ -1592,6 +1592,58 @@ async function main() {
     check('결측 배지가 사유를 품고 있음', /size="xs" title=\{c\.missingReason/.test(fngPage));
   }
 
+  /* ---------------- 8-20. 그림이 읽히는가 ---------------- */
+  console.log('\n[8-20] 그래프 — 눈금을 겹치지 않는가, 글자가 읽히는가');
+  {
+    /*
+     * 두 가지를 재서 고쳤다.
+     *
+     * ① 한 그림에 눈금이 둘이었다.
+     *    심리 점수(0~100)를 왼쪽 축에, S&P 500 가격을 오른쪽 축에 놓고 겹쳐 그렸다.
+     *    두 축을 맞추는 기준이 임의라서, 눈금을 어디에 두느냐에 따라 없던 상관관계가
+     *    보이거나 사라진다. 시간축만 공유하고 위아래 두 칸으로 나눴다.
+     *    덤으로 심리 점수 눈금이 -5.9 ~ 103.8 이던 것도 0~100 으로 못박았다.
+     *
+     * ② 차트 안 글자가 화면에서 제일 작았다.
+     *    본문을 11.5~12.5px 로 올린 뒤에도 축 눈금은 raw 7.5~9px 이라 화면에서
+     *    9~10.8px 로 찍혔다. 11px 로 올려 10.6~11.9px 이 됐다.
+     */
+    const chart2 = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const fngPage2 = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const assetPage = await readFile('src/app/asset/[id]/page.tsx', 'utf8');
+    const tpl9 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 눈금을 겹치지 않는다 */
+    check('한 그림에 두 눈금을 겹치지 않음', /const splitAxes =/.test(chart2) && !/yRight/.test(chart2));
+    check('시간축은 공유하고 칸만 나눔', /bands: \[/.test(chart2) && /plotBottom/.test(chart2));
+    check('나눈 만큼 그림이 높아짐', /SPLIT_EXTRA/.test(chart2) && /height: boxH/.test(chart2));
+    check('오른쪽 축 눈금값이 사라짐', !/innerW \+ 6/.test(chart2));
+    check('어느 칸이 무엇인지 칸 안에 적음', /geometry\.split \? \(\s*<text/.test(chart2));
+    check('나눈 뒤에는 선을 끊어 그리지 않음', /!geometry\.split && s\.dashed/.test(chart2));
+    check('심리 점수 눈금을 0~100 으로 못박음', /fixed0to100: true/.test(fngPage2));
+    check('설명도 좌·우축이 아니라 위·아래 칸으로 고침',
+      !/좌축은/.test(fngPage2) && !/우축은/.test(assetPage) && /아래 칸은/.test(assetPage));
+    check('미리보기도 칸을 나눔', /const splitAxes =/.test(tpl9) && /c\.bands/.test(tpl9));
+    check('미리보기 상자도 그만큼 커짐', /splitNow \? SPLIT_EXTRA : 0/.test(tpl9));
+    check('미리보기도 0~100 으로 못박음', /fixed: true,/.test(tpl9));
+
+    /* ② 그림 안 글자 */
+    const rawSizes = [];
+    for (const f of await listFiles('src/components', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/fontSize=\{?"?(\d+(?:\.\d+)?)"?\}?/g)) rawSizes.push({ f, v: Number(m[1]) });
+    }
+    const tiny = rawSizes.filter((x) => x.v < 9.5);
+    check('그림 안에 9.5px 보다 작은 글자가 없음', tiny.length === 0,
+      tiny.length ? `${tiny.length}곳 (예: ${tiny[0].f} ${tiny[0].v})` : `${rawSizes.length}곳 검사`);
+    check('축 눈금 크기를 한 곳에서 정함', /const TICK_FONT = 11;/.test(chart2));
+    check('미리보기도 같은 크기를 씀', /TICK_FONT = 11/.test(tpl9));
+
+    /* ③ 마크 — 크로스헤어 점은 지름 8px + 바탕 테두리 2px */
+    check('크로스헤어 점이 8px', /r=\{4\}[\s\S]{0,120}strokeWidth=\{2\}/.test(chart2));
+    check('미리보기 점도 같음', /r="4" fill="' \+ s\.color \+ '" stroke="var\(--surface\)" stroke-width="2"/.test(tpl9));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

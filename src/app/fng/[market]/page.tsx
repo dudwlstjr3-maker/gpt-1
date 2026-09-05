@@ -125,6 +125,9 @@ export default function FngDetailPage() {
         color: 'var(--accent)',
         axis: 'left',
         precision: 1,
+        // 0~100 로 못박는다. 자동 눈금은 값 범위에 맞춰 -5.9 나 103.8 같은
+        // 있을 수 없는 눈금을 그려서, 점수가 무엇인지 모르게 만든다.
+        fixed0to100: true,
         // 긴 구간에서 면을 채우면 급락 구간이 통짜 막대처럼 보여 선의 형태가 묻힌다
         area: !smooth,
       },
@@ -291,8 +294,10 @@ export default function FngDetailPage() {
             focusT={focusT}
           />
           <p className="mt-2 text-[11.5px] break-keep text-subtle">
-            좌축은 0~100 심리 점수, 우축은 {detail.benchmark?.name ?? '대표 지수'} 가격입니다. 점수가 산출되지 않은 날은
-            선이 이어지지 않습니다.
+            {detail.benchmark
+              ? `위 칸은 0~100 심리 점수, 아래 칸은 ${detail.benchmark.name} 가격입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다 — 한 눈금에 겹쳐 그리면 눈금을 어디에 두느냐에 따라 없던 상관관계가 보입니다.`
+              : '세로축은 0~100 심리 점수입니다.'}{' '}
+            점수가 산출되지 않은 날은 선이 이어지지 않습니다.
             {chartMarkers.length > 0
               ? ` 세로 점선은 과거 사건 ${chartMarkers.length}건이며, 번호는 아래 목록과 같습니다.`
               : ' 기간을 10년으로 바꾸면 과거 위기 시점이 표시됩니다.'}

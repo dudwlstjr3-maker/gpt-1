@@ -212,7 +212,7 @@ export function BasicTrend({
               stroke="var(--border)"
               strokeWidth="1"
             />
-            <text x={GUTTER_L - 6} y={g.y + 3.2} fontSize="9" fill="var(--subtle-fg)" textAnchor="end">
+            <text x={GUTTER_L - 6} y={g.y + 3.2} fontSize="10" fill="var(--subtle-fg)" textAnchor="end">
               {fmt(g.v)}
             </text>
           </g>
@@ -273,7 +273,7 @@ export function BasicTrend({
             <text
               x={VIEW_W - GUTTER_R + 6}
               y={endY[i] + 3.2}
-              fontSize="9.5"
+              fontSize="10.5"
               fontWeight={e.mine ? 700 : 400}
               fill={e.mine ? 'var(--accent)' : 'var(--subtle-fg)'}
             >
@@ -283,10 +283,10 @@ export function BasicTrend({
         ))}
 
         {/* 양 끝 연도 */}
-        <text x={GUTTER_L} y={height - 1} fontSize="9" fill="var(--subtle-fg)">
+        <text x={GUTTER_L} y={height - 1} fontSize="10" fill="var(--subtle-fg)">
           {yearOf(t0)}
         </text>
-        <text x={VIEW_W - GUTTER_R} y={height - 1} fontSize="9" fill="var(--subtle-fg)" textAnchor="end">
+        <text x={VIEW_W - GUTTER_R} y={height - 1} fontSize="10" fill="var(--subtle-fg)" textAnchor="end">
           {yearOf(t1)}
         </text>
       </svg>

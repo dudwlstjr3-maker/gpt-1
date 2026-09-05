@@ -262,7 +262,8 @@ export default function AssetPage() {
           />
           {overlay ? (
             <p className="mt-2 text-[11.5px] break-keep text-subtle">
-              우축은 0~100 심리 점수입니다. 심리 점수는 일 단위로 산출되므로 1일·1주 구간에서는 표본이 적을 수 있습니다.
+              아래 칸은 0~100 심리 점수입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다. 심리
+              점수는 일 단위로 산출되므로 1일·1주 구간에서는 표본이 적을 수 있습니다.
             </p>
           ) : null}
         </div>

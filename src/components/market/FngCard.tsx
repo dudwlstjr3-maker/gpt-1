@@ -94,16 +94,23 @@ export function FngCard({
         <ModeBadge mode={mode} size="xs" />
       </div>
 
-      {/* 신뢰도는 높을 때 말하지 않는다. 늘 붙어 있으면 배지가 아니라 장식이 된다.
-          문제가 있을 때만 뜨게 해 두면 그때 눈에 걸린다. */}
+      {/*
+       * 신뢰도는 **늘** 적는다.
+       *
+       * 예전에는 '높음' 일 때 숨겼다. 배지를 장식으로 만들지 않으려는 뜻이었는데,
+       * 값이 나빠지는 순간 배지가 새로 생기면서 이 줄이 한 줄에서 두 줄이 됐다.
+       * 390px 에서 재 보니 카드가 362px 에서 409px 로 커졌고, 아래 화면 전체가
+       * 47px 밀렸다. 30초마다 갱신되는 화면에서 그건 읽는 사람 손 밑이 흔들리는 것이다.
+       *
+       * 그래서 자리는 고정하고 **말만 바꾼다** — 높음이면 조용한 색, 낮으면 경고 색.
+       * 눈에 걸리게 하는 일은 '있다/없다' 가 아니라 색과 기호가 한다.
+       */}
       <div className="mt-1.5 mb-2 flex flex-wrap items-center gap-1">
         <CyclePhaseBadge cycle={score.cycle} />
-        {score.confidence !== 'high' ? (
-          <Badge tone={score.confidence === 'medium' ? 'neutral' : 'warn'} size="xs" title={score.confidenceReason}>
-            <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
-            신뢰도 {CONFIDENCE_LABEL[score.confidence]}
-          </Badge>
-        ) : null}
+        <Badge tone={score.confidence === 'low' ? 'warn' : 'neutral'} size="xs" title={score.confidenceReason}>
+          <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
+          신뢰도 {CONFIDENCE_LABEL[score.confidence]}
+        </Badge>
       </div>
 
       <div className="flex flex-col items-center">
@@ -163,13 +170,17 @@ export function FngCard({
           심리 상세 →
         </Link>
       </div>
-      {/* 갱신 시각은 상태바가 늘 들고 있다. 여기서는 충족률이 온전하지 않을 때만 말한다 —
-          100% 라고 매번 적어 두면 정작 90% 로 떨어진 날을 놓친다. */}
-      {score.coverage < 0.999 ? (
-        <p className="mt-1.5 text-[11.5px] text-subtle">
-          산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
-        </p>
-      ) : null}
+      {/*
+       * 산출 시각과 충족률도 늘 적는다. 위 배지와 같은 이유다 —
+       * 온전하지 않을 때만 나타나게 두면 그때마다 카드 바닥이 19px 씩 자란다.
+       * 대신 100% 가 아니면 색으로 표시해서, 90% 로 떨어진 날을 놓치지 않게 한다.
+       */}
+      <p
+        className="mt-1.5 text-[11.5px]"
+        style={{ color: score.coverage < 0.999 ? 'var(--warn)' : 'var(--subtle-fg)' }}
+      >
+        산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
+      </p>
     </article>
   );
 }

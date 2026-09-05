@@ -97,7 +97,47 @@ export function BasicTrend({
     .filter((s) => s.points.length >= 2);
 
   const mine = clean.find((s) => s.label === HIGHLIGHT) ?? clean[0];
-  if (!mine || mine.points.length < 2) return null;
+  /*
+   * 못 그릴 때도 이 블록의 크기는 그대로 둔다.
+   *
+   * 예전에는 null 을 돌려줘서 블록이 통째로 사라졌다. 값을 못 받은 날 카드가
+   * 517px 에서 377px 로 줄고, 아래 카드가 전부 위로 딸려 올라왔다. 30초마다
+   * 갱신되는 화면에서 그러면 읽던 자리를 잃는다.
+   *
+   * 그림 자리와 아래 '표로 보기' 줄까지 같은 크기로 두고 왜 못 그리는지 적는다.
+   * 빈 칸이 아니라 답이 있는 자리가 된다.
+   */
+  if (!mine || mine.points.length < 2) {
+    return (
+      <div className="max-w-[430px]">
+        {/*
+         * 크기는 진짜 그림과 같은 자로 잰다 — 같은 viewBox 를 가진 빈 svg 를 세운다.
+         * 테두리는 outline 으로 그린다. border 로 그리면 그 2px 만큼 svg 가 좁아져
+         * 높이가 2px 어긋난다 (outline 은 자리를 차지하지 않는다).
+         */}
+        <div
+          className="relative w-full rounded-md outline-1 outline-offset-[-1px] outline-dashed outline-[var(--border)]"
+          role="status"
+        >
+          <svg viewBox={`0 0 ${VIEW_W} ${height}`} className="block h-auto w-full" aria-hidden="true" />
+          <p className="absolute inset-0 flex items-center justify-center px-3 text-center text-[11.5px] leading-relaxed break-keep text-subtle">
+            <span>
+              지나온 값을 받지 못해 선을 그리지 않습니다.
+              <br />
+              빈 값을 임의로 채우지 않습니다.
+            </span>
+          </p>
+        </div>
+        {/* '표로 보기' 줄이 있던 자리. 같은 버튼을 그대로 두고 안 보이게만 한다 —
+            div 로 흉내 내면 버튼과 줄 높이가 6px 달라 그만큼 어긋난다. */}
+        <div className="mt-0.5 text-right">
+          <button type="button" disabled aria-hidden="true" tabIndex={-1} className="invisible text-[11.5px] font-semibold">
+            표로 보기
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const all = clean.flatMap((s) => s.points);
   const [t0, t1] = extent(all.map((p) => p.t));

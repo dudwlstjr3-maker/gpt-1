@@ -414,16 +414,17 @@ export default function FngDetailPage() {
                           </Badge>
                         ) : null}
                         {!c.available ? (
-                          <Badge tone="warn" size="xs">
+                          <Badge tone="warn" size="xs" title={c.missingReason ?? '값을 받지 못했습니다.'}>
                             결측
                           </Badge>
                         ) : null}
                       </div>
-                      {!c.available && c.missingReason ? (
-                        <p className="mt-0.5 text-[11.5px] break-keep" style={{ color: 'var(--warn)' }}>
-                          {c.missingReason}
-                        </p>
-                      ) : null}
+                      {/*
+                       * 결측 사유는 여기 적지 않고 펼친 자리로 내렸다.
+                       * 여기 적으면 결측이 생기는 순간 이 줄만 63px 에서 84px 로 자라
+                       * 목록 전체가 밀린다. 사유는 눌러서 보는 쪽이 맞고, 무엇이 빠졌는지는
+                       * 옆의 '결측' 배지가 이미 말한다.
+                       */}
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="tnum text-[15px] font-bold" style={{ color: scoreColor(c.score) }}>
@@ -440,6 +441,13 @@ export default function FngDetailPage() {
 
                   {open ? (
                     <div className="border-t border-border bg-surface-2 px-3 py-2.5">
+                      {/* 목록 줄에서 내려온 결측 사유. 여기서는 줄이 늘어도 목록이 밀리지 않는다. */}
+                      {!c.available && c.missingReason ? (
+                        <p className="mb-2 text-[12.5px] leading-relaxed break-keep" style={{ color: 'var(--warn)' }}>
+                          <span aria-hidden="true">△ </span>
+                          {c.missingReason}
+                        </p>
+                      ) : null}
                       <p className="text-[12.5px] leading-relaxed break-keep text-muted">{c.description}</p>
 
                       <div className="scroll-x mt-2 rounded-lg border border-border bg-surface">

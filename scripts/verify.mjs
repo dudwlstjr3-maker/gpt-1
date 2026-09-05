@@ -1529,6 +1529,69 @@ async function main() {
       /min-w-0 text-right break-words/.test(more) && /tnum min-w-0 text-right/.test(more));
   }
 
+  /* ---------------- 8-19. 값이 나빠져도 틀이 흔들리지 않는가 ---------------- */
+  console.log('\n[8-19] 데이터가 나빠질 때 화면이 흔들리지 않는가');
+  {
+    /*
+     * 사용자가 짚은 문제: "정상 / 부분 실패 사이를 오갈 때 미국 투자심리가
+     * 위아래로 흔들린다. 안 흔들리게 틀을 딱 잡아라."
+     *
+     * 재 보니 화면 열한 곳이 전부 밀리고 있었다. 원인은 하나였다 —
+     * **값이 나빠질 때만 나타나는 요소들**. 나타나는 순간 그 줄이 두 줄이 되거나
+     * 블록이 통째로 생기고 사라져서, 30초마다 갱신되는 화면이 읽는 사람 손 밑에서
+     * 움직였다.
+     *
+     *   상태바 배지가 늘어 줄바꿈       → 모든 화면 +23px (sticky 머리말이라 전부)
+     *   새로고침 단추가 눌려 두 줄      → 머리말 31px → 50px (미리보기)
+     *   세션 칩 뼈대가 진짜보다 5px 작음 → 값이 들어오는 순간 +5px
+     *   신뢰도 배지가 새로 생김         → 심리 카드 362px → 409px
+     *   산출·충족률 줄이 새로 생김      → 카드 바닥 +19px
+     *   결측 사유 줄이 생김             → 구성요소 줄 63px → 84px
+     *   그림 블록이 통째로 사라짐        → 생활 카드 517px → 377px
+     *   시세 값·거래량 줄이 사라짐       → 시세 카드 135px → 106px
+     *
+     * 규칙 하나로 고쳤다 — **자리는 고정하고 말만 바꾼다.**
+     * 지금은 정상 → 부분 실패에서 열한 화면 중 열 곳이 0px, 한 곳이 1px 이다.
+     */
+    const card = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    const bar = await readFile('src/components/market/StatusBar.tsx', 'utf8');
+    const trend2 = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const price2 = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    const fngPage = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const tpl8 = await readFile('tools/preview/template.html', 'utf8');
+    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+
+    /* ① 심리 카드 — 배지와 바닥 줄을 늘 그린다 */
+    check('신뢰도 배지를 늘 그림', !/confidence !== 'high' \?/.test(strip(card)));
+    check('신뢰도는 색으로만 구분함', /confidence === 'low' \? 'warn' : 'neutral'/.test(card));
+    check('산출·충족률 줄을 늘 그림', !/coverage < 0\.999 \? \(/.test(strip(card)));
+    check('충족률이 모자라면 색으로 표시함', /coverage < 0\.999 \? 'var\(--warn\)'/.test(card));
+
+    /* ② 상태바 — sticky 라서 여기가 자라면 전 화면이 밀린다 */
+    check('상태 줄이 줄바꿈하지 않음', /flex-nowrap/.test(bar) && !/flex-wrap items-center gap-x-2/.test(bar));
+    check('시계가 눌리지 않음', /tnum shrink-0 text-sm/.test(bar));
+    check('시나리오 배지를 가로로 밀리는 줄로 내림',
+      bar.indexOf('scroll-x mt-2') < bar.indexOf('시나리오: {snapshot.scenario}'));
+    check('세션 칩 뼈대가 진짜 칩과 같은 높이', /h-\[29px\] w-24 shrink-0 skeleton/.test(bar));
+    check('미리보기 상태 줄도 한 줄로 못박음', /\.sb-badges \{ display: flex; flex-wrap: nowrap/.test(tpl8));
+    check('미리보기 새로고침 단추가 눌리지 않음', /\.sb-row > \.ghost \{ flex-shrink: 0; white-space: nowrap; \}/.test(tpl8));
+
+    /* ③ 못 그리는 그림도 자리를 지킨다 */
+    check('선을 못 그려도 블록이 사라지지 않음', !/if \(!mine \|\| mine\.points\.length < 2\) return null/.test(trend2));
+    check('빈 자리를 같은 viewBox 로 재서 크기를 맞춤', /viewBox=\{`0 0 \$\{VIEW_W\} \$\{height\}`\} className="block h-auto w-full"/.test(trend2));
+    check("'표로 보기' 줄도 같은 단추로 자리를 지킴", /invisible text-\[11\.5px\] font-semibold/.test(trend2));
+    check('미리보기도 같은 방식으로 빈 자리를 잼', /outline:1px dashed var\(--border\);outline-offset:-1px/.test(tpl8));
+
+    /* ④ 값을 못 받은 시세 카드 */
+    check('값을 못 받아도 시세 카드가 같은 자리를 차지함', /minHeight: 64/.test(price2));
+    check('미리보기 시세 카드도 같음', /min-height:64px;display:flex;align-items:center/.test(tpl8));
+
+    /* ⑤ 결측 사유는 목록 줄이 아니라 펼친 자리에 */
+    check('결측 사유가 목록 줄을 늘리지 않음', !/\{!c\.available && c\.missingReason \? \(\s*<p className="mt-0\.5/.test(fngPage));
+    check('결측 사유는 펼친 자리에 남아 있음', /!c\.available && c\.missingReason/.test(fngPage) && /mb-2 text-\[12\.5px\]/.test(fngPage));
+    check('결측 배지가 사유를 품고 있음', /size="xs" title=\{c\.missingReason/.test(fngPage));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

@@ -223,12 +223,13 @@ function BasicCard({ item }: { item: EconomyBasic }) {
        * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
        * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다. 숫자 옆에 끼워 두었을
        * 때는 230px 밖에 안 되어 눈금 글씨가 뭉갰는데, 이제 두 배 가까이 넓다.
+       *
+       * 값을 못 받아 선을 못 그리는 날에도 블록은 같은 크기로 남는다 —
+       * 그 처리는 BasicTrend 가 한다.
        */}
-      {trend.length > 0 ? (
-        <div className="mt-2 border-t border-border pt-2">
-          <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
-        </div>
-      ) : null}
+      <div className="mt-2 border-t border-border pt-2">
+        <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
+      </div>
 
       <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-fg">{item.reading}</p>
 

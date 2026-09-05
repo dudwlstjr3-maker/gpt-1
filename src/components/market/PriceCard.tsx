@@ -61,8 +61,16 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
         </div>
       </div>
 
+      {/*
+       * 값을 못 받아도 카드가 차지하는 자리는 그대로 둔다.
+       * 값 줄(41px)과 거래량 줄(17px)이 통째로 빠지면 카드가 135px 에서 106px 로 줄어
+       * 아래 카드들이 위로 딸려 올라온다. 목록에서 한 종목만 실패해도 화면이 흔들린다.
+       */}
       {unavailable ? (
-        <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)' }}>
+        <div
+          className="mt-2 flex items-center rounded-lg px-2.5 py-2"
+          style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)', minHeight: 64 }}
+        >
           <p className="text-[12.5px] break-keep" style={{ color: 'var(--warn)' }}>
             {quote.unavailableReason ?? '값을 받지 못했습니다.'}
           </p>

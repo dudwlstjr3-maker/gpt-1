@@ -30,7 +30,7 @@ function Clock() {
     return () => window.clearInterval(t);
   }, []);
   return (
-    <span className="tnum text-sm font-semibold text-fg-strong" aria-live="off">
+    <span className="tnum shrink-0 text-sm font-semibold text-fg-strong" aria-live="off">
       {now ? formatKstTimeSec(now) : '--:--:--'}
       <span className="ml-1 text-[11.5px] font-normal text-muted">KST</span>
     </span>
@@ -80,14 +80,19 @@ export function StatusBar() {
       <div className="mx-auto w-full max-w-6xl px-3 py-2">
         {/* 1행: 시각 + 상태 배지 */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {/*
+           * 한 줄로 못박는다 (flex-wrap 아님).
+           *
+           * 배지는 상태에 따라 생겼다 없어진다 — '오류 2', '오래된 데이터 3',
+           * DEMO 의 '시나리오: partial'. 줄바꿈을 허용해 두었더니 배지 하나가 늘 때마다
+           * 이 줄이 25px 에서 52px 이 됐고, 이 머리말은 sticky 라서 **모든 화면이**
+           * 23px 씩 통째로 밀렸다. 30초마다 갱신되는 화면에서 그건 못 쓸 일이다.
+           *
+           * 자리가 모자라면 제일 덜 급한 '몇 분 전 갱신' 이 줄어든다 — 배지는 안 밀린다.
+           */}
+          <div className="flex min-w-0 flex-nowrap items-center gap-x-2 overflow-hidden">
             <Clock />
             {snapshot ? <ModeBadge mode={snapshot.mode} /> : null}
-            {snapshot?.scenario && snapshot.scenario !== 'normal' ? (
-              <Badge tone="warn" size="xs">
-                시나리오: {snapshot.scenario}
-              </Badge>
-            ) : null}
             {errorSections > 0 ? (
               <Badge tone="danger" size="xs">
                 오류 {errorSections}
@@ -101,8 +106,11 @@ export function StatusBar() {
                 정상
               </Badge>
             ) : null}
-            {/* 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다. */}
-            <span className="tnum truncate text-[12.5px] text-subtle">
+            {/* 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다.
+                좁은 화면(380px 미만)에서는 아예 감춘다 — 한 글자만 남기고 자르면
+                '방' 같은 토막이 되어 오히려 읽는 데 방해가 된다. 이 값은 상태바가
+                아니어도 각 카드의 기준 시각에서 확인할 수 있다. */}
+            <span className="tnum hidden min-w-0 truncate text-[12.5px] text-subtle min-[380px]:inline">
               {snapshot ? formatRelative(snapshot.lastFullUpdate) : '—'} 갱신
             </span>
           </div>
@@ -120,12 +128,20 @@ export function StatusBar() {
           </button>
         </div>
 
-        {/* 2행: 세션 칩 */}
+        {/* 2행: 세션 칩. DEMO 시나리오 배지도 여기 둔다 — 위 줄은 높이가 고정이어야 하고,
+            이 줄은 가로로 밀리는 줄이라 무엇이 늘어도 화면이 흔들리지 않는다. */}
         <div className="scroll-x mt-2 flex items-center gap-1.5 pb-0.5">
+          {snapshot?.scenario && snapshot.scenario !== 'normal' ? (
+            <Badge tone="warn" size="xs">
+              시나리오: {snapshot.scenario}
+            </Badge>
+          ) : null}
           {sessions.length > 0
             ? sessions.map((s) => <SessionChip key={s.market} session={s} />)
-            : ['us', 'kr', 'crypto'].map((m) => (
-                <div key={m} className="h-6 w-24 shrink-0 skeleton" />
+            : /* 뼈대는 진짜 칩과 같은 29px 이어야 한다. 24px 로 두었더니 값이 들어오는
+                 순간 sticky 머리말이 5px 자라 화면 전체가 그만큼 밀렸다. */
+              ['us', 'kr', 'crypto'].map((m) => (
+                <div key={m} className="h-[29px] w-24 shrink-0 skeleton" />
               ))}
         </div>
 

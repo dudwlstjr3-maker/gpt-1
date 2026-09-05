@@ -11,7 +11,9 @@
     "icons": "node scripts/generate-icons.mjs",
     "verify": "node scripts/verify.mjs",
     "preview": "node tools/preview/build.mjs",
-    "check:live": "node scripts/check-live.mjs"
+    "check:live": "node scripts/check-live.mjs",
+    "live:stub": "node scripts/live-stub.mjs",
+    "check:parse": "node scripts/check-parse.mjs"
   },
   "dependencies": {
     "next": "15.5.24",

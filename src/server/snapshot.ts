@@ -229,7 +229,13 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
       return { data: scores, meta, notes: c.messages() };
     },
     now,
-    (d) => d.length === 0,
+    /*
+     * 카드가 서 있어도 **점수가 하나도 없으면 빈 섹션**이다.
+     * 예전에는 배열 길이만 봤더니, 제공사가 전부 막혀 두 카드가 다 '산출 불가' 인데도
+     * 섹션 배지는 초록불(ok)이었다. 카드가 산출 불가라고 말하는 위에서 배지가
+     * 정상이라고 말하면 둘 중 하나는 거짓말이다.
+     */
+    (d) => d.length === 0 || d.every((f) => f.score === null),
   );
 
   /* -------- 투자자 수급 -------- */

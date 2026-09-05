@@ -1197,6 +1197,80 @@ async function main() {
     check('미리보기 배지도 작게', tpl2.includes("size === '2xs'"));
   }
 
+
+  /* ---------------- 8-13. LIVE 로 켜지는 조건 ---------------- */
+  console.log('\n[8-13] LIVE 로 켜지는 조건');
+  {
+    /*
+     * 여기서 잡으려는 것은 딱 하나다 — **켜지지 않는 이유가 거짓말이 아닐 것.**
+     *
+     * 예전에는 키 네 개(US·KR·CRYPTO·MACRO)를 다 요구했는데 코드가 실제로 읽는 건
+     * MACRO 하나뿐이었다. 그래서 FRED 무료 키를 제대로 넣어도 DEMO 에 머물렀고,
+     * 쓰지도 않는 변수 세 개에 아무 값이나 채워야 켜졌다.
+     * 필수 키 목록과 코드가 읽는 키가 어긋나면 여기서 걸린다.
+     */
+    const cfg = await readFile('src/server/config.ts', 'utf8');
+    const liveSrc = await Promise.all(
+      ['index.ts', 'crypto.ts', 'macro.ts', 'basics.ts', 'equities.ts'].map((f) =>
+        readFile(`src/server/adapters/live/${f}`, 'utf8').catch(() => '')),
+    );
+    const live = liveSrc.join('\n');
+
+    const required = [...(cfg.match(/REQUIRED_KEYS = \[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+    check('필수 키를 한곳에 모아 둠', required.length > 0, required.join(', ') || '없음');
+
+    // getKeys() 의 어떤 항목을 LIVE 어댑터가 실제로 읽는가
+    const readByCode = new Set();
+    for (const m of live.matchAll(/getKeys\(\)\.(\w+)/g)) readByCode.add(m[1]);
+    const ENV_OF = { usMarket: 'US_MARKET_API_KEY', krMarket: 'KR_MARKET_API_KEY', crypto: 'CRYPTO_API_KEY', macro: 'MACRO_API_KEY' };
+
+    // 코드가 없으면 못 도는 키(= 없으면 에러를 던지는 키)만 필수여야 한다
+    check('필수 키는 코드가 실제로 읽는 것뿐',
+      required.every((k) => [...readByCode].some((r) => ENV_OF[r] === k)),
+      `필수 ${required.join(',')} / 코드가 읽는 것 ${[...readByCode].map((r) => ENV_OF[r]).join(',')}`);
+
+    // 코드가 안 읽는 키를 요구하면 켜지지 않는 이유가 거짓이 된다
+    const unused = Object.values(ENV_OF).filter((e) => ![...readByCode].some((r) => ENV_OF[r] === e));
+    check('코드가 안 읽는 키를 필수로 요구하지 않음',
+      unused.every((e) => !required.includes(e)),
+      `안 읽는 키: ${unused.join(', ') || '없음'}`);
+
+    check('없어도 되는 키는 따로 두고 이유를 적음', /OPTIONAL_KEYS/.test(cfg) && /why:/.test(cfg));
+    check('DEMO 로 떨어질 때 어떻게 켜는지 알려 줌', /fred\.stlouisfed\.org\/docs\/api\/api_key/.test(cfg));
+
+    // 제공사 주소는 전부 갈아 끼울 수 있어야 대역 서버·사내 미러를 붙일 수 있다
+    const eq = await readFile('src/server/adapters/live/equities.ts', 'utf8');
+    check('Cboe 주소도 환경변수로 바꿀 수 있음', /envUrl\('CBOE_CSV_URL'\)/.test(eq));
+    const envExample = await readFile('.env.example', 'utf8');
+    for (const v of ['MACRO_BASE_URL', 'US_MARKET_BASE_URL', 'CRYPTO_BASE_URL', 'CBOE_CSV_URL']) {
+      check(`.env.example 에 ${v} 가 있음`, envExample.includes(v));
+    }
+
+    /* 산출 못 한 것을 정상이라고 말하지 않는가 */
+    const snapSrc = await readFile('src/server/snapshot.ts', 'utf8');
+    check('점수가 하나도 없으면 심리 섹션을 비었다고 표시',
+      /d\.every\(\(f\) => f\.score === null\)/.test(snapSrc));
+    const sumSrc = await readFile('src/server/summary.ts', 'utf8');
+    check('근거 줄만 남으면 요약도 근거 부족으로 표시',
+      /shown\.every\(\(l\) => l\.kind === 'insufficient'\)/.test(sumSrc));
+
+    /* LIVE 파싱을 키 없이 확인할 길이 있는가 */
+    check('LIVE 파싱 점검 스크립트가 있음', existsSync('scripts/check-parse.mjs') && existsSync('scripts/live-stub.mjs'));
+    const stub = await readFile('scripts/live-stub.mjs', 'utf8');
+    check('대역 서버가 제공사가 아니라고 밝힘', /제공사가 아니다/.test(stub) && /전부 가짜/.test(stub));
+    const parse = await readFile('scripts/check-parse.mjs', 'utf8');
+    check('무엇을 확인 못 하는지도 밝힘', /확인하지 못한다/.test(parse) && /check:live/.test(parse));
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    check('npm 스크립트로 돌릴 수 있음', !!pkg.scripts['check:parse'] && !!pkg.scripts['live:stub']);
+
+    /* 무료 소스 커버리지를 실제 값으로 적어 두었는가 */
+    const readme = await readFile('README.md', 'utf8');
+    check('무료 소스 커버리지를 실제 측정값으로 적음',
+      readme.includes('**71%**') && readme.includes('**63%**') && readme.includes('실제로 돌려서 잰 값'));
+    check('크립토가 문턱을 못 넘는다는 사실을 숨기지 않음',
+      /크립토 \| \*\*63%\*\* \| ❌ 산출 불가/.test(readme));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

@@ -12,7 +12,7 @@
  *  - 제공사 약관에 따라 실시간 재배포가 금지된 경우 delayMinutes 를 정확히 표기한다.
  */
 
-import { getKeys } from '@/server/config';
+import { envUrl, getKeys } from '@/server/config';
 import { AdapterNotConfiguredError, SeriesUnavailableError, fetchJson } from '@/server/http';
 import { catalogFor } from '@/lib/catalog';
 import { buildCryptoFngInput } from './crypto';
@@ -121,11 +121,6 @@ function meta(asOf: string, fetchedAt: string, source: DataSource, notes?: strin
     sources: [source],
     ...(notes && notes.length ? { notes } : {}),
   };
-}
-
-function envUrl(name: string): string | null {
-  const v = process.env[name];
-  return v && v.trim() !== '' ? v.trim() : null;
 }
 
 /* ------------------------------------------------------------------ */

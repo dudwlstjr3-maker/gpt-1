@@ -118,9 +118,15 @@ export function buildSummary(
     });
   }
 
+  /*
+   * 근거 줄만 남았으면 그것도 '근거 부족' 이다.
+   * 사실도 해석도 못 적고 "무엇이 없다" 는 말만 셋 남았는데 insufficient 가 false 면,
+   * 화면은 정상인 요약처럼 보여 준다. 남은 줄의 성격으로 판정한다.
+   */
+  const shown = lines.slice(0, 3);
   return {
-    lines: lines.slice(0, 3),
+    lines: shown,
     generatedAt: now.toISOString(),
-    insufficient: false,
+    insufficient: shown.every((l) => l.kind === 'insufficient'),
   };
 }

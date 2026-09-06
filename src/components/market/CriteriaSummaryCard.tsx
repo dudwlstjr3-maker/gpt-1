@@ -29,8 +29,8 @@ export function CriteriaSummaryCard() {
   }
 
   return (
-    <section className="mt-3 px-3" aria-labelledby="home-criteria-title">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
+    <section className="mt-5 px-3" aria-labelledby="home-criteria-title">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h3 id="home-criteria-title" className="text-[13px] font-bold text-fg-strong">
           내 기준
         </h3>
@@ -45,11 +45,11 @@ export function CriteriaSummaryCard() {
           description="무엇을 볼지 직접 정해 두면 지금 그 조건이 맞는지 여기서 바로 확인할 수 있습니다."
         />
       ) : (
-        <div className="card p-3.5">
+        <div className="card p-3">
           <p className="tnum text-[22px] leading-none font-bold text-fg-strong">
             {sum.total}개 중 {sum.met}개 맞음
           </p>
-          <p className="tnum mt-1.5 text-[12.5px] text-muted">
+          <p className="tnum mt-2 text-[12.5px] text-muted">
             아님 {sum.unmet}개{sum.unknown > 0 ? ` · 판정 불가 ${sum.unknown}개` : ''}
           </p>
           {/* 조건이 다 맞아도 신호가 아니라는 말은 요약 옆에 둔다. 아래로 밀면 안 읽힌다. */}

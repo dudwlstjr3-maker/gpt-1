@@ -101,7 +101,7 @@ export default function AlertsPage() {
     <div className="pt-2 pb-6">
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">알림</h1>
 
-      <section className="mt-3 px-3">
+      <section className="mt-5 px-3">
         <div className="card p-3">
           <Toggle
             checked={settings.alertsEnabled}
@@ -110,7 +110,7 @@ export default function AlertsPage() {
             description="데이터가 갱신될 때마다 규칙을 확인합니다. 앱이 열려 있을 때만 동작합니다."
           />
           {settings.alertsEnabled ? (
-            <div className="mt-2 border-t border-border pt-2.5">
+            <div className="mt-2 border-t border-border pt-2">
               {permission === 'unsupported' ? (
                 <Notice tone="neutral">이 브라우저는 시스템 알림을 지원하지 않습니다. 앱 내 알림만 표시됩니다.</Notice>
               ) : permission === 'granted' ? (
@@ -124,13 +124,13 @@ export default function AlertsPage() {
                 </Notice>
               ) : (
                 <div>
-                  <p className="mb-1.5 text-[12.5px] break-keep text-muted">
+                  <p className="mb-2 text-[12.5px] break-keep text-muted">
                     시스템 알림을 받으려면 권한이 필요합니다. 권한 요청은 이 버튼을 눌렀을 때만 발생합니다.
                   </p>
                   <button
                     type="button"
                     onClick={requestPermission}
-                    className="rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[13px] font-semibold text-fg"
+                    className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[13px] font-semibold text-fg"
                   >
                     알림 권한 요청
                   </button>
@@ -142,11 +142,11 @@ export default function AlertsPage() {
       </section>
 
       {/* 규칙 추가 */}
-      <section className="mt-4 px-3" aria-labelledby="alert-add-title">
-        <h2 id="alert-add-title" className="mb-1.5 text-[13px] font-bold text-muted">
+      <section className="mt-5 px-3" aria-labelledby="alert-add-title">
+        <h2 id="alert-add-title" className="mb-2 text-[13px] font-bold text-muted">
           알림 규칙 추가
         </h2>
-        <form onSubmit={submit} className="card space-y-2.5 p-3">
+        <form onSubmit={submit} className="card space-y-2 p-3">
           <label className="block">
             <span className="mb-1 block text-[12.5px] text-muted">알림 종류</span>
             <select
@@ -157,7 +157,7 @@ export default function AlertsPage() {
                 setTarget(RULE_META[t].needsTargetQuote ? (t === 'risk_spike' ? 'vix' : 'spx') : 'us');
                 setThreshold(t === 'calendar_reminder' ? '60' : t === 'fng_threshold' ? '25' : t === 'price_move' ? '3' : '');
               }}
-              className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-fg"
+              className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg"
             >
               {(Object.keys(RULE_META) as AlertRuleType[]).map((t) => (
                 <option key={t} value={t}>
@@ -176,7 +176,7 @@ export default function AlertsPage() {
               <select
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-fg"
+                className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg"
               >
                 {meta.needsTargetQuote
                   ? targetOptions.map((c) => (
@@ -204,7 +204,7 @@ export default function AlertsPage() {
                   value={threshold}
                   onChange={(e) => setThreshold(e.target.value)}
                   required
-                  className="tnum w-full rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-fg"
+                  className="tnum w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg"
                 />
               </label>
               {type === 'fng_threshold' || type === 'price_target' ? (
@@ -213,7 +213,7 @@ export default function AlertsPage() {
                   <select
                     value={direction}
                     onChange={(e) => setDirection(e.target.value as 'above' | 'below' | 'both')}
-                    className="w-full rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-fg"
+                    className="w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg"
                   >
                     <option value="above">이상일 때</option>
                     <option value="below">이하일 때</option>
@@ -232,7 +232,7 @@ export default function AlertsPage() {
               step={5}
               value={cooldown}
               onChange={(e) => setCooldown(e.target.value)}
-              className="tnum w-full rounded-lg border border-border bg-surface-2 px-2.5 py-2 text-[13px] text-fg"
+              className="tnum w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg"
             />
           </label>
 
@@ -247,8 +247,8 @@ export default function AlertsPage() {
       </section>
 
       {/* 규칙 목록 */}
-      <section className="mt-4 px-3" aria-labelledby="alert-rules-title">
-        <h2 id="alert-rules-title" className="mb-1.5 text-[13px] font-bold text-muted">
+      <section className="mt-5 px-3" aria-labelledby="alert-rules-title">
+        <h2 id="alert-rules-title" className="mb-2 text-[13px] font-bold text-muted">
           등록된 규칙 ({settings.alertRules.length})
         </h2>
         {settings.alertRules.length === 0 ? (
@@ -256,7 +256,7 @@ export default function AlertsPage() {
         ) : (
           <ul className="card divide-y divide-[var(--border)] overflow-hidden">
             {settings.alertRules.map((r) => (
-              <li key={r.id} className="flex items-center gap-2 px-3 py-2.5">
+              <li key={r.id} className="flex items-center gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold text-fg">{r.label}</p>
                   <p className="text-[11.5px] text-subtle">
@@ -289,13 +289,13 @@ export default function AlertsPage() {
       </section>
 
       {/* 발생 이력 */}
-      <section className="mt-4 px-3" aria-labelledby="alert-log-title">
-        <div className="mb-1.5 flex items-center justify-between gap-2">
+      <section className="mt-5 px-3" aria-labelledby="alert-log-title">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <h2 id="alert-log-title" className="text-[13px] font-bold text-muted">
             발생 이력
           </h2>
           {events.length > 0 ? (
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               <button type="button" onClick={markAllRead} className="text-[12.5px] font-semibold text-accent">
                 모두 읽음
               </button>
@@ -310,7 +310,7 @@ export default function AlertsPage() {
         ) : (
           <ul className="card divide-y divide-[var(--border)] overflow-hidden">
             {events.map((e) => (
-              <li key={e.id} className="px-3 py-2.5">
+              <li key={e.id} className="px-3 py-2">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-[13px] font-semibold text-fg">{e.title}</p>
                   <div className="flex shrink-0 items-center gap-1">

@@ -31,7 +31,7 @@ function OutcomeBar({ market }: { market: PredictionMarket }) {
   if (priced.length === 0) return null;
 
   return (
-    <ul className="mt-2 space-y-1.5">
+    <ul className="mt-2 space-y-2">
       {priced.map((o, i) => {
         const name = o.labelKo ?? o.label;
         const top = i === 0;
@@ -82,7 +82,7 @@ function MarketCard({ market }: { market: PredictionMarket }) {
         </p>
       ) : (
         <>
-          <div className="mt-2.5 flex items-end justify-between gap-2 border-t border-border pt-2.5">
+          <div className="mt-2 flex items-end justify-between gap-2 border-t border-border pt-2">
             <div className="min-w-0">
               <p className="tnum text-[24px] leading-none font-bold text-fg-strong">
                 {top?.price === null || top === null ? NO_VALUE : `${formatNumber(top.price, 0)}¢`}
@@ -103,7 +103,7 @@ function MarketCard({ market }: { market: PredictionMarket }) {
         </>
       )}
 
-      <p className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 text-[11.5px] text-subtle">
+      <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 text-[11.5px] text-subtle">
         <span className="tnum">
           24시간 거래 {market.volume24h === null ? NO_VALUE : `$${formatCompactEn(market.volume24h, 1)}`}
         </span>
@@ -154,7 +154,7 @@ export function PredictionSection() {
       >
         {(digest) => (
           <>
-            <div className="mb-2 flex items-center gap-1.5">
+            <div className="mb-2 flex items-center gap-2">
               <Badge tone="neutral" size="xs">
                 <span aria-hidden="true">◈</span>
                 {digest.venue}

@@ -18,7 +18,7 @@ export function Disclaimer() {
         ) : null}
       </div>
       <p className="mt-2 text-[13px] font-semibold text-fg">{DISCLAIMER_TEXT}</p>
-      <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
         {SELF_CALCULATED_NOTE} 지수·시세는 제공사 사정에 따라 지연될 수 있으며, 표시된 기준 시각을 확인하고 이용해 주세요.
         과거 수치가 미래 결과를 보장하지 않습니다.
         {snapshot ? ` 산식 버전 ${snapshot.formulaVersion}.` : ''}

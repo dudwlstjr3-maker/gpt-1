@@ -43,7 +43,7 @@ export function SegmentedControl<T extends string>({
             aria-label={o.srLabel}
             onClick={() => onChange(o.value)}
             className={`${full ? 'flex-1' : ''} rounded-md font-semibold transition-colors ${
-              size === 'xs' ? 'px-2 py-1 text-[12.5px]' : 'px-2.5 py-1.5 text-xs'
+              size === 'xs' ? 'px-2 py-1 text-[12.5px]' : 'px-2 py-2 text-xs'
             } ${active ? 'text-fg-strong' : 'text-muted hover:text-fg'}`}
             style={active ? { background: 'var(--surface-3)' } : undefined}
           >
@@ -77,7 +77,7 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(o.value)}
-            className={`relative px-3 py-2.5 text-sm font-semibold transition-colors ${
+            className={`relative px-3 py-2 text-sm font-semibold transition-colors ${
               active ? 'text-fg-strong' : 'text-muted hover:text-fg'
             }`}
           >
@@ -109,7 +109,7 @@ export function Toggle({
 }) {
   const id = useId();
   return (
-    <div className="flex items-start justify-between gap-3 py-2.5">
+    <div className="flex items-start justify-between gap-3 py-2">
       <div className="min-w-0">
         <label htmlFor={id} className="block text-sm font-medium text-fg">
           {label}

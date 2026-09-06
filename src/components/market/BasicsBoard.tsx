@@ -68,7 +68,7 @@ function Comparisons({
   const bars = sameScale && sameUnit && oneSided && magMax > 0 && spread <= 0.7;
 
   return (
-    <dl className="mt-2 space-y-1.5">
+    <dl className="mt-2 space-y-2">
       {items.map((c) => (
         <div key={c.label} className="grid grid-cols-[68px_1fr_auto] items-center gap-2">
           <dt className={`truncate text-[12.5px] ${c.primary ? 'font-semibold text-fg' : 'text-muted'}`}>{c.label}</dt>
@@ -95,7 +95,7 @@ function Comparisons({
       {/* 나라끼리 그대로 견주면 안 되는 지표는 그 이유를 표 바로 밑에 적는다.
           숫자를 나란히 놓는 순간 사람은 비교부터 하기 때문에, 경고가 표 아래에 있어야 한다. */}
       {note ? (
-        <p className="mt-1.5 border-t border-border pt-1.5 text-[11.5px] leading-relaxed break-keep text-subtle">
+        <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
           <span aria-hidden="true">※ </span>
           {note}
         </p>
@@ -134,7 +134,7 @@ function GuidePanel({
   ];
 
   return (
-    <div className="mt-2.5 border-t border-border pt-2.5">
+    <div className="mt-2 border-t border-border pt-2">
       <button
         type="button"
         onClick={onToggle}
@@ -145,11 +145,11 @@ function GuidePanel({
       </button>
 
       {open ? (
-        <div className="mt-2 rounded-lg bg-surface-2 px-2.5 py-2">
+        <div className="mt-2 rounded-lg bg-surface-2 px-2 py-2">
           <p className="text-[12.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
-          <dl className="mt-2 space-y-1.5 border-t border-border pt-2">
+          <dl className="mt-2 space-y-2 border-t border-border pt-2">
             {rows.map((r) => (
-              <div key={r.label} className="flex items-start gap-1.5">
+              <div key={r.label} className="flex items-start gap-2">
                 {/* 화살표는 값의 방향일 뿐이라 등락 색을 쓰지 않는다 */}
                 <span aria-hidden="true" className="mt-px w-3 shrink-0 text-center text-[11.5px] text-muted">
                   {r.glyph}
@@ -194,7 +194,7 @@ function BasicCard({ item }: { item: EconomyBasic }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-[14px] leading-snug font-bold break-keep text-fg-strong">{item.name}</h3>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-subtle">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-subtle">
             <span className="min-w-0 truncate">{item.englishName}</span>
             <Badge tone={item.official ? 'neutral' : 'warn'} size="2xs">
               <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
@@ -299,7 +299,7 @@ export function BasicsBoard() {
           section={section}
           onRetry={refresh}
           loading={
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {[0, 1, 2].map((i) => (
                 <SkeletonCard key={i} height={60} lines={3} />
               ))}
@@ -314,10 +314,10 @@ export function BasicsBoard() {
               <div className="space-y-4">
                 {groupList(list).map((g) => (
                   <section key={g.id} aria-labelledby={`basics-${g.id}`}>
-                    <div className="mb-1.5">
+                    <div className="mb-2">
                       <h2 id={`basics-${g.id}`} className="text-[13px] font-bold text-muted">
                         {g.label}
-                        <span className="tnum ml-1.5 font-normal text-subtle">{g.items.length}</span>
+                        <span className="tnum ml-2 font-normal text-subtle">{g.items.length}</span>
                       </h2>
                       {g.note ? (
                         <p className="mt-0.5 text-[11.5px] leading-relaxed break-keep text-subtle">{g.note}</p>
@@ -330,7 +330,7 @@ export function BasicsBoard() {
                      * 세 칸은 넣지 않는다 — 카드가 310px 밑으로 내려가면 이름과 값이
                      * 한 줄에 못 서고 그래프 눈금이 뭉갠다.
                      */}
-                    <ul className="grid gap-2.5 md:grid-cols-2">
+                    <ul className="grid gap-2 md:grid-cols-2">
                       {g.items.map((item) => (
                         <BasicCard key={item.id} item={item} />
                       ))}

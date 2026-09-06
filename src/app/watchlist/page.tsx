@@ -46,7 +46,7 @@ export default function WatchlistPage() {
             title="관심목록이 비어 있습니다"
             description="시장 화면에서 카드의 ☆ 를 눌러 추가하세요. 관심목록 항목은 홈 화면 상단에 먼저 표시됩니다."
             action={
-              <Link href="/market/us" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg">
+              <Link href="/market/us" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold text-fg">
                 시장 화면으로 이동
               </Link>
             }
@@ -55,8 +55,8 @@ export default function WatchlistPage() {
       ) : (
         <>
           {/* 순서 편집 */}
-          <section aria-labelledby="watch-order-title" className="mt-3 px-3">
-            <h2 id="watch-order-title" className="mb-1.5 text-[13px] font-bold text-muted">
+          <section aria-labelledby="watch-order-title" className="mt-5 px-3">
+            <h2 id="watch-order-title" className="mb-2 text-[13px] font-bold text-muted">
               표시 순서
             </h2>
             <ul className="card divide-y divide-[var(--border)] overflow-hidden">
@@ -106,15 +106,15 @@ export default function WatchlistPage() {
             </ul>
           </section>
 
-          <section aria-labelledby="watch-quotes-title" className="mt-4 px-3">
-            <h2 id="watch-quotes-title" className="mb-1.5 text-[13px] font-bold text-muted">
+          <section aria-labelledby="watch-quotes-title" className="mt-5 px-3">
+            <h2 id="watch-quotes-title" className="mb-2 text-[13px] font-bold text-muted">
               현재 시세
             </h2>
             <SectionGate
               section={section}
               onRetry={refresh}
               loading={
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {[0, 1, 2].map((i) => (
                     <SkeletonCard key={i} height={44} lines={1} />
                   ))}
@@ -125,7 +125,7 @@ export default function WatchlistPage() {
                 quotes.length === 0 ? (
                   <EmptyState title="시세를 찾을 수 없습니다" description="선택한 항목이 현재 응답에 없습니다." />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {quotes.map((q) => (
                       <PriceCard key={q.id} quote={q} />
                     ))}

@@ -450,10 +450,10 @@ export function InteractiveChart({
 
   return (
     <div>
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {series.map((s) => (
-            <li key={s.id} className="flex items-center gap-1.5 text-[12.5px] text-muted">
+            <li key={s.id} className="flex items-center gap-2 text-[12.5px] text-muted">
               <span
                 aria-hidden="true"
                 className="inline-block h-0.5 w-4 rounded-full"
@@ -716,7 +716,7 @@ export function InteractiveChart({
           {/* 툴팁 */}
           {cursorPoint && geometry ? (
             <div
-              className="pointer-events-none absolute top-1 rounded-lg border border-border px-2 py-1.5 text-[12.5px] shadow-lg"
+              className="pointer-events-none absolute top-1 rounded-lg border border-border px-2 py-2 text-[12.5px] shadow-lg"
               style={{
                 background: 'var(--bg-elevated)',
                 left: Math.max(0, Math.min(geometry.w - 172, geometry.x(cursorPoint.t) - 86)),
@@ -725,7 +725,7 @@ export function InteractiveChart({
             >
               {/* 표식 위에 섰으면 무슨 일이 있었는지부터 알려 준다 */}
               {cursorMarker ? (
-                <div className="mb-1 flex items-start gap-1.5 border-b border-border pb-1">
+                <div className="mb-1 flex items-start gap-2 border-b border-border pb-1">
                   <span
                     aria-hidden="true"
                     className="mt-px inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"

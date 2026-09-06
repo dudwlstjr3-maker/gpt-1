@@ -32,9 +32,9 @@ export function Badge({
       title={title}
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border font-semibold whitespace-nowrap ${
         size === '2xs'
-          ? 'px-1.5 py-0 text-[10.5px]'
+          ? 'px-2 py-0 text-[10.5px]'
           : size === 'xs'
-            ? 'px-1.5 py-0.5 text-[11.5px]'
+            ? 'px-2 py-0.5 text-[11.5px]'
             : 'px-2 py-0.5 text-[12.5px]'
       }`}
       style={{ background: s.bg, color: s.fg, borderColor: s.border }}

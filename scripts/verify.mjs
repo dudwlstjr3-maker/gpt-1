@@ -1491,10 +1491,11 @@ async function main() {
 
     /* 손가락으로 누를 자리 */
     const price = await readFile('src/components/market/PriceCard.tsx', 'utf8');
-    check('관심 별표를 손가락으로 누를 수 있음(16px 글리프에 36×44 자리)',
-      /after:-inset-x-2\.5 after:-inset-y-\[14px\]/.test(price) && /after:content-\[''\]/.test(price));
-    check('넓힌 자리가 이름 링크를 덮지 않음', /items-center gap-2\.5/.test(price));
-    check('미리보기 별표도 같은 자리', /\.star::after \{ content: ''; position: absolute; inset: -14px -10px; \}/.test(tpl7));
+    check('관심 별표를 손가락으로 누를 수 있음(16px 글리프에 32×44 자리)',
+      /after:-inset-x-2 after:-inset-y-\[14px\]/.test(price) && /after:content-\[''\]/.test(price));
+    // 넓힌 가로(8px)가 옆 칸 간격(gap-2 = 8px)과 같아야 이름 링크를 덮지 않는다
+    check('넓힌 자리가 이름 링크를 덮지 않음', /items-center gap-2"/.test(price));
+    check('미리보기 별표도 같은 자리', /\.star::after \{ content: ''; position: absolute; inset: -14px -8px; \}/.test(tpl7));
     for (const f of ['src/app/watchlist/page.tsx', 'src/app/more/page.tsx']) {
       const t = await readFile(f, 'utf8');
       check(`${f.split('/')[2]} 의 순서·삭제 버튼이 40px`, !/h-7 w-7/.test(t) && /h-10 w-10/.test(t));
@@ -1642,6 +1643,71 @@ async function main() {
     /* ③ 마크 — 크로스헤어 점은 지름 8px + 바탕 테두리 2px */
     check('크로스헤어 점이 8px', /r=\{4\}[\s\S]{0,120}strokeWidth=\{2\}/.test(chart2));
     check('미리보기 점도 같음', /r="4" fill="' \+ s\.color \+ '" stroke="var\(--surface\)" stroke-width="2"/.test(tpl9));
+  }
+
+  /* ---------------- 8-21. 간격이 일정한가 · 숫자로 판단할 수 있는가 ---------------- */
+  console.log('\n[8-21] 간격 한 눈금 · 판단 재료');
+  {
+    /*
+     * ① 간격이 제각각이었다.
+     *    같은 일을 하는 자리가 파일마다 달랐다 — 카드 안쪽 여백이 8·10·12·14·16px,
+     *    카드끼리 간격이 6·8·10·12·16·20px, 섹션 사이가 12·16·20px 이었다.
+     *    반 칸(6·10·14px)을 없애 4px 격자로 스냅하고, 역할별로 값을 하나씩 정했다.
+     *      카드 안쪽 여백 = 화면 좌우 여백 = 12px (카드 글자가 화면 글자와 같은 세로선)
+     *      섹션 사이 = 20px
+     *    2px(0.5)만 남겼다 — 기호와 글자가 붙는 자리.
+     *
+     * ② 숫자는 있는데 판단할 재료가 없었다.
+     *    값·방향·색 띠·구간 목록이 다 있는데, 정작 "다음 단계까지 얼마 남았나" 는
+     *    15 에서 11.55 를 직접 빼야 나왔고, "요즘 값 중 어디인가" 는 스파크라인
+     *    모양으로 짐작해야 했다. 둘 다 있는 데이터로 계산된다.
+     */
+    const HALF = /(?<![\w-])(?:-?(?:m|p)(?:t|b|l|r|x|y)?|gap(?:-x|-y)?|space-(?:x|y))-(?:1\.5|2\.5|3\.5)(?![\d.])/;
+    const offGrid = [];
+    const cardPad = new Set();
+    const sectionTop = new Set();
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (HALF.test(t)) offGrid.push(f);
+      for (const m of t.matchAll(/className="[^"]*\bcard\b[^"]*"/g)) {
+        const p2 = m[0].match(/(?<![\w-])p-(\d+(?:\.\d+)?)/);
+        if (p2) cardPad.add(p2[1]);
+      }
+      for (const m of t.matchAll(/<section[^>]*className="[^"]*?(?<![\w-])mt-(\d+(?:\.\d+)?)/g)) sectionTop.add(m[1]);
+    }
+    check('간격이 4px 격자를 벗어나지 않음 (2px 만 예외)', offGrid.length === 0,
+      offGrid.length ? `${offGrid.length}개 파일 (예: ${offGrid[0]})` : '');
+    check('카드 안쪽 여백이 하나뿐', [...cardPad].filter((v) => v !== '0').length === 1,
+      `쓰인 값: ${[...cardPad].sort().join(', ') || '없음'}`);
+    check('카드 여백이 화면 좌우 여백과 같은 12px', cardPad.has('3'));
+    check('섹션 사이 간격이 하나뿐', sectionTop.size === 1, `쓰인 값: ${[...sectionTop].sort().join(', ')}`);
+    // 미리보기 스타일시트도 4px 격자 위에 있어야 한다 (같은 화면을 손으로 옮겨 그린 것이라 따로 샌다)
+    const tplSp = await readFile('tools/preview/template.html', 'utf8');
+    const offCss = [...tplSp.matchAll(/(?:padding|margin|gap)(?:-\w+)?: ?(\d+)px/g)]
+      .map((m) => Number(m[1]))
+      // 2px 은 기호와 글자가 붙는 자리라 앱과 마찬가지로 남긴다
+      .filter((v) => v > 2 && v % 4 !== 0);
+    check('미리보기 여백도 4px 격자 위에 있음', offCss.length === 0,
+      offCss.length ? `벗어난 값 ${[...new Set(offCss)].sort((a, b) => a - b).join(', ')}px` : '');
+
+    /* ② 판단 재료 */
+    const judge = await readFile('src/lib/riskJudgement.mjs', 'utf8');
+    const gauges = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    const tpl10 = await readFile('tools/preview/template.html', 'utf8');
+    check('다음 경계를 계산하는 규칙이 있음', /export function nextBoundary/.test(judge));
+    check('낮을수록 위험한 지표도 방향을 뒤집어 봄', /direction !== 'lower_is_riskier'/.test(judge));
+    check('제일 위험한 구간에서는 나아지는 경계를 말함', /dir: 'better'/.test(judge));
+    check('최근 구간 안의 자리를 계산함', /export function recentPosition/.test(judge));
+    check('표본이 적으면 범위를 말하지 않음', /vals\.length < 5/.test(judge));
+    check('움직이지 않은 구간은 위치를 말하지 않음', /!\(max > min\)/.test(judge));
+    check('백분위라고 부르지 않음 — 최저~최고 사이의 자리라고 적음', /백분위가 아니라/.test(judge));
+    check('지표 카드가 그 재료를 보여줌', /<JudgeStrip indicator=\{indicator\} \/>/.test(gauges));
+    check('미리보기도 같은 규칙을 씀',
+      /function nextBoundary\(i\)/.test(tpl10) && /function recentPosition\(spark, value\)/.test(tpl10) && /judgeStrip\(i\)/.test(tpl10));
+    // 판단 재료라고 해서 매매를 권하면 안 된다
+    for (const word of ['매수', '매도', '사세요', '파세요', '지금 사', '지금 팔']) {
+      check(`판단 재료에 '${word}' 가 없음`, !judge.includes(word) && !/JudgeStrip[\s\S]{0,2000}/.exec(gauges)?.[0]?.includes(word));
+    }
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

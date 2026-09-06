@@ -150,7 +150,7 @@ export default function AssetPage() {
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           <ModeBadge mode={detail.mode} size="xs" />
           <button
             type="button"
@@ -166,14 +166,14 @@ export default function AssetPage() {
       </div>
 
       {/* 현재가 */}
-      <section className="mt-3 px-3" aria-label="현재 시세">
-        <div className="card p-3.5">
+      <section className="mt-5 px-3" aria-label="현재 시세">
+        <div className="card p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="tnum text-2xl leading-tight font-bold text-fg-strong">
                 {q.price === null ? NO_VALUE : f.price(q)}
               </p>
-              <p className="tnum mt-1 flex items-center gap-1.5 text-[13px] font-semibold" style={{ color }}>
+              <p className="tnum mt-1 flex items-center gap-2 text-[13px] font-semibold" style={{ color }}>
                 <span aria-hidden="true">{f.glyph(dir)}</span>
                 {f.change(q)} ({f.changePct(q)})
                 <span className="sr-only">{DIRECTION_LABEL[dir]}</span>
@@ -191,7 +191,7 @@ export default function AssetPage() {
             </p>
           ) : null}
 
-          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border pt-2.5 text-[12.5px]">
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-2 text-[12.5px]">
             <div className="flex justify-between gap-2">
               <dt className="text-muted">거래량</dt>
               <dd className="tnum text-fg">{q.volume === null ? NO_VALUE : formatKoreanCompact(q.volume, 1)}</dd>
@@ -223,12 +223,12 @@ export default function AssetPage() {
       </section>
 
       {/* 차트 */}
-      <section className="mt-4 px-3" aria-labelledby="asset-chart-title">
+      <section className="mt-5 px-3" aria-labelledby="asset-chart-title">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 id="asset-chart-title" className="text-base font-bold text-fg-strong">
             가격 추이
           </h2>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <SegmentedControl
               label="기간"
               size="xs"
@@ -272,7 +272,7 @@ export default function AssetPage() {
       <div className="mt-4 px-3">
         <Link
           href={`/fng/${q.market}`}
-          className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-[13px] font-semibold text-fg hover:bg-surface-3"
+          className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-3 py-2 text-[13px] font-semibold text-fg hover:bg-surface-3"
         >
           {MARKET_LABEL[q.market]} 투자심리 상세 보기
           <span aria-hidden="true">→</span>

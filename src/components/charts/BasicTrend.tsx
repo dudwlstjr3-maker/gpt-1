@@ -313,7 +313,7 @@ export function BasicTrend({
       </div>
 
       {showTable ? (
-        <div className="scroll-x mt-1.5 rounded-lg border border-border">
+        <div className="scroll-x mt-2 rounded-lg border border-border">
           <table className="data-table">
             <caption className="sr-only">{label} 연도별 값</caption>
             <thead>

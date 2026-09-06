@@ -34,7 +34,7 @@ export function ReadingGuide({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded-lg border border-border bg-surface-2 px-2.5 py-2">
+    <div className="rounded-lg border border-border bg-surface-2 px-2 py-2">
       {/* 여는 버튼은 문장 옆이 아니라 아래에 둔다. 390px 에서 옆에 두면 한 줄이
           55% 폭으로 눌려 네 줄로 쪼개졌다 — 읽으라고 남긴 한 줄이 제일 안 읽혔다. */}
       <p className="text-[12.5px] leading-relaxed break-keep text-muted">
@@ -51,7 +51,7 @@ export function ReadingGuide({
       >
         {open ? '접기 ▴' : `${label} ▾`}
       </button>
-      {open ? <div className="mt-2.5 space-y-2.5 border-t border-border pt-2.5">{children}</div> : null}
+      {open ? <div className="mt-2 space-y-2 border-t border-border pt-2">{children}</div> : null}
     </div>
   );
 }

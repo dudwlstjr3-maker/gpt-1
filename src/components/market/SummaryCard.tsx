@@ -26,8 +26,8 @@ export function SummaryCard() {
 
       <SectionGate section={section} onRetry={refresh} loading={<SkeletonCard height={60} lines={2} />}>
         {(summary) => (
-          <div className="card p-3.5">
-            <ul className="space-y-2.5">
+          <div className="card p-3">
+            <ul className="space-y-2">
               {summary.lines.map((line, i) => {
                 const meta = KIND_META[line.kind];
                 return (
@@ -41,7 +41,7 @@ export function SummaryCard() {
                 );
               })}
             </ul>
-            <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] text-subtle">
+            <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
               생성 {formatKstTime(summary.generatedAt)} · 실제 가격·지표 값에 근거해 규칙 기반으로 작성되며, 근거가 없으면
               원인을 추정하지 않습니다.
             </p>

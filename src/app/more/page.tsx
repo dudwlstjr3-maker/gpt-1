@@ -24,9 +24,9 @@ interface Health {
 
 function Section({ title, children, description }: { title: string; children: React.ReactNode; description?: string }) {
   return (
-    <section className="mt-4 px-3">
-      <h2 className="mb-1.5 text-[13px] font-bold text-muted">{title}</h2>
-      {description ? <p className="mb-1.5 text-[12.5px] break-keep text-subtle">{description}</p> : null}
+    <section className="mt-5 px-3">
+      <h2 className="mb-2 text-[13px] font-bold text-muted">{title}</h2>
+      {description ? <p className="mb-2 text-[12.5px] break-keep text-subtle">{description}</p> : null}
       <div className="card p-3">{children}</div>
     </section>
   );
@@ -110,7 +110,7 @@ export default function MorePage() {
             현재 LIVE 모드입니다. 시나리오 전환은 DEMO 모드에서만 동작합니다. (MARKET_MOOD_MODE=demo 로 전환 가능)
           </Notice>
         ) : null}
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-2 space-y-2">
           {DEMO_SCENARIOS.map((s) => {
             const active = settings.scenario === s.id;
             return (
@@ -119,7 +119,7 @@ export default function MorePage() {
                   type="button"
                   onClick={() => update({ scenario: s.id })}
                   aria-pressed={active}
-                  className="flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left"
+                  className="flex w-full items-start gap-2 rounded-lg border px-2 py-2 text-left"
                   style={{
                     borderColor: active ? 'var(--accent)' : 'var(--border)',
                     background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--surface-2)',
@@ -186,7 +186,7 @@ export default function MorePage() {
         </ul>
 
         <div className="mt-3 border-t border-border pt-2">
-          <p className="mb-1.5 text-[12.5px] text-muted">추가할 항목</p>
+          <p className="mb-2 text-[12.5px] text-muted">추가할 항목</p>
           <div className="space-y-2">
             {MARKET_IDS.map((m) => {
               const candidates = catalogFor(m).filter((c) => !settings.homeItems.includes(c.id));
@@ -194,13 +194,13 @@ export default function MorePage() {
               return (
                 <div key={m}>
                   <p className="mb-1 text-[11.5px] text-subtle">{MARKET_LABEL[m]}</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {candidates.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => toggleHomeItem(c.id)}
-                        className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[12.5px] text-muted hover:text-fg"
+                        className="rounded-full border border-border bg-surface-2 px-2 py-1 text-[12.5px] text-muted hover:text-fg"
                       >
                         + {c.name}
                       </button>
@@ -228,7 +228,7 @@ export default function MorePage() {
             { href: '/calendar', label: '경제 캘린더', desc: 'FOMC·금통위·CPI·고용보고서·만기·실적' },
           ].map((l) => (
             <li key={l.href}>
-              <Link href={l.href} className="flex items-center justify-between gap-2 py-2.5">
+              <Link href={l.href} className="flex items-center justify-between gap-2 py-2">
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-fg">{l.label}</span>
                   <span className="block truncate text-[12.5px] text-subtle">{l.desc}</span>
@@ -243,7 +243,7 @@ export default function MorePage() {
       </Section>
 
       <Section title="데이터 진단">
-        <dl className="space-y-1.5 text-[13px]">
+        <dl className="space-y-2 text-[13px]">
           <div className="flex items-center justify-between gap-2">
             <dt className="text-muted">현재 모드</dt>
             <dd>{snapshot ? <ModeBadge mode={snapshot.mode} /> : '—'}</dd>
@@ -279,8 +279,8 @@ export default function MorePage() {
         </dl>
         {snapshot ? (
           <div className="mt-3 border-t border-border pt-2">
-            <p className="mb-1.5 text-[12.5px] text-muted">섹션별 상태</p>
-            <ul className="grid grid-cols-2 gap-1.5">
+            <p className="mb-2 text-[12.5px] text-muted">섹션별 상태</p>
+            <ul className="grid grid-cols-2 gap-2">
               {Object.entries(snapshot.sections).map(([key, s]) => (
                 <li key={key} className="flex items-center justify-between gap-1 rounded-md bg-surface-2 px-2 py-1">
                   <span className="truncate text-[12.5px] text-muted">{key}</span>

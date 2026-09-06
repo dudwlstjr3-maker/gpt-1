@@ -155,12 +155,12 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
   const months = Math.round((stats.forwardDays / 21) * 10) / 10;
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-fg-strong">구간별 과거 통계</h3>
         <span className="tnum text-[11.5px] text-subtle">표본 {formatNumber(stats.totalDays, 0)}일</span>
       </div>
-      <p className="mb-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
+      <p className="mb-2 text-[12.5px] leading-relaxed break-keep text-muted">
         점수가 각 구간이던 날 이후{' '}
         <strong className="text-fg">
           약 {months}개월({stats.forwardDays}거래일)
@@ -179,7 +179,7 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
           return (
             <li key={b.stageId}>
               <div className="mb-1 flex items-baseline justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5">
+                <span className="flex min-w-0 items-center gap-2">
                   {/* 단계 색은 공포↔탐욕 띠와 같은 색이다. 아래 상자그림도 같은 색을 쓴다. */}
                   <span
                     aria-hidden="true"
@@ -215,7 +215,7 @@ export function BandStatsView({ stats }: { stats: FngBandStats }) {
       </ul>
 
       {domain ? (
-        <div className="mt-1.5">
+        <div className="mt-2">
           <Axis d={domain} />
           <p className="mt-0.5 text-center text-[10.5px] text-subtle">
             이후 약 {months}개월 수익률 (%)

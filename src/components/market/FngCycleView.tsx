@@ -59,7 +59,7 @@ function HorizonRow({ h, score }: { h: FngCycleHorizon; score: number | null }) 
   const unavailable = h.percentile === null;
 
   return (
-    <li className="border-b border-border py-2.5 last:border-b-0">
+    <li className="border-b border-border py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-fg">{h.label}</p>
@@ -126,7 +126,7 @@ export function FngCycleView({ cycle }: { cycle: FngCycle }) {
   const c = useChangeColor();
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       {/* 국면 */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -140,7 +140,7 @@ export function FngCycleView({ cycle }: { cycle: FngCycle }) {
 
       <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">{cycle.phase.description}</p>
 
-      <dl className="mt-2.5 flex gap-2 border-t border-border pt-2.5">
+      <dl className="mt-2 flex gap-2 border-t border-border pt-2">
         <div className="flex-1 rounded-lg bg-surface-2 px-2 py-2 text-center">
           <dt className="text-[11.5px] text-muted">현재 점수</dt>
           <dd className="tnum mt-0.5 text-[13px] font-bold" style={{ color: scoreColor(cycle.score) }}>
@@ -163,7 +163,7 @@ export function FngCycleView({ cycle }: { cycle: FngCycle }) {
       </dl>
 
       {/* 기간별 위치 */}
-      <div className="mt-3 border-t border-border pt-2.5">
+      <div className="mt-3 border-t border-border pt-2">
         <h4 className="mb-1 text-[12.5px] font-bold text-muted">기간별 심리 위치</h4>
         <p className="mb-1 text-[11.5px] leading-relaxed break-keep text-subtle">
           같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다. <strong>기간 내 위치</strong>는 그

@@ -58,7 +58,7 @@ function IndexRow({
     <>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13.5px] font-semibold text-fg-strong">{item.name}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-subtle">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
           <span className="tnum">{item.symbol}</span>
           {quote ? (
             <>
@@ -106,13 +106,13 @@ function IndexRow({
       {quote ? (
         <Link
           href={`/asset/${item.id}`}
-          className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2"
+          className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"
           aria-label={`${item.name} ${hasValue ? `${f.price(quote)} ${f.srChange(quote)}` : '값 없음'}`}
         >
           {inner}
         </Link>
       ) : (
-        <div className="flex items-center gap-2.5 px-3 py-2.5">{inner}</div>
+        <div className="flex items-center gap-2 px-3 py-2">{inner}</div>
       )}
 
       {/* 기준점 — "3,714" 라는 숫자는 언제를 100 으로 놓았는지 알아야 읽힌다 */}
@@ -164,14 +164,14 @@ export function MarketIndexBoard() {
       ) : null}
 
       <div className={failed ? 'mt-3 px-3' : 'px-3'}>
-        <div className="space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-3 lg:space-y-0">
+        <div className="space-y-2 lg:grid lg:grid-cols-3 lg:items-start lg:gap-2 lg:space-y-0">
           {groups.map((g) => (
             <section key={g.market} aria-labelledby={`idx-${g.market}`} className="card overflow-hidden">
               <div
                 className="flex items-center justify-between gap-2 border-b border-border px-3 py-2"
                 style={{ background: `color-mix(in srgb, ${marketColor(g.market)} 8%, transparent)` }}
               >
-                <h2 id={`idx-${g.market}`} className="flex items-center gap-1.5 text-[13px] font-bold">
+                <h2 id={`idx-${g.market}`} className="flex items-center gap-2 text-[13px] font-bold">
                   {/* 색은 훑기용 표식일 뿐이고, 어느 시장인지는 옆의 글자가 말한다 */}
                   <span
                     aria-hidden="true"
@@ -205,7 +205,7 @@ export function MarketIndexBoard() {
         </div>
       </div>
 
-      <section aria-labelledby="idx-help" className="mt-4 px-3">
+      <section aria-labelledby="idx-help" className="mt-5 px-3">
         <div className="card p-3">
           <h2 id="idx-help" className="text-[13px] font-bold text-fg-strong">
             지수 숫자를 읽는 법
@@ -225,7 +225,7 @@ export function MarketIndexBoard() {
               시장을 재는 눈금이라서, 실제로 사고파는 것은 그 지수를 따라가도록 만든 상품입니다.
             </li>
           </ul>
-          <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
+          <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
             지수마다 산출 기관과 방식이 다릅니다. 이 화면은 값을 받아 그대로 보여줄 뿐, 다시 계산하지 않습니다.
           </p>
         </div>

@@ -45,7 +45,7 @@ export function HomePrices() {
         section={section}
         onRetry={refresh}
         loading={
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2, 3].map((i) => (
               <SkeletonCard key={i} height={44} lines={1} />
             ))}
@@ -59,13 +59,13 @@ export function HomePrices() {
               title="선택된 항목이 없습니다"
               description="관심목록에 종목을 추가하거나 더보기에서 홈 표시 항목을 설정하세요."
               action={
-                <Link href="/more" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg">
+                <Link href="/more" className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold text-fg">
                   표시 항목 설정
                 </Link>
               }
             />
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {ordered.map((q) => (
                 <PriceCard key={q.id} quote={q} />
               ))}

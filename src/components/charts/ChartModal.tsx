@@ -103,7 +103,7 @@ export function ChartModal({
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="-mt-0.5 shrink-0 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-[13px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
+            className="-mt-0.5 shrink-0 rounded-lg border border-border bg-surface-2 px-2 py-1 text-[13px] font-semibold text-muted hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus)]"
           >
             닫기 <span aria-hidden="true">✕</span>
           </button>

@@ -59,25 +59,25 @@ function GuidePanel({ id }: { id: string }) {
   const g = guideFor(id);
   if (!g) return null;
   return (
-    <details className="mt-1.5">
+    <details className="mt-2">
       <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-accent hover:underline">
         이게 무슨 지표인가요? ▾
       </summary>
-      <div className="mt-1.5 rounded-lg bg-surface-2 px-2.5 py-2">
+      <div className="mt-2 rounded-lg bg-surface-2 px-2 py-2">
         <p className="text-[12.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
         {/* 기준점이 있는 지수는 그것부터 알려 준다. 기준을 모르면 숫자를 읽을 수 없다. */}
         {g.baseline ? (
-          <p className="mt-1.5 rounded-md bg-surface-3 px-2 py-1.5 text-[11.5px] leading-relaxed break-keep text-muted">
+          <p className="mt-2 rounded-md bg-surface-3 px-2 py-2 text-[11.5px] leading-relaxed break-keep text-muted">
             <span className="font-semibold text-fg">기준 · </span>
             {g.baseline}
           </p>
         ) : null}
-        <dl className="mt-2 space-y-1.5 border-t border-border pt-2">
+        <dl className="mt-2 space-y-2 border-t border-border pt-2">
           {[
             { glyph: '▲', label: '오르면', text: g.whenUp },
             { glyph: '▼', label: '내리면', text: g.whenDown },
           ].map((row) => (
-            <div key={row.label} className="flex items-start gap-1.5">
+            <div key={row.label} className="flex items-start gap-2">
               <span aria-hidden="true" className="mt-px shrink-0 text-[11.5px] text-muted">
                 {row.glyph}
               </span>
@@ -145,7 +145,7 @@ export default function IndicatorsPage() {
       {view === 'all' && alerts.length > 0 ? (
         <div className="mt-3 px-3">
           <div className="card p-3" style={{ borderColor: 'color-mix(in srgb, var(--danger) 40%, var(--border))' }}>
-            <p className="mb-1.5 text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
+            <p className="mb-2 text-[13px] font-bold" style={{ color: 'var(--danger)' }}>
               ▲ 주의 단계 지표 {alerts.length}건
             </p>
             <ul className="space-y-1">
@@ -204,7 +204,7 @@ export default function IndicatorsPage() {
                   {list.map((m) => {
                     const risk = RISK_META[m.riskLevel];
                     return (
-                      <li key={m.id} className="px-3 py-2.5">
+                      <li key={m.id} className="px-3 py-2">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-[13px] font-semibold text-fg">{m.name}</p>
@@ -223,7 +223,7 @@ export default function IndicatorsPage() {
                             </p>
                           </div>
                         </div>
-                        <div className="mt-1.5 flex items-center gap-1.5">
+                        <div className="mt-2 flex items-center gap-2">
                           <Badge tone={risk.tone} size="xs">
                             {risk.signal ? <SignalDot signal={risk.signal} size={6} /> : null}
                             <span aria-hidden="true">{risk.glyph}</span>

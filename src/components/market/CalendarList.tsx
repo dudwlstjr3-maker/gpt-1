@@ -31,14 +31,14 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
   const past = now !== null && t <= now;
 
   return (
-    <li className="border-b border-border px-3 py-2.5 last:border-b-0">
+    <li className="border-b border-border px-3 py-2 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* 시장 배지에 그 시장 색을 입힌다. 여러 시장이 섞인 목록에서 눈으로 훑는 데 쓰는
                 표식일 뿐, 어느 시장인지는 배지 안의 글자가 말한다. */}
             <span
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] font-semibold"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11.5px] font-semibold"
               style={{
                 borderColor: `color-mix(in srgb, ${marketColor(event.market)} 45%, var(--border))`,
                 background: `color-mix(in srgb, ${marketColor(event.market)} 12%, transparent)`,
@@ -85,7 +85,7 @@ export function EventRow({ event, now }: { event: CalendarEvent; now: number | n
         </div>
       </div>
 
-      <dl className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px]">
+      <dl className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px]">
         <div className="flex gap-1">
           <dt className="text-subtle">예상</dt>
           <dd className="tnum text-fg">{event.forecast ?? NO_VALUE}</dd>

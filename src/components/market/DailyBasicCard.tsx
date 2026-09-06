@@ -45,7 +45,7 @@ export function DailyBasicCard() {
           const group = groupOfBasic(item.id);
 
           return (
-            <div className="card p-3.5">
+            <div className="card p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-fg-strong">{item.name}</p>
@@ -64,7 +64,7 @@ export function DailyBasicCard() {
                 <p className="mt-2 text-[13px] leading-relaxed break-keep text-fg">{guide.headline}</p>
               ) : null}
 
-              <div className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-border pt-2.5">
+              <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-border pt-2">
                 <p className="tnum text-[20px] leading-none font-bold text-fg-strong">
                   {item.value === null ? NO_VALUE : `${formatNumber(item.value, item.precision)}${item.suffix}`}
                 </p>

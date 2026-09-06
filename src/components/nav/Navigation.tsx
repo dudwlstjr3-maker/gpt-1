@@ -99,7 +99,7 @@ export function DesktopSidebar() {
                 <Link
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors hover:bg-surface-2"
+                  className="flex items-center gap-2 rounded-lg px-2 py-2 text-[13px] font-semibold transition-colors hover:bg-surface-2"
                   style={{
                     color: active ? 'var(--accent)' : 'var(--muted-fg)',
                     background: active ? 'var(--surface-2)' : undefined,
@@ -115,7 +115,7 @@ export function DesktopSidebar() {
       </nav>
       {/* 지수 화면에서도 들어갈 수 있지만, 데스크톱에서는 한 번에 가는 길을 남겨 둔다 */}
       <div className="mt-4 border-t border-border pt-3">
-        <p className="mb-1 px-2.5 text-[11.5px] font-semibold tracking-wide text-subtle">시장별 화면</p>
+        <p className="mb-1 px-2 text-[11.5px] font-semibold tracking-wide text-subtle">시장별 화면</p>
         <ul className="space-y-0.5">
           {[
             { href: '/market/us', label: '미국' },
@@ -127,7 +127,7 @@ export function DesktopSidebar() {
                 <Link
                   href={m.href}
                   aria-current={active ? 'page' : undefined}
-                  className="block rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-surface-2"
+                  className="block rounded-lg px-2 py-2 text-[13px] font-medium transition-colors hover:bg-surface-2"
                   style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)', background: active ? 'var(--surface-2)' : undefined }}
                 >
                   {m.label}
@@ -144,7 +144,7 @@ export function DesktopSidebar() {
             <li key={s.href}>
               <Link
                 href={s.href}
-                className="block rounded-lg px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                className="block rounded-lg px-2 py-2 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
               >
                 {s.label}
               </Link>

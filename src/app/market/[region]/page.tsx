@@ -132,7 +132,7 @@ export default function MarketRegionPage() {
       </div>
 
       {/* 시장 전환 */}
-      <div className="mt-2.5 px-3">
+      <div className="mt-2 px-3">
         <SegmentedControl
           label="시장 전환"
           full
@@ -146,7 +146,7 @@ export default function MarketRegionPage() {
 
       <div className="mt-3 px-3 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-4">
         {/* 좌측: 심리 · 위험 · 시장 고유 정보 */}
-        <div className="space-y-2.5 lg:sticky lg:top-32">
+        <div className="space-y-2 lg:sticky lg:top-32">
           {fng && snapshot ? <FngCard score={fng} mode={snapshot.mode} /> : <SkeletonCard height={140} lines={2} />}
 
           <RiskForMarket market={region} />
@@ -194,7 +194,7 @@ export default function MarketRegionPage() {
                   const dir = f.direction(q);
                   return (
                     <li key={q.id}>
-                      <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-1.5 hover:opacity-80">
+                      <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-2 hover:opacity-80">
                         <span className="truncate text-[13px] text-fg">{q.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="tnum text-[13px] font-semibold text-fg-strong">
@@ -221,7 +221,7 @@ export default function MarketRegionPage() {
               type="button"
               onClick={() => setOnlyWatched((v) => !v)}
               aria-pressed={onlyWatched}
-              className="rounded-lg border border-border px-2.5 py-1 text-[12.5px] font-semibold"
+              className="rounded-lg border border-border px-2 py-1 text-[12.5px] font-semibold"
               style={{
                 background: onlyWatched ? 'var(--surface-3)' : 'var(--surface-2)',
                 color: onlyWatched ? 'var(--accent)' : 'var(--muted-fg)',
@@ -236,7 +236,7 @@ export default function MarketRegionPage() {
               section={quotesSection}
               onRetry={refresh}
               loading={
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {[0, 1, 2, 3].map((i) => (
                     <SkeletonCard key={i} height={44} lines={1} />
                   ))}
@@ -251,7 +251,7 @@ export default function MarketRegionPage() {
                     description={onlyWatched ? '카드의 ☆ 를 눌러 관심목록에 추가하세요.' : undefined}
                   />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {list.map((q) => (
                       <PriceCard key={q.id} quote={q} />
                     ))}
@@ -263,8 +263,8 @@ export default function MarketRegionPage() {
 
           {/* 이 시장의 일정 */}
           {events.length > 0 ? (
-            <section className="mt-4" aria-labelledby={`cal-${region}`}>
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <section className="mt-5" aria-labelledby={`cal-${region}`}>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
                 <h2 id={`cal-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 일정
                 </h2>
@@ -284,8 +284,8 @@ export default function MarketRegionPage() {
 
           {/* 이 시장의 뉴스 */}
           {news.length > 0 ? (
-            <section className="mt-4" aria-labelledby={`news-${region}`}>
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <section className="mt-5" aria-labelledby={`news-${region}`}>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
                 <h2 id={`news-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 뉴스
                 </h2>
@@ -295,10 +295,10 @@ export default function MarketRegionPage() {
                   </Badge>
                 ) : null}
               </div>
-              <div className="card p-3.5">
-                <ul className="space-y-2.5">
+              <div className="card p-3">
+                <ul className="space-y-2">
                   {news.map((n) => (
-                    <li key={n.id} className="border-b border-border pb-2.5 last:border-b-0 last:pb-0">
+                    <li key={n.id} className="border-b border-border pb-2 last:border-b-0 last:pb-0">
                       <p className="text-[13px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
                       <p className="mt-1 truncate text-[11.5px] text-subtle">{n.titleOriginal}</p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">

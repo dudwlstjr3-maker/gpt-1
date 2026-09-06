@@ -136,7 +136,7 @@ function HistorySpark({ history, band }: { history: { t: number; score: number }
 /** 무엇이 이 점수를 만들었는지 */
 function AxisRows({ board }: { board: Board }) {
   return (
-    <ul className="mt-3 space-y-1.5">
+    <ul className="mt-3 space-y-2">
       {board.axes.map((a) => (
         <li key={a.id} className="flex items-center gap-2">
           <span className="w-[42px] shrink-0 text-[12.5px] whitespace-nowrap text-muted" title={a.label}>
@@ -166,14 +166,14 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
 
   if (board.score === null) {
     return (
-      <div className="card p-3.5">
+      <div className="card p-3">
         <div className="flex items-center gap-2">
           <Badge tone="warn" size="xs">
             <span aria-hidden="true">?</span>산출 불가
           </Badge>
           <span className="text-[13px] font-semibold text-fg-strong">국면 점수를 낼 수 없습니다</span>
         </div>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">{board.unavailableReason}</p>
+        <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">{board.unavailableReason}</p>
         <AxisRows board={board} />
       </div>
     );
@@ -182,10 +182,10 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
   const missing = board.axes.filter((a) => a.percentile === null);
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span aria-hidden="true" className="text-[13px]" style={{ color: bandColor(band) }}>
               {band?.glyph}
             </span>
@@ -223,7 +223,7 @@ export function RegimeBoardBody({ digest, compact = false }: { digest: RegimeDig
       )}
 
       {/* 이 문장은 접거나 아래로 밀지 않는다. 전광판에서 제일 중요한 줄이다. */}
-      <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
         지금이 역사적으로 어디쯤인지만 보여 줍니다. 사거나 팔라는 신호가 아닙니다 — 지난 26년 자료에서 점수가 낮았다고
         해서 그 뒤 12개월이 좋았던 것은 아니었습니다.{' '}
         <Link href="/regime" className="font-semibold text-accent hover:underline">

@@ -15,7 +15,7 @@ export function FngSection() {
   const version = section?.data?.[0]?.formulaVersion ?? '';
 
   return (
-    <section aria-labelledby="fng-section-title" className="mt-3">
+    <section aria-labelledby="fng-section-title" className="mt-5">
       <div className="mb-2 flex items-baseline justify-between gap-2 px-3">
         <div className="min-w-0">
           <h2 id="fng-section-title" className="text-base font-bold text-fg-strong">
@@ -49,7 +49,7 @@ export function FngSection() {
               ))}
             </div>
             {/* 데스크톱: 3열 */}
-            <div className="hidden gap-3 px-3 lg:grid lg:grid-cols-3">
+            <div className="hidden gap-2 px-3 lg:grid lg:grid-cols-3">
               {scores.map((s) => (
                 <FngCard key={s.market} score={s} mode={mode} standalone={false} />
               ))}

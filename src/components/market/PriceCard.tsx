@@ -26,19 +26,19 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
   return (
     <article className="card relative p-3" aria-label={`${quote.name} 시세`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2">
           {showStar ? (
             /*
              * 별표는 글자로는 작아야 맞지만 손가락에는 14px 이 너무 작았다.
-             * 글리프는 그대로 두고 ::after 로 누를 자리만 36×44 로 넓힌다.
-             * 가로로 넓힌 만큼은 옆 칸과의 간격(gap-2.5)이라, 이름 링크를 덮지 않는다.
+             * 글리프는 그대로 두고 ::after 로 누를 자리만 32×44 로 넓힌다.
+             * 가로로 넓힌 8px 이 옆 칸과의 간격(gap-2)과 같아서 이름 링크를 덮지 않는다.
              */
             <button
               type="button"
               onClick={() => toggleWatch(quote.id)}
               aria-pressed={watched}
               aria-label={watched ? `${quote.name} 관심목록에서 제거` : `${quote.name} 관심목록에 추가`}
-              className="relative shrink-0 text-base leading-none after:absolute after:-inset-x-2.5 after:-inset-y-[14px] after:content-['']"
+              className="relative shrink-0 text-base leading-none after:absolute after:-inset-x-2 after:-inset-y-[14px] after:content-['']"
               style={{ color: watched ? 'var(--warn)' : 'var(--subtle-fg)' }}
             >
               {watched ? '★' : '☆'}
@@ -68,7 +68,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
        */}
       {unavailable ? (
         <div
-          className="mt-2 flex items-center rounded-lg px-2.5 py-2"
+          className="mt-2 flex items-center rounded-lg px-2 py-2"
           style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)', minHeight: 64 }}
         >
           <p className="text-[12.5px] break-keep" style={{ color: 'var(--warn)' }}>
@@ -102,7 +102,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
        * 이용 조건은 종목 상세 화면이 말한다. 값을 잘못 읽게 만드는 것(환산 불가)만 띄운다.
        */}
       {quote.volume !== null || f.conversionUnavailable(quote) ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
           {quote.volume !== null ? <span>거래량 {formatKoreanCompact(quote.volume, 1)}</span> : null}
           {f.conversionUnavailable(quote) ? (
             <span style={{ color: 'var(--warn)' }}>환율 없음 — 환산 불가</span>
@@ -122,7 +122,7 @@ export function PriceRow({ quote }: { quote: Quote }) {
   return (
     <Link
       href={`/asset/${quote.id}`}
-      className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 hover:bg-surface-2"
+      className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-surface-2"
     >
       <div className="min-w-0">
         <p className="truncate text-[13px] font-semibold text-fg">{quote.name}</p>
@@ -161,7 +161,7 @@ export function StatTile({
     tone === 'alert' ? 'var(--danger)' : tone === 'watch' ? 'var(--warn)' : tone === 'unknown' ? 'var(--muted-fg)' : 'var(--fg-strong)';
   const toneLabel = tone === 'alert' ? '주의' : tone === 'watch' ? '관찰' : tone === 'unknown' ? '정보 없음' : '정상';
   return (
-    <div className="card-flat min-w-0 p-2.5">
+    <div className="card-flat min-w-0 p-3">
       <p className="truncate text-[11.5px] text-muted">{label}</p>
       <p className="tnum mt-0.5 truncate text-sm font-bold" style={{ color }}>
         {value}

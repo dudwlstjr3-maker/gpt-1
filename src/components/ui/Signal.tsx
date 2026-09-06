@@ -101,7 +101,7 @@ export interface SignalTallyItem {
  */
 export function SignalTally({ items, total }: { items: SignalTallyItem[]; total: number }) {
   return (
-    <ul className="grid grid-cols-3 gap-1.5" aria-label={`산출된 ${total}개 지표의 신호등 분포`}>
+    <ul className="grid grid-cols-3 gap-2" aria-label={`산출된 ${total}개 지표의 신호등 분포`}>
       {SIGNAL_ORDER.slice()
         .reverse()
         .map((s) => {
@@ -121,7 +121,7 @@ export function SignalTally({ items, total }: { items: SignalTallyItem[]; total:
                   : 'var(--surface)',
               }}
             >
-              <span className="flex items-center justify-center gap-1.5">
+              <span className="flex items-center justify-center gap-2">
                 <SignalDot signal={s} size={9} />
                 <span className="text-[11.5px] font-semibold" style={{ color: signalColor(s) }}>
                   {SIGNAL_COLOR_LABEL[s]}
@@ -154,12 +154,12 @@ export function SignalTally({ items, total }: { items: SignalTallyItem[]; total:
  */
 export function SignalLegend({ note }: { note?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-2 px-2.5 py-2">
+    <div className="rounded-lg border border-border bg-surface-2 px-2 py-2">
       <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {SIGNAL_ORDER.slice()
           .reverse()
           .map((s) => (
-            <li key={s} className="flex items-center gap-1.5 text-[11.5px]">
+            <li key={s} className="flex items-center gap-2 text-[11.5px]">
               <SignalDot signal={s} size={8} />
               <span className="font-semibold" style={{ color: signalColor(s) }}>
                 {SIGNAL_COLOR_LABEL[s]}
@@ -168,7 +168,7 @@ export function SignalLegend({ note }: { note?: string }) {
             </li>
           ))}
       </ul>
-      <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
         {note ?? '색은 지금 수치가 평소보다 얼마나 벗어나 있는지를 뜻합니다. 사라·팔라는 신호가 아닙니다.'}
       </p>
     </div>

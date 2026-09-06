@@ -49,7 +49,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
           section={section}
           onRetry={refresh}
           loading={
-            <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
               {[0, 1, 2, 3].map((i) => (
                 <SkeletonCard key={i} height={70} lines={2} />
               ))}
@@ -74,7 +74,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
             return (
               <>
                 {/* 종합 요약 */}
-                <div className="card p-3.5">
+                <div className="card p-3">
                   <div className="flex items-start gap-2">
                     <SignalLight
                       signal={alertCount > 0 ? 'red' : watchCount > 0 ? 'yellow' : 'green'}
@@ -85,18 +85,18 @@ export function RiskBoard({ market }: { market: MarketId }) {
                   </div>
 
                   {/* 신호등 집계 */}
-                  <div className="mt-3 border-t border-border pt-2.5">
+                  <div className="mt-3 border-t border-border pt-2">
                     <SignalTally items={tally.items} total={tally.total} />
                   </div>
 
                   {/* 단계별 분포 — 신호등을 4단계로 더 잘게 쪼갠 개수.
                       어느 지표인지는 바로 위 신호등 집계가 이름으로 대므로 여기서는 세지만 한다.
                       같은 카드에서 같은 이름을 두 번 늘어놓으면 어느 쪽을 읽어야 할지 알 수 없다. */}
-                  <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-2.5">
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 border-t border-border pt-2">
                     {byLevel.map((g) => (
                       <div key={g.level} className="min-w-0">
                         <div
-                          className="flex items-center gap-1.5 text-[12.5px] font-semibold"
+                          className="flex items-center gap-2 text-[12.5px] font-semibold"
                           style={{ color: RISK_COLOR[g.level] }}
                         >
                           <SignalDot signal={riskSignal(g.level)} size={7} />
@@ -108,7 +108,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
                     ))}
                   </div>
 
-                  <p className="mt-2.5 border-t border-border pt-2 text-[11.5px] text-subtle">
+                  <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
                     산출 {formatKstFull(digest.generatedAt)} · {MARKET_LABEL[market]} 관련 {items.length}개 중{' '}
                     {available.length}개 값 확보
                   </p>
@@ -118,7 +118,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
                  * 안내 상자가 셋이었다. 첫 지표 카드까지 250자를 넘겨야 했다.
                  * 지우지 않고 접는다 — 제일 오해하기 쉬운 한 줄만 남긴다.
                  */}
-                <div className="mt-2.5">
+                <div className="mt-2">
                   <ReadingGuide
                     lead={
                       <>
@@ -146,11 +146,11 @@ export function RiskBoard({ market }: { market: MarketId }) {
 
                 {/* 지표 카드 */}
                 {items.length === 0 ? (
-                  <div className="mt-2.5">
+                  <div className="mt-2">
                     <EmptyState title="해당 시장의 지표가 없습니다" description="필터를 바꿔 보세요." />
                   </div>
                 ) : (
-                  <div className="mt-2.5 grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
                     {items.map((i) => (
                       <RiskCard key={i.id} indicator={i} />
                     ))}
@@ -159,7 +159,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
 
                 {/* 표 대안 */}
                 <div className="mt-4">
-                  <h2 className="mb-1.5 text-[13px] font-bold text-muted">표로 보기</h2>
+                  <h2 className="mb-2 text-[13px] font-bold text-muted">표로 보기</h2>
                   <div className="scroll-x card">
                     <table className="data-table">
                       <caption className="sr-only">{MARKET_LABEL[market]} 위험 신호등 요약</caption>

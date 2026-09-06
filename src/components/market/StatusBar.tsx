@@ -41,7 +41,7 @@ function SessionChip({ session }: { session: MarketSession }) {
   const hint = sessionHint(session);
   return (
     <div
-      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2 py-1"
+      className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface-2 px-2 py-1"
       title={hint}
     >
       <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: PHASE_COLOR[session.phase] }} />
@@ -130,7 +130,7 @@ export function StatusBar() {
 
         {/* 2행: 세션 칩. DEMO 시나리오 배지도 여기 둔다 — 위 줄은 높이가 고정이어야 하고,
             이 줄은 가로로 밀리는 줄이라 무엇이 늘어도 화면이 흔들리지 않는다. */}
-        <div className="scroll-x mt-2 flex items-center gap-1.5 pb-0.5">
+        <div className="scroll-x mt-2 flex items-center gap-2 pb-0.5">
           {snapshot?.scenario && snapshot.scenario !== 'normal' ? (
             <Badge tone="warn" size="xs">
               시나리오: {snapshot.scenario}
@@ -154,7 +154,7 @@ export function StatusBar() {
          * 두 개를 나란히 두면 무엇이 다른지 알 수 없다.
          */}
         {error ? (
-          <p className="mt-1.5 text-[12.5px]" style={{ color: 'var(--warn)' }} role="status">
+          <p className="mt-2 text-[12.5px]" style={{ color: 'var(--warn)' }} role="status">
             최신 데이터를 받지 못해 마지막 정상 데이터를 표시하고 있습니다. ({error})
           </p>
         ) : null}

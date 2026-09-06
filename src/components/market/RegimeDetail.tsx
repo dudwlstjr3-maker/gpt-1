@@ -40,7 +40,7 @@ import type { RegimeDigest } from '@/types';
  */
 function BigChart({ history }: { history: { t: number; score: number }[] }) {
   if (history.length < 8) {
-    return <p className="card p-3.5 text-[13px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
+    return <p className="card p-3 text-[13px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
   }
   const years = Math.round((history[history.length - 1].t - history[0].t) / (365.25 * 86_400_000));
   const series: ChartSeries[] = [
@@ -56,7 +56,7 @@ function BigChart({ history }: { history: { t: number; score: number }[] }) {
     },
   ];
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <InteractiveChart series={series} height={190} label={`국면 점수 ${years}년 추이`} />
       <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
         매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은
@@ -113,7 +113,7 @@ function EpisodeTable({ title, note, episodes }: { title: string; note: string; 
   return (
     <div className="mt-3">
       <h3 className="text-[13px] font-bold text-fg-strong">{title}</h3>
-      <p className="mt-0.5 mb-1.5 text-[12.5px] leading-relaxed break-keep text-muted">{note}</p>
+      <p className="mt-0.5 mb-2 text-[12.5px] leading-relaxed break-keep text-muted">{note}</p>
       <div className="card overflow-x-auto p-0">
         <table className="w-full min-w-[420px] text-[12.5px]">
           <thead>
@@ -167,9 +167,9 @@ export function RegimeDetail() {
               <div className="mt-3">
                 <BigChart history={digest.history} />
               </div>
-              <ul className="mt-3 space-y-1">
+              <ul className="mt-3 space-y-2">
                 {digest.board.axes.map((a) => (
-                  <li key={a.id} className="card flex items-start gap-2 p-2.5">
+                  <li key={a.id} className="card flex items-start gap-2 p-3">
                     <span className="w-[74px] shrink-0 text-[12.5px] font-semibold text-fg-strong">{a.label}</span>
                     <div className="min-w-0 flex-1">
                       <p className="tnum text-[12.5px] text-fg">
@@ -242,7 +242,7 @@ export function RegimeDetail() {
         <h2 id="regime-limits" className="mb-2 text-base font-bold text-fg-strong">
           이 검증이 못 하는 것
         </h2>
-        <ul className="card space-y-2 p-3.5">
+        <ul className="card space-y-2 p-3">
           {EVIDENCE_LIMITS.map((l, i) => (
             <li key={i} className="flex items-start gap-2 text-[12.5px] leading-relaxed break-keep text-muted">
               <span aria-hidden="true" className="mt-[3px] shrink-0 text-subtle">
@@ -259,7 +259,7 @@ export function RegimeDetail() {
         <h2 id="regime-sources" className="mb-2 text-base font-bold text-fg-strong">
           검증에 쓴 자료
         </h2>
-        <ul className="card space-y-2.5 p-3.5">
+        <ul className="card space-y-2 p-3">
           {EVIDENCE_SOURCES.map((s) => (
             <li key={s.id}>
               <p className="text-[12.5px] font-semibold text-fg">{s.label}</p>

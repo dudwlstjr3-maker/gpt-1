@@ -87,7 +87,7 @@ export function CalendarMonth({
   };
 
   return (
-    <div className="card p-2.5">
+    <div className="card p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <button
           type="button"

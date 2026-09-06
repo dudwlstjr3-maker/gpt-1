@@ -19,7 +19,7 @@ import { CONFIDENCE_LABEL, MARKET_LABEL, type DataMode, type FngScore } from '@/
 function DeltaChip({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
-    <div className="mt-1 flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 py-1.5">
+    <div className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-surface-2 py-2">
       <span className="text-[11.5px] text-muted">{label}</span>
       <span className="tnum flex items-center gap-0.5 text-[13px] font-semibold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
@@ -40,7 +40,7 @@ function DriverRow({ kind, label, detail }: { kind: 'up' | 'down'; label: string
   const color = c.color(kind === 'up' ? 1 : -1);
   if (!label) return null;
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-2">
       <span aria-hidden="true" className="text-[11.5px] font-bold" style={{ color }}>
         {kind === 'up' ? '▲' : '▼'}
       </span>
@@ -67,14 +67,14 @@ export function FngCard({
 
   return (
     <article
-      className="card flex h-full flex-col p-3.5"
+      className="card flex h-full flex-col p-3"
       aria-labelledby={`fng-${score.market}-title`}
     >
       {/* 제목 줄에는 데이터 모드만 둔다. 국면·신뢰도 배지까지 오른쪽에 쌓으면
           왼쪽 글자 아래로 배지 하나가 혼자 떨어져 머리 부분이 들쭉날쭉해진다. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={`fng-${score.market}-title`} className="flex items-center gap-1.5 text-sm font-bold text-fg-strong">
+          <h3 id={`fng-${score.market}-title`} className="flex items-center gap-2 text-sm font-bold text-fg-strong">
             {/* 시장 색. 캘린더의 점과 같은 색이라 화면을 옮겨도 같은 시장으로 읽힌다.
                 뜻은 옆의 글자가 지고, 색은 훑기를 도울 뿐이다. */}
             <span
@@ -105,7 +105,7 @@ export function FngCard({
        * 그래서 자리는 고정하고 **말만 바꾼다** — 높음이면 조용한 색, 낮으면 경고 색.
        * 눈에 걸리게 하는 일은 '있다/없다' 가 아니라 색과 기호가 한다.
        */}
-      <div className="mt-1.5 mb-2 flex flex-wrap items-center gap-1">
+      <div className="mt-2 mb-2 flex flex-wrap items-center gap-1">
         <CyclePhaseBadge cycle={score.cycle} />
         <Badge tone={score.confidence === 'low' ? 'warn' : 'neutral'} size="xs" title={score.confidenceReason}>
           <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
@@ -119,7 +119,7 @@ export function FngCard({
 
       {unavailable ? (
         <p
-          className="mt-1 rounded-lg px-2.5 py-2 text-[12.5px] leading-relaxed break-keep"
+          className="mt-1 rounded-lg px-2 py-2 text-[12.5px] leading-relaxed break-keep"
           style={{ background: 'color-mix(in srgb, var(--warn) 12%, transparent)', color: 'var(--warn)' }}
           role="status"
         >
@@ -131,7 +131,7 @@ export function FngCard({
         <DeltaChip label="어제보다" value={score.deltaDay} />
       )}
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-[11.5px] text-muted">최근 30일</span>
         <ScoreSparkline
           points={score.spark}
@@ -141,7 +141,7 @@ export function FngCard({
         />
       </div>
 
-      <div className="mt-2.5 space-y-1.5 border-t border-border pt-2.5">
+      <div className="mt-2 space-y-2 border-t border-border pt-2">
         <DriverRow
           kind="up"
           label={score.topPositive?.label ?? null}
@@ -156,16 +156,16 @@ export function FngCard({
 
       {/* 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
           이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다. */}
-      <div className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2">
+      <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
         <Link
           href={`/market/${score.market}`}
-          className="flex-1 rounded-md bg-accent px-2 py-1.5 text-center text-[12.5px] font-semibold text-accent-fg hover:opacity-90"
+          className="flex-1 rounded-md bg-accent px-2 py-2 text-center text-[12.5px] font-semibold text-accent-fg hover:opacity-90"
         >
           {MARKET_LABEL[score.market]} 시장 →
         </Link>
         <Link
           href={`/fng/${score.market}`}
-          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-center text-[12.5px] font-semibold text-fg hover:bg-surface-3"
+          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-2 text-center text-[12.5px] font-semibold text-fg hover:bg-surface-3"
         >
           심리 상세 →
         </Link>
@@ -176,7 +176,7 @@ export function FngCard({
        * 대신 100% 가 아니면 색으로 표시해서, 90% 로 떨어진 날을 놓치지 않게 한다.
        */}
       <p
-        className="mt-1.5 text-[11.5px]"
+        className="mt-2 text-[11.5px]"
         style={{ color: score.coverage < 0.999 ? 'var(--warn)' : 'var(--subtle-fg)' }}
       >
         산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%

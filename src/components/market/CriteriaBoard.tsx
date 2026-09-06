@@ -66,13 +66,13 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
     setValue('30');
   };
 
-  const sel = 'w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-[13px] text-fg';
+  const sel = 'w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg';
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <h3 className="text-[13px] font-bold text-fg-strong">조건 추가</h3>
 
-      <div className="mt-2.5 space-y-2">
+      <div className="mt-2 space-y-2">
         <label className="block">
           <span className="mb-1 block text-[12.5px] text-muted">무엇을 볼까요</span>
           <select className={sel} value={kind} onChange={(e) => setKind(e.target.value as Criterion['kind'])}>
@@ -153,7 +153,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
         </div>
       </div>
 
-      {!valid ? <p className="mt-1.5 text-[12.5px] text-warn">숫자를 넣어 주세요.</p> : null}
+      {!valid ? <p className="mt-2 text-[12.5px] text-warn">숫자를 넣어 주세요.</p> : null}
 
       <button
         type="button"
@@ -213,7 +213,7 @@ export function CriteriaBoard() {
         </Notice>
       </div>
 
-      <div className="mt-2.5 px-3">
+      <div className="mt-2 px-3">
         <SegmentedControl
           label="내 기준 보기"
           full
@@ -236,19 +236,19 @@ export function CriteriaBoard() {
           ) : (
             <>
               {/* 요약은 개수다. 등급이나 판정을 만들지 않는다. */}
-              <div className="card p-3.5">
+              <div className="card p-3">
                 <p className="text-[13px] text-muted">내가 정한 조건</p>
                 <p className="tnum mt-1 text-[26px] leading-none font-bold text-fg-strong">
                   {sum.total}개 중 {sum.met}개 맞음
                 </p>
-                <p className="mt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
+                <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">
                   아님 {sum.unmet}개
                   {sum.unknown > 0 ? ` · 판정 불가 ${sum.unknown}개` : ''}
                   {sum.unknown > 0 ? ' — 값을 받지 못한 조건은 맞음으로 세지 않습니다.' : ''}
                 </p>
               </div>
 
-              <ul className="mt-2.5 space-y-2">
+              <ul className="mt-2 space-y-2">
                 {sum.results.map((r, i) => {
                   const c = r.criterion as Criterion;
                   const st = STATUS[r.status];
@@ -279,7 +279,7 @@ export function CriteriaBoard() {
           )}
         </div>
       ) : (
-        <div className="mt-3 space-y-2.5 px-3">
+        <div className="mt-3 space-y-2 px-3">
           <CriterionForm onAdd={addCriterion} indicators={indicators} />
 
           {settings.criteria.length > 0 ? (

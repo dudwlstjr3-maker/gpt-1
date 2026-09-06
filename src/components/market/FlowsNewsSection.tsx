@@ -13,7 +13,7 @@ function FlowBar({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   const dir = c.direction(value);
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5">
+    <div className="flex items-center justify-between gap-2 py-2">
       <span className="text-[13px] text-fg">{label}</span>
       <span className="tnum flex items-center gap-1 text-[13px] font-bold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
@@ -27,7 +27,7 @@ function FlowBar({ label, value }: { label: string; value: number | null }) {
 function FlowsCard({ flows }: { flows: FlowSummary }) {
   const allMissing = flows.foreign === null && flows.institution === null && flows.individual === null;
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <div className="mb-1 flex items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-fg-strong">한국 투자자별 당일 순매수</h3>
         <Badge tone="neutral" size="xs">
@@ -45,7 +45,7 @@ function FlowsCard({ flows }: { flows: FlowSummary }) {
           <FlowBar label="개인" value={flows.individual} />
         </div>
       )}
-      <p className="mt-2 border-t border-border pt-1.5 text-[11.5px] text-subtle">
+      <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
         기준 {formatRelative(flows.meta.asOf)} · 출처 {flows.meta.sources[0]?.name ?? '알 수 없음'}
       </p>
     </div>
@@ -64,7 +64,7 @@ export function FlowsNewsSection() {
         자금 흐름과 뉴스
       </h2>
 
-      <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 lg:grid-cols-1">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-1">
         <SectionGate section={flows} onRetry={refresh} loading={<SkeletonCard height={90} lines={1} />}>
           {(f) => <FlowsCard flows={f} />}
         </SectionGate>
@@ -76,7 +76,7 @@ export function FlowsNewsSection() {
           empty={<EmptyState title="뉴스가 없습니다" />}
         >
           {(items) => (
-            <div className="card p-3.5">
+            <div className="card p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-bold text-fg-strong">주요 뉴스</h3>
                 {isDemo ? (
@@ -90,9 +90,9 @@ export function FlowsNewsSection() {
                   DEMO 모드에서는 실제 기사가 아닌 가상의 샘플 매체·헤드라인을 보여줍니다.
                 </p>
               ) : null}
-              <ul className="space-y-2.5">
+              <ul className="space-y-2">
                 {items.slice(0, 5).map((n) => (
-                  <li key={n.id} className="border-b border-border pb-2.5 last:border-b-0 last:pb-0">
+                  <li key={n.id} className="border-b border-border pb-2 last:border-b-0 last:pb-0">
                     <p className="text-[13px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
                     <p className="mt-1 truncate text-[11.5px] text-subtle">{n.titleOriginal}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">

@@ -204,7 +204,7 @@ export function StageLegend({ score }: { score?: number | null }) {
         ) : null}
       </div>
 
-      <ul className="mt-1.5 flex text-[10.5px] leading-tight">
+      <ul className="mt-2 flex text-[10.5px] leading-tight">
         {FNG_STAGES.map((s) => {
           const active = current?.id === s.id;
           return (

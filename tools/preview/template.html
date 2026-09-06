@@ -229,7 +229,7 @@ button { font: inherit; cursor: pointer; }
 .preview {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
-  padding: 14px 16px;
+  padding: 16px 16px;
 }
 .preview-inner {
   margin: 0 auto;
@@ -267,7 +267,7 @@ button { font: inherit; cursor: pointer; }
   width: 224px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  padding: 18px 12px;
+  padding: 16px 12px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -282,8 +282,8 @@ button { font: inherit; cursor: pointer; }
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: 12px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -309,7 +309,7 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(12px);
 }
-.statusbar-inner { max-width: 1180px; margin: 0 auto; padding: 9px 12px; }
+.statusbar-inner { max-width: 1180px; margin: 0 auto; padding: 8px 12px; }
 .sb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* 한 줄로 못박는다. 배지는 상태에 따라 생겼다 없어지는데(오류·오래된 데이터·시나리오),
    줄바꿈을 허용하면 배지 하나에 이 줄이 25px → 52px 이 되고, 이 머리말은 sticky 라
@@ -324,15 +324,15 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
 /* 380px 아래에서는 아예 감춘다. 한 글자만 남기고 자르면 오히려 읽는 데 방해가 된다. */
 @media (max-width: 379px) { .sb-when { display: none; } }
 .clock { font-size: 14px; font-weight: 700; color: var(--fg-strong); }
-.clock small { font-size: 11.5px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+.clock small { font-size: 11.5px; font-weight: 400; color: var(--muted); margin-left: 4px; }
 
-.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-top: 8px; scrollbar-width: none; contain: paint; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; margin-top: 8px; scrollbar-width: none; contain: paint; }
 .chips::-webkit-scrollbar { display: none; }
 .chip {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: 9px;
@@ -342,9 +342,9 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
 .chip b { color: var(--fg); font-weight: 600; }
 .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-.sb-foot { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; }
+.sb-foot { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 8px; }
 .sb-foot p { margin: 0; font-size: 12.5px; color: var(--muted); order: 2; flex-basis: 100%; }
-.sb-toggles { display: flex; gap: 6px; order: 1; }
+.sb-toggles { display: flex; gap: 8px; order: 1; }
 @media (min-width: 560px) {
   .sb-foot p { order: 1; flex-basis: auto; }
   .sb-toggles { order: 2; }
@@ -364,14 +364,14 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
   white-space: nowrap;
 }
 .seg button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg-strong); }
-.seg.lg button { font-size: 13px; padding: 6px 11px; }
+.seg.lg button { font-size: 13px; padding: 8px 11px; }
 
 .ghost {
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);
   border-radius: 9px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -451,8 +451,8 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
 
-section.block { padding: 0 12px; margin-top: 22px; }
-.block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+section.block { padding: 0 12px; margin-top: 20px; }
+.block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .block-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--fg-strong); letter-spacing: -0.01em; }
 .block-head .hint { font-size: 12.5px; color: var(--subtle); }
 .linkbtn { border: 0; background: none; color: var(--accent); font-size: 12.5px; font-weight: 600; padding: 0; }
@@ -460,10 +460,10 @@ section.block { padding: 0 12px; margin-top: 22px; }
 
 .notice {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: flex-start;
   border-radius: 10px;
-  padding: 9px 11px;
+  padding: 8px 11px;
   font-size: 12.5px;
   line-height: 1.65;
   word-break: keep-all;
@@ -485,35 +485,35 @@ section.block { padding: 0 12px; margin-top: 22px; }
   .fng-scroll > * { width: auto; }
 }
 
-.fngcard { display: flex; flex-direction: column; padding: 14px; height: 100%; }
+.fngcard { display: flex; flex-direction: column; padding: 16px; height: 100%; }
 .fngcard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .fngcard h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--fg-strong); }
 .fngcard .sub { font-size: 11.5px; color: var(--subtle); margin-top: 2px; }
-.fng-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+.fng-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 
-.deltas { display: flex; gap: 6px; margin-top: 4px; }
-.delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: 9px; padding: 6px 2px; }
+.deltas { display: flex; gap: 8px; margin-top: 4px; }
+.delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: 9px; padding: 8px 2px; }
 /* 한 칸만 남았을 때는 가로로 눕힌다 */
-.delta.one { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.delta.one { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .delta.one small { display: inline; }
 .delta small { display: block; font-size: 11.5px; color: var(--muted); }
 .delta b { display: block; font-size: 13px; margin-top: 1px; }
 
-.sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
 .sparkrow small { font-size: 11.5px; color: var(--muted); }
 
-.drivers { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
-.driver { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
+.drivers { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.driver { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
 .driver .g { font-size: 11.5px; font-weight: 700; margin-top: 1px; flex-shrink: 0; }
 .driver .lbl { color: var(--muted); }
 .driver .det { display: block; font-size: 11.5px; color: var(--subtle); }
 
-.fngfoot { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 9px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fngfoot { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fngfoot small { font-size: 11.5px; color: var(--subtle); }
 
 /* --------------------------------- 가격 카드 --------------------------------- */
 
-.grid-cards { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.grid-cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
 @media (min-width: 640px) { .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
@@ -524,11 +524,11 @@ section.block { padding: 0 12px; margin-top: 22px; }
 .pcard-mid { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .pcard-price { font-size: 18px; font-weight: 700; color: var(--fg-strong); line-height: 1.2; }
 .pcard-chg { font-size: 13px; font-weight: 600; margin-top: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.pcard-foot { border-top: 1px solid var(--border); margin-top: 9px; padding-top: 7px; display: flex; flex-wrap: wrap; gap: 2px 9px; font-size: 11.5px; color: var(--subtle); }
+.pcard-foot { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 8px; display: flex; flex-wrap: wrap; gap: 2px 9px; font-size: 11.5px; color: var(--subtle); }
 /* 별표는 글자로는 작아야 맞지만 손가락에는 14px 이 너무 작다.
    글리프는 그대로 두고 ::after 로 누를 자리만 36×44 로 넓힌다. */
 .star { position: relative; border: 0; background: none; font-size: 16px; line-height: 1; padding: 0; color: var(--subtle); flex-shrink: 0; }
-.star::after { content: ''; position: absolute; inset: -14px -10px; }
+.star::after { content: ''; position: absolute; inset: -14px -8px; }
 .star[aria-pressed='true'] { color: var(--warn); }
 
 /* 화면 읽는 법 — 한 줄만 남기고 접어 둔다 */
@@ -538,7 +538,7 @@ section.block { padding: 0 12px; margin-top: 22px; }
 .rguide-head p { margin: 0; font-size: 12.5px; line-height: 1.7; word-break: keep-all; color: var(--muted); }
 .rguide-head b { color: var(--fg); }
 .rguide-head button { display: block; border: 0; background: none; padding: 4px; margin: 4px 0 -4px -4px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; }
-.rguide-body { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.rguide-body { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
 .rguide-body .notice { margin: 0; }
 
 /* --------------------------------- 지표 타일 --------------------------------- */
@@ -546,38 +546,38 @@ section.block { padding: 0 12px; margin-top: 22px; }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @media (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .tile .t-label { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .t-val { font-size: 14.5px; font-weight: 700; margin-top: 2px; }
 .tile .t-sub { font-size: 11.5px; color: var(--subtle); }
-.tile .t-risk { font-size: 11.5px; margin-top: 5px; display: flex; gap: 4px; align-items: center; }
+.tile .t-risk { font-size: 11.5px; margin-top: 4px; display: flex; gap: 4px; align-items: center; }
 
 /* ---------------------------------- 요약 ---------------------------------- */
 
 .summary li { display: flex; gap: 8px; align-items: flex-start; }
 .summary li > p { flex: 1; min-width: 0; }
-.summary ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.summary ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .summary p { margin: 0; font-size: 13px; line-height: 1.65; word-break: keep-all; }
 
 /* --------------------------------- 캘린더 --------------------------------- */
 
 .evlist { list-style: none; margin: 0; padding: 0; }
-.evlist li { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.evlist li { padding: 12px; border-bottom: 1px solid var(--border); }
 .evlist li:last-child { border-bottom: 0; }
 .ev-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-.ev-title { font-size: 13px; font-weight: 600; line-height: 1.35; word-break: keep-all; margin-top: 5px; }
+.ev-title { font-size: 13px; font-weight: 600; line-height: 1.35; word-break: keep-all; margin-top: 4px; }
 .ev-note { font-size: 11.5px; color: var(--subtle); margin-top: 2px; }
 .ev-time { text-align: right; flex-shrink: 0; }
 .ev-time b { font-size: 13px; color: var(--fg-strong); }
 .ev-time small { display: block; font-size: 11.5px; color: var(--subtle); }
-.ev-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; font-size: 11.5px; }
+.ev-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 8px; font-size: 11.5px; }
 .ev-meta span { color: var(--subtle); }
 .ev-meta b { color: var(--fg); font-weight: 600; }
 
 /* ---------------------------------- 뉴스 ---------------------------------- */
 
-.news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
-.news li { border-bottom: 1px solid var(--border); padding-bottom: 11px; }
+.news { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.news li { border-bottom: 1px solid var(--border); padding-bottom: 12px; }
 .news li:last-child { border-bottom: 0; padding-bottom: 0; }
 .news p { margin: 0; font-size: 13px; line-height: 1.65; word-break: keep-all; }
 .news .orig { font-size: 11.5px; color: var(--subtle); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -585,40 +585,40 @@ section.block { padding: 0 12px; margin-top: 22px; }
 
 /* ---------------------------------- 수급 ---------------------------------- */
 
-.flowrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.flowrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .flowrow:last-child { border-bottom: 0; }
 .flowrow span { font-size: 13px; }
-.flowrow b { font-size: 13px; display: flex; align-items: center; gap: 5px; }
+.flowrow b { font-size: 13px; display: flex; align-items: center; gap: 4px; }
 
 /* --------------------------------- 상세 화면 --------------------------------- */
 
-.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 12px 0; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 12px 0; }
 .detail-head h1 { margin: 0; font-size: 19px; font-weight: 700; color: var(--fg-strong); letter-spacing: -0.02em; }
 .backbtn { border: 0; background: none; color: var(--muted); font-size: 16px; padding: 0 4px 0 0; }
 
-.summary-grid { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-@media (min-width: 900px) { .summary-grid { flex-direction: row; align-items: center; gap: 26px; } }
+.summary-grid { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+@media (min-width: 900px) { .summary-grid { flex-direction: row; align-items: center; gap: 24px; } }
 .summary-grid > .meta { flex: 1; width: 100%; max-width: 560px; }
 
 dl.kv { margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-dl.kv > div { display: flex; justify-content: space-between; gap: 10px; }
+dl.kv > div { display: flex; justify-content: space-between; gap: 12px; }
 dl.kv dt { color: var(--muted); flex-shrink: 0; }
 dl.kv dd { margin: 0; text-align: right; color: var(--fg); }
 
-.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 11.5px; color: var(--muted); list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--border); margin-top: 14px; }
-.legend li { display: flex; align-items: center; gap: 5px; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; font-size: 11.5px; color: var(--muted); list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--border); margin-top: 16px; }
+.legend li { display: flex; align-items: center; gap: 4px; }
 
 .comp { border-bottom: 1px solid var(--border); }
 .comp:last-child { border-bottom: 0; }
-.comp-btn { width: 100%; display: flex; gap: 8px; align-items: flex-start; padding: 11px 12px; background: none; border: 0; text-align: left; color: inherit; }
+.comp-btn { width: 100%; display: flex; gap: 8px; align-items: flex-start; padding: 12px 12px; background: none; border: 0; text-align: left; color: inherit; }
 .comp-btn:hover { background: var(--surface-2); }
 .comp-main { flex: 1; min-width: 0; }
-.comp-labels { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.comp-labels { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .comp-name { font-size: 13px; font-weight: 600; word-break: keep-all; }
 .comp-score { text-align: right; flex-shrink: 0; }
 .comp-score b { font-size: 15px; }
 .comp-score small { display: block; font-size: 11.5px; color: var(--muted); }
-.comp-body { background: var(--surface-2); border-top: 1px solid var(--border); padding: 11px 12px; }
+.comp-body { background: var(--surface-2); border-top: 1px solid var(--border); padding: 12px 12px; }
 .comp-desc { margin: 0 0 9px; font-size: 12.5px; color: var(--muted); line-height: 1.65; word-break: keep-all; }
 
 .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -626,7 +626,7 @@ dl.kv dd { margin: 0; text-align: right; color: var(--fg); }
 /* 차트마다 붙는 표 대안. 앱의 .scroll-x / .data-table 과 같은 모양을 낸다. */
 .scroll-x { overflow-x: auto; }
 table.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-table.data-table th, table.data-table td { padding: 6px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
+table.data-table th, table.data-table td { padding: 8px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
 table.data-table tr:last-child th, table.data-table tr:last-child td { border-bottom: 0; }
 table.data-table th:first-child, table.data-table td:first-child { text-align: left; }
 table.data-table thead th { font-size: 11.5px; font-weight: 600; color: var(--muted); }
@@ -635,15 +635,15 @@ table.data-table thead th { font-size: 11.5px; font-weight: 600; color: var(--mu
 /* 생활 경제 카드 — 넓은 화면에서는 두 칸. 한 줄로만 세우면 카드 하나가 950px 을
    차지하면서 글자는 350자뿐이라, 폭은 남아돌고 세로로는 4,700px 을 굴러야 했다.
    세 칸은 넣지 않는다 — 310px 밑으로 내려가면 이름과 값이 한 줄에 못 선다. */
-.bgrid { display: grid; gap: 10px; }
+.bgrid { display: grid; gap: 8px; }
 @media (min-width: 768px) { .bgrid { grid-template-columns: 1fr 1fr; } }
 table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.data th, table.data td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.data th, table.data td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
 table.data tr:last-child td, table.data tr:last-child th { border-bottom: 0; }
 table.data th:first-child, table.data td:first-child { text-align: left; white-space: normal; }
 table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
 
-.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .bar-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .bar-top span { font-size: 12.5px; }
 .bar-top b { font-size: 12.5px; flex-shrink: 0; }
@@ -651,7 +651,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .bar-zero { position: absolute; inset-block: 0; left: 50%; width: 1px; background: var(--border-strong); }
 .bar-fill { position: absolute; inset-block: 0; border-radius: 999px; }
 
-.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .steps li { font-size: 12.5px; color: var(--muted); line-height: 1.7; word-break: keep-all; }
 
 /* ---------------------------------- 차트 ---------------------------------- */
@@ -669,8 +669,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .chartbox svg.dragging { cursor: grabbing; }
 .chartbox svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
-.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-bottom: 6px; }
-.chart-legend li { list-style: none; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-bottom: 8px; }
+.chart-legend li { list-style: none; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
 .swatch { width: 16px; height: 2px; border-radius: 2px; display: inline-block; }
 .tip {
   position: absolute;
@@ -679,7 +679,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 9px;
-  padding: 6px 9px;
+  padding: 8px 9px;
   font-size: 12.5px;
   box-shadow: var(--shadow);
   width: 168px;
@@ -687,11 +687,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   transition: opacity 0.12s;
 }
 .tip.on { opacity: 1; }
-.tip .tt-mark { display: flex; align-items: flex-start; gap: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: var(--fg); line-height: 1.35; word-break: keep-all; }
+.tip .tt-mark { display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 4px; font-size: 11.5px; font-weight: 600; color: var(--fg); line-height: 1.35; word-break: keep-all; }
 .tip .tt-badge { flex-shrink: 0; width: 14px; height: 14px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: var(--bg); margin-top: 1px; }
-.tip .tt-time { font-size: 11.5px; color: var(--subtle); margin-bottom: 3px; }
+.tip .tt-time { font-size: 11.5px; color: var(--subtle); margin-bottom: 4px; }
 .tip .tt-row { display: flex; justify-content: space-between; gap: 8px; }
-.tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 4px; }
 .tip .tt-row b { color: var(--fg); font-weight: 600; }
 
 /* --------------------------------- 하단 탭 --------------------------------- */
@@ -714,7 +714,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   color: var(--muted);
   font-size: 11.5px;
   font-weight: 600;
-  padding: 7px 2px;
+  padding: 8px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -731,7 +731,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
 .disclaimer { border-top: 1px solid var(--border); padding: 20px 12px 26px; max-width: 1180px; margin: 32px auto 0; width: 100%; }
 .disclaimer .strong { font-size: 13px; font-weight: 700; color: var(--fg); margin: 8px 0 0; }
-.disclaimer .fine { font-size: 11.5px; color: var(--subtle); line-height: 1.75; margin: 6px 0 0; word-break: keep-all; max-width: 76ch; }
+.disclaimer .fine { font-size: 11.5px; color: var(--subtle); line-height: 1.75; margin: 8px 0 0; word-break: keep-all; max-width: 76ch; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
@@ -747,7 +747,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         Next.js 앱의 실제 화면입니다. 아래 수치는 실행 중인 서버의 <strong style="color:var(--warn)">DEMO 스냅샷</strong>을 그대로 담았고,
         점수는 하드코딩이 아니라 실제 산출 엔진이 계산한 값입니다. 탭·통화·색상·테마 전환과 차트 툴팁이 모두 동작합니다.
       </p>
-      <p class="preview-note" style="margin-top:6px" id="captured"></p>
+      <p class="preview-note" style="margin-top:8px" id="captured"></p>
     </div>
     <div class="preview-controls">
       <div class="seg" role="group" aria-label="DEMO 시나리오">
@@ -1025,7 +1025,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         const on = g.length > 0;
         return '<li style="border-color:' + (on ? 'color-mix(in srgb,' + sigColor(x) + ' 45%,var(--border))' : 'var(--border)') +
           ';background:' + (on ? 'color-mix(in srgb,' + sigColor(x) + ' 10%,var(--surface))' : 'var(--surface)') + '">' +
-          '<span style="display:flex;align-items:center;justify-content:center;gap:6px">' + sigDot(x, 9) +
+          '<span style="display:flex;align-items:center;justify-content:center;gap:8px">' + sigDot(x, 9) +
           '<span style="font-size:11.5px;font-weight:600;color:' + sigColor(x) + '">' + SIGNAL_NAME[x] + '</span></span>' +
           '<p class="tnum" style="margin:2px 0 0;font-size:19px;line-height:1;font-weight:700;color:' + sigColor(x) + '">' + g.length +
           '<span style="margin-left:2px;font-size:11.5px;font-weight:400;color:var(--subtle)">개</span></p>' +
@@ -1041,7 +1041,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     SIGNAL_ORDER.slice().reverse().map((x) =>
       '<li>' + sigDot(x, 8) + '<span style="font-weight:600;color:' + sigColor(x) + '">' + SIGNAL_NAME[x] +
       '</span><span style="color:var(--subtle)">' + SIGNAL_MEAN[x] + '</span></li>').join('') +
-    '</ul><p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(note) + '</p></div>';
+    '</ul><p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(note) + '</p></div>';
 
   const dirOf = (v) => (!isNum(v) ? 'none' : v > 0 ? 'up' : v < 0 ? 'down' : 'flat');
   const dirColor = (v) => { const d = dirOf(v); return d === 'up' ? 'var(--up)' : d === 'down' ? 'var(--down)' : d === 'flat' ? 'var(--muted)' : 'var(--subtle)'; };
@@ -1134,7 +1134,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '</svg>' +
       '<div style="position:absolute;inset-inline:0;top:' + h * 0.45 + 'px;display:flex;flex-direction:column;align-items:center;pointer-events:none">' +
       '<span class="tnum" style="font-size:' + (size > 180 ? 34 : 29) + 'px;font-weight:700;line-height:1;color:' + scoreColor(s) + '">' + (s === null ? NO : fmtScore(s)) + '</span>' +
-      '<span style="margin-top:5px;font-size:12.5px;font-weight:600;color:' + scoreColor(s) + '">' + (s === null ? '산출 불가' : st.glyph + ' ' + st.label) + '</span>' +
+      '<span style="margin-top:4px;font-size:12.5px;font-weight:600;color:' + scoreColor(s) + '">' + (s === null ? '산출 불가' : st.glyph + ' ' + st.label) + '</span>' +
       '</div></div>'
     );
   }
@@ -1338,7 +1338,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
          뒤따르는 글자와 겹친다. */
       '<div class="chartbox" id="' + id + '" data-chart="' + id + '" style="height:' + (height + (splitNow ? SPLIT_EXTRA : 0)) + 'px"></div>' +
       '<div id="' + id + '-table" hidden></div>' +
-      '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
       '끌어서 구간을 고르면 그 구간만 확대되고, 확대한 뒤에는 끌어서 좌우로 옮깁니다. 휠이나 두 손가락으로도 확대·축소할 수 있습니다. 두 번 누르면 전체 구간으로 돌아갑니다. ' +
       '키보드는 ← → 시점 이동, Shift+← → 화면 이동, ＋/− 확대·축소, 0 전체입니다. 같은 내용을 표로도 볼 수 있습니다.' +
       '<b id="' + id + '-hint" style="color:var(--muted)"></b></p>' +
@@ -1579,7 +1579,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   /* ====================================================================== */
 
   const badge = (cls, text, title, size) => '<span class="badge ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : '') +
-    (size === 'sm' ? ' style="font-size:12.5px;padding:3px 9px"' :
+    (size === 'sm' ? ' style="font-size:12.5px;padding:4px 9px"' :
      size === '2xs' ? ' style="font-size:10.5px;padding:1px 6px"' : '') + '>' + text + '</span>';
   const modeBadge = () => badge('b-demo', 'DEMO', '고정 샘플 데이터입니다. 실제 시세가 아닙니다.');
   const confBadge = (c, reason) => {
@@ -1651,7 +1651,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
     return (
       '<article class="card fngcard">' +
-      '<header><div><h3><span aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;background:' + mkColor(f.market) + '"></span>' + MARKET_LABEL[f.market] + (standalone === false ? '' : ' 투자심리') + '</h3>' +
+      '<header><div><h3><span aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:8px;background:' + mkColor(f.market) + '"></span>' + MARKET_LABEL[f.market] + (standalone === false ? '' : ' 투자심리') + '</h3>' +
       (standalone === false ? '' : '<div class="sub">자체 산출 지수 · ' + esc(f.formulaVersion) + '</div>') + '</div>' +
       /* 신뢰도는 늘 적는다. 높을 때 숨겼더니 값이 나빠지는 순간 배지가 새로 생기면서
          이 줄이 한 줄에서 두 줄이 됐고, 카드가 362px → 409px 로 커져 아래가 47px 밀렸다.
@@ -1670,7 +1670,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
          대신 100% 가 아니면 색으로 표시해 떨어진 날을 놓치지 않게 한다. */
       '<div class="fngfoot"><small' + (f.coverage < 0.999 ? ' style="color:var(--warn)"' : '') + '>산출 ' +
       esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</small>' +
-      '<button type="button" class="ghost" data-go-region="' + f.market + '" style="margin-right:6px">' + esc(MARKET_LABEL[f.market]) + ' 시장 →</button>' +
+      '<button type="button" class="ghost" data-go-region="' + f.market + '" style="margin-right:8px">' + esc(MARKET_LABEL[f.market]) + ' 시장 →</button>' +
       '<button type="button" class="ghost" data-go-fng="' + f.market + '">심리 상세 →</button></div>' +
       '</article>'
     );
@@ -1682,7 +1682,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const delay = q.meta.sources[0] ? q.meta.sources[0].delayMinutes : null;
     return (
       '<article class="card pcard" aria-label="' + esc(q.name) + ' 시세">' +
-      '<div class="pcard-top"><div style="display:flex;gap:10px;align-items:flex-start;min-width:0">' +
+      '<div class="pcard-top"><div style="display:flex;gap:8px;align-items:flex-start;min-width:0">' +
       '<button type="button" class="star" data-watch="' + q.id + '" aria-pressed="' + state.watch.has(q.id) + '" aria-label="' + esc(q.name) + ' 관심목록 전환">' +
       (state.watch.has(q.id) ? '★' : '☆') + '</button>' +
       '<div style="min-width:0"><div class="pcard-name">' + esc(q.name) + '</div>' +
@@ -1717,14 +1717,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const g = INDICATOR_GUIDE[id];
     if (!g) return '';
     return (
-      '<details style="margin-top:6px"><summary style="cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--accent)">이게 무슨 지표인가요? ▾</summary>' +
-      '<div style="margin-top:6px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
+      '<details style="margin-top:8px"><summary style="cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--accent)">이게 무슨 지표인가요? ▾</summary>' +
+      '<div style="margin-top:8px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
       /* 기준점이 있는 지수는 그것부터. 기준을 모르면 숫자를 읽을 수 없다. */
-      (g.baseline ? '<p style="margin:6px 0 0;border-radius:6px;background:var(--surface-3);padding:6px 8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">기준 · </b>' + esc(g.baseline) + '</p>' : '') +
-      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">' +
+      (g.baseline ? '<p style="margin:8px 0 0;border-radius:6px;background:var(--surface-3);padding:8px 8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">기준 · </b>' + esc(g.baseline) + '</p>' : '') +
+      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:8px">' +
       [['▲', '오르면', g.whenUp], ['▼', '내리면', g.whenDown]].map(([gl, lb, tx]) =>
-        '<div style="display:flex;align-items:flex-start;gap:6px">' +
+        '<div style="display:flex;align-items:flex-start;gap:8px">' +
         '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;font-size:11.5px;color:var(--muted)">' + gl + '</span>' +
         '<dt class="sr">값이 ' + lb + '</dt>' +
         '<dd style="margin:0;min-width:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
@@ -1768,7 +1768,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const [il, ig, ic] = IMP[e.importance];
     return (
       '<li><div class="ev-top"><div style="min-width:0;flex:1">' +
-      '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       '<span style="display:inline-flex;align-items:center;gap:4px;border-radius:99px;border:1px solid color-mix(in srgb,' + mkColor(e.market) + ' 45%,var(--border));background:color-mix(in srgb,' + mkColor(e.market) + ' 12%,transparent);padding:1px 6px;font-size:11.5px;font-weight:600;color:' + mkColor(e.market) + '">' +
       '<span aria-hidden="true" style="display:block;width:5px;height:5px;border-radius:99px;background:' + mkColor(e.market) + '"></span>' +
       esc(MARKET_BADGE[e.market]) + '</span>' + badge(ic, ig + ' ' + il, '중요도 ' + il) +
@@ -1784,7 +1784,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         : '<b class="tnum">' + esc(kTime(e.scheduledAt)) + '</b>') +
       '<small class="tnum">' + esc(kDate(e.scheduledAt)) + ' KST</small>' +
       '<small class="tnum" style="color:' + (t <= now ? 'var(--subtle)' : 'var(--accent)') + '">' + esc(countdown(t - now)) + '</small></div></div>' +
-      '<dl class="ev-meta" style="margin:6px 0 0">' +
+      '<dl class="ev-meta" style="margin:8px 0 0">' +
       '<div><span>예상 </span><b class="tnum">' + esc(e.forecast || NO) + '</b></div>' +
       '<div><span>이전 </span><b class="tnum">' + esc(e.previous || NO) + '</b></div>' +
       '<div><span>발표 </span><b class="tnum" style="color:' + (e.actual ? 'var(--accent)' : 'var(--subtle)') + '">' + esc(e.actual || '미발표') + '</b></div>' +
@@ -1802,7 +1802,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const aria = '공포에서 탐욕까지 5단계 띠. ' + STAGES.map((st) => st.label + ' ' + st.min + '부터 ' + st.max).join(', ') +
       '.' + (cur ? ' 현재는 ' + cur.label + ' 단계.' : '');
     return (
-      '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">' +
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">' +
       '<div class="bandbar" style="height:14px" role="img" aria-label="' + esc(aria) + '">' +
       STAGES.map((st) => '<span class="bseg" data-on="' + (!cur || cur.id === st.id ? '1' : '0') +
         '" style="width:20%;background:var(' + st.v + 'f)"></span>').join('') +
@@ -1858,7 +1858,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           sigDot(riskSignal(i.level), 6) +
           '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">지금 여기 · ' + RISK_LABEL[i.level] + ' ' + esc(cur ? cur.label : '') + '</span></span>' +
           '<span class="tnum" style="flex-shrink:0">' + esc(fmtNum(i.scaleMax, p)) + (i.offScale === 'above' ? ' ›' : '') + '</span></div>' +
-          (i.scaleNote ? '<p style="margin:6px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">※ ' + esc(i.scaleNote) + '</p>' : '')
+          (i.scaleNote ? '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">※ ' + esc(i.scaleNote) + '</p>' : '')
         : '')
     );
   }
@@ -1875,25 +1875,25 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const open = state.openTile === i.id;
     const g = INDICATOR_GUIDE[i.id];
     return (
-      '<div class="card" style="padding:10px">' +
+      '<div class="card" style="padding:12px">' +
       '<button type="button" data-tile="' + esc(i.id) + '" aria-expanded="' + open + '" style="display:block;width:100%;text-align:left;border:0;background:none;padding:0;color:inherit">' +
-      '<div style="display:flex;align-items:flex-start;gap:6px">' + lamp(riskSignal(i.level), 'sm', i.shortName) +
+      '<div style="display:flex;align-items:flex-start;gap:8px">' + lamp(riskSignal(i.level), 'sm', i.shortName) +
       '<div style="min-width:0;flex:1"><div style="font-size:12.5px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</div>' +
       '<div style="font-size:10.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
       '<b style="color:' + RISK_COLOR[i.level] + '">' + RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</b></div></div></div>' +
       (un
-        ? '<p style="margin:6px 0 0;font-size:11.5px;color:var(--warn)">' + esc(i.unavailableReason || '값 없음') + '</p>'
-        : '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-top:6px">' +
+        ? '<p style="margin:8px 0 0;font-size:11.5px;color:var(--warn)">' + esc(i.unavailableReason || '값 없음') + '</p>'
+        : '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:4px;margin-top:8px">' +
           '<span class="tnum" style="font-size:15px;font-weight:700;color:var(--fg-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(riskValue(i.value, i)) + '</span>' +
           '<span class="tnum" style="flex-shrink:0;font-size:11.5px;color:' + dirColor(i.change) + '">' + dirGlyph(i.change) + ' ' + esc(riskChange(i.change, i)) + '</span></div>') +
       '<div style="margin-top:8px">' + bandBar(i, false) + '</div>' +
-      '<p style="margin:6px 0 0;display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:10.5px;color:var(--subtle)">' +
+      '<p style="margin:8px 0 0;display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:10.5px;color:var(--subtle)">' +
       (open ? '접기' : '무슨 뜻인가요') + '<span aria-hidden="true">' + (open ? '⌃' : '⌄') + '</span></p>' +
       '</button>' +
       (open && g
         ? '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
           '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
-          '<div style="margin-top:8px;display:grid;gap:6px">' +
+          '<div style="margin-top:8px;display:grid;gap:8px">' +
           '<div><div style="font-size:11.5px;font-weight:600;color:var(--tl-red)">올라가면</div>' +
           '<div style="font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(g.whenUp) + '</div></div>' +
           '<div><div style="font-size:11.5px;font-weight:600;color:var(--tl-green)">내려가면</div>' +
@@ -1909,27 +1909,84 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     );
   }
 
+  /* 위험이 커지는 쪽으로 다음 경계가 어디인지. 이미 제일 위험한 구간이면
+     반대로 한 단계 나아지는 경계를 돌려준다. (앱: src/lib/riskJudgement.mjs) */
+  function nextBoundary(i) {
+    const v = i.value, bands = i.bands;
+    if (typeof v !== 'number' || !isNum(v) || !bands || !bands.length) return null;
+    const up = i.direction !== 'lower_is_riskier';
+    const ordered = up ? bands.slice() : bands.slice().reverse();
+    for (const b of ordered) {
+      const edge = up ? b.from : b.to;
+      if (typeof edge !== 'number') continue;
+      if (up ? edge > v : edge < v) return { level: b.level, at: edge, delta: edge - v, dir: 'worse' };
+    }
+    for (let k = ordered.length - 1; k >= 0; k -= 1) {
+      const b = ordered[k], edge = up ? b.from : b.to;
+      if (typeof edge !== 'number') continue;
+      if (up ? edge <= v : edge >= v) {
+        const safer = ordered[k - 1];
+        return { level: safer ? safer.level : b.level, at: edge, delta: edge - v, dir: 'better' };
+      }
+    }
+    return null;
+  }
+
+  /* 최근 구간의 최저~최고 사이에서 지금 값이 선 자리. 백분위가 아니다 —
+     표본이 30일뿐이라 백분위라고 부르면 실제보다 센 말이 된다. */
+  function recentPosition(spark, value) {
+    if (typeof value !== 'number' || !isNum(value) || !spark) return null;
+    const vals = spark.map((q) => q && q.v).filter(isNum);
+    if (vals.length < 5) return null;
+    const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    if (!(max > min)) return null;
+    return { min: min, max: max, pct: Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100)), days: vals.length };
+  }
+
+  const positionWord = (pct) => (pct <= 15 ? '아래쪽 끝' : pct <= 40 ? '아래쪽' : pct < 60 ? '가운데' : pct < 85 ? '위쪽' : '위쪽 끝');
+
+  /* 판단 재료 두 칸 — 뺄셈은 화면이 대신 한다. 15 에서 11.55 를 빼게 만들지 않는다. */
+  function judgeStrip(i) {
+    const b = nextBoundary(i), r = recentPosition(i.spark, i.value);
+    if (!b && !r) return '';
+    const u = (v) => esc(fmtNum(v, i.precision) + (i.suffix || ''));
+    const cell = (title, big, small, color) =>
+      '<div style="border-radius:9px;background:var(--surface-2);padding:8px">' +
+      '<div style="font-size:11.5px;color:var(--subtle)">' + title + '</div>' +
+      '<div style="margin-top:4px;font-size:13px;font-weight:700;color:' + (color || 'var(--fg-strong)') + '">' + big + '</div>' +
+      '<div class="tnum" style="margin-top:4px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + small + '</div></div>';
+    return '<div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      cell(b && b.dir === 'better' ? '한 단계 낮아지려면' : '다음 단계',
+        b ? esc(RISK_LABEL[b.level]) : NO,
+        b ? u(b.at) + (b.dir === 'better' ? (b.delta < 0 ? ' 아래로' : ' 위로') : '부터') + ' · 지금보다 ' + esc(fmtSigned(b.delta, i.precision)) : '',
+        b ? RISK_COLOR[b.level] : null) +
+      cell('최근 ' + (r ? r.days : 30) + '일 안에서',
+        r ? positionWord(r.pct) : '—',
+        r ? u(r.min) + ' ~ ' + u(r.max) + ' 중 ' + Math.round(r.pct) + '%' : '움직임이 없어 위치를 말할 수 없습니다') +
+      '</div>';
+  }
+
   function riskCard(i) {
     const un = i.value === null;
     return (
-      '<article class="card" style="padding:14px">' +
+      '<article class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:flex-start;gap:8px">' + lamp(riskSignal(i.level), 'lg', i.name) +
       '<div style="min-width:0;flex:1"><h3 style="margin:0;font-size:13.5px;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(i.name) + '</h3>' +
       '<p style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
       (i.direction === 'higher_is_riskier' ? '값이 클수록 위험' : '값이 작을수록 위험') + '</p></div>' +
       badge(RISK_BADGE[i.level], RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level], '', 'sm') + '</div>' +
 
-      '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:10px">' +
+      '<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:8px">' +
       '<div style="min-width:0">' +
       (un
         ? '<p style="margin:0;font-size:13px;color:var(--warn)">' + esc(i.unavailableReason || '값을 받지 못했습니다.') + '</p>'
         : '<p class="tnum" style="margin:0;font-size:20px;font-weight:700;line-height:1.2;color:var(--fg-strong)">' + esc(riskValue(i.value, i)) + '</p>' +
           '<p class="tnum" style="margin:2px 0 0;font-size:12.5px;font-weight:600;color:' + dirColor(i.change) + '">' +
           dirGlyph(i.change) + ' ' + esc(riskChange(i.change, i)) +
-          '<span style="margin-left:5px;font-weight:400;color:var(--subtle)">이전 ' + esc(riskValue(i.previous, i)) + '</span></p>') +
+          '<span style="margin-left:4px;font-weight:400;color:var(--subtle)">이전 ' + esc(riskValue(i.previous, i)) + '</span></p>') +
       '</div>' + sparkline(i.spark, RISK_COLOR[i.level], 92, 32, true) + '</div>' +
 
-      '<div style="margin-top:12px">' + bandBar(i, true) + '</div>' +
+      '<div style="margin-top:12px">' + bandBar(i, true) + judgeStrip(i) + '</div>' +
 
       '<ul class="bandlegend">' + i.bands.map((b) => {
         const on = b.level === i.level;
@@ -1939,14 +1996,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           RISK_LABEL[b.level] + ' ' + esc(b.label) + '</span></li>';
       }).join('') + '</ul>' +
 
-      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px">' +
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:' + RISK_COLOR[i.level] + '"><b>지금 읽는 법 · </b>' + esc(i.reading) + '</p></div>' +
 
       /* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */
-      '<dl style="margin:10px 0 0;border-radius:9px;background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:6px">' +
+      '<dl style="margin:8px 0 0;border-radius:9px;background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:8px">' +
       [['▲', '값이 오르면', i.whenUp], ['▼', '값이 내리면', i.whenDown]].map(([gl, lb, tx]) =>
-        '<div style="display:flex;align-items:flex-start;gap:6px">' +
+        '<div style="display:flex;align-items:flex-start;gap:8px">' +
         '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;font-size:11.5px;color:var(--muted)">' + gl + '</span>' +
         '<dt class="sr">' + lb + '</dt>' +
         '<dd style="margin:0;min-width:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
@@ -1986,7 +2043,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function riskHeadline(d) {
     const sig = d.alertCount > 0 ? 'red' : d.watchCount > 0 ? 'yellow' : 'green';
     return (
-      '<div class="card" style="display:flex;align-items:flex-start;gap:8px;padding:11px 13px;border-color:color-mix(in srgb,' +
+      '<div class="card" style="display:flex;align-items:flex-start;gap:8px;padding:12px 13px;border-color:color-mix(in srgb,' +
       sigColor(sig) + ' 38%,var(--border))">' + lamp(sig, 'sm', '종합') +
       '<p style="margin:0;flex:1;min-width:0;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(d.headline) + '</p></div>'
     );
@@ -2006,9 +2063,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function crisisCard(ev, currentScore) {
     if (!ev || !ev.markers || !ev.markers.length) {
       return (
-        '<div class="card" style="padding:14px">' +
+        '<div class="card" style="padding:12px">' +
         '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">과거 위기 때의 점수</h3>' +
-        '<p style="margin:6px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">이 시장에서 표시할 사건이 히스토리 범위 안에 없습니다.</p></div>'
+        '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">이 시장에서 표시할 사건이 히스토리 범위 안에 없습니다.</p></div>'
       );
     }
 
@@ -2030,21 +2087,21 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         '<div style="min-width:0;flex:1">' +
         '<p style="margin:0;font-size:13px;font-weight:600;line-height:1.3;word-break:keep-all;color:var(--fg)">' + esc(m.label) + '</p>' +
         '<p class="tnum" style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + esc(kYmd(m.t)) +
-        '<span style="margin-left:6px">' + (EVENT_CAT_LABEL[m.category] || '') + '</span></p></div>' +
+        '<span style="margin-left:8px">' + (EVENT_CAT_LABEL[m.category] || '') + '</span></p></div>' +
         '<div style="flex-shrink:0;text-align:right">' +
         '<p class="tnum" style="margin:0;font-size:16px;line-height:1;font-weight:700;color:' + col + '">' +
         (m.score === null ? NO : esc(fmtNum(m.score, 1))) + '</p>' +
         '<p style="margin:4px 0 0;font-size:11.5px;font-weight:600;color:' + col + '">' + esc(m.stageLabel || '산출 불가') + '</p>' +
         '</div></div>' +
         (on
-          ? '<p style="margin:6px 0 0;border-top:1px solid var(--border);padding-top:6px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(m.note) + '</p>'
+          ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(m.note) + '</p>'
           : '') +
         '</button></li>'
       );
     }).join('');
 
     return (
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">' +
       '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">과거 위기 때의 점수</h3>' +
       '<span class="tnum" style="font-size:11.5px;color:var(--subtle)">' + ev.markers.length + '건</span></div>' +
@@ -2056,7 +2113,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           '<b class="tnum" style="color:' + scoreColor(currentScore) + '">' + esc(fmtNum(currentScore, 1)) + '점</b>' +
           (curStage ? ' (' + curStage.label + ')' : '') + ' 입니다.</p>'
         : '') +
-      '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">' + rows + '</ul>' +
+      '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' + rows + '</ul>' +
       '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
       '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px">' +
       '<table class="data-table"><caption class="sr">과거 위기 시점의 자체 산출 심리 점수</caption>' +
@@ -2070,7 +2127,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       (ev.outOfRange > 0
         ? '<p style="margin:8px 0 0;font-size:11.5px;word-break:keep-all;color:var(--subtle)">히스토리 범위보다 앞선 사건 ' + ev.outOfRange + '건은 점수를 산출할 수 없어 표시하지 않았습니다.</p>'
         : '') +
-      '<p class="notice n-warn" style="margin-top:10px"><span>ⓘ</span><span>' + esc(ev.caveat) +
+      '<p class="notice n-warn" style="margin-top:8px"><span>ⓘ</span><span>' + esc(ev.caveat) +
       ' 과거에 이랬다는 기록일 뿐입니다.</span></p>' +
       '</div>'
     );
@@ -2099,7 +2156,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const horizon = (h) => {
       const un = h.percentile === null;
       return (
-        '<li style="border-bottom:1px solid var(--border);padding:10px 0">' +
+        '<li style="border-bottom:1px solid var(--border);padding:12px 0">' +
         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
         '<div style="min-width:0"><p style="margin:0;font-size:13px;font-weight:600;color:var(--fg)">' + esc(h.label) + '</p>' +
         (un
@@ -2126,14 +2183,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     };
 
     return (
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
       '<div style="min-width:0"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">현재 국면</h3>' +
       '<p style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + esc(cy.phase.levelLabel) + ' × ' + esc(cy.phase.directionLabel) + '</p></div>' +
       phaseBadge(cy, 'sm') + '</div>' +
       '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(cy.phase.description) + '</p>' +
 
-      '<div style="display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<div style="display:flex;gap:8px;margin-top:8px;border-top:1px solid var(--border);padding-top:12px">' +
       [['현재 점수', cy.score === null ? NO : fmtNum(cy.score, 1), scoreColor(cy.score)],
        ['20일 평균', cy.ma20 === null ? NO : fmtNum(cy.ma20, 1), 'var(--fg)'],
        ['10일 기울기', cy.slope === null ? NO : fmtSigned(cy.slope, 2), dirColor(cy.slope)]].map(([l, v, col]) =>
@@ -2142,7 +2199,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         '<div class="tnum" style="font-size:13px;font-weight:700;margin-top:2px;color:' + col + '">' + esc(v) + '</div></div>').join('') +
       '</div>' +
 
-      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">' +
       '<h4 style="margin:0 0 4px;font-size:12.5px;font-weight:700;color:var(--muted)">기간별 심리 위치</h4>' +
       '<p style="margin:0 0 4px;font-size:11.5px;line-height:1.7;color:var(--subtle);word-break:keep-all">같은 점수라도 최근 흐름 안에서 어디쯤인지에 따라 의미가 다릅니다. <b>기간 내 위치</b>는 그 기간의 날 가운데 지금보다 점수가 낮았던 날의 비율입니다.</p>' +
       '<ul style="list-style:none;margin:0;padding:0">' + cy.horizons.map(horizon).join('') + '</ul></div>' +
@@ -2214,7 +2271,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
   function bandStatsCard(bs) {
     if (!bs) {
-      return '<div class="card" style="padding:14px"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">구간별 과거 통계</h3>' +
+      return '<div class="card" style="padding:12px"><h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">구간별 과거 통계</h3>' +
         '<p style="margin:8px 0 0;font-size:12.5px;color:var(--muted)">통계를 낼 만큼 히스토리가 쌓이지 않았거나 비교할 대표 지수가 없습니다.</p></div>';
     }
     const STAGE_VAR = { extreme_fear: '--s1', fear: '--s2', neutral: '--s3', greed: '--s4', extreme_greed: '--s5' };
@@ -2222,7 +2279,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const months = Math.round((bs.forwardDays / 21) * 10) / 10;
 
     return (
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
       '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">구간별 과거 통계</h3>' +
       '<span class="tnum" style="font-size:11.5px;color:var(--subtle)">표본 ' + esc(fmtNum(bs.totalDays, 0)) + '일</span></div>' +
@@ -2238,7 +2295,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         const v = b.avgForward;
         return '<li>' +
           '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
-          '<span style="display:flex;align-items:center;gap:6px;min-width:0">' +
+          '<span style="display:flex;align-items:center;gap:8px;min-width:0">' +
           '<span style="width:6px;height:10px;border-radius:2px;flex-shrink:0;background:var(' + STAGE_VAR[b.stageId] + ')"></span>' +
           '<span style="font-size:12.5px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.stageLabel) + '</span>' +
           '<span class="tnum" style="font-size:11.5px;color:var(--subtle);flex-shrink:0">' + b.sampleDays + '일</span></span>' +
@@ -2253,7 +2310,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           '</li>';
       }).join('') + '</ul>' +
 
-      (d ? '<div style="margin-top:6px">' + bandAxis(d) +
+      (d ? '<div style="margin-top:8px">' + bandAxis(d) +
         '<p style="margin:2px 0 0;text-align:center;font-size:10.5px;color:var(--subtle)">이후 약 ' + months + '개월 수익률 (%)</p></div>' : '') +
 
       '<p class="notice n-warn" style="margin-top:12px"><span>ⓘ</span><span>' + esc(bs.caveat) +
@@ -2288,7 +2345,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return (
       '<section class="block"><div class="block-head"><h2>예측시장에서 화제인 질문</h2>' +
       '<span class="hint">계속 바뀝니다</span></div>' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
       badge('b-neutral', '◈ ' + d.venue) +
       '<span class="tnum" style="font-size:11.5px;color:var(--subtle)">' + esc(kTime(d.meta.fetchedAt)) + ' 기준</span></div>' +
       (d.markets.length === 0
@@ -2308,7 +2365,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
                   : '') +
               (m.unavailableReason
                 ? '<p style="margin:8px 0 0;font-size:12.5px;word-break:keep-all;color:var(--warn)">△ ' + esc(m.unavailableReason) + '</p>'
-                : '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px">' +
+                : '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px">' +
                   '<div style="min-width:0">' +
                   '<div class="tnum" style="font-size:24px;line-height:1;font-weight:700;color:var(--fg-strong)">' +
                   (top ? esc(fmtNum(top.price, 0)) + '¢' : NO) + '</div>' +
@@ -2317,7 +2374,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
                   '<div style="flex-shrink:0;text-align:right;font-size:12.5px;color:var(--muted)">' +
                   '<div style="font-size:10.5px;color:var(--subtle)">같은 쪽 24시간</div>' +
                   '<div class="tnum">' + (m.changeDay === null ? NO : esc(fmtSigned(m.changeDay, 1)) + '¢') + '</div></div></div>' +
-                  '<ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px">' +
+                  '<ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px">' +
                   priced.map(function (o, i) {
                     return '<li style="display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:8px">' +
                       '<span style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
@@ -2328,7 +2385,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
                       '<span class="tnum" style="flex-shrink:0;text-align:right;font-size:13px;' +
                       (i === 0 ? 'font-weight:700;color:var(--fg-strong)' : 'color:var(--muted)') + '">' + esc(fmtNum(o.price, 0)) + '¢</span></li>';
                   }).join('') + '</ul>') +
-              '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle);display:flex;flex-wrap:wrap;gap:4px 12px">' +
+              '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle);display:flex;flex-wrap:wrap;gap:4px 12px">' +
               '<span class="tnum">24시간 거래 ' + (m.volume24h === null ? NO : '$' + esc(enCompact(m.volume24h, 1))) + '</span>' +
               '<span>마감 ' + (m.closesAt ? esc(kYmd(m.closesAt)) : NO) + (left !== null ? ' (' + left + '일 남음)' : '') + '</span>' +
               '<span>' + (m.url ? '원문 링크' : 'DEMO 샘플이라 원문 링크가 없습니다') + '</span></p></div>'
@@ -2375,7 +2432,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function criteriaBlock() {
     return (
       '<section style="margin-top:12px;padding:0 12px">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">' +
       '<h3 style="margin:0;font-size:13px;font-weight:700;color:var(--fg-strong)">내 기준</h3>' +
       '<span class="linkbtn">조건 만들기 →</span></div>' +
       '<p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span>아직 정한 조건이 없습니다. ' +
@@ -2463,7 +2520,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   }
 
   function regimeAxes(board) {
-    return '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:6px">' +
+    return '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:8px">' +
       board.axes.map((a) =>
         '<li style="display:flex;align-items:center;gap:8px">' +
         '<span style="width:42px;flex-shrink:0;font-size:12.5px;white-space:nowrap;color:var(--muted)" title="' + esc(a.label) + '">' + esc(a.short || a.label) + '</span>' +
@@ -2481,20 +2538,20 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function regimeBody(digest, compact) {
     const board = digest.board;
     if (board.score === null) {
-      return '<div class="card" style="padding:14px">' +
+      return '<div class="card" style="padding:12px">' +
         '<div style="display:flex;align-items:center;gap:8px">' + badge('b-warn', '? 산출 불가') +
         '<span style="font-size:13px;font-weight:600;color:var(--fg-strong)">국면 점수를 낼 수 없습니다</span></div>' +
-        '<p style="margin:6px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(board.unavailableReason || '') + '</p>' +
+        '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(board.unavailableReason || '') + '</p>' +
         regimeAxes(board) + '</div>';
     }
     const band = board.band;
     const missing = board.axes.filter((a) => a.percentile === null);
     const notable = board.rarity && board.rarity.notable && board.rarity.headline;
     return (
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
       '<div style="min-width:0">' +
-      '<div style="display:flex;align-items:center;gap:6px;color:' + bandColor(band) + '">' +
+      '<div style="display:flex;align-items:center;gap:8px;color:' + bandColor(band) + '">' +
       '<span aria-hidden="true" style="font-size:13px">' + esc(band ? band.glyph : '') + '</span>' +
       '<span style="font-size:13px;font-weight:700">' + esc(band ? band.label : '') + '</span></div>' +
       '<p style="margin:4px 0 0;font-size:19px;line-height:1.2;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' +
@@ -2513,7 +2570,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           esc(missing.map((m) => m.label + ' 제외 — ' + (m.reason || '자료 없음')).join(' · ')) +
           ' · 남은 축의 가중치 ' + Math.round(board.coverage * 100) + '% 로 계산했습니다.</p>'
         : '') +
-      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
       '지금이 역사적으로 어디쯤인지만 보여 줍니다. <b>사거나 팔라는 신호가 아닙니다</b> — 지난 26년 자료에서 점수가 낮았다고 해서 그 뒤 12개월이 좋았던 것은 아니었습니다. ' +
       '<button type="button" class="linkbtn" data-go="regime">검증 결과 보기 →</button></p>' +
       '</div>'
@@ -2587,7 +2644,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ? regimeBody(digest, true) +
           /* 앱과 같이 조작 가능한 차트를 쓴다. 조작 안 되는 그림이 하나만 섞여 있으면
              사용자는 그게 고장 난 줄 안다. */
-          '<div class="card" style="padding:14px;margin-top:12px">' +
+          '<div class="card" style="padding:12px;margin-top:12px">' +
           lineChart([{ id: 'regime', name: '국면 점수', points: digest.history.map(function (h) { return { t: h.t, v: h.score }; }),
                        color: 'var(--accent)', axis: 'left', precision: 1, fixed0to100: true, area: true }],
                     190, '국면 점수 추이') +
@@ -2595,7 +2652,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           '매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은 기간과 비교한 값입니다.</p></div>' +
           '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:4px">' +
           digest.board.axes.map((a) =>
-            '<li class="card" style="padding:10px;display:flex;gap:8px;align-items:flex-start">' +
+            '<li class="card" style="padding:12px;display:flex;gap:8px;align-items:flex-start">' +
             '<span style="width:74px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--fg-strong)">' + esc(a.label) + '</span>' +
             '<div style="min-width:0;flex:1">' +
             '<p class="tnum" style="margin:0;font-size:12.5px;color:var(--fg)">' +
@@ -2624,14 +2681,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '</section>' +
 
       '<section class="block"><div class="block-head"><h2>이 검증이 못 하는 것</h2></div>' +
-      '<div class="card" style="padding:14px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:8px">' +
+      '<div class="card" style="padding:12px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:8px">' +
       ev.limits.map((l) =>
         '<li style="display:flex;gap:8px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
         '<span aria-hidden="true" style="flex-shrink:0;color:var(--subtle)">▪</span><span>' + esc(l) + '</span></li>').join('') +
       '</ul></div></section>' +
 
       '<section class="block"><div class="block-head"><h2>검증에 쓴 자료</h2></div>' +
-      '<div class="card" style="padding:14px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:10px">' +
+      '<div class="card" style="padding:12px"><ul style="margin:0;padding:0;list-style:none;display:grid;gap:8px">' +
       ev.sources.map((sc) =>
         '<li><p style="margin:0;font-size:12.5px;font-weight:600;color:var(--fg)">' + esc(sc.label) + '</p>' +
         '<p style="margin:2px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(sc.origin) + ' · ' + esc(sc.via) + '</p></li>').join('') +
@@ -2656,13 +2713,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return (
       '<section class="block"><div class="block-head"><h2>오늘의 경제 이야기</h2>' +
       '<button type="button" class="linkbtn" data-go="basics">전체 보기 →</button></div>' +
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
       '<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--fg-strong)">' + esc(item.name) + '</div>' +
       '<div style="margin-top:2px;font-size:11.5px;color:var(--subtle)">' + esc(item.englishName) + (grp ? ' · ' + esc(grp.label) : '') + '</div></div>' +
       badge(item.official ? 'b-neutral' : 'b-warn', item.official ? '◎ 공식 통계' : '△ 비공식 개념') + '</div>' +
       (g ? '<p style="margin:8px 0 0;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.headline) + '</p>' : '') +
-      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
+      '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px;display:flex;justify-content:space-between;align-items:baseline;gap:8px">' +
       '<div class="tnum" style="font-size:20px;line-height:1;font-weight:700;color:var(--fg-strong)">' +
       (item.value === null ? NO : esc(fmtNum(item.value, item.precision)) + esc(item.suffix || '')) + '</div>' +
       '<button type="button" class="linkbtn" data-go="basics">읽는 법 보기 →</button></div>' +
@@ -2726,12 +2783,12 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
       '<div class="dash">' +
       '<section class="block"><div class="block-head"><h2>오늘의 시장 요약</h2></div>' +
-      '<div class="card summary" style="padding:14px"><ul>' +
+      '<div class="card summary" style="padding:12px"><ul>' +
       summary.lines.map((l) => {
         const [lb, cls, gl] = SUM[l.kind];
         return '<li>' + badge(cls, gl + ' ' + lb) + '<p>' + esc(l.text) + '</p></li>';
       }).join('') +
-      '</ul><p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">생성 ' +
+      '</ul><p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">생성 ' +
       esc(kTime(summary.generatedAt)) + ' · 실제 가격·지표 값에 근거해 규칙 기반으로 작성되며, 근거가 없으면 원인을 추정하지 않습니다.</p></div></section>' +
 
       /* 요약 아래는 탭으로 나눈다. 예전에는 전부 세로로 이어져 끝까지 내리는 데만
@@ -2759,8 +2816,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
       (state.homeTab !== 'flows' ? '' :
       '<section class="block"><div class="block-head"><h2>자금 흐름과 뉴스</h2></div>' +
-      '<div style="display:grid;gap:10px;grid-template-columns:1fr" class="grid-flows">' +
-      '<div class="card" style="padding:14px">' +
+      '<div style="display:grid;gap:8px;grid-template-columns:1fr" class="grid-flows">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">' +
       '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">한국 투자자별 당일 순매수</h3>' + badge('b-neutral', 'KOSPI') + '</div>' +
       (flows && (flows.foreign !== null || flows.institution !== null)
@@ -2768,11 +2825,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
             '<div class="flowrow"><span>' + l + '</span><b class="tnum" style="color:' + dirColor(v) + '">' + dirGlyph(v) + ' ' +
             (v === null ? NO : esc(koCompact(Math.abs(v) * 1e8, 1)) + '원') + '<span class="sr">' + (v > 0 ? '순매수' : '순매도') + '</span></b></div>').join('')
         : '<p class="notice n-warn">' + esc((flows && flows.meta.notes && flows.meta.notes[0]) || '투자자별 매매동향 데이터를 받지 못했습니다.') + ' 값을 0으로 표시하지 않습니다.</p>') +
-      (flows ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:7px;font-size:11.5px;color:var(--subtle)">기준 ' +
+      (flows ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">기준 ' +
         esc(relative(flows.meta.asOf)) + ' · 출처 ' + esc((flows.meta.sources[0] || {}).name || '알 수 없음') + '</p>' : '') + '</div>' +
 
-      '<div class="card" style="padding:14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">' +
+      '<div class="card" style="padding:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
       '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">주요 뉴스</h3>' + badge('b-demo', 'DEMO 샘플') + '</div>' +
       '<p style="margin:0 0 8px;font-size:11.5px;color:var(--subtle)">DEMO 모드에서는 실제 기사가 아닌 가상의 샘플 매체·헤드라인을 보여줍니다.</p>' +
       '<ul class="news">' + news.map((n) =>
@@ -2802,7 +2859,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const rank = { alert: 3, watch: 2, normal: 1, calm: 0 };
 
     return (
-      '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">시장</h1>' +
+      '<div style="padding:12px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">시장</h1>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted)">시장별로 화면이 나뉘어 있습니다. 들어갈 시장을 고르세요.</p></div>' +
       '<div style="padding:12px"><div class="hubgrid">' +
       MARKETS.map((m) => {
@@ -2831,7 +2888,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
               ({ high: '높음', medium: '보통', low: '낮음' })[f.confidence] + ' · 산출 ' + esc(kTime(f.computedAt)) + '</p>'
             : '') +
           (worst
-            ? '<p style="margin:6px 0 0;font-size:11.5px;color:' + RISK_COLOR[worst.level] + '">' +
+            ? '<p style="margin:8px 0 0;font-size:11.5px;color:' + RISK_COLOR[worst.level] + '">' +
               RISK_GLYPH[worst.level] + ' ' + esc(worst.shortName) + ' ' + RISK_LABEL[worst.level] + '</p>'
             : '') +
           '</div></div>' +
@@ -2846,7 +2903,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
               '<span class="tnum" style="color:' + dirColor(q.changePct) + '">' + dirGlyph(q.changePct) + ' ' + esc(fmtPct(q.changePct)) + '</span></span></li>';
           }).join('') + '</ul>' +
 
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
           badge('b-neutral', '종목 ' + list.length + '개') +
           '<span style="font-size:12.5px;font-weight:600;color:var(--accent)">' + MARKET_LABEL[m] + ' 시장 열기 →</span></div>' +
           '</button>'
@@ -2891,7 +2948,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       .filter((e) => e.country === country && Date.parse(e.scheduledAt) >= nowMs - 6 * 3600000).slice(0, 3);
 
     return (
-      '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
+      '<div style="padding:12px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
       '<div style="display:flex;align-items:flex-start;gap:8px;min-width:0">' +
       '<button type="button" class="backbtn" data-go="indices" aria-label="지수 목록으로">←</button>' +
       '<div style="min-width:0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 시장</h1>' +
@@ -2899,25 +2956,25 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">' + sessBadge(sess.phase) +
       '<span style="font-size:11.5px;color:var(--subtle)">' + esc(sess.hint) + '</span></div></div>' +
 
-      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 전환">' +
+      '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 전환">' +
       MARKETS.map((x) => '<button type="button" style="flex:1" data-region="' + x + '" aria-pressed="' + (m === x) + '">' + MARKET_LABEL[x] + '</button>').join('') +
       '</div></div>' +
 
       '<div style="padding:12px"><div class="mktgrid">' +
 
       // 좌측
-      '<div style="display:flex;flex-direction:column;gap:10px">' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
       (f ? fngCard(f) : '') +
       (marketRisk.length
         ? '<div class="card" style="padding:12px">' +
           '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px">' +
           '<h2 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">' + MARKET_LABEL[m] + ' 관련 위험 지표</h2>' +
           '<button type="button" class="linkbtn" data-go="risk">신호등 전체 →</button></div>' +
-          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">' +
+          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' +
           marketRisk.map((i) =>
             '<li><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px">' +
             '<span style="font-size:13px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(i.shortName) + '</span>' +
-            '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+            '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0">' +
             '<span class="tnum" style="font-size:13px;font-weight:700;color:var(--fg-strong)">' + esc(riskValue(i.value, i)) + '</span>' +
             '<span style="font-size:11.5px;color:' + RISK_COLOR[i.level] + '">' + RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level] + '</span></span></div>' +
             bandBar(i, false) + '</li>').join('') +
@@ -2938,7 +2995,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ? '<div class="card" style="padding:12px"><h2 style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--fg-strong)">' + SPECIAL_TITLE[m] + '</h2>' +
           '<ul style="list-style:none;margin:0;padding:0">' +
           special.map((q) =>
-            '<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+            '<li style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
             '<span style="font-size:13px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(q.name) + '</span>' +
             '<span style="display:flex;gap:8px;flex-shrink:0"><span class="tnum" style="font-size:13px;font-weight:600;color:var(--fg-strong)">' +
             esc(q.price === null ? NO : fmtValue(q.price, q)) + '</span>' +
@@ -2961,17 +3018,17 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       (list.length ? list.map(priceCard).join('') : '<p style="font-size:13px;color:var(--muted)">표시할 항목이 없습니다.</p>') + '</div>' +
 
       (events.length
-        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px">' +
           '<h2 style="margin:0;font-size:13px;font-weight:700;color:var(--muted)">' + MARKET_LABEL[m] + ' 관련 일정</h2>' +
           '<button type="button" class="linkbtn" data-go="calendar">전체 캘린더 →</button></div>' +
           '<div class="card" style="overflow:hidden"><ul class="evlist">' + events.map(eventRow).join('') + '</ul></div></section>'
         : '') +
 
       (news.length
-        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+        ? '<section style="margin-top:16px"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px">' +
           '<h2 style="margin:0;font-size:13px;font-weight:700;color:var(--muted)">' + MARKET_LABEL[m] + ' 관련 뉴스</h2>' +
           badge('b-demo', 'DEMO 샘플') + '</div>' +
-          '<div class="card" style="padding:14px"><ul class="news">' +
+          '<div class="card" style="padding:12px"><ul class="news">' +
           news.map((n) =>
             '<li><p>' + esc(n.summaryKo) + '</p><div class="orig">' + esc(n.titleOriginal) + '</div>' +
             '<div class="meta"><span>' + esc(n.outlet) + '</span><span>' + esc(relative(n.publishedAt)) + '</span><span>원문 링크 없음</span></div></li>').join('') +
@@ -3006,36 +3063,36 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const headline = buildRiskHeadline(items, false);
 
     return (
-      '<div style="padding:14px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px">' +
+      '<div style="padding:12px 12px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px">' +
       '<div style="min-width:0"><h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">시장 위험 신호등</h1>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">시장별 핵심 위험 게이지입니다. 고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 봅니다. 구간 기준은 그대로 공개합니다.</p></div>' +
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">전체 지표 →</button></div>' +
 
-      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
+      '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
       [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-riskscope="' + v + '" aria-pressed="' + (state.riskScope === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
 
       '<div style="padding:12px">' +
       // 종합
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:flex-start;gap:8px">' +
       lamp(alertN > 0 ? 'red' : watchN > 0 ? 'yellow' : 'green', 'lg', MARKET_LABEL[state.riskScope] + ' 종합') +
       '<p style="margin:0;flex:1;min-width:0;font-size:13px;line-height:1.7;word-break:keep-all">' + esc(headline) + '</p></div>' +
-      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' + signalTally({ indicators: items }) + '</div>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">' + signalTally({ indicators: items }) + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:8px;border-top:1px solid var(--border);padding-top:12px">' +
       groups.map((g) =>
-        '<div style="min-width:0"><div style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:' + RISK_COLOR[g.lv] + '">' +
+        '<div style="min-width:0"><div style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:' + RISK_COLOR[g.lv] + '">' +
         sigDot(riskSignal(g.lv), 7) +
         '<span aria-hidden="true">' + RISK_GLYPH[g.lv] + '</span>' + RISK_LABEL[g.lv] + ' ' + g.items.length + '</div>' +
         '<p style="margin:2px 0 0;font-size:11.5px;color:var(--subtle);word-break:keep-all">' + esc(RISK_LEVEL_NOTE[g.level] || '') + '</p></div>').join('') +
       '</div>' +
-      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">산출 ' +
+      '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">산출 ' +
       esc(kFull(d.generatedAt)) + ' · ' + MARKET_LABEL[state.riskScope] + ' 관련 ' + items.length + '개 중 ' + available.length + '개 값 확보</p></div>' +
 
       /* 안내 상자가 셋이었다. 첫 지표 카드까지 250자를 넘겨야 했다.
          지우지 않고 접는다 — 제일 오해하기 쉬운 한 줄만 남긴다. */
-      '<div class="rguide" style="margin-top:10px">' +
+      '<div class="rguide" style="margin-top:8px">' +
       '<div class="rguide-head"><p>ⓘ 빨간불은 \u2018위험하니 팔아라\u2019가 아니라 <b>\u2018이 지표가 평소보다 크게 벗어나 있다\u2019</b>는 뜻입니다. 초록불도 안전을 보장하지 않습니다.</p>' +
       '<button type="button" data-rguide="risk" aria-expanded="' + (state.readGuide ? 'true' : 'false') + '">' +
       (state.readGuide ? '접기 ▴' : '이 화면 읽는 법 ▾') + '</button></div>' +
@@ -3050,7 +3107,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         : '') +
       '</div>' +
 
-      '<div class="riskcards" style="margin-top:10px">' + items.map(riskCard).join('') + '</div>' +
+      '<div class="riskcards" style="margin-top:8px">' + items.map(riskCard).join('') + '</div>' +
 
       // 표 대안
       '<h2 style="margin:16px 0 6px;font-size:13px;font-weight:700;color:var(--muted)">표로 보기</h2>' +
@@ -3142,7 +3199,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     });
 
     return (
-      '<div class="card" style="padding:10px">' +
+      '<div class="card" style="padding:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
       '<button type="button" data-calmove="-1" aria-label="이전 달" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);color:var(--muted)">‹</button>' +
       '<p class="tnum" style="margin:0;font-size:13px;font-weight:700;color:var(--fg-strong)">' + y + '년 ' + m + '월</p>' +
@@ -3161,7 +3218,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<li>점 하나가 일정 하나입니다. 날짜를 누르면 그날 일정만 아래에 나옵니다.</li></ul></div>' +
       '<section style="margin-top:12px"><h2 style="margin:0 0 6px;font-size:13px;font-weight:700;color:var(--muted)">' +
       esc(kDate(sel + 'T00:00:00+09:00')) +
-      '<span style="margin-left:6px;font-weight:400;color:var(--subtle)">' + (selList.length ? selList.length + '건' : '일정 없음') + '</span></h2>' +
+      '<span style="margin-left:8px;font-weight:400;color:var(--subtle)">' + (selList.length ? selList.length + '건' : '일정 없음') + '</span></h2>' +
       (selList.length
         ? '<div class="card" style="overflow:hidden"><ul class="evlist">' + selList.map(eventRow).join('') + '</ul></div>'
         : '<p style="margin:0;font-size:13px;color:var(--muted)">이날은 등록된 일정이 없습니다. 다른 날짜를 눌러 보세요.</p>') +
@@ -3185,9 +3242,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       groups.get(k).push(e);
     });
     return (
-      '<div style="padding:14px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
+      '<div style="padding:12px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.</p></div>' +
-      '<div style="padding:10px 12px 0;display:flex;flex-wrap:wrap;gap:8px"><div class="seg lg" role="group" aria-label="시장">' +
+      '<div style="padding:12px 12px 0;display:flex;flex-wrap:wrap;gap:8px"><div class="seg lg" role="group" aria-label="시장">' +
       [['all', '전체'], ['us', '미국'], ['kr', '한국'], ['crypto', '크립토']].map(([v, l]) =>
         '<button type="button" data-cal="' + v + '" aria-pressed="' + (state.calMarket === v) + '">' + l + '</button>').join('') +
       '</div>' +
@@ -3215,11 +3272,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const alerts = list.filter((m) => m.riskLevel === 'alert' && m.value !== null);
     const groups = [GROUP_OF[state.macroMarket], '글로벌'];
     return (
-      '<div style="padding:14px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<div style="padding:12px 12px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
       '<h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 · 위험 지표</h1>' +
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 속 경제 이야기 →</button></div>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 “생활” 탭에 따로 모았습니다.</p></div>' +
-      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
+      '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
       [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
@@ -3231,7 +3288,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       (state.indView === 'all' && alerts.length
         ? '<div style="padding:12px 12px 0"><div class="card" style="padding:12px;border-color:color-mix(in srgb,var(--danger) 40%,var(--border))">' +
           '<p style="margin:0 0 6px;font-size:13px;font-weight:700;color:var(--danger)">▲ 주의 단계 지표 ' + alerts.length + '건</p>' +
-          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px">' +
+          '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px">' +
           alerts.map((m) => '<li style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span>' + esc(m.name) + '</span>' +
             '<span style="font-size:12.5px;color:var(--muted);text-align:right;word-break:keep-all">' + esc(m.riskNote) + '</span></li>').join('') +
           '</ul></div></div>'
@@ -3245,14 +3302,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           '<div class="card" style="overflow:hidden"><ul style="list-style:none;margin:0;padding:0">' +
           items.map((m) => {
             const [lbl, col, gl] = RISK[m.riskLevel];
-            return '<li style="padding:10px 12px;border-bottom:1px solid var(--border)">' +
-              '<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">' +
+            return '<li style="padding:12px 12px;border-bottom:1px solid var(--border)">' +
+              '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">' +
               '<div style="min-width:0"><div style="font-size:13px;font-weight:600">' + esc(m.name) + '</div>' +
               '<div style="font-size:11.5px;color:var(--subtle);margin-top:2px">기준 ' + esc(relative(m.meta.asOf)) + ' · 출처 ' + esc((m.meta.sources[0] || {}).name || '알 수 없음') + '</div></div>' +
               '<div style="text-align:right;flex-shrink:0"><div class="tnum" style="font-size:15px;font-weight:700;color:var(--fg-strong)">' + esc(macroValue(m)) + '</div>' +
               '<div class="tnum" style="font-size:11.5px;color:var(--muted)">' + (m.trend === 'up' ? '▲' : m.trend === 'down' ? '▼' : '―') + ' 이전 ' +
               esc(m.previous === null ? NO : fmtNum(m.previous, m.precision)) + '</div></div></div>' +
-              '<div style="margin-top:6px;display:flex;gap:6px;align-items:center">' + badge(m.riskLevel === 'alert' ? 'b-danger' : m.riskLevel === 'watch' ? 'b-warn' : 'b-ok', gl + ' ' + lbl) +
+              '<div style="margin-top:8px;display:flex;gap:8px;align-items:center">' + badge(m.riskLevel === 'alert' ? 'b-danger' : m.riskLevel === 'watch' ? 'b-warn' : 'b-ok', gl + ' ' + lbl) +
               (m.riskNote ? '<span style="font-size:12.5px;color:var(--muted);word-break:keep-all">' + esc(m.riskNote) + '</span>' : '') + '</div>' +
               guidePanel(m.id) + '</li>';
           }).join('') +
@@ -3310,15 +3367,15 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const maxAbs = Math.max(0.01, ...contribs.map(Math.abs));
 
     return (
-      '<div class="detail-head"><div style="display:flex;align-items:center;gap:6px;min-width:0">' +
+      '<div class="detail-head"><div style="display:flex;align-items:center;gap:8px;min-width:0">' +
       '<button type="button" class="backbtn" data-go="home" aria-label="뒤로">←</button>' +
       '<h1>' + MARKET_LABEL[m] + ' 투자심리 상세</h1></div>' + modeBadge() + '</div>' +
 
-      '<div style="padding:10px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 선택">' +
+      '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장 선택">' +
       MARKETS.map((x) => '<button type="button" style="flex:1" data-fngm="' + x + '" aria-pressed="' + (m === x) + '">' + MARKET_LABEL[x] + '</button>').join('') +
       '</div></div>' +
 
-      '<section class="block"><div class="card" style="padding:16px">' +
+      '<section class="block"><div class="card" style="padding:12px">' +
       '<div class="summary-grid">' + gauge(f.score, 200) +
       '<div class="meta">' +
       (f.score === null
@@ -3354,13 +3411,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ? ' 이 구간의 선은 하루치 점수를 ' + SMOOTH_DAYS + '일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.'
         : '') +
       '</p></div>' +
-      '<div style="margin-top:10px">' + crisisCard(d.events, f.score) + '</div></section>' +
+      '<div style="margin-top:8px">' + crisisCard(d.events, f.score) + '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>사이클과 구간 통계</h2></div>' +
       '<div class="riskcards">' + cycleCard(f.cycle) + bandStatsCard(d.bandStats) + '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>점수 상승·하락 기여도</h2></div>' +
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">전일 대비 점수 변화 기여도 (점)</p>' +
       '<ul class="bars">' + f.components.map((c) => {
         const v = c.contributionDay;
@@ -3371,9 +3428,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
           (v === null ? '' : '<span class="bar-fill" style="background:' + dirColor(v) + ';left:' + (v > 0 ? 50 : 50 - pct) + '%;width:' + pct + '%"></span>') +
           '</div></li>';
       }).join('') + '</ul>' +
-      '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:10px" class="drivers-grid">' +
+      '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:12px" class="drivers-grid">' +
       [['가장 큰 상승 요인', f.topPositive], ['가장 큰 하락 요인', f.topNegative]].map(([l, dr]) =>
-        '<div style="background:var(--surface-2);border-radius:9px;padding:10px">' +
+        '<div style="background:var(--surface-2);border-radius:9px;padding:12px">' +
         '<div style="font-size:11.5px;color:var(--muted)">' + l + '</div>' +
         '<div style="font-size:13px;font-weight:600;margin-top:2px;word-break:keep-all">' + esc(dr ? dr.label : '해당 없음') + '</div>' +
         (dr ? '<div style="font-size:11.5px;color:var(--subtle)">' + esc(dr.detail) + '</div>' : '') + '</div>').join('') +
@@ -3425,24 +3482,24 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       }).join('') + '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>산출 방법</h2></div>' +
-      '<div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">' +
+      '<div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">' +
       '<p style="margin:0;font-size:13px;line-height:1.7;word-break:keep-all">' + esc(d.methodology.summary) + '</p>' +
       '<ol class="steps">' + d.methodology.steps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
-      '<div style="border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px">' +
+      '<div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">' +
       '<p style="margin:0;font-size:12.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">극단치 처리 · </b>' + esc(d.methodology.winsorization) + '</p>' +
       '<p style="margin:0;font-size:12.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">결측 처리 · </b>' + esc(d.methodology.coverageRule) + '</p></div>' +
       '<p class="notice n-neutral"><span>ⓘ</span><span>' + esc(d.methodology.scaleWarning) + '</span></p>' +
       '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>데이터 출처와 업데이트</h2></div>' +
-      '<div class="card" style="padding:14px">' +
+      '<div class="card" style="padding:12px">' +
       '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' +
       f.meta.sources.map((x) =>
         '<li><div style="font-size:13px;font-weight:600">' + esc(x.name) + '</div>' +
         '<div style="font-size:11.5px;color:var(--subtle);word-break:keep-all">' +
         (x.delayMinutes === null ? '지연 정보 없음' : x.delayMinutes === 0 ? '실시간' : x.delayMinutes + '분 지연') +
         (x.terms ? ' · ' + esc(x.terms) : '') + '</div></li>').join('') +
-      '</ul><p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">데이터 기준 시각 ' +
+      '</ul><p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">데이터 기준 시각 ' +
       esc(kFull(f.meta.asOf)) + ' · 수집 ' + esc(kFull(f.meta.fetchedAt)) + '</p></div></section>'
     );
   }
@@ -3469,7 +3526,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const magMin = mags.length ? Math.min.apply(null, mags) : 0;
     const bars = sameScale !== false && sameUnit && oneSided && magMax > 0 && magMin / magMax <= 0.7;
     return (
-      '<dl style="margin:8px 0 0;display:flex;flex-direction:column;gap:6px">' +
+      '<dl style="margin:8px 0 0;display:flex;flex-direction:column;gap:8px">' +
       items.map((c) => {
         const w = c.value === null || c.value === undefined ? 0 : Math.max(2, (Math.abs(c.value) / magMax) * 100);
         return (
@@ -3491,7 +3548,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       /* 그대로 견주면 안 되는 지표는 이유를 표 바로 밑에 적는다.
          숫자를 나란히 놓는 순간 사람은 비교부터 하기 때문이다. */
       (note
-        ? '<p style="margin:6px 0 0;border-top:1px solid var(--border);padding-top:6px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">※ ' + esc(note) + '</p>'
+        ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">※ ' + esc(note) + '</p>'
         : '') +
       '</dl>'
     );
@@ -3588,7 +3645,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '</svg>') +
       // 그림을 못 보는 사람에게도 같은 내용이 가야 한다
       '<details style="margin-top:2px"><summary style="cursor:pointer;list-style:none;text-align:right;font-size:11.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
-      '<div class="scroll-x" style="margin-top:6px;border:1px solid var(--border);border-radius:9px"><table class="data-table">' +
+      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px"><table class="data-table">' +
       '<thead><tr><th>연도</th>' + clean.map((s) => '<th>' + esc(s.label) + '</th>').join('') + '</tr></thead><tbody>' +
       mine.points.slice(-12).reverse().map((p) =>
         '<tr><th class="tnum" style="font-weight:400">' + yr(p.t) + '</th>' +
@@ -3615,13 +3672,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       ['↔', '시장 이야기와의 연결', g.marketLink],
     ]);
     return (
-      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px">' +
       '<details><summary style="cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--accent)">이게 무슨 숫자인가요? ▾</summary>' +
       '<div style="margin-top:8px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
-      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">' +
+      '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:8px">' +
       rows.map(function (r) {
-        return '<div style="display:flex;align-items:flex-start;gap:6px">' +
+        return '<div style="display:flex;align-items:flex-start;gap:8px">' +
           '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;width:12px;text-align:center;font-size:11.5px;color:var(--muted)">' + r[0] + '</span>' +
           '<dt class="sr">' + esc(r[1]) + '</dt>' +
           '<dd style="margin:0;min-width:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
@@ -3648,15 +3705,15 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     if (rest.length) groups.push({ id: 'rest', label: '그 밖의 지표', note: '', items: rest });
     const list = all;
     return (
-      '<div style="padding:10px 12px 0"><p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span><b>여기 숫자는 투자심리 점수의 구성요소가 아닙니다.</b> 대부분 1년에 한두 번 바뀌는 값이라 그날의 시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요. <b>전부 통계기관이 발표하는 공식 지표</b>만 담았습니다 — 발표 기관이 없는 개념은 넣지 않습니다.</span></p></div>' +
+      '<div style="padding:12px 12px 0"><p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span><b>여기 숫자는 투자심리 점수의 구성요소가 아닙니다.</b> 대부분 1년에 한두 번 바뀌는 값이라 그날의 시장을 설명하지 못합니다. 나라끼리 형편을 견줘 보거나, 기사에 나온 용어의 뜻을 확인하는 용도로 보세요. <b>전부 통계기관이 발표하는 공식 지표</b>만 담았습니다 — 발표 기관이 없는 개념은 넣지 않습니다.</span></p></div>' +
       (list.length === 0
         ? '<div style="padding:12px"><p class="notice n-warn" style="margin:0">표시할 지표가 없습니다.</p></div>'
         : '<div style="padding:12px;display:flex;flex-direction:column;gap:16px">' +
           groups.map(function (grp) {
           return '<section aria-labelledby="basics-' + grp.id + '">' +
-          '<div style="margin-bottom:6px">' +
+          '<div style="margin-bottom:8px">' +
           '<h2 id="basics-' + grp.id + '" style="margin:0;font-size:13px;font-weight:700;color:var(--muted)">' + esc(grp.label) +
-          '<span class="tnum" style="margin-left:6px;font-weight:400;color:var(--subtle)">' + grp.items.length + '</span></h2>' +
+          '<span class="tnum" style="margin-left:8px;font-weight:400;color:var(--subtle)">' + grp.items.length + '</span></h2>' +
           (grp.note ? '<p style="margin:2px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(grp.note) + '</p>' : '') +
           '</div>' +
           '<div class="bgrid">' +
@@ -3669,7 +3726,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
               '<div class="card" style="padding:12px">' +
               '<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">' +
               '<div style="min-width:0"><h3 style="margin:0;font-size:14px;line-height:1.4;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
-              '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11.5px;color:var(--subtle)">' +
+              '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:11.5px;color:var(--subtle)">' +
               '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.englishName) + '</span>' +
               badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div></div>' +
               '<div style="flex-shrink:0;text-align:right">' +
@@ -3724,7 +3781,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const delay = q && q.meta.sources[0] ? q.meta.sources[0].delayMinutes : null;
     return (
       '<li style="border-bottom:1px solid var(--border)">' +
-      '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px">' +
+      '<div style="display:flex;align-items:center;gap:8px;padding:12px 12px">' +
       '<div style="min-width:0;flex:1">' +
       '<div style="font-size:13.5px;font-weight:600;color:var(--fg-strong);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(item.name) + '</div>' +
       '<div style="margin-top:2px;font-size:11.5px;color:var(--subtle)"><span class="tnum">' + esc(item.symbol) + '</span>' +
@@ -3761,7 +3818,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
    */
   function head(title, desc) {
     return (
-      '<div style="padding:14px 12px 0">' +
+      '<div style="padding:12px 12px 0">' +
       '<h1 style="margin:0;font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--fg-strong)">' + title + '</h1>' +
       '<p style="margin:4px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + desc + '</p></div>'
     );
@@ -3788,7 +3845,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         return (
           '<section class="card" style="overflow:hidden" aria-labelledby="idx-' + m + '">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border);padding:8px 12px;background:color-mix(in srgb,' + mkColor(m) + ' 8%,transparent)">' +
-          '<h2 id="idx-' + m + '" style="margin:0;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700">' +
+          '<h2 id="idx-' + m + '" style="margin:0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700">' +
           // 색은 훑기용 표식일 뿐이고, 어느 시장인지는 옆의 글자가 말한다
           '<span aria-hidden="true" style="display:block;width:8px;height:8px;border-radius:99px;background:' + mkColor(m) + '"></span>' +
           '<span style="color:' + mkColor(m) + '">' + MARKET_LABEL[m] + '</span></h2>' +
@@ -3811,7 +3868,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ['지수는 살 수 있는 물건이 아닙니다.', '시장을 재는 눈금이라서, 실제로 사고파는 것은 그 지수를 따라가도록 만든 상품입니다.'],
       ].map((r) => '<li><b style="color:var(--fg)">' + r[0] + '</b> ' + esc(r[1]) + '</li>').join('') +
       '</ul>' +
-      '<p style="margin:10px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
       '지수마다 산출 기관과 방식이 다릅니다. 이 화면은 값을 받아 그대로 보여줄 뿐, 다시 계산하지 않습니다.</p>' +
       '</div></div>'
     );
@@ -3837,10 +3894,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       NAV.map((n) =>
         '<li><button type="button" class="navbtn" data-go="' + n.id + '"' +
         (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('') +
-      '<li aria-hidden="true" style="height:1px;background:var(--border);margin:10px 6px"></li>' +
+      '<li aria-hidden="true" style="height:1px;background:var(--border);margin:12px 6px"></li>' +
       '<li style="padding:0 10px 4px;font-size:11.5px;font-weight:600;color:var(--subtle)">시장별 화면</li>' +
       MARKET_NAV.map((m) =>
-        '<li><button type="button" class="navbtn" data-go-region="' + m.region + '" style="font-size:13px;padding:7px 10px"' +
+        '<li><button type="button" class="navbtn" data-go-region="' + m.region + '" style="font-size:13px;padding:8px 10px"' +
         (state.view === 'marketRegion' && state.region === m.region ? ' aria-current="page"' : '') + '>' + m.label + '</button></li>').join('');
 
     document.getElementById('tabnav').innerHTML = NAV.filter((n) => n.id !== 'indicators').map((n) =>
@@ -4257,33 +4314,33 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 /* 신호등 램프 3구 */
 .tl-lamp {
   display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 3px; border-radius: 999px; background: var(--surface-2);
+  padding: 4px; border-radius: 999px; background: var(--surface-2);
   border: 1px solid var(--border); flex-shrink: 0;
 }
 .tl-lamp i { display: block; border-radius: 999px; }
 
-.tl-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
+.tl-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; list-style: none; margin: 0; padding: 0; }
 .tl-tally li { border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; }
 .tl-legend { border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; }
 .tl-legend ul { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 0; padding: 0; }
-.tl-legend li { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+.tl-legend li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
 .bandmark {
   position: absolute; top: 50%; width: 3px; height: 16px;
   transform: translate(-50%, -50%); border-radius: 999px;
   background: var(--fg-strong); box-shadow: 0 0 0 2px var(--surface);
 }
 .bandscale { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 11.5px; color: var(--subtle); }
-.bandlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 10px 0 0; padding: 0; }
-.bandlegend li { display: flex; align-items: center; gap: 5px; font-size: 11.5px; }
-.stagestrip { display: flex; margin: 6px 0 0; padding: 0; list-style: none; font-size: 10.5px; line-height: 1.25; }
+.bandlegend { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 12px 0 0; padding: 0; }
+.bandlegend li { display: flex; align-items: center; gap: 4px; font-size: 11.5px; }
+.stagestrip { display: flex; margin: 8px 0 0; padding: 0; list-style: none; font-size: 10.5px; line-height: 1.25; }
 .stagestrip li { width: 20%; padding: 0 2px; text-align: center; }
 .riskgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.riskcards { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.hubgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.idxgrid { display: flex; flex-direction: column; gap: 12px; }
+.riskcards { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.hubgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.idxgrid { display: flex; flex-direction: column; gap: 8px; }
 @media (min-width: 1000px) { .idxgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
 .mktgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.risktile { display: block; padding: 10px; }
+.risktile { display: block; padding: 12px; }
 .risktile:hover { background: var(--surface-2); }
 @media (min-width: 640px) { .riskgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1100px) { .riskgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

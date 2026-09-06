@@ -52,7 +52,7 @@ function Row({
         type="button"
         onClick={() => onSelect(active ? null : marker.t)}
         aria-pressed={active}
-        className="w-full rounded-lg border px-2.5 py-2 text-left transition-colors"
+        className="w-full rounded-lg border px-2 py-2 text-left transition-colors"
         style={{
           borderColor: active ? `color-mix(in srgb, ${textColor} 45%, var(--border))` : 'var(--border)',
           background: active ? `color-mix(in srgb, ${textColor} 8%, var(--surface))` : 'var(--surface)',
@@ -64,7 +64,7 @@ function Row({
             <p className="text-[13px] leading-tight font-semibold break-keep text-fg">{marker.label}</p>
             <p className="tnum mt-0.5 text-[11.5px] text-subtle">
               {formatKstDate(marker.t)}
-              <span className="ml-1.5">{MARKET_EVENT_CATEGORY_LABEL[marker.category]}</span>
+              <span className="ml-2">{MARKET_EVENT_CATEGORY_LABEL[marker.category]}</span>
             </p>
           </div>
           <div className="shrink-0 text-right">
@@ -77,7 +77,7 @@ function Row({
           </div>
         </div>
         {active ? (
-          <p className="mt-1.5 border-t border-border pt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
+          <p className="mt-2 border-t border-border pt-2 text-[12.5px] leading-relaxed break-keep text-muted">
             {marker.note}
             {marker.unavailableReason ? ` ${marker.unavailableReason}` : ''}
           </p>
@@ -100,9 +100,9 @@ export function CrisisMarkers({
 }) {
   if (events.markers.length === 0) {
     return (
-      <div className="card p-3.5">
+      <div className="card p-3">
         <h3 className="text-sm font-bold text-fg-strong">과거 위기 때의 점수</h3>
-        <p className="mt-1.5 text-[12.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">
           이 시장에서 표시할 사건이 히스토리 범위 안에 없습니다.
           {events.outOfRange > 0 ? ` 범위를 벗어난 사건 ${events.outOfRange}건은 표시하지 않았습니다.` : ''}
         </p>
@@ -115,18 +115,18 @@ export function CrisisMarkers({
   const currentStage = stageOf(currentScore);
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-fg-strong">과거 위기 때의 점수</h3>
         <span className="tnum text-[11.5px] text-subtle">{events.markers.length}건</span>
       </div>
-      <p className="mb-2.5 text-[12.5px] leading-relaxed break-keep text-muted">
+      <p className="mb-2 text-[12.5px] leading-relaxed break-keep text-muted">
         누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.
       </p>
 
       {/* 지금과 견주기 — 숫자만으로는 감이 오지 않으므로 한 줄로 풀어 준다 */}
       {lowest && currentScore !== null ? (
-        <p className="mb-2.5 rounded-lg bg-surface-2 px-2.5 py-2 text-[12.5px] leading-relaxed break-keep text-fg">
+        <p className="mb-2 rounded-lg bg-surface-2 px-2 py-2 text-[12.5px] leading-relaxed break-keep text-fg">
           표시된 사건 중 가장 낮았던 때는 <strong style={{ color: scoreColor(lowest.score) }}>{lowest.label}</strong> 의{' '}
           <strong className="tnum" style={{ color: scoreColor(lowest.score) }}>
             {formatNumber(lowest.score, 1)}점
@@ -139,7 +139,7 @@ export function CrisisMarkers({
         </p>
       ) : null}
 
-      <ul className="space-y-1.5">
+      <ul className="space-y-2">
         {events.markers.map((m, i) => (
           <Row
             key={m.id}
@@ -187,7 +187,7 @@ export function CrisisMarkers({
         </p>
       ) : null}
 
-      <div className="mt-2.5">
+      <div className="mt-2">
         <Notice tone="warn">
           {events.caveat} 과거에 이랬다는 기록일 뿐입니다.
         </Notice>

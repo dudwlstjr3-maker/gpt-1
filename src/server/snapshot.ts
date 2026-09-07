@@ -110,12 +110,14 @@ async function section<T>(
 export interface SnapshotOptions {
   scenario: DemoScenario;
   now?: Date;
+  /** 선물 판에서 고른 기간. 기간마다 캐시가 따로 잡힌다. */
+  futuresRange?: string;
 }
 
-export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOptions): Promise<Snapshot> {
+export async function buildSnapshot({ scenario, now = new Date(), futuresRange }: SnapshotOptions): Promise<Snapshot> {
   const { adapter, reason } = getAdapter();
   const mode = adapter.mode;
-  const ctx: AdapterContext = { now, scenario };
+  const ctx: AdapterContext = { now, scenario, ...(futuresRange ? { futuresRange } : {}) };
   const dayKey = kstDateKey(now);
   const ns = `${mode}:${scenario}:${dayKey}`;
 
@@ -313,6 +315,19 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.board.score === null && d.history.length === 0,
   );
 
+  /* -------- 선물 시장 -------- */
+  /* 기간은 화면에서 고른다. 캐시 키에 기간을 넣어야 1일과 3개월이 섞이지 않는다. */
+  const futures = await section(
+    'futures',
+    `${ns}:futures:${futuresRange ?? '1D'}`,
+    async () => {
+      const board = await adapter.getFutures(ctx, futuresRange ?? '1D');
+      return { data: board, meta: nowMeta(now) };
+    },
+    now,
+    (d) => d.rows.length === 0 || d.availableCount === 0,
+  );
+
   /* -------- 뉴스 -------- */
   const news = await section(
     'news',
@@ -349,7 +364,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, regime, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, regime, calendar, news, futures, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -440,6 +455,7 @@ function errorSections(now: Date, message: string): SnapshotSections {
     regime: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
+    futures: blankSection(now, 'error', message),
     summary: blankSection(now, 'error', message),
   };
 }
@@ -457,6 +473,7 @@ function loadingSections(now: Date): SnapshotSections {
     regime: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),
+    futures: blankSection(now, 'loading'),
     summary: blankSection(now, 'loading'),
   };
 }

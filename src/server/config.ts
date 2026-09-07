@@ -121,6 +121,8 @@ export function resolveMode(): { mode: DataMode; reason: string; missing: string
 export const SECTION_TTL: Record<SectionKey, number> = {
   sessions: 10_000,
   quotes: 30_000,
+  // 선물은 정규장 밖에서도 움직인다. 시세와 같은 결로 잡는다.
+  futures: 30_000,
   flows: 120_000,
   fng: 300_000,
   macro: 6 * 3600_000,
@@ -139,6 +141,7 @@ export const SECTION_TTL: Record<SectionKey, number> = {
 export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
   sessions: 60_000,
   quotes: 300_000,
+  futures: 300_000,
   flows: 900_000,
   fng: 3 * 3600_000,
   macro: 48 * 3600_000,

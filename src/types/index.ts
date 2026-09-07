@@ -777,6 +777,39 @@ export interface MarketSummary {
 /* 스냅샷 (API 최상위 응답)                                               */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* 선물 시장                                                            */
+/* ------------------------------------------------------------------ */
+
+export interface FuturesQuote {
+  /** futuresCatalog 의 id */
+  id: string;
+  last: number | null;
+  /** 고른 기간 동안의 변화폭 */
+  change: number | null;
+  /** 고른 기간 동안의 변화율 (%) */
+  changePct: number | null;
+  spark: SeriesPoint[];
+  /**
+   * 선물 계약이 아니라 현물·지표를 대신 쓴 경우 무엇을 썼는지.
+   * 화면에 그대로 나간다 — 안 적으면 선물 가격으로 읽힌다.
+   */
+  proxyNote?: string;
+  /** 값이 없을 때 사유 (거래소 유료 데이터 등) */
+  unavailableReason?: string;
+  meta: Meta;
+}
+
+export interface FuturesBoard {
+  /** 어느 기간의 등락률인가 */
+  range: string;
+  rows: FuturesQuote[];
+  /** 값을 채운 항목 수 / 전체 */
+  availableCount: number;
+  totalCount: number;
+  generatedAt: string;
+}
+
 export interface SnapshotSections {
   sessions: Section<MarketSession[]>;
   fng: Section<FngScore[]>;
@@ -789,6 +822,7 @@ export interface SnapshotSections {
   regime: Section<RegimeDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;
+  futures: Section<FuturesBoard>;
   summary: Section<MarketSummary>;
 }
 

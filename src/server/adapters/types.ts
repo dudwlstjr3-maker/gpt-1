@@ -12,6 +12,7 @@ import type {
   DemoScenario,
   EconomyBasic,
   FlowSummary,
+  FuturesBoard,
   MacroIndicator,
   MarketId,
   NewsItem,
@@ -27,6 +28,8 @@ export interface AdapterContext {
   now: Date;
   /** DEMO 모드에서만 유효 */
   scenario: DemoScenario;
+  /** 선물 판에서 고른 기간 ('1D' | '1W' | '1M' | '3M' | 'YTD') */
+  futuresRange?: string;
 }
 
 export interface BenchmarkSeries {
@@ -76,6 +79,15 @@ export interface MarketAdapter {
 
   /** 뉴스 */
   getNews(ctx: AdapterContext): Promise<NewsItem[]>;
+
+  /**
+   * 선물 시장 판.
+   *
+   * 값을 못 넣는 항목도 빼지 않고 사유를 담아 돌려준다 — 거래소 유료 시세를
+   * 조용히 빼면 목록이 왜 짧은지 알 수 없고, 아무 데서나 긁어 오면 이 앱이
+   * 지키기로 한 '제공업체 이용약관·재배포 권한' 규칙을 어긴다.
+   */
+  getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard>;
 
   /** 종목 상세 차트 */
   getAssetSeries(id: string, range: RangeKey, ctx: AdapterContext): Promise<SeriesPoint[]>;

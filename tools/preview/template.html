@@ -541,6 +541,12 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .rguide-body { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
 .rguide-body .notice { margin: 0; }
 
+/* 선물 판 — 한 줄에 이름·막대·값 */
+.futlist { list-style: none; margin: 0; padding: 0; }
+.futlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.futlist li:last-child { border-bottom: 0; padding-bottom: 0; }
+.futlist li:first-child { padding-top: 0; }
+
 /* --------------------------------- 지표 타일 --------------------------------- */
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -841,6 +847,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     openTile: null,
     /* 지표 화면의 '읽는 법' 을 펴 두었는가 */
     readGuide: false,
+    /* 선물 판에서 고른 기간 */
+    futRange: '1D',
     calMarket: 'all',
     region: 'us',
     riskScope: 'us',
@@ -3824,6 +3832,105 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     );
   }
 
+  /**
+   * 선물 시장.
+   *
+   * 막대는 0 을 가운데 둔 발산형이고, 길이 기준은 **묶음 안에서 제일 크게 움직인
+   * 값**이다 — 전체 기준으로 잡으면 크립토가 하루 5% 움직이는 통에 통화(0.2%)는
+   * 선 하나로 뭉갠다. 기준이 묶음마다 다르므로 그 사실을 묶음 머리에 적는다.
+   *
+   * 값이 없는 항목도 지우지 않는다. 거래소가 파는 시세라 못 넣는 것이므로
+   * 자리를 두고 사유를 적는다 — 조용히 빼면 목록이 왜 짧은지 알 수 없다.
+   */
+  const FUT_LOOKBACK = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, YTD: 170 };
+  const FUT_RANGE_LABEL = { '1D': '하루', '1W': '1주', '1M': '1개월', '3M': '3개월', YTD: '올해' };
+
+  function futChangeOver(spark, back) {
+    if (!spark || spark.length < 2) return null;
+    const last = spark[spark.length - 1], idx = spark.length - 1 - back;
+    if (idx < 0) return null;
+    const prev = spark[idx];
+    if (!prev || !isNum(prev.v) || !isNum(last.v) || prev.v === 0) return null;
+    return ((last.v - prev.v) / prev.v) * 100;
+  }
+
+  function futBar(pct, max, color) {
+    const W = 200, H = 14, half = W / 2;
+    const w = max > 0 ? Math.min(half, (Math.abs(pct) / max) * half) : 0;
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="height:14px;width:100%" aria-hidden="true">' +
+      '<line x1="' + half + '" x2="' + half + '" y1="0" y2="' + H + '" stroke="var(--border-strong)" stroke-width="1"/>' +
+      '<rect x="' + (pct >= 0 ? half : half - w) + '" y="' + (H / 2 - 4) + '" width="' + Math.max(1, w) +
+      '" height="8" rx="1.5" fill="' + color + '" opacity=".85"/></svg>';
+  }
+
+  function viewFutures() {
+    const sec = snap().sections.futures || {};
+    const rows = (sec.data && sec.data.rows) || [];
+    const byId = {};
+    rows.forEach((r) => { byId[r.id] = r; });
+    const back = FUT_LOOKBACK[state.futRange] || 1;
+
+    const groups = DATA.futures.groups.map((g) => ({
+      g: g,
+      items: DATA.futures.items.filter((it) => it.group === g.id).sort((a, b) => a.order - b.order)
+        .map((it) => ({ it: it, row: byId[it.id] })).filter((x) => x.row),
+    })).filter((x) => x.items.length);
+
+    return (
+      '<div style="padding:8px 12px 0">' +
+      '<p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span>지수·금속·농산물 <b>선물 시세는 거래소(CME·ICE)가 파는 데이터</b>라 무료로 재배포할 수 있는 소스가 없습니다. 그런 항목은 값을 비우고 사유를 적어 두었습니다. 채워진 값 중 상당수는 선물 계약이 아니라 현물·기준 가격이며, 그 경우 <b>대신 쓴 값</b> 표시가 붙습니다.</span></p></div>' +
+      '<div style="padding:8px 12px 0"><div class="seg" style="width:100%" role="group" aria-label="기간">' +
+      ['1D', '1W', '1M', '3M', 'YTD'].map((r) =>
+        '<button type="button" style="flex:1" data-futrange="' + r + '" aria-pressed="' + (state.futRange === r) + '">' +
+        FUT_RANGE_LABEL[r] + '</button>').join('') + '</div></div>' +
+      '<div style="padding:12px;display:flex;flex-direction:column;gap:20px">' +
+      groups.map((grp) => {
+        const withPct = grp.items.map((x) => ({ ...x, pct: futChangeOver(x.row.spark, back) }));
+        const max = Math.max(0.01, ...withPct.map((x) => Math.abs(x.pct || 0)).filter(isNum));
+        const shown = withPct.filter((x) => x.row.last !== null && x.row.last !== undefined).length;
+        const reasons = [];
+        withPct.forEach((x) => {
+          const rs = x.row.unavailableReason;
+          if (rs && reasons.indexOf(rs) < 0) reasons.push(rs);
+        });
+        return '<section aria-labelledby="fut-' + grp.g.id + '">' +
+          '<div style="margin-bottom:8px">' +
+          '<h2 id="fut-' + grp.g.id + '" style="margin:0;font-size:12.5px;font-weight:700;color:var(--muted)">' + esc(grp.g.label) +
+          '<span class="tnum" style="margin-left:8px;font-weight:400;color:var(--subtle)">' + shown + '/' + withPct.length + '</span></h2>' +
+          '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' + esc(grp.g.note) +
+          ' 막대 길이는 이 묶음에서 제일 크게 움직인 값(<span class="tnum">' + fmtNum(max, 2) + '%</span>) 기준입니다 — 묶음끼리는 길이를 견주지 마세요.</p>' +
+          reasons.map((rs) => '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">※ ' + esc(rs) + '</p>').join('') +
+          '</div>' +
+          '<ul class="card futlist" style="padding:12px">' +
+          withPct.map((x) => {
+            const missing = x.row.last === null || x.row.last === undefined;
+            const col = dirColor(x.pct);
+            return '<li>' +
+              '<div style="min-width:0">' +
+              '<div style="display:flex;min-width:0;gap:8px;align-items:baseline">' +
+              '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--fg)">' + esc(x.it.name) + '</span>' +
+              '<span style="flex-shrink:0;font-size:11.5px;color:var(--subtle)">' + esc(x.it.symbol) + '</span></div>' +
+              (missing
+                ? '<p style="margin:4px 0 0;font-size:11.5px;color:var(--subtle)">값 없음</p>'
+                : '<div style="margin-top:4px;display:flex;align-items:center;gap:8px">' +
+                  '<span style="width:92px;flex-shrink:0">' + futBar(x.pct || 0, max, col) + '</span>' +
+                  scoreSpark(x.row.spark.slice(-30).map((q) => ({ t: q.t, v: q.v })), 56, 16) +
+                  (x.it.proxy ? badge('b-warn', '대신 쓴 값', x.it.proxy, '2xs') : '') + '</div>') +
+              '</div>' +
+              '<div style="flex-shrink:0;text-align:right">' +
+              '<div class="tnum" style="font-size:13px;font-weight:700;color:var(--fg-strong)">' +
+              (missing ? NO : esc(fmtNum(x.row.last, x.it.precision) + (x.it.suffix || ''))) + '</div>' +
+              '<div class="tnum" style="margin-top:4px;font-size:12.5px;font-weight:600;color:' + col + '">' +
+              (x.pct === null || x.pct === undefined ? NO : esc(fmtSigned(x.pct, 2)) + '%') + '</div></div></li>';
+          }).join('') + '</ul></section>';
+      }).join('') +
+      '<p style="margin:0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">기준 기간 ' +
+      FUT_RANGE_LABEL[state.futRange] + ' · 값을 채운 항목 ' + ((sec.data && sec.data.availableCount) || 0) + '/' +
+      ((sec.data && sec.data.totalCount) || 0) + '. 등락률은 고른 기간의 처음과 마지막을 견준 값이며, 장중 고가·저가는 반영하지 않습니다.</p>' +
+      '</div>'
+    );
+  }
+
   function viewIndices() {
     return head('시장 지수', '시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.') + marketIndexBoard();
   }
@@ -3887,6 +3994,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   const MARKET_NAV = [
     { region: 'us', label: '미국' },
     { region: 'crypto', label: '크립토' },
+    /* 선물은 하단 탭에 넣지 않는다 — 앱과 같다. 320px 에서 여덟 칸이면 글자가 뭉갠다. */
+    { view: 'futures', label: '선물' },
   ];
 
   function renderNav() {
@@ -3897,8 +4006,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<li aria-hidden="true" style="height:1px;background:var(--border);margin:12px 6px"></li>' +
       '<li style="padding:0 10px 4px;font-size:11.5px;font-weight:600;color:var(--subtle)">시장별 화면</li>' +
       MARKET_NAV.map((m) =>
-        '<li><button type="button" class="navbtn" data-go-region="' + m.region + '" style="font-size:13px;padding:8px 10px"' +
-        (state.view === 'marketRegion' && state.region === m.region ? ' aria-current="page"' : '') + '>' + m.label + '</button></li>').join('');
+        '<li><button type="button" class="navbtn" ' +
+        (m.view ? 'data-go="' + m.view + '"' : 'data-go-region="' + m.region + '"') +
+        ' style="font-size:13px;padding:8px 10px"' +
+        ((m.view ? state.view === m.view : state.view === 'marketRegion' && state.region === m.region)
+          ? ' aria-current="page"' : '') + '>' + m.label + '</button></li>').join('');
 
     document.getElementById('tabnav').innerHTML = NAV.filter((n) => n.id !== 'indicators').map((n) =>
       '<li><button type="button" data-go="' + n.id + '"' + (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('');
@@ -3958,6 +4070,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const v = {
       home: viewHome,
       indices: viewIndices,
+      futures: viewFutures,
       basics: viewBasics,
       marketRegion: viewMarketRegion,
       calendar: viewCalendar,
@@ -4010,6 +4123,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       window.scrollTo({ top: 0, behavior: 'instant' });
       return render();
     }
+    if (d.futrange) { state.futRange = d.futrange; return render(); }
     if (d.rguide) { state.readGuide = !state.readGuide; return render(); }
     if (d.tile !== undefined) { state.openTile = state.openTile === d.tile ? null : d.tile; return render(); }
     if (d.zoomOpen) { e.preventDefault(); return openZoom(d.zoomOpen); }

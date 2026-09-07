@@ -36,6 +36,64 @@ const ASSET_IDS = ['spx', 'kospi', 'btc'];
  * 읽은 지수는 숫자 자체가 거짓말이 된다 — 원본에서 뽑는다.
  * 모양이 조금이라도 달라지면 조용히 비우지 말고 빌드를 세운다.
  */
+/**
+ * 선물 목록도 원본에서 뽑는다.
+ *
+ * 이름·심볼·묶음·자릿수·사유를 손으로 베끼면 앱과 어긋난다. 특히 '왜 값이
+ * 없는가' 는 어긋나면 안 되는 문장이다 — 미리보기에서만 다른 이유가 적히면
+ * 그걸 보고 판단한 사람이 잘못 안다.
+ */
+function readFuturesCatalog() {
+  const src = fs.readFileSync(path.join(HERE, '../../src/lib/futuresCatalog.ts'), 'utf8');
+
+  const groups = [];
+  const gBlock = src.match(/export const FUTURES_GROUPS[^=]*=\s*\[([\s\S]*?)\n\];/);
+  if (!gBlock) throw new Error('futuresCatalog.ts 에서 FUTURES_GROUPS 를 찾지 못했습니다.');
+  for (const m of gBlock[1].matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']*)',\s*note:\s*'((?:[^'\\]|\\.)*)'\s*\}/g)) {
+    groups.push({ id: m[1], label: m[2], note: m[3].replace(/\\'/g, "'") });
+  }
+  if (groups.length < 5) throw new Error(`FUTURES_GROUPS 를 ${groups.length}개만 읽었습니다.`);
+
+  const iBlock = src.match(/export const FUTURES_ITEMS[^=]*=\s*\[([\s\S]*?)\n\];/);
+  if (!iBlock) throw new Error('futuresCatalog.ts 에서 FUTURES_ITEMS 를 찾지 못했습니다.');
+  const consts = {};
+  for (const m of src.matchAll(/^const (EXCHANGE_PAID|KRX_PAID)\s*=\s*\n?\s*'((?:[^'\\]|\\.)*)';/gm)) {
+    consts[m[1]] = m[2].replace(/\\'/g, "'");
+  }
+  const items = [];
+  for (const line of iBlock[1].split('\n')) {
+    const id = line.match(/\{\s*id:\s*'([^']+)'/);
+    if (!id) continue;
+    const pick = (k) => {
+      const m = line.match(new RegExp('\\b' + k + ":\\s*'((?:[^'\\\\]|\\\\.)*)'"));
+      return m ? m[1].replace(/\\'/g, "'") : null;
+    };
+    const num = (k) => {
+      const m = line.match(new RegExp('\\b' + k + ':\\s*(-?\\d+)'));
+      return m ? Number(m[1]) : 0;
+    };
+    const reasonConst = line.match(/\breason:\s*(EXCHANGE_PAID|KRX_PAID)/);
+    items.push({
+      id: id[1],
+      name: pick('name'),
+      symbol: pick('symbol'),
+      group: pick('group'),
+      precision: num('precision'),
+      suffix: pick('suffix') ?? '',
+      order: num('order'),
+      source: pick('source'),
+      reason: reasonConst ? consts[reasonConst[1]] : pick('reason'),
+      proxy: pick('proxy'),
+    });
+  }
+  if (items.length < 30) throw new Error(`FUTURES_ITEMS 를 ${items.length}개만 읽었습니다.`);
+  for (const it of items) {
+    if (!it.name || !it.symbol || !it.group) throw new Error(`선물 항목이 덜 읽혔습니다: ${it.id}`);
+    if (it.source === 'none' && !it.reason) throw new Error(`사유 없는 빈 항목: ${it.id}`);
+  }
+  return { groups, items };
+}
+
 function readIndexCatalog() {
   const src = fs.readFileSync(path.join(HERE, '../../src/lib/catalog.ts'), 'utf8');
 
@@ -135,7 +193,15 @@ async function main() {
   // 전광판이 스냅샷에 없으면 미리보기에 빈 화면이 남는다. 조용히 넘기지 않는다.
   if (!snapshot.sections.regime) throw new Error('스냅샷에 regime 섹션이 없습니다.');
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, regimeEvidence };
+  const futures = readFuturesCatalog();
+  // 목록에 있는 항목은 스냅샷에도 있어야 한다. 없으면 미리보기에 빈 줄이 남는다.
+  {
+    const have = new Set((snapshot.sections.futures?.data?.rows ?? []).map((r) => r.id));
+    const missing = futures.items.filter((i) => !have.has(i.id)).map((i) => i.id);
+    if (missing.length) throw new Error(`스냅샷에 선물 항목이 없습니다: ${missing.join(', ')}`);
+  }
+
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');

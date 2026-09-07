@@ -120,6 +120,9 @@ export function DesktopSidebar() {
           {[
             { href: '/market/us', label: '미국' },
             { href: '/market/crypto', label: '크립토' },
+            /* 선물은 하단 탭에 넣지 않는다 — 320px 에서 여덟 칸이면 글자가 뭉갠다.
+               넓은 화면 사이드바와 '더보기' 목록, 지수 화면에서 들어간다. */
+            { href: '/futures', label: '선물' },
           ].map((m) => {
             const active = pathname === m.href;
             return (

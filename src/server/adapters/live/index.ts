@@ -36,6 +36,22 @@ import { fetchFredCalendar, fredCalendarConfig } from './providers/fredCalendar'
 import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
+import { FUTURES_ITEMS } from '@/lib/futuresCatalog';
+
+/**
+ * 선물 판의 항목을 FRED 계열에 잇는다.
+ * 여기 없는 항목은 무료로 재배포할 수 있는 소스가 없다는 뜻이다.
+ */
+const FUTURES_FRED: Record<string, FredSeriesKey | undefined> = {
+  vx: 'vix',
+  cl: 'wti', bz: 'brent', ng: 'henry_hub',
+  dx: 'dollar_index', '6e': 'fx_eur', '6j': 'fx_jpy', '6b': 'fx_gbp',
+  '6c': 'fx_cad', '6a': 'fx_aud', '6s': 'fx_chf', krw: 'usdkrw',
+  zt: 'ust2', zf: 'ust5', zn: 'ust10', zb: 'ust30',
+};
+
+/** 기간별로 며칠 전과 견줄 것인가 (거래일) */
+const FUTURES_LOOKBACK: Record<string, number> = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, YTD: 170 };
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
 import type { RegimeSeries } from '@/server/regime';
@@ -52,6 +68,8 @@ import type {
   Quote,
   RangeKey,
   SeriesPoint,
+  FuturesBoard,
+  FuturesQuote,
 } from '@/types';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
 
@@ -516,6 +534,79 @@ export class LiveAdapter implements MarketAdapter {
    * 제공사 약관상 본문 재배포가 금지된 경우가 많다. 헤드라인·매체·발행시각·원문 링크만 저장하고
    * summaryKo 는 직접 생성한 요약(summaryOrigin: 'derived')임을 표시한다.
    */
+  /**
+   * 선물 판.
+   *
+   * 무엇을 채우고 무엇을 비우나
+   *   FRED(미국 정부·연준 공개 데이터)로 받을 수 있는 항목만 채운다. 무료이고
+   *   재배포 제한이 없기 때문이다. 다만 FRED 가 주는 것은 대개 **선물 계약이
+   *   아니라 현물·기준 가격**이라, 그 사실을 항목마다 proxyNote 로 함께 내보낸다.
+   *
+   *   지수·금속·농산물 선물은 거래소(CME·ICE)가 파는 시세다. 무료로 재배포할 수
+   *   있는 소스가 없으므로 값을 비우고 사유를 적는다 — 다른 곳에서 긁어 오면
+   *   이 앱이 지키기로 한 '제공업체 이용약관·재배포 권한' 규칙을 어긴다.
+   */
+  async getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard> {
+    const cfg = this.fred();
+    const back = FUTURES_LOOKBACK[range] ?? 1;
+    const rows: FuturesQuote[] = [];
+    for (const item of FUTURES_ITEMS) {
+      const key = item.source === 'fred' && cfg ? FUTURES_FRED[item.id] : undefined;
+      if (!key) {
+        rows.push({
+          id: item.id,
+          last: null,
+          change: null,
+          changePct: null,
+          spark: [],
+          unavailableReason:
+            item.reason ??
+            (item.source === 'binance'
+              ? '크립토 무기한선물은 심리 상세의 파생 지표로 이미 쓰고 있습니다. 이 판에는 아직 연결하지 않았습니다.'
+              : cfg
+                ? '아직 연결하지 않았습니다.'
+                : 'FRED 키가 없어 값을 받을 수 없습니다.'),
+          meta: meta(ctx.now.toISOString(), ctx.now.toISOString(), FRED_SOURCE),
+        });
+        continue;
+      }
+      try {
+        const obs = await fetchSeries(cfg as FredConfig, key, { limit: 400 });
+        const pts = obs.filter((o) => Number.isFinite(o.v));
+        if (pts.length < 2) throw new SeriesUnavailableError(`${item.name} 값이 두 개도 오지 않았습니다.`);
+        const last = pts[pts.length - 1];
+        const prev = pts[Math.max(0, pts.length - 1 - back)];
+        rows.push({
+          id: item.id,
+          last: Number(last.v.toFixed(item.precision)),
+          change: Number((last.v - prev.v).toFixed(item.precision)),
+          changePct: prev.v !== 0 ? Number((((last.v - prev.v) / prev.v) * 100).toFixed(2)) : null,
+          // 화면이 기간을 바꿔 가며 계산하므로 넉넉히 준다 (YTD 까지 커버)
+          spark: pts.slice(-181),
+          ...(item.proxy ? { proxyNote: item.proxy } : {}),
+          meta: meta(new Date(last.t).toISOString(), ctx.now.toISOString(), FRED_SOURCE),
+        });
+      } catch (e) {
+        rows.push({
+          id: item.id,
+          last: null,
+          change: null,
+          changePct: null,
+          spark: [],
+          unavailableReason: e instanceof Error ? e.message : '값을 받지 못했습니다.',
+          meta: meta(ctx.now.toISOString(), ctx.now.toISOString(), FRED_SOURCE),
+        });
+      }
+    }
+    return {
+      range,
+      rows,
+      availableCount: rows.filter((r) => r.last !== null).length,
+      totalCount: rows.length,
+      generatedAt: ctx.now.toISOString(),
+    };
+  }
+
   async getNews(_ctx: AdapterContext): Promise<NewsItem[]> {
     throw new NotWiredError('뉴스', 'src/server/adapters/live/index.ts > LiveAdapter.getNews');
   }

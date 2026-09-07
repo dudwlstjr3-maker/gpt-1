@@ -222,6 +222,7 @@ export default function MorePage() {
             { href: '/indicators', label: '경제·위험 지표 전체', desc: '기준금리·물가·고용·PMI·스프레드·밸류에이션' },
             { href: '/basics', label: '생활 경제 지수', desc: '1인당 GDP·지니계수·빅맥지수·PPP 환율·엥겔계수·소비자심리' },
             { href: '/indices', label: '시장 지수', desc: 'S&P 500 · 나스닥 · KOSPI · VIX · 달러지수' },
+            { href: '/futures', label: '선물 시장', desc: '지수·에너지·금속·농산물·통화·금리 선물 등락률 (거래소 유료 시세는 비어 있습니다)' },
             { href: '/regime', label: '국면 전광판', desc: '지금이 지난 20년 중 어디쯤인지 + 과거에 그랬을 때 무슨 일이 있었는지' },
             { href: '/criteria', label: '내 기준', desc: '내가 정한 조건이 지금 맞는지 확인 (매매 판단은 하지 않습니다)' },
             { href: '/alerts', label: '알림 설정', desc: '단계 변경·점수 돌파·목표가·급등락·지표 발표 전' },

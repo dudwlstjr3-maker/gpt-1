@@ -1710,6 +1710,78 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-22. 선물 판 ---------------- */
+  console.log('\n[8-22] 선물 시장 — 규칙을 지키면서 어디까지 담았나');
+  {
+    /*
+     * 요청은 "finviz.com/futures 에 있는 걸 전부 가져와라" 였다.
+     * 긁어 오지 않았다. 두 가지 이유다.
+     *   ① finviz 이용약관이 자동 수집·재배포를 금지한다.
+     *   ② 이 앱이 처음부터 지키기로 한 규칙 — "데이터 제공업체의 이용약관·재배포
+     *      권한·지연 조건 준수" — 을 어긴다. 한국 개별주·VKOSPI 를 뺀 것과 같은 이유다.
+     *
+     * 대신 화면은 그대로 만들고, 값은 합법적으로 받을 수 있는 것만 채운다.
+     * 못 채우는 항목은 지우지 않고 **왜 비었는지**를 적는다 — 조용히 빼면 목록이
+     * 왜 짧은지 알 수 없다.
+     */
+    const cat = await readFile('src/lib/futuresCatalog.ts', 'utf8');
+    const view = await readFile('src/components/market/FuturesBoard.tsx', 'utf8');
+    const demoF = await readFile('src/server/adapters/demo/futures.ts', 'utf8');
+    const liveF = await readFile('src/server/adapters/live/index.ts', 'utf8');
+    const tpl11 = await readFile('tools/preview/template.html', 'utf8');
+    const buildJs = await readFile('tools/preview/build.mjs', 'utf8');
+
+    /* ① 목록과 사유 */
+    const ids = [...cat.matchAll(/\{ id: '([^']+)', name: '/g)].map((m) => m[1]);
+    check('선물 항목이 30개 이상', ids.length >= 30, `${ids.length}개`);
+    check('항목 id 가 겹치지 않음', new Set(ids).size === ids.length);
+    check('값을 못 넣는 항목은 사유를 갖고 있음',
+      !/source: 'none'(?![^}]*reason:)/.test(cat.replace(/\n/g, ' ')));
+    check('거래소 유료 시세라는 사실을 밝힘', /거래소\(CME·ICE\)가 파는 시세/.test(cat));
+    check('선물이 아닌 값을 대신 쓴 경우 그 사실을 적음', /proxy\?: string/.test(cat) && /현물 고시가/.test(cat));
+
+    /* ② 화면 */
+    const boardRes = await fetch(`${BASE}/api/snapshot?scenario=normal`);
+    const boardJson = await boardRes.json();
+    const board = boardJson?.sections?.futures?.data;
+    check('스냅샷에 선물 판이 있음', Boolean(board), board ? `${board.rows.length}개` : '없음');
+    if (board) {
+      check('목록의 모든 항목이 스냅샷에 있음', board.rows.length === ids.length, `${board.rows.length}/${ids.length}`);
+      check('값이 없는 항목도 빠지지 않음', board.rows.some((r) => r.last === null && r.unavailableReason));
+      check('값이 있는 항목은 지나온 선을 갖고 있음',
+        board.rows.filter((r) => r.last !== null).every((r) => r.spark.length > 30));
+      check('빈 값을 0 으로 채우지 않음', board.rows.every((r) => r.last !== null || r.changePct === null));
+    }
+    for (const path of ['/futures']) {
+      const res = await fetch(`${BASE}${path}`);
+      check(`${path} 응답 200`, res.status === 200, `status=${res.status}`);
+    }
+
+    /* ③ 막대 — 묶음 안에서만 견준다 */
+    check('등락 막대가 0 을 가운데 둔 발산형', /const half = BAR_W \/ 2/.test(view) && /pct >= 0 \? half : half - w/.test(view));
+    check('막대 기준이 묶음 안 최댓값', /묶음에서 제일 크게 움직인 값/.test(view));
+    check('기준이 묶음마다 다르다는 사실을 적음', /묶음끼리는 길이를 견주지/.test(view));
+    check('기간을 바꿔도 서버에 다시 묻지 않음', /changeOver\(r\.spark, back\)/.test(view));
+    check('지나온 선이 짧으면 값을 지어내지 않음', /if \(idx < 0\) return null/.test(cat));
+
+    /* ④ 세 곳이 같은 목록을 본다 */
+    check('미리보기가 목록을 원본에서 읽음', /readFuturesCatalog/.test(buildJs) && /futuresCatalog\.ts/.test(buildJs));
+    check('미리보기도 사유 없는 빈 항목을 막음', /사유 없는 빈 항목/.test(buildJs));
+    check('미리보기에 선물 화면이 있음', /function viewFutures\(\)/.test(tpl11) && /futures: viewFutures/.test(tpl11));
+    check('미리보기 막대도 같은 규칙', /function futBar\(pct, max, color\)/.test(tpl11));
+
+    /* ⑤ DEMO 와 LIVE 가 같은 규칙을 지킨다 */
+    check('DEMO 도 거래소 유료 항목을 비워 둠', /item\.source === 'none'/.test(demoF));
+    check('DEMO 값이 실제 시세가 아님을 밝힘', /실제 시세가 아니다/.test(demoF));
+    check('LIVE 는 FRED 로 되는 것만 채움', /FUTURES_FRED/.test(liveF));
+    check('LIVE 도 대신 쓴 값이라는 사실을 함께 내보냄', /item\.proxy \? \{ proxyNote: item\.proxy \}/.test(liveF));
+    // 긁어 온 소스가 섞이지 않았는지
+    for (const banned of ['finviz', 'investing.com', 'tradingview']) {
+      check(`${banned} 을(를) 긁어 오지 않음`,
+        !cat.includes(banned) && !liveF.includes(banned) && !demoF.includes(banned));
+    }
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

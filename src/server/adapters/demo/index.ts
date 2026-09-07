@@ -9,6 +9,7 @@
  */
 
 import { mulberry32, gaussianFrom, hashSeed } from '@/lib/rng';
+import { buildFutures } from './futures';
 import { CATALOG, catalogFor, type CatalogItem } from '@/lib/catalog';
 import { getSession } from '@/lib/marketHours';
 import { clamp, round } from '@/lib/stats';
@@ -28,6 +29,7 @@ import type {
   Quote,
   RangeKey,
   SeriesPoint,
+  FuturesBoard,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import { COMPONENTS } from '@/server/fng/definitions';
@@ -1487,6 +1489,13 @@ export class DemoAdapter implements MarketAdapter {
   async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {
     if (ctx.scenario === 'empty') return [];
     return buildCalendar(ctx);
+  }
+
+  async getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard> {
+    if (ctx.scenario === 'empty') {
+      return { range, rows: [], availableCount: 0, totalCount: 0, generatedAt: ctx.now.toISOString() };
+    }
+    return buildFutures(ctx, range, makeMeta(ctx, 'us'));
   }
 
   async getNews(ctx: AdapterContext): Promise<NewsItem[]> {

@@ -9,6 +9,7 @@
  * 쪽은 한 해의 살림 — 같은 자리에 두면 무엇을 보고 있는지가 흐려졌다.
  */
 
+import Link from 'next/link';
 import { BackBar } from '@/components/nav/BackBar';
 import { MarketIndexBoard } from '@/components/market/MarketIndexBoard';
 
@@ -16,12 +17,15 @@ export default function IndicesPage() {
   return (
     <div className="pt-2 pb-4">
       <BackBar />
-      <header className="px-3 pt-1">
+      <header className="flex items-start justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">시장 지수</h1>
-        <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">
-          시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.
-        </p>
+        <Link href="/futures" className="mt-1 shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+          선물 시장 →
+        </Link>
       </header>
+      <p className="mt-1 px-3 text-[12.5px] leading-relaxed break-keep text-muted">
+        시장 전체를 한 숫자로 재는 값입니다. 개별 종목은 각 시장 화면과 관심목록에 있습니다.
+      </p>
 
       <div className="mt-3">
         <MarketIndexBoard />

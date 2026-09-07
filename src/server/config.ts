@@ -12,6 +12,7 @@ export interface ProviderKeys {
   macro: string | null;
   calendar: string | null;
   news: string | null;
+  energy: string | null;
 }
 
 function env(name: string): string | null {
@@ -28,6 +29,7 @@ export function getKeys(): ProviderKeys {
     macro: env('MACRO_API_KEY'),
     calendar: env('CALENDAR_API_KEY'),
     news: env('NEWS_API_KEY'),
+    energy: env('EIA_API_KEY'),
   };
 }
 
@@ -69,6 +71,12 @@ export const REQUIRED_KEYS = ['MACRO_API_KEY'] as const;
  */
 export const OPTIONAL_KEYS: { name: string; why: string }[] = [
   { name: 'CRYPTO_API_KEY', why: 'CoinGecko 무료 Demo 키. 없어도 되지만 넣으면 분당 요청 한도가 올라갑니다.' },
+  {
+    name: 'EIA_API_KEY',
+    why:
+      'EIA(미국 에너지정보청) 무료 키. 없으면 선물 판의 원유·천연가스가 현물 가격으로 대신 채워지고 ' +
+      '난방유·휘발유는 빕니다. 넣으면 NYMEX 인도월 정산가와 콘탱고·백워데이션까지 나옵니다.',
+  },
 ];
 
 /**
@@ -86,6 +94,7 @@ export function resolveMode(): { mode: DataMode; reason: string; missing: string
   const has: Record<string, string | null> = {
     MACRO_API_KEY: env.macro,
     CRYPTO_API_KEY: env.crypto,
+    EIA_API_KEY: env.energy,
   };
   const missing = REQUIRED_KEYS.filter((k) => !has[k]);
 

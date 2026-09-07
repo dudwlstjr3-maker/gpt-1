@@ -17,6 +17,13 @@
  * 값이 없는 항목을 지우지 않는 이유
  *   지수·금속·농산물 선물은 거래소가 파는 시세다. 조용히 빼면 목록이 왜 짧은지
  *   알 수 없다. 자리를 두고 **왜 비었는지**를 적는다.
+ *
+ * 인도월 곡선
+ *   에너지 넷(원유·천연가스·난방유·휘발유)만 인도월 1~4를 함께 받는다 —
+ *   EIA(미국 에너지정보청)가 NYMEX 정산가를 공개 통계로 내기 때문이다.
+ *   가격 하나는 "비싸다/싸다" 밖에 못 읽지만, 곡선을 같이 놓으면 시장이 앞을
+ *   어떻게 보고 있는지(콘탱고·백워데이션)가 한 줄 더 붙는다. 그 줄이 이 화면에서
+ *   드물게 **판단 재료**가 되는 자리라 접어 두지 않고 그대로 편다.
  */
 
 import { useMemo, useState } from 'react';
@@ -25,6 +32,7 @@ import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/S
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { Sparkline } from '@/components/charts/Sparkline';
+import { curveShape, contractLabel } from '@/lib/futuresCurve.mjs';
 import { useChangeColor } from './useChangeColor';
 import { formatNumber, formatSigned, NO_VALUE } from '@/lib/format';
 import {
@@ -35,7 +43,7 @@ import {
   groupedFutures,
   type FuturesRange,
 } from '@/lib/futuresCatalog';
-import type { FuturesQuote } from '@/types';
+import type { FuturesCurvePoint, FuturesQuote } from '@/types';
 
 /** 막대 한 줄의 크기 (viewBox 좌표) */
 const BAR_W = 200;
@@ -62,6 +70,79 @@ function ChangeBar({ pct, max, color }: { pct: number; max: number; color: strin
         opacity="0.85"
       />
     </svg>
+  );
+}
+
+/** 인도월 곡선 미니 그림. 네 점뿐이라 축은 두지 않고 모양만 보여준다. */
+function CurveShape({ curve }: { curve: FuturesCurvePoint[] }) {
+  const W = 62;
+  const H = 18;
+  const pts = [...curve].sort((a, b) => a.n - b.n);
+  const vals = pts.map((p) => p.value);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const span = hi - lo || 1;
+  const xy = pts.map((p, i) => ({
+    x: 3 + (i / Math.max(1, pts.length - 1)) * (W - 6),
+    // 위가 비싼 쪽. 값 차이가 작아도 모양이 보이도록 세로를 꽉 채운다
+    y: H - 4 - ((p.value - lo) / span) * (H - 8),
+  }));
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-[18px] w-[62px] shrink-0" aria-hidden="true">
+      <polyline
+        points={xy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+        fill="none"
+        stroke="var(--muted-fg)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {xy.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r={i === 0 ? 2.6 : 1.8} fill="var(--muted-fg)" />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * 인도월 곡선 한 줄.
+ *
+ * 모양(콘탱고·백워데이션)은 **글자와 기호로** 먼저 말한다. 색은 거들 뿐이고,
+ * 색만으로 뜻을 전하지 않는다.
+ */
+function CurveStrip({
+  curve,
+  precision,
+  suffix,
+}: {
+  curve: FuturesCurvePoint[];
+  precision: number;
+  suffix: string;
+}) {
+  const read = curveShape(curve);
+  if (!read) return null;
+  const far = [...curve].sort((a, b) => a.n - b.n)[curve.length - 1];
+  return (
+    <div className="mt-2 rounded-lg bg-surface-2 px-2 py-2">
+      <div className="flex items-center gap-2">
+        <CurveShape curve={curve} />
+        <div className="min-w-0">
+          <p className="text-[12px] font-semibold text-fg">
+            <span aria-hidden="true">{read.glyph} </span>
+            {read.label}
+            <span className="tnum ml-2 font-normal text-muted">
+              {formatSigned(read.spreadPct, 1)}%
+            </span>
+          </p>
+          <p className="tnum mt-0.5 text-[11.5px] text-subtle">
+            근월 {formatNumber(read.near, precision)}
+            {suffix} → {contractLabel(far.n)} {formatNumber(read.far, precision)}
+            {suffix}
+          </p>
+        </div>
+      </div>
+      <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-muted">{read.meaning}</p>
+    </div>
   );
 }
 
@@ -115,6 +196,13 @@ function Row({
           {pct === null ? NO_VALUE : `${formatSigned(pct, 2)}%`}
         </p>
       </div>
+
+      {/* 인도월 곡선은 줄 전체 너비를 쓴다 — 오른쪽 숫자 칸에 끼우면 세 줄로 접힌다 */}
+      {!missing && row.curve && row.curve.length >= 2 ? (
+        <div className="col-span-2">
+          <CurveStrip curve={row.curve} precision={item.precision} suffix={item.suffix} />
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -133,7 +221,9 @@ export function FuturesBoardView() {
         <Notice tone="neutral">
           지수·금속·농산물 <strong>선물 시세는 거래소(CME·ICE)가 파는 데이터</strong>라 무료로 재배포할 수 있는
           소스가 없습니다. 그런 항목은 값을 비우고 사유를 적어 두었습니다. 채워진 값 중 상당수는 선물 계약이 아니라
-          현물·기준 가격이며, 그 경우 <strong>대신 쓴 값</strong> 표시가 붙습니다.
+          현물·기준 가격이며, 그 경우 <strong>대신 쓴 값</strong> 표시가 붙습니다. 에너지 넷(원유·천연가스·난방유·휘발유)은
+          미국 에너지정보청(EIA)이 <strong>인도월 정산가</strong>를 공개해, 받아진 항목에는 인도월 곡선(콘탱고·백워데이션)까지
+          함께 놓습니다.
         </Notice>
       </div>
 

@@ -84,12 +84,19 @@ function readFuturesCatalog() {
       source: pick('source'),
       reason: reasonConst ? consts[reasonConst[1]] : pick('reason'),
       proxy: pick('proxy'),
+      // fallback 은 { source, note } 라 pick 으로는 안 잡힌다. note 만 따로 뽑는다.
+      fallbackNote: (line.match(/\bfallback:\s*\{[^}]*\bnote:\s*'((?:[^'\\]|\\.)*)'/) ?? [])[1] ?? null,
     });
   }
   if (items.length < 30) throw new Error(`FUTURES_ITEMS 를 ${items.length}개만 읽었습니다.`);
   for (const it of items) {
     if (!it.name || !it.symbol || !it.group) throw new Error(`선물 항목이 덜 읽혔습니다: ${it.id}`);
     if (it.source === 'none' && !it.reason) throw new Error(`사유 없는 빈 항목: ${it.id}`);
+    // EIA 로 받는 항목이 fallback 도 reason 도 없이 비면, 화면에 이유 없는 빈 줄이 남는다.
+    // 지금은 어댑터가 "EIA 키가 없어 비웁니다" 를 만들어 주므로 여기서는 표기만 확인한다.
+    if (it.source === 'eia' && it.proxy) {
+      throw new Error(`EIA 로 받는 항목에 proxy 가 남아 있습니다 (대신 쓴 값이 아닙니다): ${it.id}`);
+    }
   }
   return { groups, items };
 }
@@ -199,6 +206,17 @@ async function main() {
     const have = new Set((snapshot.sections.futures?.data?.rows ?? []).map((r) => r.id));
     const missing = futures.items.filter((i) => !have.has(i.id)).map((i) => i.id);
     if (missing.length) throw new Error(`스냅샷에 선물 항목이 없습니다: ${missing.join(', ')}`);
+    // EIA 항목은 인도월 곡선이 함께 와야 한다. 없으면 미리보기에서 곡선 줄이 통째로 빠져
+    // "본 화면과 다른데 눈치채지 못하는" 상태가 된다.
+    const rows = snapshot.sections.futures?.data?.rows ?? [];
+    const noCurve = futures.items
+      .filter((i) => i.source === 'eia')
+      .filter((i) => {
+        const r = rows.find((x) => x.id === i.id);
+        return r && r.last !== null && (r.curve ?? []).length < 2;
+      })
+      .map((i) => i.id);
+    if (noCurve.length) throw new Error(`인도월 곡선이 없는 EIA 항목: ${noCurve.join(', ')}`);
   }
 
   const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };

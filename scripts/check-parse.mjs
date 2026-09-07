@@ -43,6 +43,8 @@ const env = {
   WORLDBANK_BASE_URL: `${BASE}/wb`,
   BIGMAC_CSV_URL: `${BASE}/bigmac.csv`,
   CBOE_CSV_URL: `${BASE}/cboe.csv`,
+  EIA_API_KEY: 'stub-key-not-real',
+  EIA_BASE_URL: `${BASE}/eia`,
   PORT: String(APP_PORT),
 };
 
@@ -91,7 +93,7 @@ check('전체가 죽지 않음', !snap.fatalError, snap.fatalError ?? '');
 check('모드가 LIVE', snap.mode === 'LIVE');
 
 /* 붙인 것은 살아야 한다 */
-for (const key of ['quotes', 'macro', 'basics', 'calendar', 'regime', 'fng']) {
+for (const key of ['quotes', 'macro', 'basics', 'calendar', 'regime', 'fng', 'futures']) {
   const sec = snap.sections?.[key];
   const ok = sec && sec.status !== 'error' && sec.data !== null;
   check(`${key} 를 읽어 냄`, ok, sec ? `status=${sec.status}${sec.error ? ` (${String(sec.error).slice(0, 60)})` : ''}` : '섹션 없음');
@@ -132,6 +134,35 @@ check('미국은 문턱을 넘어 점수가 나옴', us?.score !== null && us?.s
 const cr = (snap.sections?.fng?.data ?? []).find((f) => f.market === 'crypto');
 check('크립토는 문턱을 못 넘고 사유를 밝힘', cr?.score === null && !!cr?.unavailableReason,
   cr ? `coverage=${Math.round((cr.coverage ?? 0) * 100)}%` : '없음');
+
+console.log('\n[선물] EIA 인도월 정산가를 읽어 내는가');
+const fut = snap.sections?.futures?.data;
+const futRows = fut?.rows ?? [];
+const byId = Object.fromEntries(futRows.map((r) => [r.id, r]));
+check('선물 판이 항목을 다 실어 보냄', futRows.length >= 39, `${futRows.length}개`);
+check('값을 채운 항목이 있음', (fut?.availableCount ?? 0) >= 18, `${fut?.availableCount}/${fut?.totalCount}`);
+
+for (const id of ['cl', 'ng', 'ho', 'rb']) {
+  const r = byId[id];
+  const n = r?.curve?.length ?? 0;
+  check(`${id} — EIA 인도월 ${n}개를 읽음`, n >= 2,
+    r ? (r.last === null ? `값 없음 (${String(r.unavailableReason ?? '').slice(0, 60)})` : `근월 ${r.last}`) : '줄이 없음');
+  // EIA 로 받았으면 '대신 쓴 값' 이 붙으면 안 된다 — 진짜 선물 정산가다
+  check(`${id} — 선물 정산가라 '대신 쓴 값' 표시가 없음`, !!r && !r.proxyNote, r?.proxyNote ?? '없음');
+  check(`${id} — 출처가 EIA 로 찍힘`, (r?.meta?.sources ?? []).some((x) => /EIA/.test(x?.name ?? '')),
+    (r?.meta?.sources ?? []).map((x) => x.name).join(', ') || '없음');
+}
+
+// 곡선의 네 점은 **같은 날**이어야 한다. 날짜가 섞이면 그건 곡선이 아니라 시차다.
+const clCurve = byId.cl?.curve ?? [];
+check('곡선의 인도월이 모두 같은 날', clCurve.length >= 2 && new Set(clCurve.map((c) => c.at)).size === 1,
+  `${new Set(clCurve.map((c) => c.at)).size}개 날짜`);
+
+// 거래소 유료 항목은 EIA 를 붙였다고 채워지면 안 된다
+const paid = ['es', 'gc', 'zc'].map((id) => byId[id]).filter(Boolean);
+check('거래소 유료 항목은 여전히 비어 있고 사유가 있음',
+  paid.length === 3 && paid.every((r) => r.last === null && !!r.unavailableReason),
+  paid.map((r) => `${r.id}=${r.last === null ? '빔' : r.last}`).join(' '));
 
 console.log('\n[결측] 없는 값을 지어내지 않는가');
 const zeroed = (snap.sections?.macro?.data ?? []).filter((m) => m.value === 0 && m.unavailableReason);

@@ -781,6 +781,14 @@ export interface MarketSummary {
 /* 선물 시장                                                            */
 /* ------------------------------------------------------------------ */
 
+/** 인도월 곡선의 한 점 (1 = 근월물) */
+export interface FuturesCurvePoint {
+  n: number;
+  value: number;
+  /** 이 값의 거래일 (곡선의 모든 점은 같은 날이다) */
+  at: string;
+}
+
 export interface FuturesQuote {
   /** futuresCatalog 의 id */
   id: string;
@@ -795,6 +803,11 @@ export interface FuturesQuote {
    * 화면에 그대로 나간다 — 안 적으면 선물 가격으로 읽힌다.
    */
   proxyNote?: string;
+  /**
+   * 인도월 1~4 가격. 콘탱고·백워데이션을 읽는 재료다.
+   * 받은 항목에만 있다 — 대부분의 선물은 거래소 유료 시세라 곡선을 받을 수 없다.
+   */
+  curve?: FuturesCurvePoint[];
   /** 값이 없을 때 사유 (거래소 유료 데이터 등) */
   unavailableReason?: string;
   meta: Meta;

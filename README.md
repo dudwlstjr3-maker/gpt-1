@@ -73,10 +73,13 @@ cp .env.example .env.local
 | `KR_MARKET_API_KEY` / `KR_MARKET_BASE_URL` | 한국 시세·투자자 수급 |
 | `CRYPTO_API_KEY` / `CRYPTO_BASE_URL` | 크립토 시세·도미넌스·파생 |
 | `MACRO_API_KEY` / `MACRO_BASE_URL` | 거시 지표 (FRED, 한국은행 ECOS 등) |
+| `EIA_API_KEY` / `EIA_BASE_URL` | 에너지 선물 인도월 정산가 (EIA, 무료·선택) |
 | `CALENDAR_API_KEY` / `CALENDAR_BASE_URL` | 경제 캘린더 (선택) |
 | `NEWS_API_KEY` / `NEWS_BASE_URL` | 뉴스 (선택) |
 
-`US_MARKET_API_KEY`, `KR_MARKET_API_KEY`, `CRYPTO_API_KEY`, `MACRO_API_KEY` 가 **필수 키**입니다 (`auto` 모드의 LIVE 판정 기준).
+**필수 키는 `MACRO_API_KEY` 하나뿐입니다** (`auto` 모드의 LIVE 판정 기준). 코드가 실제로 읽는 키가 그것뿐이라, 쓰지도 않는 변수를 요구하지 않습니다 — 자세한 사정은 이 문서 아래쪽 `REQUIRED_KEYS` 설명을 보세요.
+
+`EIA_API_KEY` 는 없어도 앱이 돌지만, 넣으면 선물 판의 원유·천연가스가 **현물 대체값에서 실제 NYMEX 인도월 정산가로 바뀌고** 난방유·휘발유가 채워지며 콘탱고·백워데이션이 함께 표시됩니다. [eia.gov/opendata](https://www.eia.gov/opendata/) 에서 이메일만 넣으면 무료로 발급됩니다.
 
 ### 업스트림 호출 정책 (선택)
 
@@ -97,7 +100,7 @@ cp .env.example .env.local
 
 ### 연결 상태 (2026-09 기준)
 
-전부 **무료** 제공사입니다. 키가 필요한 곳은 FRED 하나뿐입니다.
+전부 **무료** 제공사입니다. 키가 필요한 곳은 FRED(필수)와 EIA(선택) 둘뿐입니다.
 
 | 무엇 | 제공사 | 키 | 지연 | 상태 |
 |---|---|---|---|---|
@@ -107,6 +110,8 @@ cp .env.example .env.local
 | 한국 지수 (KOSPI · KOSDAQ) | **Stooq** | 불필요 | **~15분** | ✅ (지수만) |
 | 미국 주식 풋/콜 비율 | **Cboe** | 불필요 | 일별 마감 | ✅ |
 | VIX · 하이일드 · 장단기 금리차 · 국채 · CPI · 실업률 · 원달러 | **FRED** | 무료 키 | 발표 즉시 | ✅ |
+| 에너지 선물 인도월 정산가 (WTI · 천연가스 · 난방유 · RBOB) | **EIA** | 무료 키 (선택) | 마감 후 일별 | ✅ |
+| 지수 · 금속 · 농산물 선물 | — | — | — | ⬜ 거래소 유료 |
 | 1인당 GDP · 지니계수 · 미저리 · PPP 괴리 | **World Bank** | 불필요 | 연 1회 | ✅ |
 | 빅맥지수 | **The Economist** (공개 저장소 CSV) | 불필요 | 연 2회 | ✅ |
 | 종목 상세 차트 (40종목 중 26종목) | CoinGecko · Stooq · FRED · Binance | 위와 같음 | 위와 같음 | ✅ |

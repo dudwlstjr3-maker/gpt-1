@@ -31,6 +31,33 @@ const VOL: Record<string, number> = {
 
 const DAYS = 190;
 
+/**
+ * 인도월 곡선의 기울기 (계약 한 칸당 비율).
+ *
+ * LIVE 에서는 EIA 가 인도월 1~4를 그대로 주지만, DEMO 에는 받아 올 곳이 없으니
+ * 마지막 값에서 일정한 기울기로 만들어 낸다. **양수와 음수를 섞어 둔다** —
+ * 화면이 콘탱고와 백워데이션을 둘 다 제대로 그리는지 DEMO 만으로 확인할 수 있어야
+ * 한다. 값 자체는 실제 시세가 아니다.
+ */
+const CURVE_SLOPE: Record<string, number> = {
+  cl: -0.009,  // 백워데이션
+  ng: 0.021,   // 콘탱고
+  ho: -0.004,  // 완만한 백워데이션
+  rb: 0.012,   // 콘탱고
+};
+
+/** 인도월 1~4. LIVE 와 같은 모양으로 만든다 (같은 날짜, 근월물부터). */
+function curveFor(item: FuturesItem, last: number, at: number) {
+  const slope = CURVE_SLOPE[item.id];
+  if (slope === undefined) return undefined;
+  const iso = new Date(at).toISOString();
+  return [1, 2, 3, 4].map((n) => ({
+    n,
+    value: Number((last * (1 + slope * (n - 1))).toFixed(item.precision)),
+    at: iso,
+  }));
+}
+
 /** 기간별로 며칠 전과 견줄 것인가 */
 function lookback(range: string, now: Date): number {
   if (range === '1D') return 1;
@@ -94,15 +121,19 @@ export function buildFutures(ctx: AdapterContext, range: string, meta: Meta): Fu
       };
     }
     const s = seriesFor(item, ctx.now);
-    const last = s[s.length - 1].v;
+    const point = s[s.length - 1];
+    const last = point.v;
     const prev = s[Math.max(0, s.length - 1 - back)].v;
+    const rounded = Number(last.toFixed(item.precision));
+    const curve = curveFor(item, rounded, point.t);
     return {
       id: item.id,
-      last: Number(last.toFixed(item.precision)),
+      last: rounded,
       change: Number((last - prev).toFixed(item.precision)),
       changePct: prev !== 0 ? Number((((last - prev) / prev) * 100).toFixed(2)) : null,
       // 화면이 기간을 바꿔 가며 계산하므로 넉넉히 준다 (YTD 까지 커버)
       spark: s.slice(-181),
+      ...(curve ? { curve } : {}),
       ...(item.proxy ? { proxyNote: item.proxy } : {}),
       meta,
     };

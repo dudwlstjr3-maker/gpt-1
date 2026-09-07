@@ -12,6 +12,8 @@
  *   **왜 못 넣는지를 항목 옆에 적고 비워 둔다.** 조용히 빼면 목록이 왜 짧은지
  *   알 수가 없고, 아무 데서나 긁어 오면 규칙을 어긴다.
  *
+ *   - 'eia'    : 미국 에너지정보청. **인도월별 선물 정산가를 그대로 준다** —
+ *               이 목록에서 진짜 선물 계약 값이 실리는 유일한 자리다 (에너지 넷).
  *   - 'fred'   : 미국 정부·연준 공개 데이터. 무료이고 재배포에 제한이 없다.
  *   - 'binance': 거래소 공개 API. 크립토 무기한선물은 공개되어 있다.
  *   - 'none'   : 무료로 쓸 수 있는 합법 소스가 없다. reason 에 이유를 적는다.
@@ -33,7 +35,7 @@ export interface FuturesGroup {
 
 export const FUTURES_GROUPS: FuturesGroup[] = [
   { id: 'index', label: '지수', note: '주가지수 선물. 정규장이 닫혀 있어도 거의 24시간 움직여서 다음 날 분위기를 미리 보여줍니다.' },
-  { id: 'energy', label: '에너지', note: '원유·천연가스. 물가와 경기에 바로 얹히는 값입니다.' },
+  { id: 'energy', label: '에너지', note: '원유·천연가스. 물가와 경기에 바로 얹히는 값입니다. 이 묶음만 인도월 정산가를 받을 수 있어, 받아진 항목에는 인도월 곡선이 함께 붙습니다.' },
   { id: 'metal', label: '금속', note: '금·은은 안전자산, 구리는 경기 민감 금속으로 읽습니다.' },
   { id: 'agri', label: '농산물', note: '곡물·소프트·축산. 식료품 물가의 앞단입니다.' },
   { id: 'currency', label: '통화', note: '달러가 오르면 대체로 원자재와 신흥국 자산이 눌립니다.' },
@@ -52,7 +54,7 @@ export interface FuturesItem {
   suffix: string;
   order: number;
   /** 이 항목의 값을 어디서 가져오는가 */
-  source: 'fred' | 'binance' | 'none';
+  source: 'eia' | 'fred' | 'binance' | 'none';
   /** source 가 'none' 일 때 왜 못 가져오는지 */
   reason?: string;
   /**
@@ -60,6 +62,12 @@ export interface FuturesItem {
    * 이 문구는 화면에 그대로 나간다 — 선물 가격으로 오해하면 안 되기 때문이다.
    */
   proxy?: string;
+  /**
+   * 우선 소스(EIA)를 못 쓸 때 대신 채우는 곳.
+   * EIA 무료 키가 없으면 선물 대신 현물 가격이 들어가는데, 그건 다른 값이므로
+   * 대신 쓴 순간에만 note 를 화면에 붙인다. 키가 있으면 이 문구는 나오지 않는다.
+   */
+  fallback?: { source: 'fred'; note: string };
 }
 
 const EXCHANGE_PAID =
@@ -76,11 +84,11 @@ export const FUTURES_ITEMS: FuturesItem[] = [
   { id: 'k200f', name: '코스피200 선물', symbol: 'K200', group: 'index', precision: 2, suffix: '', order: 6, source: 'none', reason: KRX_PAID },
 
   /* ---------------- 에너지 ---------------- */
-  { id: 'cl', name: 'WTI 원유', symbol: 'CL', group: 'energy', precision: 2, suffix: '$', order: 1, source: 'fred', proxy: '선물 근월물이 아니라 WTI 현물 고시가입니다 (EIA → FRED).' },
+  { id: 'cl', name: 'WTI 원유', symbol: 'CL', group: 'energy', precision: 2, suffix: '$', order: 1, source: 'eia', fallback: { source: 'fred', note: '선물 근월물이 아니라 WTI 현물 고시가입니다 (EIA → FRED). EIA 무료 키를 넣으면 선물 정산가로 바뀝니다.' } },
   { id: 'bz', name: '브렌트유', symbol: 'BZ', group: 'energy', precision: 2, suffix: '$', order: 2, source: 'fred', proxy: '선물 근월물이 아니라 브렌트 현물 고시가입니다 (EIA → FRED).' },
-  { id: 'ng', name: '천연가스', symbol: 'NG', group: 'energy', precision: 3, suffix: '$', order: 3, source: 'fred', proxy: '선물 근월물이 아니라 헨리허브 현물 가격입니다 (EIA → FRED).' },
-  { id: 'ho', name: '난방유', symbol: 'HO', group: 'energy', precision: 4, suffix: '$', order: 4, source: 'none', reason: EXCHANGE_PAID },
-  { id: 'rb', name: '휘발유(RBOB)', symbol: 'RB', group: 'energy', precision: 4, suffix: '$', order: 5, source: 'none', reason: EXCHANGE_PAID },
+  { id: 'ng', name: '천연가스', symbol: 'NG', group: 'energy', precision: 3, suffix: '$', order: 3, source: 'eia', fallback: { source: 'fred', note: '선물 근월물이 아니라 헨리허브 현물 가격입니다 (EIA → FRED). EIA 무료 키를 넣으면 선물 정산가로 바뀝니다.' } },
+  { id: 'ho', name: '난방유', symbol: 'HO', group: 'energy', precision: 4, suffix: '$', order: 4, source: 'eia' },
+  { id: 'rb', name: '휘발유(RBOB)', symbol: 'RB', group: 'energy', precision: 4, suffix: '$', order: 5, source: 'eia' },
 
   /* ---------------- 금속 ---------------- */
   { id: 'gc', name: '금', symbol: 'GC', group: 'metal', precision: 2, suffix: '$', order: 1, source: 'none', reason: EXCHANGE_PAID },

@@ -37,21 +37,7 @@ import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig 
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
 import { FUTURES_ITEMS } from '@/lib/futuresCatalog';
-
-/**
- * 선물 판의 항목을 FRED 계열에 잇는다.
- * 여기 없는 항목은 무료로 재배포할 수 있는 소스가 없다는 뜻이다.
- */
-const FUTURES_FRED: Record<string, FredSeriesKey | undefined> = {
-  vx: 'vix',
-  cl: 'wti', bz: 'brent', ng: 'henry_hub',
-  dx: 'dollar_index', '6e': 'fx_eur', '6j': 'fx_jpy', '6b': 'fx_gbp',
-  '6c': 'fx_cad', '6a': 'fx_aud', '6s': 'fx_chf', krw: 'usdkrw',
-  zt: 'ust2', zf: 'ust5', zn: 'ust10', zb: 'ust30',
-};
-
-/** 기간별로 며칠 전과 견줄 것인가 (거래일) */
-const FUTURES_LOOKBACK: Record<string, number> = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, YTD: 170 };
+import { EIA_FUTURES, EIA_SOURCE, curveFrom, eiaConfig, fetchFuturesChain, type EiaConfig } from './providers/eia';
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
 import type { RegimeSeries } from '@/server/regime';
@@ -72,6 +58,21 @@ import type {
   FuturesQuote,
 } from '@/types';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
+
+/**
+ * 선물 판의 항목을 FRED 계열에 잇는다.
+ * 여기 없는 항목은 무료로 재배포할 수 있는 소스가 없다는 뜻이다.
+ */
+const FUTURES_FRED: Record<string, FredSeriesKey | undefined> = {
+  vx: 'vix',
+  cl: 'wti', bz: 'brent', ng: 'henry_hub',
+  dx: 'dollar_index', '6e': 'fx_eur', '6j': 'fx_jpy', '6b': 'fx_gbp',
+  '6c': 'fx_cad', '6a': 'fx_aud', '6s': 'fx_chf', krw: 'usdkrw',
+  zt: 'ust2', zf: 'ust5', zn: 'ust10', zb: 'ust30',
+};
+
+/** 기간별로 며칠 전과 견줄 것인가 (거래일) */
+const FUTURES_LOOKBACK: Record<string, number> = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, YTD: 170 };
 
 /** 구현이 아직 없는 지점을 명확히 알린다. 조용히 빈 값을 만들지 않는다. */
 class NotWiredError extends Error {
@@ -546,30 +547,113 @@ export class LiveAdapter implements MarketAdapter {
    *   있는 소스가 없으므로 값을 비우고 사유를 적는다 — 다른 곳에서 긁어 오면
    *   이 앱이 지키기로 한 '제공업체 이용약관·재배포 권한' 규칙을 어긴다.
    */
+  /**
+   * 선물 판.
+   *
+   * 값을 어디서 가져오는지가 항목마다 다르고, **다르다는 사실 자체가 정보다.**
+   *
+   *   1) EIA  — 에너지 넷(원유·천연가스·난방유·휘발유)만. 미국 에너지정보청이
+   *             NYMEX 인도월 정산가를 공개 통계로 내므로 **진짜 선물 계약 값**이
+   *             들어간다. 인도월 1~4를 함께 받아 콘탱고·백워데이션까지 읽는다.
+   *   2) FRED — 나머지 채워지는 항목. 대부분 선물이 아니라 현물·기준 가격이라
+   *             '대신 쓴 값' 표시를 붙인다.
+   *   3) 나머지 — 거래소가 파는 시세라 비운다. 왜 비는지를 같이 올려보낸다.
+   *
+   * EIA 키가 없으면 원유·천연가스는 FRED 현물로 내려앉는다. 그때는 **현물이라는
+   * 사실을 반드시 붙인다** — 조용히 바꿔치기하면 사용자가 선물 값으로 읽는다.
+   */
   async getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard> {
     const cfg = this.fred();
+    const eia = this.eia();
     const back = FUTURES_LOOKBACK[range] ?? 1;
+    const now = ctx.now.toISOString();
     const rows: FuturesQuote[] = [];
+
+    const blank = (id: string, reason: string, src: DataSource = FRED_SOURCE): FuturesQuote => ({
+      id,
+      last: null,
+      change: null,
+      changePct: null,
+      spark: [],
+      unavailableReason: reason,
+      meta: meta(now, now, src),
+    });
+
     for (const item of FUTURES_ITEMS) {
-      const key = item.source === 'fred' && cfg ? FUTURES_FRED[item.id] : undefined;
-      if (!key) {
-        rows.push({
-          id: item.id,
-          last: null,
-          change: null,
-          changePct: null,
-          spark: [],
-          unavailableReason:
-            item.reason ??
-            (item.source === 'binance'
-              ? '크립토 무기한선물은 심리 상세의 파생 지표로 이미 쓰고 있습니다. 이 판에는 아직 연결하지 않았습니다.'
-              : cfg
-                ? '아직 연결하지 않았습니다.'
-                : 'FRED 키가 없어 값을 받을 수 없습니다.'),
-          meta: meta(ctx.now.toISOString(), ctx.now.toISOString(), FRED_SOURCE),
-        });
+      /* ---------- 1) EIA — 진짜 선물 정산가 ---------- */
+      if (item.source === 'eia' && eia && EIA_FUTURES[item.id]) {
+        const spec = EIA_FUTURES[item.id];
+        try {
+          const chain = await fetchFuturesChain(eia, item.id, { days: 260 });
+          const front = chain.get(spec.series[0]) ?? [];
+          if (front.length < 2) {
+            throw new SeriesUnavailableError(
+              `EIA 에서 ${spec.what} 값이 두 개도 오지 않았습니다 (계열 ${spec.series[0]}).`,
+            );
+          }
+          const last = front[front.length - 1];
+          const prev = front[Math.max(0, front.length - 1 - back)];
+          const curve = curveFrom(chain, spec.series);
+          rows.push({
+            id: item.id,
+            last: Number(last.v.toFixed(item.precision)),
+            change: Number((last.v - prev.v).toFixed(item.precision)),
+            changePct: prev.v !== 0 ? Number((((last.v - prev.v) / prev.v) * 100).toFixed(2)) : null,
+            spark: front.slice(-181),
+            ...(curve.length >= 2
+              ? {
+                  curve: curve.map((c) => ({
+                    n: c.n,
+                    value: Number(c.value.toFixed(item.precision)),
+                    at: new Date(c.at).toISOString(),
+                  })),
+                }
+              : {}),
+            meta: meta(new Date(last.t).toISOString(), now, EIA_SOURCE),
+          });
+          continue;
+        } catch (e) {
+          // EIA 가 안 되면 대신 쓸 곳이 있는 항목만 내려앉는다. 아래로 흘려보낸다.
+          const why = e instanceof Error ? e.message : 'EIA 에서 값을 받지 못했습니다.';
+          if (!(item.fallback && cfg && FUTURES_FRED[item.id])) {
+            rows.push(blank(item.id, why, EIA_SOURCE));
+            continue;
+          }
+        }
+      }
+
+      /* EIA 를 쓸 항목인데 키가 없다 — 대신 쓸 곳이 없으면 그 사실을 그대로 적는다 */
+      if (item.source === 'eia' && !eia && !(item.fallback && cfg)) {
+        rows.push(
+          blank(
+            item.id,
+            'EIA 무료 키(EIA_API_KEY)가 없어 비워 둡니다. 이 값은 미국 에너지정보청이 무료로 공개하는 ' +
+              'NYMEX 인도월 정산가라, 키만 넣으면 채워집니다.',
+            EIA_SOURCE,
+          ),
+        );
         continue;
       }
+
+      /* ---------- 2) FRED — 대부분 현물·기준 가격이다 ---------- */
+      const usingFallback = item.source === 'eia';
+      const key = (item.source === 'fred' || usingFallback) && cfg ? FUTURES_FRED[item.id] : undefined;
+      if (!key) {
+        rows.push(
+          blank(
+            item.id,
+            item.reason ??
+              (item.source === 'binance'
+                ? '크립토 무기한선물은 심리 상세의 파생 지표로 이미 쓰고 있습니다. 이 판에는 아직 연결하지 않았습니다.'
+                : cfg
+                  ? '아직 연결하지 않았습니다.'
+                  : 'FRED 키가 없어 값을 받을 수 없습니다.'),
+          ),
+        );
+        continue;
+      }
+      // 대신 쓴 경우의 문구. EIA 에서 내려앉았으면 fallback.note, 원래 대체값이면 proxy.
+      const note = usingFallback ? item.fallback?.note : item.proxy;
       try {
         const obs = await fetchSeries(cfg as FredConfig, key, { limit: 400 });
         const pts = obs.filter((o) => Number.isFinite(o.v));
@@ -583,27 +667,20 @@ export class LiveAdapter implements MarketAdapter {
           changePct: prev.v !== 0 ? Number((((last.v - prev.v) / prev.v) * 100).toFixed(2)) : null,
           // 화면이 기간을 바꿔 가며 계산하므로 넉넉히 준다 (YTD 까지 커버)
           spark: pts.slice(-181),
-          ...(item.proxy ? { proxyNote: item.proxy } : {}),
-          meta: meta(new Date(last.t).toISOString(), ctx.now.toISOString(), FRED_SOURCE),
+          ...(note ? { proxyNote: note } : {}),
+          meta: meta(new Date(last.t).toISOString(), now, FRED_SOURCE),
         });
       } catch (e) {
-        rows.push({
-          id: item.id,
-          last: null,
-          change: null,
-          changePct: null,
-          spark: [],
-          unavailableReason: e instanceof Error ? e.message : '값을 받지 못했습니다.',
-          meta: meta(ctx.now.toISOString(), ctx.now.toISOString(), FRED_SOURCE),
-        });
+        rows.push(blank(item.id, e instanceof Error ? e.message : '값을 받지 못했습니다.'));
       }
     }
+
     return {
       range,
       rows,
       availableCount: rows.filter((r) => r.last !== null).length,
       totalCount: rows.length,
-      generatedAt: ctx.now.toISOString(),
+      generatedAt: now,
     };
   }
 
@@ -711,6 +788,15 @@ export class LiveAdapter implements MarketAdapter {
   private fred(): FredConfig | null {
     const key = getKeys().macro;
     return key ? fredConfig(key, envUrl('MACRO_BASE_URL')) : null;
+  }
+
+  /**
+   * EIA 설정. 없어도 앱은 돈다 — 대신 에너지 선물이 현물로 내려앉거나 빈다.
+   * 그래서 REQUIRED_KEYS 가 아니라 OPTIONAL_KEYS 에 있다.
+   */
+  private eia(): EiaConfig | null {
+    const key = getKeys().energy;
+    return key ? eiaConfig(key, envUrl('EIA_BASE_URL')) : null;
   }
 
   private keyFor(market: MarketId): string {

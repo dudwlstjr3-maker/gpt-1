@@ -61,6 +61,20 @@ const FRED_SPEC = {
   UNRATE: [7708, 4.1, 0, 0.01, 3],
   PAYEMS: [7709, 159000, 0.00005, 0.001, 1000],
   DEXKOUS: [7710, 1340, 0, 0.01, 900],
+  /* 선물 판에서 쓰는 계열. 여기 없으면 그 줄은 빈 채로 나가고,
+     "우리 코드가 읽는가" 를 확인할 기회 자체가 사라진다. */
+  DGS5: [7711, 4.25, 0, 0.02, 0.1],
+  DGS30: [7712, 4.6, 0, 0.02, 0.1],
+  DCOILWTICO: [7713, 72, 0, 0.02, 10],
+  DCOILBRENTEU: [7714, 76, 0, 0.02, 10],
+  DHHNGSP: [7715, 2.9, 0, 0.03, 0.5],
+  DTWEXBGS: [7716, 121, 0, 0.004, 80],
+  DEXUSEU: [7717, 1.08, 0, 0.004, 0.5],
+  DEXJPUS: [7718, 152, 0, 0.005, 80],
+  DEXUSUK: [7719, 1.27, 0, 0.004, 0.5],
+  DEXCAUS: [7720, 1.39, 0, 0.004, 0.8],
+  DEXUSAL: [7721, 0.66, 0, 0.005, 0.4],
+  DEXSZUS: [7722, 0.88, 0, 0.004, 0.4],
 };
 
 function fredObservations(id, start) {
@@ -248,6 +262,51 @@ const server = createServer((req, res) => {
     }
     const head = 'DATE,CALL,PUT,EQUITY PUT/CALL RATIO,INDEX PUT/CALL RATIO,TOTAL PUT/CALL RATIO';
     return text(res, `Cboe Daily Market Statistics\n\n${head}\n${rows.join('\n')}\n`);
+  }
+
+  /*
+   * EIA 선물 정산가 (v2).
+   *
+   * ⚠ Cboe CSV 와 같은 사정이다 — 이 응답 모양과 계열 코드는 EIA 문서를 따른 것이지
+   *   실제 응답을 받아 확인한 것이 아니다(이 컨테이너에서 api.eia.gov 로 나갈 수 없다).
+   *   그러니 여기서 증명되는 것은 "EIA 가 이 모양으로 답하면 우리가 읽는다" 까지다.
+   *   실제 모양은 키를 넣고 `npm run check:live` 로 확인해야 한다.
+   *
+   * 인도월 1~4를 한 번에 달라고 하므로, facets[series][] 로 온 계열마다 줄을 만든다.
+   * 값은 근월물 기준에서 인도월마다 조금씩 기울여 준다 — 콘탱고·백워데이션을 화면이
+   * 제대로 읽는지 여기서 확인할 수 있어야 한다.
+   */
+  if (/^\/eia\/(petroleum|natural-gas)\/pri\/fut\/data\/?$/.test(p)) {
+    const series = u.searchParams.getAll('facets[series][]');
+    const length = Math.min(Number(u.searchParams.get('length') ?? 400), 5000);
+    const perSeries = Math.max(2, Math.floor(length / Math.max(1, series.length)));
+    // 근월물 기준값 · 인도월 한 칸당 기울기 (음수면 백워데이션)
+    const spec = {
+      RCLC: { base: 63.4, slope: -0.009, units: '$/BBL' },
+      RNGC: { base: 3.14, slope: 0.021, units: '$/MMBTU' },
+      RHOC: { base: 2.18, slope: -0.004, units: '$/GAL' },
+      EER_: { base: 1.94, slope: 0.012, units: '$/GAL' },
+    };
+    // 날짜별 흔들림은 **인도월 전체가 함께** 쓴다. 계약마다 따로 흔들면 같은 날의
+    // 곡선 모양이 흔들림에 잡아먹혀, 화면이 콘탱고인지 백워데이션인지 확인할 수 없다.
+    const rDay = rng(3300);
+    const dayFactor = Array.from({ length: perSeries }, () => 1 + (rDay() - 0.5) * 0.02);
+    const rows = [];
+    for (const code of series) {
+      const sp = spec[code.slice(0, 4)] ?? { base: 10, slope: 0, units: 'X' };
+      // 계열 이름 안의 인도월 번호 (RCLC1 · …PE3_…)
+      const n = Number((code.match(/(?:C|PE)(\d)/) ?? [])[1] ?? 1);
+      for (let i = 0; i < perSeries; i += 1) {
+        rows.push({
+          period: iso(Date.now() - i * DAY),
+          series: code,
+          'series-description': `stub ${code}`,
+          value: Number((sp.base * (1 + sp.slope * (n - 1)) * dayFactor[i]).toFixed(3)),
+          units: sp.units,
+        });
+      }
+    }
+    return json(res, { response: { total: rows.length, dateFormat: 'YYYY-MM-DD', frequency: 'daily', data: rows } });
   }
 
   /* ---------------- 이코노미스트 빅맥 CSV ---------------- */

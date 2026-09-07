@@ -54,9 +54,9 @@ async function getJson(path) {
  */
 async function unitTests() {
   console.log('[0] 순수 로직 단위 테스트 (node --test)');
-  const files = ['scripts/fred-calendar.test.mjs', 'scripts/criteria.test.mjs', 'scripts/regime.test.mjs'].filter(
-    (f) => existsSync(f),
-  );
+  // 목록을 손으로 적어 두면 새 테스트를 만들고도 안 돌린 채 지나간다 (실제로 그랬다).
+  // 폴더에서 찾아 전부 태운다.
+  const files = (await listFiles('scripts', /\.test\.mjs$/)).sort();
   if (files.length === 0) {
     check('단위 테스트 파일이 있음', false, '없음');
     return;
@@ -1774,12 +1774,102 @@ async function main() {
     check('DEMO 도 거래소 유료 항목을 비워 둠', /item\.source === 'none'/.test(demoF));
     check('DEMO 값이 실제 시세가 아님을 밝힘', /실제 시세가 아니다/.test(demoF));
     check('LIVE 는 FRED 로 되는 것만 채움', /FUTURES_FRED/.test(liveF));
-    check('LIVE 도 대신 쓴 값이라는 사실을 함께 내보냄', /item\.proxy \? \{ proxyNote: item\.proxy \}/.test(liveF));
+    check('LIVE 도 대신 쓴 값이라는 사실을 함께 내보냄', /note \? \{ proxyNote: note \}/.test(liveF));
     // 긁어 온 소스가 섞이지 않았는지
     for (const banned of ['finviz', 'investing.com', 'tradingview']) {
       check(`${banned} 을(를) 긁어 오지 않음`,
         !cat.includes(banned) && !liveF.includes(banned) && !demoF.includes(banned));
     }
+  }
+
+  /* ---------------- 8-23. 인도월 곡선 ---------------- */
+  console.log('\n[8-23] 선물 — 값 하나 말고 판단 재료 (인도월 곡선)');
+  {
+    /*
+     * 여기가 이 앱에서 **진짜 선물 계약 값**이 실리는 유일한 자리다.
+     * 지수·금속·농산물 선물은 거래소가 파는 시세라 못 넣지만, 에너지 넷은 미국
+     * 에너지정보청(EIA)이 NYMEX 인도월 정산가를 공개 통계로 내고 재배포 제한이 없다.
+     *
+     * 인도월 1~4를 함께 받는 이유는 곡선을 읽기 위해서다 — 가격 하나는 비싸다/싸다
+     * 밖에 못 읽지만, 곡선은 "시장이 앞으로를 어떻게 보고 있는가" 를 한 줄 더 준다.
+     * 그게 "숫자만 늘어놓지 말라" 는 요구에 대한 대답이다.
+     */
+    const eiaSrc = existsSync('src/server/adapters/live/providers/eia.ts')
+      ? await readFile('src/server/adapters/live/providers/eia.ts', 'utf8') : '';
+    const curveSrc = existsSync('src/lib/futuresCurve.mjs') ? await readFile('src/lib/futuresCurve.mjs', 'utf8') : '';
+    const cat2 = await readFile('src/lib/futuresCatalog.ts', 'utf8');
+    const view2 = await readFile('src/components/market/FuturesBoard.tsx', 'utf8');
+    const liveF2 = await readFile('src/server/adapters/live/index.ts', 'utf8');
+    const cfgSrc = await readFile('src/server/config.ts', 'utf8');
+    const tpl12 = await readFile('tools/preview/template.html', 'utf8');
+    const stub = await readFile('scripts/live-stub.mjs', 'utf8');
+    const parse = await readFile('scripts/check-parse.mjs', 'utf8');
+    const envEx = await readFile('.env.example', 'utf8');
+
+    /* ① 제공사 */
+    check('EIA 제공사 모듈이 있음', eiaSrc.length > 0);
+    check('인도월 1~4를 한 번에 받음', /facets\[series\]\[\]/.test(eiaSrc) && /RCLC1/.test(eiaSrc) && /RNGC1/.test(eiaSrc));
+    check('난방유·휘발유까지 붙음', /RHOC1/.test(eiaSrc) && /EER_EPMRR_PE1_Y35NY_DPG/.test(eiaSrc));
+    check('결측을 0 으로 바꾸지 않음', /0 으로 바꾸면/.test(eiaSrc));
+    check('응답 모양을 확인하지 못했다는 사실을 적어 둠',
+      /확인하지 못했다/.test(eiaSrc) && /check:live/.test(eiaSrc));
+    check('약관·재배포 조건을 적어 둠', /재배포에 제한이 없다/.test(eiaSrc) && /무료/.test(eiaSrc));
+
+    /* ② 같은 날끼리만 견준다 — 시차를 곡선이라고 부르지 않는다 */
+    check('곡선은 같은 날짜의 값끼리만 만든다', /같은 날짜의 값끼리만/.test(eiaSrc) && /function curveFrom/.test(eiaSrc));
+
+    /* ③ 곡선 읽기 규칙 */
+    check('곡선 읽기가 순수 모듈로 분리됨', /export function curveShape/.test(curveSrc));
+    check('문턱 아래는 평평으로 읽음', /FLAT_PCT = 0\.5/.test(curveSrc));
+    check('색만으로 뜻을 전하지 않음(기호+글자)', /SHAPE_GLYPH/.test(curveSrc) && /SHAPE_LABEL/.test(curveSrc));
+    check('사라/팔아라 를 말하지 않음',
+      !/(매수|매도|사세요|파세요|수익|추천)/.test(curveSrc), '문구 검사');
+    check('계약이 둘 미만이면 모양을 지어내지 않음', /pts\.length < 2\) return null/.test(curveSrc));
+    check('곡선 단위 테스트가 있음', existsSync('scripts/futuresCurve.test.mjs'));
+
+    /* ④ 키가 없을 때의 정직함 */
+    check('EIA 키가 선택 키로 등록됨', /EIA_API_KEY/.test(cfgSrc) && /OPTIONAL_KEYS/.test(cfgSrc));
+    check('키가 없으면 현물로 내려앉고 그 사실을 밝힘', /fallback\?: \{ source: 'fred'; note: string \}/.test(cat2));
+    check('내려앉은 경우에만 대신 쓴 값 문구를 붙임', /const note = usingFallback \? item\.fallback\?\.note : item\.proxy/.test(liveF2));
+    check('대신 쓸 곳이 없으면 왜 비는지 적음', /EIA 무료 키\(EIA_API_KEY\)가 없어 비워 둡니다/.test(liveF2));
+    check('.env.example 에 EIA 항목이 있음', /EIA_API_KEY=/.test(envEx) && /eia\.gov\/opendata/.test(envEx));
+
+    /* ⑤ 화면 */
+    check('화면이 곡선 줄을 그림', /function CurveStrip/.test(view2) && /curveShape\(curve\)/.test(view2));
+    check('곡선 줄이 한 줄 전체를 씀', /col-span-2/.test(view2));
+    check('미리보기도 같은 규칙을 옮겨 둠',
+      /function futCurveShape/.test(tpl12) && /FUT_FLAT_PCT = 0\.5/.test(tpl12) && /futcurve/.test(tpl12));
+
+    /* ⑥ 스냅샷에 실제로 실려 오는가 */
+    const fRes = await fetch(`${BASE}/api/snapshot?scenario=normal`);
+    const fSnap = await fRes.json();
+    const fRows = fSnap?.sections?.futures?.data?.rows ?? [];
+    const eiaIds = [...cat2.matchAll(/\{ id: '([^']+)'[^\n]*source: 'eia'/g)].map((m) => m[1]);
+    check('EIA 로 받는 항목이 네 개', eiaIds.length === 4, eiaIds.join(' '));
+    for (const id of eiaIds) {
+      const r = fRows.find((x) => x.id === id);
+      check(`${id} 에 인도월 곡선이 실려 옴`, (r?.curve ?? []).length >= 2, `${(r?.curve ?? []).length}개`);
+      check(`${id} 곡선의 인도월이 모두 같은 날`,
+        new Set((r?.curve ?? []).map((c) => c.at)).size === 1);
+    }
+    // DEMO 는 콘탱고와 백워데이션을 둘 다 보여줘야 화면을 확인할 수 있다
+    const shapes = eiaIds.map((id) => {
+      const c = fRows.find((x) => x.id === id)?.curve ?? [];
+      if (c.length < 2) return null;
+      const s2 = [...c].sort((a, b) => a.n - b.n);
+      return ((s2[s2.length - 1].value - s2[0].value) / Math.abs(s2[0].value)) * 100;
+    }).filter((v) => v !== null);
+    check('DEMO 에 콘탱고와 백워데이션이 둘 다 있음',
+      shapes.some((v) => v >= 0.5) && shapes.some((v) => v <= -0.5),
+      shapes.map((v) => v.toFixed(1) + '%').join(' '));
+
+    /* ⑦ 파싱 점검이 이 경로를 태우는가 */
+    check('대역 서버에 EIA 경로가 있음', /EIA 선물 정산가/.test(stub) && /RNGC/.test(stub) && /natural-gas/.test(stub));
+    check('대역 서버가 곡선 모양을 흔들림에 잡아먹히지 않게 만듦', /인도월 전체가 함께/.test(stub));
+    check('파싱 점검이 EIA 를 태움', /EIA_BASE_URL/.test(parse) && /인도월/.test(parse));
+    check('선물 판에 쓰는 FRED 계열이 대역 서버에 다 있음',
+      ['DGS5', 'DGS30', 'DCOILWTICO', 'DCOILBRENTEU', 'DHHNGSP', 'DTWEXBGS',
+        'DEXUSEU', 'DEXJPUS', 'DEXUSUK', 'DEXCAUS', 'DEXUSAL', 'DEXSZUS'].every((k) => stub.includes(k)));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

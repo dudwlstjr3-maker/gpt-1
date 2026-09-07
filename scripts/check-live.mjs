@@ -119,6 +119,66 @@ await probeText('주식 풋/콜 비율',
   (b) => `${b.trim().split(/\r?\n/).length - 1}줄`);
 
 /*
+ * EIA 선물 정산가 — **응답 모양을 눈으로 확인하는 자리**.
+ *
+ * 이 앱에서 진짜 선물 계약 값이 실리는 곳은 여기뿐이다(에너지 넷). 그런데
+ * 파서가 기대하는 모양과 계열 코드는 EIA 문서를 따른 것이지 실제 응답으로
+ * 확인한 것이 아니다. 그래서 여기서는 값만 찍지 않고 **첫 줄의 열 이름을 그대로**
+ * 찍는다 — 'series' 와 'period' 와 'value' 가 실제로 오는지 눈으로 보라는 뜻이다.
+ * 다르면 그 자리에서 providers/eia.ts 를 고치면 된다.
+ */
+const EIA = process.env.EIA_BASE_URL || 'https://api.eia.gov/v2';
+const EIA_KEY = process.env.EIA_API_KEY || '';
+
+console.log('\n[선물 정산가] EIA — 무료 키가 있어야 합니다 (없으면 원유·천연가스가 현물로 대체됩니다)');
+if (!EIA_KEY) {
+  console.log('  · EIA_API_KEY 가 비어 있습니다. https://www.eia.gov/opendata/ 에서 이메일만 넣으면 무료 발급');
+  console.log('    없어도 앱은 돕니다 — 원유·천연가스는 FRED 현물로 채워지고(대신 쓴 값 표시),');
+  console.log('    난방유·휘발유는 사유와 함께 빕니다.');
+} else {
+  // 계열 표는 providers/eia.ts 에도 있다. 이 스크립트는 next 없이 도는 .mjs 라
+  // .ts 를 읽을 수 없어 여기에 한 벌 더 적어 둔다. 검증 스크립트가 둘을 대조한다.
+  const CHAINS = {
+    'WTI 원유': { route: 'petroleum/pri/fut', series: ['RCLC1', 'RCLC2', 'RCLC3', 'RCLC4'] },
+    천연가스: { route: 'natural-gas/pri/fut', series: ['RNGC1', 'RNGC2', 'RNGC3', 'RNGC4'] },
+    난방유: { route: 'petroleum/pri/fut', series: ['RHOC1', 'RHOC2', 'RHOC3', 'RHOC4'] },
+    'RBOB 휘발유': {
+      route: 'petroleum/pri/fut',
+      series: ['EER_EPMRR_PE1_Y35NY_DPG', 'EER_EPMRR_PE2_Y35NY_DPG', 'EER_EPMRR_PE3_Y35NY_DPG', 'EER_EPMRR_PE4_Y35NY_DPG'],
+    },
+  };
+  let shapeShown = false;
+  for (const [label, spec] of Object.entries(CHAINS)) {
+    const q = new URLSearchParams({
+      api_key: EIA_KEY,
+      frequency: 'daily',
+      'data[0]': 'value',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
+      offset: '0',
+      length: '8',
+    });
+    for (const c of spec.series) q.append('facets[series][]', c);
+    await probe(`${label} 인도월 1~4`, `${EIA}/${spec.route}/data/?${q.toString()}`, (b) => {
+      const rows = b?.response?.data ?? [];
+      if (!shapeShown && rows[0]) {
+        shapeShown = true;
+        console.log(`      첫 줄의 열 이름: ${Object.keys(rows[0]).join(', ')}`);
+        console.log('      (파서는 period · series · value 를 봅니다. 이름이 다르면 providers/eia.ts 를 고치세요)');
+      }
+      const got = [...new Set(rows.map((r) => r.series))];
+      const missing = spec.series.filter((c) => !got.includes(c));
+      const latest = rows.filter((r) => r.series === spec.series[0])[0];
+      return (
+        `${rows.length}행 · 계열 ${got.length}/${spec.series.length}` +
+        (missing.length > 0 ? ` ⚠ 안 온 계열: ${missing.join(', ')}` : '') +
+        (latest ? ` · 근월 ${latest.period} = ${latest.value} ${latest.units ?? ''}` : '')
+      );
+    });
+  }
+}
+
+/*
  * 경제 캘린더 — FRED 발표 일정.
  *
  * 여기서 release 이름을 **그대로 출력**하는 것이 핵심이다.

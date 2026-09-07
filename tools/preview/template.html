@@ -546,6 +546,7 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .futlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .futlist li:last-child { border-bottom: 0; padding-bottom: 0; }
 .futlist li:first-child { padding-top: 0; }
+.futcurve { grid-column: 1 / -1; margin-top: 8px; border-radius: 8px; background: var(--surface-2); padding: 8px; }
 
 /* --------------------------------- 지표 타일 --------------------------------- */
 
@@ -3854,6 +3855,70 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return ((last.v - prev.v) / prev.v) * 100;
   }
 
+  /* 인도월 곡선 읽기 — src/lib/futuresCurve.mjs 를 그대로 옮긴 것.
+     문턱(0.5%)과 문구가 저쪽과 어긋나면 검증 스크립트가 잡는다. */
+  var FUT_FLAT_PCT = 0.5;
+  var FUT_SHAPE_LABEL = { contango: '콘탱고', backwardation: '백워데이션', flat: '거의 평평' };
+  var FUT_SHAPE_GLYPH = { contango: '▲', backwardation: '▼', flat: '＝' };
+  function futMeaning(shape, months) {
+    const m = isNum(months) && months > 0 ? months + '개월 뒤' : '먼 달';
+    if (shape === 'contango') return m + ' 인도분이 더 비쌉니다. 지금 당장은 물량이 넉넉하다는 쪽으로 읽습니다.';
+    if (shape === 'backwardation') return m + ' 인도분이 더 쌉니다. 지금 당장 물량이 모자란다는 쪽으로 읽습니다.';
+    return '인도월끼리 값 차이가 거의 없습니다.';
+  }
+  function futContractLabel(n) {
+    const v = Number(n);
+    if (!isNum(v) || v < 1) return '';
+    return v === 1 ? '근월' : '+' + (v - 1) + '개월';
+  }
+  function futCurveShape(curve) {
+    if (!Array.isArray(curve)) return null;
+    const pts = curve.filter((p) => p && isNum(Number(p.n)) && isNum(Number(p.value)))
+      .map((p) => ({ n: Number(p.n), value: Number(p.value) })).sort((a, b) => a.n - b.n);
+    if (pts.length < 2) return null;
+    const near = pts[0], far = pts[pts.length - 1];
+    if (near.value === 0) return null;
+    const spreadPct = ((far.value - near.value) / Math.abs(near.value)) * 100;
+    const months = far.n - near.n;
+    let shape = 'flat';
+    if (spreadPct >= FUT_FLAT_PCT) shape = 'contango';
+    else if (spreadPct <= -FUT_FLAT_PCT) shape = 'backwardation';
+    return { shape: shape, spreadPct: spreadPct, months: months, near: near.value, far: far.value,
+      label: FUT_SHAPE_LABEL[shape], glyph: FUT_SHAPE_GLYPH[shape], meaning: futMeaning(shape, months), farN: far.n };
+  }
+  /* 네 점뿐이라 축은 두지 않고 모양만 보여준다 */
+  function futCurveSvg(curve) {
+    const W = 62, H = 18;
+    const pts = curve.slice().sort((a, b) => a.n - b.n);
+    const vals = pts.map((p) => p.value);
+    const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const span = (hi - lo) || 1;
+    const xy = pts.map((p, i) => ({
+      x: 3 + (i / Math.max(1, pts.length - 1)) * (W - 6),
+      y: H - 4 - ((p.value - lo) / span) * (H - 8),
+    }));
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="height:18px;width:62px;flex-shrink:0" aria-hidden="true">' +
+      '<polyline points="' + xy.map((p) => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') + '" fill="none" ' +
+      'stroke="var(--muted)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+      xy.map((p, i) => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + (i === 0 ? 2.6 : 1.8) +
+        '" fill="var(--muted)"/>').join('') + '</svg>';
+  }
+  function futCurveStrip(curve, precision, suffix) {
+    const read = futCurveShape(curve);
+    if (!read) return '';
+    return '<div class="futcurve">' +
+      '<div style="display:flex;align-items:center;gap:8px">' + futCurveSvg(curve) +
+      '<div style="min-width:0">' +
+      '<p style="margin:0;font-size:12px;font-weight:600;color:var(--fg)"><span aria-hidden="true">' + read.glyph + ' </span>' +
+      esc(read.label) + '<span class="tnum" style="margin-left:8px;font-weight:400;color:var(--muted)">' +
+      esc(fmtSigned(read.spreadPct, 1)) + '%</span></p>' +
+      '<p class="tnum" style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">근월 ' +
+      esc(fmtNum(read.near, precision) + (suffix || '')) + ' → ' + esc(futContractLabel(read.farN)) + ' ' +
+      esc(fmtNum(read.far, precision) + (suffix || '')) + '</p></div></div>' +
+      '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
+      esc(read.meaning) + '</p></div>';
+  }
+
   function futBar(pct, max, color) {
     const W = 200, H = 14, half = W / 2;
     const w = max > 0 ? Math.min(half, (Math.abs(pct) / max) * half) : 0;
@@ -3878,7 +3943,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
     return (
       '<div style="padding:8px 12px 0">' +
-      '<p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span>지수·금속·농산물 <b>선물 시세는 거래소(CME·ICE)가 파는 데이터</b>라 무료로 재배포할 수 있는 소스가 없습니다. 그런 항목은 값을 비우고 사유를 적어 두었습니다. 채워진 값 중 상당수는 선물 계약이 아니라 현물·기준 가격이며, 그 경우 <b>대신 쓴 값</b> 표시가 붙습니다.</span></p></div>' +
+      '<p class="notice n-neutral" style="margin:0"><span>ⓘ</span><span>지수·금속·농산물 <b>선물 시세는 거래소(CME·ICE)가 파는 데이터</b>라 무료로 재배포할 수 있는 소스가 없습니다. 그런 항목은 값을 비우고 사유를 적어 두었습니다. 채워진 값 중 상당수는 선물 계약이 아니라 현물·기준 가격이며, 그 경우 <b>대신 쓴 값</b> 표시가 붙습니다. 에너지 넷(원유·천연가스·난방유·휘발유)은 미국 에너지정보청(EIA)이 <b>인도월 정산가</b>를 공개해, 받아진 항목에는 인도월 곡선(콘탱고·백워데이션)까지 함께 놓습니다.</span></p></div>' +
       '<div style="padding:8px 12px 0"><div class="seg" style="width:100%" role="group" aria-label="기간">' +
       ['1D', '1W', '1M', '3M', 'YTD'].map((r) =>
         '<button type="button" style="flex:1" data-futrange="' + r + '" aria-pressed="' + (state.futRange === r) + '">' +
@@ -3915,13 +3980,19 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
                 : '<div style="margin-top:4px;display:flex;align-items:center;gap:8px">' +
                   '<span style="width:92px;flex-shrink:0">' + futBar(x.pct || 0, max, col) + '</span>' +
                   scoreSpark(x.row.spark.slice(-30).map((q) => ({ t: q.t, v: q.v })), 56, 16) +
-                  (x.it.proxy ? badge('b-warn', '대신 쓴 값', x.it.proxy, '2xs') : '') + '</div>') +
+                  (x.row.proxyNote || x.it.proxy
+                    ? badge('b-warn', '대신 쓴 값', x.row.proxyNote || x.it.proxy, '2xs') : '') + '</div>') +
               '</div>' +
               '<div style="flex-shrink:0;text-align:right">' +
               '<div class="tnum" style="font-size:13px;font-weight:700;color:var(--fg-strong)">' +
               (missing ? NO : esc(fmtNum(x.row.last, x.it.precision) + (x.it.suffix || ''))) + '</div>' +
               '<div class="tnum" style="margin-top:4px;font-size:12.5px;font-weight:600;color:' + col + '">' +
-              (x.pct === null || x.pct === undefined ? NO : esc(fmtSigned(x.pct, 2)) + '%') + '</div></div></li>';
+              (x.pct === null || x.pct === undefined ? NO : esc(fmtSigned(x.pct, 2)) + '%') + '</div></div>' +
+              /* 인도월 곡선은 <li> 의 직계 자식이라야 한다. 오른쪽 숫자 칸 안에 넣으면
+                 grid-column 이 먹지 않고, 그 칸이 넓어져 왼쪽 이름 칸이 0 으로 눌린다. */
+              (!missing && x.row.curve && x.row.curve.length >= 2
+                ? futCurveStrip(x.row.curve, x.it.precision, x.it.suffix) : '') +
+              '</li>';
           }).join('') + '</ul></section>';
       }).join('') +
       '<p style="margin:0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">기준 기간 ' +

@@ -25,6 +25,9 @@ const OUT =
     ? path.resolve(process.argv[outFlag + 1])
     : path.resolve(HERE, '../../dist/market-mood-3-preview.html');
 
+/** 아티팩트로 올릴 벌 — 게시 도구가 머리 태그를 직접 씌우므로 여기엔 없어야 한다 */
+const OUT_BARE = OUT.replace(/\.html$/, '') + '.artifact.html';
+
 /** 자산 상세까지 담고 싶은 종목. 없으면 조용히 건너뛴다. */
 const ASSET_IDS = ['spx', 'kospi', 'btc'];
 
@@ -228,10 +231,35 @@ async function main() {
   const html = tpl.replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, html);
 
-  const mb = (html.length / 1024 / 1024).toFixed(2);
+  /*
+   * 두 벌을 낸다. 쓰이는 자리가 다르고, 한 벌로는 둘 다 안 된다.
+   *
+   *   ① 그냥 여는 파일 (OUT)
+   *      브라우저로 바로 열거나 남에게 보내는 파일이다. <!doctype> 과
+   *      **<meta charset="utf-8"> 이 반드시 있어야 한다.** 없으면 로컬 파일을 열 때
+   *      브라우저가 인코딩을 짐작하는데, 한글이 통째로 깨진다. 화면을 아무리 잘
+   *      만들어도 글자가 깨지면 아무것도 아니다.
+   *
+   *   ② 아티팩트용 (OUT_BARE)
+   *      게시 도구가 <!doctype>·html·head·body 를 직접 씌우기 때문에, 그쪽에
+   *      올리는 파일에는 그 태그가 있으면 안 된다. template.html 이 원래 이 모양이다.
+   */
+  fs.writeFileSync(OUT_BARE, html);
+
+  const standalone =
+    '<!doctype html>\n<html lang="ko">\n<head>\n' +
+    '<meta charset="utf-8">\n' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+    '<meta name="color-scheme" content="dark light">\n' +
+    '</head>\n<body style="margin:0">\n' +
+    html +
+    '\n</body>\n</html>\n';
+  fs.writeFileSync(OUT, standalone);
+
+  const mb = (standalone.length / 1024 / 1024).toFixed(2);
   console.log(`미리보기 생성: ${OUT} (${mb}MB, 모드 ${snapshot.mode})`);
+  console.log(`  아티팩트용(머리 태그 없음): ${OUT_BARE}`);
   if (Number(mb) > 15) console.log('  주의: 16MB 에 가깝습니다. 히스토리 길이를 줄이세요.');
 }
 

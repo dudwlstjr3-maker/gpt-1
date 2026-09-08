@@ -1768,6 +1768,11 @@ async function main() {
 
     /* ④ 세 곳이 같은 목록을 본다 */
     check('미리보기가 목록을 원본에서 읽음', /readFuturesCatalog/.test(buildJs) && /futuresCatalog\.ts/.test(buildJs));
+    // 그냥 여는 파일에는 charset 이 반드시 있어야 한다. 없으면 로컬에서 열 때
+    // 브라우저가 인코딩을 짐작하고 한글이 통째로 깨진다 — 화면을 아무리 잘 만들어도 소용없다.
+    check('미리보기 파일에 문자 인코딩이 박혀 있음',
+      /<meta charset="utf-8">/.test(buildJs) && /<!doctype html>/.test(buildJs));
+    check('아티팩트용은 머리 태그 없이 따로 낸다', /OUT_BARE/.test(buildJs));
     check('미리보기도 사유 없는 빈 항목을 막음', /사유 없는 빈 항목/.test(buildJs));
     check('미리보기에 선물 화면이 있음', /function viewFutures\(\)/.test(tpl11) && /futures: viewFutures/.test(tpl11));
     check('미리보기 막대도 같은 규칙', /function futBar\(pct, max, color\)/.test(tpl11));

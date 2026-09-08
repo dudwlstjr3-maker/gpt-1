@@ -309,6 +309,88 @@ const server = createServer((req, res) => {
     return json(res, { response: { total: rows.length, dateFormat: 'YYYY-MM-DD', frequency: 'daily', data: rows } });
   }
 
+  /*
+   * SEC EDGAR companyconcept.
+   *
+   * ⚠ Cboe·EIA 와 같은 사정이다 — 이 응답 모양은 SEC 문서를 따른 것이지 실제 응답을
+   *   받아 확인한 것이 아니다(이 컨테이너에서 data.sec.gov 로 나갈 수 없다).
+   *   여기서 증명되는 것은 "SEC 가 이 모양으로 답하면 우리가 읽는다" 까지다.
+   *
+   * 일부러 재현하는 것들 — 실제 공시의 까다로운 성질이고, 이게 없으면 파서가
+   * 현장에서 처음 터진다.
+   *   ① 회사가 안 쓰는 태그는 404 다 (오류가 아니라 "그 태그는 안 쓴다" 는 뜻).
+   *   ② 한 태그 안에 분기(3개월)·누적(6·9개월)·연간(12개월)이 섞여 온다.
+   *   ③ 같은 기간이 수정 공시로 두 번 온다.
+   *   ④ 주당 값은 단위가 USD 가 아니라 USD/shares 다.
+   */
+  if (/^\/sec\/api\/xbrl\/companyconcept\/CIK\d{10}\/us-gaap\/[A-Za-z]+\.json$/.test(p)) {
+    // SEC 는 연락처가 담긴 User-Agent 를 요구한다. 우리가 실제로 붙이는지 여기서 본다.
+    if (!req.headers['user-agent']) {
+      res.writeHead(403, { 'content-type': 'text/plain' });
+      return res.end('User-Agent 헤더가 없습니다 (SEC 는 연락처가 담긴 User-Agent 를 요구합니다)\n');
+    }
+    const seg = p.split('/');
+    const cik = seg[5].slice(3);
+    const tag = seg[7].replace(/\.json$/, '');
+
+    // 이 대역 서버가 "안다" 고 할 태그. 나머지는 404 — 회사마다 태그가 다른 상황을 재현한다.
+    const KNOWN = {
+      RevenueFromContractWithCustomerExcludingAssessedTax: { base: 9.4e10, unit: 'USD' },
+      OperatingIncomeLoss: { base: 2.9e10, unit: 'USD' },
+      NetIncomeLoss: { base: 2.4e10, unit: 'USD' },
+      EarningsPerShareDiluted: { base: 1.6, unit: 'USD/shares' },
+      NetCashProvidedByUsedInOperatingActivities: { base: 3.3e10, unit: 'USD' },
+      Liabilities: { base: 2.8e11, unit: 'USD' },
+      StockholdersEquity: { base: 8.0e10, unit: 'USD' },
+    };
+    const spec = KNOWN[tag];
+    if (!spec) {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'not found' }));
+    }
+
+    const r = rng(9100 + tag.length + Number(cik.slice(-3)));
+    const rows = [];
+    // 최근 분기말은 45일쯤 전. 거기서 91일씩 거슬러 12분기.
+    const q0 = Date.now() - 45 * DAY;
+    const isInstant = tag === 'Liabilities' || tag === 'StockholdersEquity';
+    const vals = [];
+    for (let i = 11; i >= 0; i -= 1) vals.unshift(spec.base * (1 + (11 - i) * 0.03) * (1 + (r() - 0.5) * 0.06));
+
+    for (let i = 0; i < 12; i += 1) {
+      const end = q0 - i * 91 * DAY;
+      const v = vals[11 - i];
+      if (isInstant) {
+        // ④ 시점 값 — start 가 없다
+        rows.push({ end: iso(end), val: Number(v.toFixed(2)), fy: new Date(end).getUTCFullYear(), fp: 'Q3', form: '10-Q', filed: iso(end + 30 * DAY), accn: `stub-${i}` });
+        continue;
+      }
+      // 분기 (3개월)
+      rows.push({ start: iso(end - 91 * DAY), end: iso(end), val: Number(v.toFixed(2)), fy: new Date(end).getUTCFullYear(), fp: 'Q3', form: '10-Q', filed: iso(end + 30 * DAY), accn: `stub-q${i}` });
+      // ② 9개월 누적도 같은 태그로 온다 — 분기로 잘못 담으면 값이 튄다
+      rows.push({ start: iso(end - 273 * DAY), end: iso(end), val: Number((v * 2.9).toFixed(2)), fy: new Date(end).getUTCFullYear(), fp: 'Q3', form: '10-Q', filed: iso(end + 30 * DAY), accn: `stub-y${i}` });
+      // 연간 — 네 분기마다 한 번
+      if (i % 4 === 0) {
+        rows.push({ start: iso(end - 364 * DAY), end: iso(end), val: Number((v * 3.95).toFixed(2)), fy: new Date(end).getUTCFullYear(), fp: 'FY', form: '10-K', filed: iso(end + 45 * DAY), accn: `stub-a${i}` });
+      }
+    }
+    // ③ 가장 최근 분기를 수정 공시로 한 번 더 — 나중에 접수된 쪽을 써야 한다
+    const newest = rows.find((x) => x.accn === 'stub-q0');
+    if (newest) {
+      rows.push({ ...newest, val: Number((newest.val * 1.04).toFixed(2)), filed: iso(Date.now()), accn: 'stub-q0-amended' });
+    }
+
+    return json(res, {
+      cik: Number(cik),
+      taxonomy: 'us-gaap',
+      tag,
+      label: tag,
+      description: 'stub',
+      entityName: `Stub Company ${cik} (실제 회사가 아닙니다)`,
+      units: { [spec.unit]: rows },
+    });
+  }
+
   /* ---------------- 이코노미스트 빅맥 CSV ---------------- */
   if (p === '/bigmac.csv') {
     const head = 'date,iso_a3,currency_code,name,local_price,dollar_ex,dollar_price,USD_raw,EUR_raw,GBP_raw,JPY_raw,CNY_raw';

@@ -28,6 +28,7 @@ const FRED_KEY = process.env.MACRO_API_KEY || '';
 
 let ok = 0;
 let bad = 0;
+function bad_count() { bad += 1; }
 
 async function probe(label, url, pick) {
   const t0 = Date.now();
@@ -175,6 +176,79 @@ if (!EIA_KEY) {
         (latest ? ` · 근월 ${latest.period} = ${latest.value} ${latest.units ?? ''}` : '')
       );
     });
+  }
+}
+
+/*
+ * SEC EDGAR — **응답 모양과 태그를 눈으로 확인하는 자리**.
+ *
+ * 회사마다 쓰는 XBRL 태그가 다르다. 우리는 태그를 앞에서부터 시도해 값이 오는 첫
+ * 태그를 쓰는데, **어느 태그가 실제로 오는지는 물어봐야 안다.** 그래서 여기서
+ * 회사별로 태그를 하나씩 두드려 보고 어느 것이 걸리는지 그대로 찍는다.
+ * 다 빗나가면 companyCatalog.ts 의 tags 목록에 실제 태그를 추가하면 된다.
+ */
+const SEC = process.env.SEC_BASE_URL || 'https://data.sec.gov';
+const SEC_UA = process.env.SEC_USER_AGENT || 'MarketMood3/1.0 (contact: set SEC_USER_AGENT env var)';
+
+console.log('\n[재무제표] SEC EDGAR — 키가 필요 없습니다 (연락처가 담긴 User-Agent 는 필요합니다)');
+if (!process.env.SEC_USER_AGENT) {
+  console.log('  ⚠ SEC_USER_AGENT 가 비어 있습니다. SEC 는 연락처가 담긴 User-Agent 를 요구하고');
+  console.log('    없으면 403 으로 막습니다. 기본값으로 시도해 보지만 운영에서는 반드시 채우세요.');
+}
+{
+  // companyCatalog.ts 와 같은 표. .ts 를 이 스크립트에서 못 읽어 한 벌 더 적어 둔다.
+  const FIRMS = [['애플', '0000320193'], ['엔비디아', '0001045810'], ['테슬라', '0001318605']];
+  const TAGS = [
+    ['매출', ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet']],
+    ['영업이익', ['OperatingIncomeLoss']],
+    ['순이익', ['NetIncomeLoss', 'ProfitLoss']],
+    ['주당순이익', ['EarningsPerShareDiluted', 'EarningsPerShareBasicAndDiluted']],
+  ];
+  let shapeShown = false;
+  for (const [firm, cik] of FIRMS) {
+    const hits = [];
+    for (const [label, tags] of TAGS) {
+      let found = null;
+      for (const tag of tags) {
+        try {
+          const r = await fetch(`${SEC}/api/xbrl/companyconcept/CIK${cik}/us-gaap/${tag}.json`, {
+            headers: { 'user-agent': SEC_UA, accept: 'application/json' },
+            signal: AbortSignal.timeout(12000),
+          });
+          if (r.status === 404) continue;      // 그 회사가 안 쓰는 태그
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const b = await r.json();
+          const rows = b?.units?.USD ?? b?.units?.['USD/shares'] ?? [];
+          if (!Array.isArray(rows) || rows.length === 0) continue;
+          found = { tag, rows, entityName: b.entityName };
+          if (!shapeShown) {
+            shapeShown = true;
+            console.log(`      첫 줄의 열 이름: ${Object.keys(rows[0]).join(', ')}`);
+            console.log('      (파서는 start · end · val · form · filed 를 봅니다. 다르면 providers/sec.ts 를 고치세요)');
+          }
+          break;
+        } catch (e) {
+          found = { error: e instanceof Error ? e.message : String(e) };
+          break;
+        }
+      }
+      if (found?.rows) {
+        // 3개월짜리가 실제로 있는지 — 없으면 분기 표가 통째로 빈다
+        const q = found.rows.filter((x) => {
+          if (!x.start || !x.end) return false;
+          const d = Math.round((Date.parse(x.end) - Date.parse(x.start)) / 86400000);
+          return d >= 80 && d <= 100;
+        });
+        hits.push(`${label}=${found.tag}(${found.rows.length}행·분기 ${q.length})`);
+      } else if (found?.error) {
+        hits.push(`${label}✗ ${found.error}`);
+      } else {
+        hits.push(`${label}✗ 아는 태그가 다 빗나감 (${tags.join('/')})`);
+      }
+    }
+    const bad = hits.filter((h) => h.includes('✗')).length;
+    if (bad === 0) { ok += 1; console.log(`  ✓ ${firm} — ${hits.join(' · ')}`); }
+    else { bad_count(); console.log(`  ✗ ${firm} — ${hits.join(' · ')}`); }
   }
 }
 

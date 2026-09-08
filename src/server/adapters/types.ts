@@ -20,6 +20,7 @@ import type {
   Quote,
   RangeKey,
   SeriesPoint,
+  Fundamentals,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import type { RegimeSeries } from '@/server/regime';
@@ -91,6 +92,17 @@ export interface MarketAdapter {
 
   /** 종목 상세 차트 */
   getAssetSeries(id: string, range: RangeKey, ctx: AdapterContext): Promise<SeriesPoint[]>;
+
+  /**
+   * 미국 상장사 재무제표 (SEC 공시).
+   *
+   * 가격만 있는 화면에는 "왜 이 값인가" 를 물을 재료가 없다. 매출·이익·이익률과
+   * 주가를 이익으로 나눈 값이 여기서 온다.
+   *
+   * price 를 함께 받는 이유는 PER 때문이다 — 공시에는 주가가 없다.
+   * 공시가 없는 대상(지수·원자재·환율·코인)이면 SeriesUnavailableError 를 던진다.
+   */
+  getFundamentals(id: string, price: number | null, ctx: AdapterContext): Promise<Fundamentals>;
 
   /** 통화 전환용 환율 */
   getUsdKrw(ctx: AdapterContext): Promise<number | null>;

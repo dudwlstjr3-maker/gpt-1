@@ -10,6 +10,7 @@
 
 import { mulberry32, gaussianFrom, hashSeed } from '@/lib/rng';
 import { buildFutures } from './futures';
+import { buildFundamentals } from './fundamentals';
 import { CATALOG, catalogFor, type CatalogItem } from '@/lib/catalog';
 import { getSession } from '@/lib/marketHours';
 import { clamp, round } from '@/lib/stats';
@@ -30,6 +31,7 @@ import type {
   RangeKey,
   SeriesPoint,
   FuturesBoard,
+  Fundamentals,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import { COMPONENTS } from '@/server/fng/definitions';
@@ -1532,6 +1534,10 @@ export class DemoAdapter implements MarketAdapter {
     const values = ref.values.slice(-take);
     const dates = ref.dates.slice(-take);
     return values.map((v, i) => ({ t: dates[i], v: round(v, 6) }));
+  }
+
+  async getFundamentals(id: string, price: number | null, ctx: AdapterContext): Promise<Fundamentals> {
+    return buildFundamentals(id, price, ctx, makeMeta(ctx, 'us'));
   }
 
   async getUsdKrw(ctx: AdapterContext): Promise<number | null> {

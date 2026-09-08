@@ -887,6 +887,71 @@ export type RangeKey = '1D' | '1W' | '1M' | '3M' | '1Y' | '3Y';
  */
 export const ASSET_RANGES: RangeKey[] = ['1D', '1W', '1M', '3M', '1Y'];
 
+/* ------------------------------------------------------------------ */
+/* 재무제표 (SEC 공시)                                                   */
+/* ------------------------------------------------------------------ */
+
+/** 재무 항목 한 기간의 값 */
+export interface FinancialPoint {
+  /** 기간 끝 (YYYY-MM-DD) */
+  end: string;
+  /** 기간 시작. 재무상태표 항목은 시점 값이라 없다. */
+  start?: string;
+  value: number;
+  /** 어느 보고서에서 왔는가 (10-K · 10-Q) */
+  form: string;
+  /** 그 보고서가 접수된 날 */
+  filed: string;
+  fy: number | null;
+  fp: string;
+}
+
+export interface FinancialLine {
+  id: string;
+  label: string;
+  hint: string;
+  unit: 'usd' | 'usd_per_share';
+  /**
+   * 기간 값(손익·현금흐름)인가 시점 값(재무상태표)인가.
+   *
+   * 시점 값은 '3분기 부채' 같은 게 없다 — 그 날짜의 잔액이 있을 뿐이다.
+   * 화면이 분기/연간 토글을 이 줄에 적용하면 안 되므로 성질을 함께 보낸다.
+   */
+  kind: 'duration' | 'instant';
+  /**
+   * 실제로 쓴 XBRL 태그. 회사마다 다른 태그를 쓰기 때문에 밝힌다 —
+   * 회사끼리 견줄 때 같은 것을 보고 있는지가 중요하다.
+   */
+  tag: string | null;
+  quarterly: FinancialPoint[];
+  annual: FinancialPoint[];
+  /** 값이 없으면 왜 없는지 */
+  unavailableReason?: string;
+}
+
+export interface Fundamentals {
+  cik: string;
+  ticker: string;
+  /** SEC 가 돌려준 회사 이름 (원문) */
+  entityName: string | null;
+  lines: FinancialLine[];
+  /** 주가를 이익으로 나눈 값. 어떻게 냈는지를 함께 담는다. */
+  valuation: {
+    basis: 'ttm' | 'annual' | null;
+    eps: number | null;
+    per: number | null;
+    period: string | null;
+    note: string;
+  };
+  /**
+   * 4분기가 분기 표에서 빌 수 있다는 사실.
+   * 10-K 는 한 해 전체를 담고 4분기를 따로 담지 않는 경우가 있는데,
+   * 연간에서 1~3분기를 빼서 채우지 않는다 — 그건 회사가 보고한 값이 아니다.
+   */
+  quarterlyGapNote: string;
+  meta: Meta;
+}
+
 export interface AssetDetail {
   quote: Quote;
   /** ASSET_RANGES 에 있는 구간만 채워진다 */
@@ -901,6 +966,13 @@ export interface AssetDetail {
   unavailable?: Partial<Record<RangeKey, string>>;
   /** 같은 시장의 F&G 점수(겹쳐보기용) */
   fngOverlay: Partial<Record<RangeKey, FngHistoryPoint[]>>;
+  /**
+   * 재무제표. 미국 상장사만 있다 — SEC 공시가 있는 회사에 한한다.
+   * 지수·원자재·환율·코인에는 없다.
+   */
+  fundamentals?: Fundamentals;
+  /** 재무제표가 없는 경우 왜 없는지 */
+  fundamentalsUnavailable?: string;
   mode: DataMode;
 }
 

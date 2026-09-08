@@ -1872,6 +1872,111 @@ async function main() {
         'DEXUSEU', 'DEXJPUS', 'DEXUSUK', 'DEXCAUS', 'DEXUSAL', 'DEXSZUS'].every((k) => stub.includes(k)));
   }
 
+  /* ---------------- 8-24. 재무제표 ---------------- */
+  console.log('\n[8-24] 재무제표 — 가격만 있던 화면에 회사를 붙였는가');
+  {
+    /*
+     * 이 앱은 오랫동안 종목의 가격만 알았다. 가격만으로는 "왜 이 값인가" 를 물을 수
+     * 없다. SEC(미국 증권거래위원회)가 상장사 공시를 기계가 읽는 형태로 전부, 무료로,
+     * 재배포 제한 없이 공개한다 — 유료 벤더가 파는 '재무 데이터' 의 원본이다.
+     *
+     * 여기서 지키는지 보는 것
+     *   · 회사가 안 쓰는 태그는 그 줄만 비고 화면 전체가 죽지 않는다
+     *   · 4분기를 공시하지 않는 회사의 빈 분기를 연간에서 빼서 채우지 않는다
+     *   · 적자면 PER 을 내지 않고 왜 안 내는지 적는다
+     *   · 공시가 없는 대상(지수·코인)은 '없다' 고 말한다
+     */
+    const fundSrc = existsSync('src/lib/fundamentals.mjs') ? await readFile('src/lib/fundamentals.mjs', 'utf8') : '';
+    const secSrc = existsSync('src/server/adapters/live/providers/sec.ts')
+      ? await readFile('src/server/adapters/live/providers/sec.ts', 'utf8') : '';
+    const compSrc = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    const cardSrc = await readFile('src/components/market/FundamentalsCard.tsx', 'utf8');
+    const demoFund = await readFile('src/server/adapters/demo/fundamentals.ts', 'utf8');
+    const stub2 = await readFile('scripts/live-stub.mjs', 'utf8');
+    const parse2 = await readFile('scripts/check-parse.mjs', 'utf8');
+    const envEx2 = await readFile('.env.example', 'utf8');
+
+    /* ① 읽기 규칙 */
+    check('재무제표 읽기가 순수 모듈로 분리됨', /export function quarterly/.test(fundSrc) && /export function valuation/.test(fundSrc));
+    check('수정 공시가 오면 나중 것을 쓴다', /export function dedupe/.test(fundSrc) && /가장 나중에 접수된/.test(fundSrc));
+    check('기간 길이로 분기·연간을 가른다', /QUARTER_MIN = 80/.test(fundSrc) && /YEAR_MIN = 340/.test(fundSrc));
+    check('전년 동기와 견준다 (직전 분기가 아님)', /계절을 탄다/.test(fundSrc) && /export function yoy/.test(fundSrc));
+    check('비율은 같은 기간끼리만 나눈다', /같은 기간끼리만 나눈다/.test(fundSrc));
+    check('TTM 은 연속한 네 분기라야 한다', /연속한 네 분기라야 한다/.test(fundSrc));
+    check('4분기를 연간에서 빼서 채우지 않는다', /빼서 채우지 않는다/.test(fundSrc));
+    check('재무제표 단위 테스트가 있음', existsSync('scripts/fundamentals.test.mjs'));
+
+    /* ② 제공사 */
+    check('SEC 제공사 모듈이 있음', secSrc.length > 0);
+    check('키가 필요 없다는 사실과 재배포 조건을 적어 둠',
+      /무료이고 키가 없다/.test(secSrc) && /재배포 제한도 없다/.test(secSrc));
+    check('SEC 가 요구하는 User-Agent 를 붙임', /'user-agent': cfg\.userAgent/.test(secSrc));
+    check('404 는 오류가 아니라 그 태그를 안 쓴다는 뜻으로 다룸',
+      /noRetryStatus/.test(secSrc) && /e\.status === 404\) return null/.test(secSrc));
+    check('응답 모양을 확인하지 못했다는 사실을 적어 둠', /확인하지\s*\n?\s*\*\s*못했다|확인하지 못했다/.test(secSrc));
+    check('회사마다 다른 태그를 앞에서부터 시도함', /for \(const tag of def\.tags\)/.test(secSrc));
+    check('어느 태그를 썼는지 올려보냄', /tag,\s*\n\s*quarterly/.test(secSrc) || /line: \{ \.\.\.base, tag,/.test(secSrc));
+    check('.env.example 이 User-Agent 를 설명함', /SEC_USER_AGENT=/.test(envEx2) && /403/.test(envEx2));
+
+    /* ③ 목록 */
+    const ciks = [...compSrc.matchAll(/cik: '(\d{10})'/g)].map((m) => m[1]);
+    check('회사 목록에 CIK 가 10자리로 들어 있음', ciks.length >= 5, `${ciks.length}곳`);
+    check('CIK 가 겹치지 않음', new Set(ciks).size === ciks.length);
+    check('항목마다 대체 태그가 여러 개 적혀 있음', /tags: \[\s*\n?\s*'/.test(compSrc));
+    check('항목마다 초보자용 설명이 있음', (compSrc.match(/hint:/g) ?? []).length >= 7);
+
+    /* ④ 화면 */
+    check('판단 재료를 숫자보다 먼저 놓음', /판단 재료 세 칸/.test(cardSrc));
+    check('막대를 순서가 아니라 날짜 자리에 놓음', /날짜 자리/.test(cardSrc) && /slotOf/.test(cardSrc));
+    check('빠진 기간을 빈칸이라고 말함', /공시하지 않았다는 뜻입니다/.test(cardSrc));
+    check('방향을 기호와 글자로 말함', /word\.glyph/.test(cardSrc) && /word\.label/.test(cardSrc));
+    check('표로 보기가 있음', /표로 보기/.test(cardSrc));
+    check('출처와 태그를 화면에 밝힘', /태그 \{line\.tag\}/.test(cardSrc) && /SEC EDGAR/.test(cardSrc));
+    check('앞으로의 실적이 아니라는 사실을 적음', /앞으로의 실적을 뜻하지 않습니다/.test(cardSrc));
+
+    /* ⑤ DEMO 도 같은 규칙 */
+    check('DEMO 가 실제 공시가 아님을 밝힘', /실제 공시가 아니다/.test(demoFund));
+    check('DEMO 가 4분기 빈 회사를 재현함', /missingQ4/.test(demoFund));
+    check('DEMO 가 적자 회사를 재현함 (PER 안 나오는 자리)', /적자 회사/.test(demoFund));
+
+    /* ⑥ 실제로 실려 오는가 */
+    const aapl = await getJson('/api/asset/aapl?scenario=normal');
+    const f = aapl.body?.fundamentals;
+    check('종목 상세에 재무제표가 실려 옴', Boolean(f), f ? `${f.lines?.length}줄` : '없음');
+    if (f) {
+      const byId = Object.fromEntries((f.lines ?? []).map((l) => [l.id, l]));
+      check('손익 항목이 분기로 옴', (byId.revenue?.quarterly ?? []).length >= 4, `${byId.revenue?.quarterly?.length}분기`);
+      check('재무상태표 항목은 시점 값(기간 없음)', (byId.liabilities?.annual ?? []).every((p) => !p.start));
+      check('줄마다 성질(기간/시점)이 붙어 있음', (f.lines ?? []).every((l) => l.kind === 'duration' || l.kind === 'instant'));
+      check('4분기가 빈 회사라 TTM 대신 연간을 씀', f.valuation?.basis === 'annual', `basis=${f.valuation?.basis}`);
+      check('어떻게 냈는지 문장으로 밝힘', /연간 값을 썼습니다/.test(String(f.valuation?.note ?? '')));
+      check('4분기를 빼서 채우지 않았음', (byId.revenue?.quarterly ?? []).length < 12, `${byId.revenue?.quarterly?.length}개 (12개가 아님)`);
+    }
+    // 적자 회사는 PER 을 내지 않는다
+    const tsla = (await getJson('/api/asset/tsla?scenario=normal')).body?.fundamentals;
+    check('적자면 PER 을 내지 않고 이유를 적음',
+      tsla?.valuation?.per === null && /적자/.test(String(tsla?.valuation?.note ?? '')),
+      String(tsla?.valuation?.note ?? '').slice(0, 40));
+    // 공시가 없는 대상은 없다고 말한다
+    for (const id of ['spx', 'btc', 'usdkrw']) {
+      const d = (await getJson(`/api/asset/${id}?scenario=normal`)).body;
+      check(`${id} 은 재무제표가 없다고 밝힘`, !d?.fundamentals && /공시/.test(String(d?.fundamentalsUnavailable ?? '')));
+    }
+    // 줄 하나가 비어도 화면이 죽지 않는다
+    const part = (await getJson('/api/asset/aapl?scenario=partial')).body?.fundamentals;
+    check('줄 하나가 비어도 나머지는 그대로 나옴',
+      Boolean(part) && (part.lines ?? []).some((l) => l.unavailableReason) && (part.lines ?? []).some((l) => l.quarterly.length > 0),
+      part ? `${(part.lines ?? []).filter((l) => l.unavailableReason).length}줄 빔` : '없음');
+
+    /* ⑦ 파싱 점검이 이 경로를 태우는가 */
+    check('대역 서버에 SEC 경로가 있음', /companyconcept/.test(stub2));
+    check('대역 서버가 안 쓰는 태그를 404 로 답함', /res\.writeHead\(404/.test(stub2) && /companyconcept/.test(stub2));
+    check('대역 서버가 누적·연간이 섞여 오는 상황을 재현함', /9개월 누적도 같은 태그로/.test(stub2));
+    check('대역 서버가 수정 공시를 재현함', /수정 공시로 한 번 더/.test(stub2));
+    check('대역 서버가 User-Agent 없으면 막음', /User-Agent 헤더가 없습니다/.test(stub2));
+    check('파싱 점검이 재무제표를 태움', /SEC_BASE_URL/.test(parse2) && /재무제표/.test(parse2));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

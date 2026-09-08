@@ -45,6 +45,8 @@ const env = {
   CBOE_CSV_URL: `${BASE}/cboe.csv`,
   EIA_API_KEY: 'stub-key-not-real',
   EIA_BASE_URL: `${BASE}/eia`,
+  SEC_BASE_URL: `${BASE}/sec`,
+  SEC_USER_AGENT: 'MarketMood3-check-parse (stub)',
   PORT: String(APP_PORT),
 };
 
@@ -163,6 +165,44 @@ const paid = ['es', 'gc', 'zc'].map((id) => byId[id]).filter(Boolean);
 check('거래소 유료 항목은 여전히 비어 있고 사유가 있음',
   paid.length === 3 && paid.every((r) => r.last === null && !!r.unavailableReason),
   paid.map((r) => `${r.id}=${r.last === null ? '빔' : r.last}`).join(' '));
+
+console.log('\n[재무제표] SEC 공시를 읽어 내는가');
+{
+  const res = await fetch(`http://localhost:${APP_PORT}/api/asset/aapl`, { signal: AbortSignal.timeout(120000) });
+  const a = await res.json();
+  const f = a?.fundamentals;
+  check('종목 상세에 재무제표가 실려 옴', Boolean(f), f ? `${f.lines?.length}줄` : String(a?.fundamentalsUnavailable ?? '없음'));
+  if (f) {
+    const byId = Object.fromEntries((f.lines ?? []).map((l) => [l.id, l]));
+    for (const id of ['revenue', 'operating_income', 'net_income', 'eps']) {
+      const l = byId[id];
+      check(`${id} — 분기 값을 읽음`, (l?.quarterly ?? []).length >= 4,
+        l ? `${l.quarterly.length}분기 · 태그 ${l.tag ?? '없음'}` : '줄이 없음');
+    }
+    // ② 한 태그에 섞여 오는 9개월 누적을 분기로 잘못 담지 않았는가
+    const rq = byId.revenue?.quarterly ?? [];
+    const spans = rq.map((p) => Math.round((Date.parse(p.end) - Date.parse(p.start)) / 86400000));
+    check('분기 칸에 3개월짜리만 들어감', spans.length > 0 && spans.every((d) => d >= 80 && d <= 100),
+      spans.length ? `${Math.min(...spans)}~${Math.max(...spans)}일` : '없음');
+    const ra = byId.revenue?.annual ?? [];
+    const aspans = ra.map((p) => Math.round((Date.parse(p.end) - Date.parse(p.start)) / 86400000));
+    check('연간 칸에 12개월짜리만 들어감', aspans.length > 0 && aspans.every((d) => d >= 340 && d <= 380),
+      aspans.length ? `${Math.min(...aspans)}~${Math.max(...aspans)}일` : '없음');
+    // ③ 수정 공시가 오면 나중 것을 썼는가 (같은 기간이 두 줄로 남으면 안 된다)
+    const keys = rq.map((p) => `${p.start}|${p.end}`);
+    check('같은 기간이 두 번 담기지 않음', new Set(keys).size === keys.length, `${keys.length}개`);
+    // ④ 시점 값(재무상태표)은 기간이 없다
+    const liab = byId.liabilities?.annual ?? [];
+    check('재무상태표 항목은 시점 값으로 담김', liab.length > 0 && liab.every((p) => !p.start), `${liab.length}개`);
+    // 회사가 안 쓰는 태그는 404 → 그 줄만 사유와 함께 빈다 (전체가 죽지 않는다)
+    check('PER 을 냈거나 왜 못 냈는지 밝힘', typeof f.valuation?.note === 'string' && f.valuation.note.length > 0,
+      f.valuation?.per === null ? f.valuation?.note?.slice(0, 50) : `${f.valuation.per?.toFixed(1)}배 (${f.valuation.basis})`);
+  }
+  // 공시가 없는 대상은 '없다' 고 말해야 한다 — 조용히 빈 상자를 두면 안 된다
+  const idx = await (await fetch(`http://localhost:${APP_PORT}/api/asset/spx`, { signal: AbortSignal.timeout(120000) })).json();
+  check('지수에는 재무제표가 없다고 밝힘', !idx?.fundamentals && /공시/.test(String(idx?.fundamentalsUnavailable ?? '')),
+    String(idx?.fundamentalsUnavailable ?? '').slice(0, 50));
+}
 
 console.log('\n[결측] 없는 값을 지어내지 않는가');
 const zeroed = (snap.sections?.macro?.data ?? []).filter((m) => m.value === 0 && m.unavailableReason);

@@ -38,6 +38,9 @@ import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
 import { FUTURES_ITEMS } from '@/lib/futuresCatalog';
 import { EIA_FUTURES, EIA_SOURCE, curveFrom, eiaConfig, fetchFuturesChain, type EiaConfig } from './providers/eia';
+import { SEC_SOURCE, fetchFundamentals, secConfig } from './providers/sec';
+import { COMPANY_BY_ASSET, MAX_PERIODS } from '@/lib/companyCatalog';
+import { valuation } from '@/lib/fundamentals.mjs';
 import { COMPONENTS, allMetricIds } from '@/server/fng/definitions';
 import type { EngineInput } from '@/server/fng/engine';
 import type { RegimeSeries } from '@/server/regime';
@@ -56,6 +59,7 @@ import type {
   SeriesPoint,
   FuturesBoard,
   FuturesQuote,
+  Fundamentals,
 } from '@/types';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
 
@@ -766,6 +770,51 @@ export class LiveAdapter implements MarketAdapter {
     const why = NO_FREE_SERIES[id];
     if (why) throw new SeriesUnavailableError(why);
     throw new NotWiredError(`${id} ${range} 시계열`, 'src/server/adapters/live/index.ts > LiveAdapter.getAssetSeries');
+  }
+
+  /* --------------------------- 재무제표 --------------------------- */
+
+  /**
+   * 미국 상장사 재무제표 — SEC 공시.
+   *
+   * 키가 필요 없다. 미국 증권거래위원회가 상장사 공시를 기계가 읽는 형태로
+   * 전부 공개하고, 연방정부 저작물이라 재배포 제한도 없다. 유료 벤더가 파는
+   * '재무 데이터' 의 원본이 대체로 이것이다.
+   *
+   * 줄 하나가 비어도 나머지는 그대로 나온다 — 회사마다 쓰는 XBRL 태그가 달라서
+   * 어떤 줄은 못 찾는 게 정상이고, 그때 화면 전체를 내리면 값이 있는 줄까지 잃는다.
+   */
+  async getFundamentals(id: string, price: number | null, ctx: AdapterContext): Promise<Fundamentals> {
+    const company = COMPANY_BY_ASSET.get(id);
+    if (!company) {
+      throw new SeriesUnavailableError(
+        'SEC 공시가 있는 미국 상장사만 재무제표를 보여줍니다. 지수·원자재·환율·코인에는 공시가 없습니다.',
+      );
+    }
+    const cfg = secConfig();
+    const { lines, entityName } = await fetchFundamentals(cfg, company.cik, MAX_PERIODS);
+    const eps = lines.find((l) => l.id === 'eps');
+    const now = ctx.now.toISOString();
+    // 가장 최근에 접수된 보고서 날짜를 기준 시각으로 쓴다 — 공시는 그때 나온 값이다
+    const filed = lines
+      .flatMap((l) => [...l.quarterly, ...l.annual])
+      .map((p) => p.filed)
+      .filter(Boolean)
+      .sort();
+    const asOf = filed.length > 0 ? `${filed[filed.length - 1]}T00:00:00Z` : now;
+
+    return {
+      cik: company.cik,
+      ticker: company.ticker,
+      entityName,
+      lines,
+      valuation: valuation(price, eps?.quarterly ?? [], eps?.annual ?? []),
+      quarterlyGapNote:
+        '4분기 값은 연간보고서(10-K)에만 담기고 분기로는 공시되지 않는 회사가 있습니다. ' +
+        '그런 분기는 표에서 비워 둡니다 — 연간에서 1~3분기를 빼서 채우면 회사가 보고한 값이 아니게 됩니다. ' +
+        '그 회사는 연간 탭에서 보세요.',
+      meta: meta(asOf, now, SEC_SOURCE),
+    };
   }
 
   /* ----------------------------- 환율 ----------------------------- */

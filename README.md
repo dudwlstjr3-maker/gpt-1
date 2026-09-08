@@ -74,6 +74,7 @@ cp .env.example .env.local
 | `CRYPTO_API_KEY` / `CRYPTO_BASE_URL` | 크립토 시세·도미넌스·파생 |
 | `MACRO_API_KEY` / `MACRO_BASE_URL` | 거시 지표 (FRED, 한국은행 ECOS 등) |
 | `EIA_API_KEY` / `EIA_BASE_URL` | 에너지 선물 인도월 정산가 (EIA, 무료·선택) |
+| `SEC_USER_AGENT` / `SEC_BASE_URL` | 미국 상장사 재무제표 (SEC, 키 불필요 · 연락처 User-Agent 필요) |
 | `CALENDAR_API_KEY` / `CALENDAR_BASE_URL` | 경제 캘린더 (선택) |
 | `NEWS_API_KEY` / `NEWS_BASE_URL` | 뉴스 (선택) |
 
@@ -111,6 +112,7 @@ cp .env.example .env.local
 | 미국 주식 풋/콜 비율 | **Cboe** | 불필요 | 일별 마감 | ✅ |
 | VIX · 하이일드 · 장단기 금리차 · 국채 · CPI · 실업률 · 원달러 | **FRED** | 무료 키 | 발표 즉시 | ✅ |
 | 에너지 선물 인도월 정산가 (WTI · 천연가스 · 난방유 · RBOB) | **EIA** | 무료 키 (선택) | 마감 후 일별 | ✅ |
+| 미국 상장사 재무제표 (매출·영업이익·순이익·EPS·현금흐름·부채) | **SEC EDGAR** | 불필요 | 분기·연간 공시 | ✅ |
 | 지수 · 금속 · 농산물 선물 | — | — | — | ⬜ 거래소 유료 |
 | 1인당 GDP · 지니계수 · 미저리 · PPP 괴리 | **World Bank** | 불필요 | 연 1회 | ✅ |
 | 빅맥지수 | **The Economist** (공개 저장소 CSV) | 불필요 | 연 2회 | ✅ |

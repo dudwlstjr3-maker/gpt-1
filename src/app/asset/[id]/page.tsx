@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { useFormatter } from '@/components/market/useFormatter';
 import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
+import { FundamentalsCard } from '@/components/market/FundamentalsCard';
 import { FreshnessBadge, ModeBadge, SessionBadge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, SkeletonCard } from '@/components/ui/States';
@@ -268,6 +269,8 @@ export default function AssetPage() {
           ) : null}
         </div>
       </section>
+
+      <FundamentalsCard fundamentals={detail.fundamentals} unavailable={detail.fundamentalsUnavailable} />
 
       <div className="mt-4 px-3">
         <Link

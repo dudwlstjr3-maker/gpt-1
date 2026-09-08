@@ -1781,6 +1781,9 @@ async function main() {
       /\.env\.local/.test(bundleJs) && /node_modules/.test(bundleJs) && /SKIP_DIR/.test(bundleJs));
     check('묶음이 규칙을 앞에 붙임 (맥락 없이 던지지 않는다)',
       existsSync('tools/review/01-검토-요청.md') && existsSync('tools/review/02-업그레이드-요청.md'));
+    // 받는 사람이 여러 번 올리게 하지 않는다 — 파일 하나로 낸다
+    check('묶음이 파일 하나(zip)로 나옴', /spawnSync\('zip'/.test(bundleJs) && /검토\.zip/.test(bundleJs));
+    check('묶음이 읽을 수 없는 파일을 뺌', /SKIP_EXT/.test(bundleJs));
     check('요청서가 일부러 지키는 규칙을 밝힘',
       /일부러\*\* 지키는 규칙/.test(await readFile('tools/review/01-검토-요청.md', 'utf8')));
     check('미리보기도 사유 없는 빈 항목을 막음', /사유 없는 빈 항목/.test(buildJs));

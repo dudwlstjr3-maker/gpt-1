@@ -38,6 +38,7 @@ API 키가 하나도 없어도 **DEMO 모드로 바로 실행**됩니다. 별도
 | `npm run icons` | PWA 아이콘 PNG 재생성 (`public/icons/`) |
 | `npm run verify` | **실행 중인 서버**를 상대로 검증 기준 자동 확인 (아래 7장) |
 | `npm run check:parse` | 키·네트워크 없이 **LIVE 파싱 코드**가 도는지 확인 (로컬 대역 서버) |
+| `npm run bundle` | 검토용 묶음 만들기 — 소스 전부와 요청서를 `dist/market-mood-3-검토.zip` 파일 하나로 냅니다. 키가 담기는 파일(`.env.local`)은 걸러 냅니다. |
 | `npm run check:live` | 키를 넣고 **제공사에 실제로** 물어봄 — 무엇이 살아 있는지 |
 | `npm run live:stub` | 대역 서버만 따로 띄움 (`check:parse` 가 알아서 띄우므로 보통은 불필요) |
 | `npm run preview` | 서버 없이 파일 하나로 도는 미리보기 HTML 굽기 |

@@ -1773,6 +1773,16 @@ async function main() {
     check('미리보기 파일에 문자 인코딩이 박혀 있음',
       /<meta charset="utf-8">/.test(buildJs) && /<!doctype html>/.test(buildJs));
     check('아티팩트용은 머리 태그 없이 따로 낸다', /OUT_BARE/.test(buildJs));
+
+    // 검토용 묶음 — 남에게 코드를 넘기는 길이라, 비밀이 담길 파일을 거르는지가 제일 중요하다
+    const bundleJs = existsSync('scripts/bundle.mjs') ? await readFile('scripts/bundle.mjs', 'utf8') : '';
+    check('검토용 묶음 스크립트가 있음', bundleJs.length > 0);
+    check('묶음이 .env.local 과 node_modules 를 거름',
+      /\.env\.local/.test(bundleJs) && /node_modules/.test(bundleJs) && /SKIP_DIR/.test(bundleJs));
+    check('묶음이 규칙을 앞에 붙임 (맥락 없이 던지지 않는다)',
+      existsSync('tools/review/01-검토-요청.md') && existsSync('tools/review/02-업그레이드-요청.md'));
+    check('요청서가 일부러 지키는 규칙을 밝힘',
+      /일부러\*\* 지키는 규칙/.test(await readFile('tools/review/01-검토-요청.md', 'utf8')));
     check('미리보기도 사유 없는 빈 항목을 막음', /사유 없는 빈 항목/.test(buildJs));
     check('미리보기에 선물 화면이 있음', /function viewFutures\(\)/.test(tpl11) && /futures: viewFutures/.test(tpl11));
     check('미리보기 막대도 같은 규칙', /function futBar\(pct, max, color\)/.test(tpl11));

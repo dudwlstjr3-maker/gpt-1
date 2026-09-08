@@ -1002,8 +1002,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   return [
     mk(
       'per_capita_gdp',
-      '1인당 GDP',
-      'GDP per capita',
+      '국민 한 사람 몫의 생산',
+      '1인당 GDP · GDP per capita',
       round(krGdpNow, 0),
       round(krGdpPrev, 0),
       0,
@@ -1026,8 +1026,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'gini',
-      '지니계수',
-      'Gini coefficient',
+      '소득이 얼마나 고르게 나뉘는지',
+      '지니계수 · Gini coefficient',
       B.giniKr,
       B.giniKrPrev,
       3,
@@ -1040,8 +1040,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'misery',
-      '미저리 지수',
-      'Misery Index',
+      '물가와 실업을 더한 살림 고통 지수',
+      '미저리 지수 · Misery Index',
       round(miseryKr, 1),
       round(miseryKrPrev, 1),
       1,
@@ -1083,8 +1083,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'ppp_gap',
-      '구매력평가(PPP) 환율 괴리',
-      'PPP exchange rate gap',
+      '물가로 따진 환율과 실제 환율의 차이',
+      '구매력평가(PPP) 환율 괴리 · PPP exchange rate gap',
       round(pppNow, 1),
       round(undervaluedKrw(BASIC_PRICES.pppKrwPerUsd, at(250)), 1),
       1,
@@ -1109,8 +1109,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'engel',
-      '엥겔계수',
-      'Engel coefficient',
+      '쓰는 돈 중 먹는 데 쓰는 몫',
+      '엥겔계수 · Engel coefficient',
       B.engelKr,
       B.engelKrPrev,
       1,
@@ -1125,8 +1125,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'pir',
-      '소득 대비 주택가격 (PIR)',
-      'Price to Income Ratio',
+      '집값이 연 소득의 몇 배',
+      '소득 대비 주택가격(PIR) · Price to Income Ratio',
       B.pirSeoul,
       B.pirSeoulPrev,
       1,
@@ -1148,8 +1148,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'cli',
-      'OECD 경기선행지수',
-      'OECD Composite Leading Indicator',
+      '경기가 앞으로 어디로 갈지 미리 보는 지수',
+      'OECD 경기선행지수 · Composite Leading Indicator',
       round(cliAt(s.kospi, i), 1),
       round(cliAt(s.kospi, at(20)), 1),
       1,
@@ -1177,8 +1177,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'ccsi',
-      '소비자심리지수',
-      'CCSI',
+      '가계가 살림살이를 어떻게 느끼는지',
+      '소비자심리지수 · CCSI',
       round(ccsiAt(i), 1),
       round(ccsiAt(at(20)), 1),
       1,

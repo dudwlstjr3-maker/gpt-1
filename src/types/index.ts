@@ -641,6 +641,12 @@ export interface RiskIndicator {
   name: string;
   /** 짧은 이름 (타일용) */
   shortName: string;
+  /**
+   * 작게 붙는 원래 이름 (업계 용어 · 영어).
+   * 큰 글씨는 쉬운 우리말로 두고, 원래 이름은 지우지 않고 작게 남긴다 —
+   * 지우면 기사나 다른 자료에서 같은 값을 봤을 때 같은 것인지 알 수 없다.
+   */
+  term?: string;
   /** 어느 시장의 위험을 보는 지표인가 */
   scope: MarketId | 'global';
   value: number | null;
@@ -908,7 +914,10 @@ export interface FinancialPoint {
 
 export interface FinancialLine {
   id: string;
+  /** 큰 글씨 — 쉬운 우리말 */
   label: string;
+  /** 작은 글씨 — 원래 이름 (한국어 용어 · 영어). 지우면 다른 자료와 대조할 길이 없어진다. */
+  term: string;
   hint: string;
   unit: 'usd' | 'usd_per_share';
   /**

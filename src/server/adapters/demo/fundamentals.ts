@@ -97,7 +97,7 @@ export function buildFundamentals(
   const marginQ = revQ.map(() => shape.margin * (1 + (rnd() - 0.5) * 0.14));
 
   const lines: FinancialLine[] = FINANCIAL_LINES.map((def) => {
-    const base = { id: def.id, label: def.label, hint: def.hint, unit: def.unit, kind: def.kind };
+    const base = { id: def.id, label: def.label, term: def.term, hint: def.hint, unit: def.unit, kind: def.kind };
     if (shape.skip?.includes(def.id) || broken.has(def.id)) {
       return {
         ...base,

@@ -838,10 +838,12 @@ async function main() {
 
     const basics = snap.sections?.basics?.data ?? [];
     check('생활 경제 지수가 아홉 가지', basics.length === 9, `${basics.length}개`);
-    // 이름은 API 가 내려주므로 서버가 그린 HTML 에는 없다. 데이터에서 확인한다.
-    const names = basics.map((b) => b.name);
-    for (const name of ['빅맥지수', '1인당 GDP', '엥겔계수', '지니계수']) {
-      check(`생활 경제 지수에 ${name} 있음`, names.includes(name), names.join(', ').slice(0, 60));
+    // 표시 이름이 아니라 **id** 로 확인한다. 큰 글씨는 쉬운 우리말로 바뀔 수 있고
+    // 실제로 바뀌었다 ('1인당 GDP' → '국민 한 사람 몫의 생산'). 정체는 id 다.
+    const ids9 = basics.map((b) => b.id);
+    for (const [id, was] of [['bigmac', '빅맥지수'], ['per_capita_gdp', '1인당 GDP'],
+      ['engel', '엥겔계수'], ['gini', '지니계수']]) {
+      check(`생활 경제 지수에 ${was} 있음`, ids9.includes(id), ids9.join(', ').slice(0, 60));
     }
     // 아홉 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
     // 있으면 화면에서 "그 밖의 지표" 로 밀려나므로 원본에서 확인한다.
@@ -1923,7 +1925,9 @@ async function main() {
     check('회사 목록에 CIK 가 10자리로 들어 있음', ciks.length >= 5, `${ciks.length}곳`);
     check('CIK 가 겹치지 않음', new Set(ciks).size === ciks.length);
     check('항목마다 대체 태그가 여러 개 적혀 있음', /tags: \[\s*\n?\s*'/.test(compSrc));
-    check('항목마다 초보자용 설명이 있음', (compSrc.match(/hint:/g) ?? []).length >= 7);
+    // 설명은 이제 손으로 적지 않고 용어 사전(what)에서 온다
+    check('항목마다 초보자용 설명이 있음', (compSrc.match(/named\('/g) ?? []).length >= 7,
+      `${(compSrc.match(/named\('/g) ?? []).length}개`);
 
     /* ④ 화면 */
     check('판단 재료를 숫자보다 먼저 놓음', /판단 재료 세 칸/.test(cardSrc));
@@ -1931,8 +1935,9 @@ async function main() {
     check('빠진 기간을 빈칸이라고 말함', /공시하지 않았다는 뜻입니다/.test(cardSrc));
     check('방향을 기호와 글자로 말함', /word\.glyph/.test(cardSrc) && /word\.label/.test(cardSrc));
     check('표로 보기가 있음', /표로 보기/.test(cardSrc));
-    check('출처와 태그를 화면에 밝힘', /태그 \{line\.tag\}/.test(cardSrc) && /SEC EDGAR/.test(cardSrc));
-    check('앞으로의 실적이 아니라는 사실을 적음', /앞으로의 실적을 뜻하지 않습니다/.test(cardSrc));
+    check('출처와 태그를 화면에 밝힘',
+      /TERMS\.xbrl_tag\.plain\} \{line\.tag\}/.test(cardSrc) && /SEC EDGAR/.test(cardSrc));
+    check('앞으로의 실적이 아니라는 사실을 적음', /앞으로의 실적을\s+뜻하지 않습니다/.test(cardSrc));
 
     /* ⑤ DEMO 도 같은 규칙 */
     check('DEMO 가 실제 공시가 아님을 밝힘', /실제 공시가 아니다/.test(demoFund));
@@ -1975,6 +1980,81 @@ async function main() {
     check('대역 서버가 수정 공시를 재현함', /수정 공시로 한 번 더/.test(stub2));
     check('대역 서버가 User-Agent 없으면 막음', /User-Agent 헤더가 없습니다/.test(stub2));
     check('파싱 점검이 재무제표를 태움', /SEC_BASE_URL/.test(parse2) && /재무제표/.test(parse2));
+  }
+
+  /* ---------------- 8-25. 용어 ---------------- */
+  console.log('\n[8-25] 용어 — 큰 글씨는 쉬운 우리말, 원래 이름은 작게');
+  {
+    /*
+     * ROE · PER · EPS · OAS 같은 말은 아는 사람에게만 짧고, 모르는 사람에게는 아무
+     * 뜻이 없다. 그렇다고 원래 이름을 지워 버리면 기사나 다른 자료에서 같은 값을
+     * 봤을 때 같은 것인지 알 수가 없다.
+     *
+     * 그래서 둘 다 적는다 — 큰 글씨는 뜻을 푼 우리말, 그 아래 작은 글씨가 원래 이름.
+     * 이름은 src/lib/terms.ts 한 곳에서만 정한다. 화면마다 손으로 적으면 같은 용어가
+     * 화면마다 다르게 불린다.
+     */
+    const terms = await readFile('src/lib/terms.ts', 'utf8');
+    const label = await readFile('src/components/ui/TermLabel.tsx', 'utf8');
+    const card = await readFile('src/components/market/FundamentalsCard.tsx', 'utf8');
+    const comp = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    const curve = await readFile('src/lib/futuresCurve.mjs', 'utf8');
+    const riskSrc = await readFile('src/server/risk.ts', 'utf8');
+    const basicsView = await readFile('src/components/market/BasicsBoard.tsx', 'utf8');
+    const tpl13 = await readFile('tools/preview/template.html', 'utf8');
+
+    check('용어 사전이 한 곳에 있음', /export const TERMS/.test(terms));
+    check('사전이 쉬운 말과 원래 이름을 함께 담음', /plain: string/.test(terms) && /term: string/.test(terms));
+    check('이름표 컴포넌트가 있음', /export function TermLabel/.test(label) && /export function TermInline/.test(label));
+    check('소리로 읽을 때 둘을 함께 읽어 줌', /aria-label=\{`\$\{t\.plain\} \(\$\{t\.term\}\)`\}/.test(label));
+    check('재무 항목 이름을 사전에서 가져옴', /function named\(/.test(comp) && /TERMS\[id\]/.test(comp));
+
+    // 사전에 담긴 우리말 이름에 영어 약어가 그대로 남아 있으면 안 된다
+    const plains = [...terms.matchAll(/plain: '([^']+)'/g)].map((m) => m[1]);
+    const stillEnglish = plains.filter((v) => /[A-Za-z]{2,}/.test(v));
+    check('쉬운 이름에 영어가 남아 있지 않음', stillEnglish.length === 0, stillEnglish.join(', ') || `${plains.length}개 검사`);
+    // 원래 이름은 반대로 반드시 남아 있어야 한다 — 지우면 대조할 길이 없다
+    const termsList = [...terms.matchAll(/\n    term: '([^']+)'/g)].map((m) => m[1]);
+    check('원래 이름이 지워지지 않았음', termsList.length >= 10, `${termsList.length}개`);
+
+    /* 재무제표 화면 */
+    check('재무 항목이 원래 이름을 작게 달고 있음', /\{line\.term\}/.test(card));
+    check('세 칸 머리말도 사전을 씀', /TermInline id="per"/.test(card) && /TermInline id="operating_margin"/.test(card));
+    check('10-K · 10-Q 를 우리말로 풀어 씀', /function formName/.test(card) && /form_10k/.test(card));
+    check('CIK · XBRL 을 우리말로 풀어 씀', /TERMS\.cik\.plain/.test(card) && /TERMS\.xbrl_tag\.plain/.test(card));
+    check('PER 설명이 화면 문장에 우리말로 있음', /지금 주가를 1주가 번 돈으로 나눈 값/.test(card));
+
+    /* 선물 곡선 */
+    check('콘탱고·백워데이션을 우리말로 먼저 말함',
+      /contango: '먼 달이 더 비쌈'/.test(curve) && /backwardation: '가까운 달이 더 비쌈'/.test(curve));
+    check('원래 이름은 따로 남겨 둠', /export const SHAPE_TERM/.test(curve) && /콘탱고 · Contango/.test(curve));
+    check('미리보기도 같은 이름을 씀', /FUT_SHAPE_TERM/.test(tpl13) && /먼 달이 더 비쌈/.test(tpl13));
+
+    /* 위험 신호등 */
+    check('위험 지표가 원래 이름을 따로 갖고 있음', (riskSrc.match(/^    term: '/gm) ?? []).length >= 5,
+      `${(riskSrc.match(/^    term: '/gm) ?? []).length}개`);
+    check('하이일드 OAS 를 우리말로 바꿈', /위험한 회사가 더 무는 이자/.test(riskSrc) && !/name: '하이일드/.test(riskSrc));
+    check('미리보기도 원래 이름을 그림', /i\.term \?/.test(tpl13));
+
+    /* 생활 경제 지수 */
+    check('생활 지수도 원래 이름을 제 줄에 둠', /\{item\.englishName\}<\/p>/.test(basicsView));
+    check('원래 이름을 잘리는 자리에 두지 않음', !/truncate">\{item\.englishName\}/.test(basicsView));
+
+    /* 실제로 화면에 나오는 이름이 바뀌었는가 */
+    const snapT = (await getJson('/api/snapshot?scenario=normal')).body;
+    const risks = snapT.sections?.risk?.data?.indicators ?? [];
+    check('위험 지표 이름에 영어 약어가 앞장서지 않음',
+      risks.every((i) => !/^[A-Z]{2,}/.test(i.name)), risks.map((i) => i.name).join(' / ').slice(0, 80));
+    check('위험 지표가 원래 이름을 함께 내려보냄', risks.filter((i) => i.term).length >= 5,
+      `${risks.filter((i) => i.term).length}/${risks.length}`);
+    const basicsT = snapT.sections?.basics?.data ?? [];
+    check('생활 지수 이름에 영어 약어가 앞장서지 않음',
+      basicsT.every((b) => !/^[A-Z]{2,}/.test(b.name)), basicsT.map((b) => b.name).join(' / ').slice(0, 80));
+    check('생활 지수가 원래 이름을 함께 내려보냄', basicsT.every((b) => typeof b.englishName === 'string' && b.englishName.length > 0));
+    const fundT = (await getJson('/api/asset/aapl?scenario=normal')).body?.fundamentals;
+    check('재무 항목이 우리말 이름과 원래 이름을 둘 다 내려보냄',
+      (fundT?.lines ?? []).every((l) => l.label && l.term && !/[A-Za-z]{2,}/.test(l.label)),
+      (fundT?.lines ?? []).map((l) => l.label).join(' / ').slice(0, 80));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

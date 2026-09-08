@@ -130,10 +130,10 @@ function CurveStrip({
           <p className="text-[12px] font-semibold text-fg">
             <span aria-hidden="true">{read.glyph} </span>
             {read.label}
-            <span className="tnum ml-2 font-normal text-muted">
-              {formatSigned(read.spreadPct, 1)}%
-            </span>
+            <span className="tnum ml-2 font-normal text-muted">{formatSigned(read.spreadPct, 1)}%</span>
           </p>
+          {/* 원래 이름을 작게 붙인다 — 기사에서 '콘탱고' 라고 쓴 것과 같은 것임을 알 수 있게 */}
+          <p className="mt-0.5 text-[11.5px] text-subtle">{read.term}</p>
           <p className="tnum mt-0.5 text-[11.5px] text-subtle">
             근월 {formatNumber(read.near, precision)}
             {suffix} → {contractLabel(far.n)} {formatNumber(read.far, precision)}

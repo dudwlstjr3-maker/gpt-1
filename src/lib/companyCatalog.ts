@@ -19,6 +19,8 @@
  *   지키지 않으면 차단한다 — 그건 약관이 아니라 접속 조건이라 코드가 지킨다.
  */
 
+import { TERMS } from '@/lib/terms';
+
 export interface CompanyRef {
   /** CATALOG 의 종목 id */
   assetId: string;
@@ -54,7 +56,10 @@ export type FinancialLineId =
 
 export interface FinancialLineDef {
   id: FinancialLineId;
+  /** 큰 글씨 — 쉬운 우리말 (terms.ts 에서 가져온다) */
   label: string;
+  /** 작은 글씨 — 원래 이름 */
+  term: string;
   /** 이 줄이 무엇인지 한 문장 — 재무제표를 처음 보는 사람 기준 */
   hint: string;
   /** 앞에서부터 시도한다. 값이 오는 첫 태그를 쓴다. */
@@ -67,11 +72,19 @@ export interface FinancialLineDef {
   primary: boolean;
 }
 
+/**
+ * 이름과 설명은 손으로 적지 않고 용어 사전에서 가져온다.
+ * 같은 용어가 화면마다 다르게 불리지 않게 하려는 것이다.
+ */
+function named(id: FinancialLineId) {
+  const t = TERMS[id];
+  if (!t) throw new Error(`용어 사전에 없는 항목입니다: ${id}`);
+  return { id, label: t.plain, term: t.term, hint: t.what ?? '' };
+}
+
 export const FINANCIAL_LINES: FinancialLineDef[] = [
   {
-    id: 'revenue',
-    label: '매출',
-    hint: '회사가 물건과 서비스를 팔아 받은 돈입니다. 여기서 모든 비용을 빼기 전 금액입니다.',
+    ...named('revenue'),
     tags: [
       'RevenueFromContractWithCustomerExcludingAssessedTax',
       'Revenues',
@@ -83,36 +96,28 @@ export const FINANCIAL_LINES: FinancialLineDef[] = [
     primary: true,
   },
   {
-    id: 'operating_income',
-    label: '영업이익',
-    hint: '매출에서 원가와 판매·관리비를 뺀 값입니다. 본업으로 얼마를 벌었는지를 봅니다.',
+    ...named('operating_income'),
     tags: ['OperatingIncomeLoss'],
     unit: 'usd',
     kind: 'duration',
     primary: true,
   },
   {
-    id: 'net_income',
-    label: '순이익',
-    hint: '이자와 세금까지 다 빼고 마지막에 남은 돈입니다.',
+    ...named('net_income'),
     tags: ['NetIncomeLoss', 'ProfitLoss'],
     unit: 'usd',
     kind: 'duration',
     primary: true,
   },
   {
-    id: 'eps',
-    label: '주당순이익 (희석)',
-    hint: '순이익을 주식 수로 나눈 값입니다. 주식 하나가 벌어들인 몫이며, PER 의 분모가 됩니다.',
+    ...named('eps'),
     tags: ['EarningsPerShareDiluted', 'EarningsPerShareBasicAndDiluted'],
     unit: 'usd_per_share',
     kind: 'duration',
     primary: true,
   },
   {
-    id: 'operating_cash_flow',
-    label: '영업활동 현금흐름',
-    hint: '본업에서 실제로 들어온 현금입니다. 이익은 났는데 현금이 안 들어오는 회사를 가려냅니다.',
+    ...named('operating_cash_flow'),
     tags: [
       'NetCashProvidedByUsedInOperatingActivities',
       'NetCashProvidedByUsedInOperatingActivitiesContinuingOperations',
@@ -122,18 +127,14 @@ export const FINANCIAL_LINES: FinancialLineDef[] = [
     primary: false,
   },
   {
-    id: 'liabilities',
-    label: '총부채',
-    hint: '회사가 갚아야 할 돈의 합입니다. 특정 시점의 잔액입니다.',
+    ...named('liabilities'),
     tags: ['Liabilities'],
     unit: 'usd',
     kind: 'instant',
     primary: false,
   },
   {
-    id: 'equity',
-    label: '자기자본',
-    hint: '자산에서 부채를 뺀, 주주 몫입니다. 부채를 이것으로 나눈 것이 부채비율입니다.',
+    ...named('equity'),
     tags: ['StockholdersEquity', 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest'],
     unit: 'usd',
     kind: 'instant',

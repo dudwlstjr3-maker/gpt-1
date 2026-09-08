@@ -147,7 +147,7 @@ const US_COMPONENTS: ComponentDef[] = [
     weight: 14,
     description: '신용등급 낮은 회사채가 국채보다 더 물어야 하는 금리(스프레드)를 본다. 벌어질수록 공포 쪽이다.',
     subMetrics: [
-      { id: 'us_hy_oas', label: '하이일드 OAS', weight: 100, invert: true, precision: 2, suffix: '%', hint: 'ICE BofA High Yield OAS' },
+      { id: 'us_hy_oas', label: '위험한 회사가 더 무는 이자', weight: 100, invert: true, precision: 2, suffix: '%', hint: '하이일드 스프레드 · ICE BofA High Yield OAS' },
     ],
     plannedSources: [S.fred],
   },

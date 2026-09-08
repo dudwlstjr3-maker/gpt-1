@@ -151,11 +151,16 @@ export function ttm(quarters) {
 }
 
 /**
- * 주가수익비율(PER) = 주가 / 주당순이익.
+ * 주가가 이익의 몇 배인가 = 주가 / 1주가 번 돈.
+ * (원래 이름은 주가수익비율 · PER 이고, 나누는 쪽은 주당순이익 · EPS 다.)
  *
- * 최근 네 분기 EPS 를 더한 값(TTM)을 우선 쓰고, 그게 안 되면 최근 회계연도 값을
- * 쓴다. **어느 쪽을 썼는지 반드시 함께 돌려준다** — 둘은 다른 숫자다.
- * EPS 가 0 이하면 PER 을 내지 않는다 (적자 기업의 PER 은 뜻이 없다).
+ * 최근 네 분기 것을 더한 값을 우선 쓰고, 그게 안 되면 최근 1년치 값을 쓴다.
+ * **어느 쪽을 썼는지 반드시 함께 돌려준다** — 둘은 다른 숫자다.
+ * 1주가 번 돈이 0 이하면 내지 않는다 (적자일 때는 이 숫자가 뜻을 잃는다).
+ *
+ * 문구를 여기서 우리말로 쓰는 이유
+ *   이 글은 화면에 그대로 나간다. 'PER 을 낼 수 없습니다' 라고 적으면 PER 이
+ *   무엇인지 아는 사람에게만 설명이 된다.
  */
 export function valuation(price, epsQuarters, epsAnnual) {
   const t = ttm(epsQuarters);
@@ -175,10 +180,16 @@ export function valuation(price, epsQuarters, epsAnnual) {
   }
 
   if (eps === null) {
-    return { basis: null, eps: null, per: null, period: null, note: '주당순이익을 받지 못해 PER 을 낼 수 없습니다.' };
+    return {
+      basis: null,
+      eps: null,
+      per: null,
+      period: null,
+      note: '1주가 번 돈(주당순이익)을 받지 못해 몇 배인지 낼 수 없습니다.',
+    };
   }
   if (!Number.isFinite(price) || price <= 0) {
-    return { basis, eps, per: null, period, note: '주가를 받지 못해 PER 을 낼 수 없습니다.' };
+    return { basis, eps, per: null, period, note: '주가를 받지 못해 몇 배인지 낼 수 없습니다.' };
   }
   if (eps <= 0) {
     return {
@@ -186,7 +197,7 @@ export function valuation(price, epsQuarters, epsAnnual) {
       eps,
       per: null,
       period,
-      note: '주당순이익이 0 이하라 PER 을 내지 않습니다. 적자 기업의 PER 은 뜻이 없습니다.',
+      note: '1주가 번 돈이 0 이하, 곧 적자라 몇 배인지 내지 않습니다. 적자일 때는 이 숫자가 뜻을 잃습니다.',
     };
   }
   return {
@@ -196,8 +207,8 @@ export function valuation(price, epsQuarters, epsAnnual) {
     period,
     note:
       basis === 'ttm'
-        ? `최근 네 분기 주당순이익 합계(${period}) 로 나눈 값입니다.`
-        : `최근 회계연도 주당순이익(${period}) 으로 나눈 값입니다. 네 분기가 연속으로 오지 않아 연간 값을 썼습니다.`,
+        ? `최근 네 분기에 1주가 번 돈을 더한 값(${period}) 으로 주가를 나눴습니다.`
+        : `최근 1년치로 1주가 번 돈(${period}) 으로 주가를 나눴습니다. 네 분기가 연속으로 오지 않아 연간 값을 썼습니다.`,
   };
 }
 

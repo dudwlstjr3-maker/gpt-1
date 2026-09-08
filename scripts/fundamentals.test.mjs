@@ -123,7 +123,7 @@ test('주가나 EPS 가 없으면 PER 이 없고 사유가 남는다', () => {
   assert.match(valuation(null, [], annual([y('2025-12-31', 5)])).note, /주가/);
   const none = valuation(120, [], []);
   assert.equal(none.basis, null);
-  assert.match(none.note, /주당순이익을 받지 못해/);
+  assert.match(none.note, /1주가 번 돈\(주당순이익\)을 받지 못해/);
 });
 
 test('방향은 글자와 기호로도 말한다', () => {

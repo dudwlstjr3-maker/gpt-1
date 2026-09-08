@@ -13,6 +13,12 @@
  *   PER · 매출이 전년 동기 대비 얼마나 늘었나 · 영업이익률이 몇 %인가.
  *   그 아래에 항목별 막대와 표를 둔다. 표는 접어 두되 지우지 않는다.
  *
+ * 이름을 어떻게 부르나
+ *   큰 글씨는 **쉬운 우리말**, 그 아래 작은 글씨가 원래 이름이다.
+ *   PER · EPS 같은 말은 아는 사람에게만 짧고 모르는 사람에게는 아무 뜻이 없다.
+ *   그렇다고 지워 버리면 다른 자료와 대조할 길이 없어지므로 둘 다 적는다.
+ *   이름은 src/lib/terms.ts 한 곳에서만 정한다.
+ *
  * 지키는 것
  *   · 값이 없으면 0 으로 채우지 않고 왜 없는지 적는다.
  *   · 방향은 색이 아니라 기호(▲▼＝)와 글자로 먼저 말한다.
@@ -25,6 +31,8 @@ import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { Notice } from '@/components/ui/States';
+import { TermInline } from '@/components/ui/TermLabel';
+import { TERMS } from '@/lib/terms';
 import { formatCompactEn, formatNumber, formatSigned, NO_VALUE } from '@/lib/format';
 import { PERIOD_KEYS, PERIOD_LABEL, type PeriodKey } from '@/lib/companyCatalog';
 import { ratio, trendWord, yoy } from '@/lib/fundamentals.mjs';
@@ -41,6 +49,13 @@ function periodLabel(p: FinancialPoint, period: PeriodKey): string {
   if (period === 'annual') return `${p.end.slice(0, 4)}년`;
   const m = Number(p.end.slice(5, 7));
   return `${p.end.slice(0, 4)}·${Math.min(4, Math.max(1, Math.ceil(m / 3)))}Q`;
+}
+
+/** 보고서 이름 — 10-K · 10-Q 는 미국 서식 번호일 뿐이라 우리말을 앞에 둔다 */
+function formName(form: string): string {
+  if (form === '10-K') return `${TERMS.form_10k.plain} 10-K`;
+  if (form === '10-Q') return `${TERMS.form_10q.plain} 10-Q`;
+  return form;
 }
 
 const BAR_H = 56;
@@ -129,6 +144,7 @@ function LineBlock({ line, period }: { line: FinancialLine; period: PeriodKey })
     return (
       <li className="card p-3">
         <p className="text-[13px] font-semibold text-fg">{line.label}</p>
+        <p className="mt-0.5 text-[11.5px] text-subtle">{line.term}</p>
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
           {line.unavailableReason ??
             (period === 'quarterly'
@@ -144,6 +160,8 @@ function LineBlock({ line, period }: { line: FinancialLine; period: PeriodKey })
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-fg">{line.label}</p>
+          {/* 원래 이름을 작게 붙인다 — 지우면 다른 자료와 같은 것인지 대조할 수 없다 */}
+          <p className="mt-0.5 text-[11.5px] text-subtle">{line.term}</p>
           <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">{line.hint}</p>
         </div>
         <p className="tnum shrink-0 text-[15px] font-bold text-fg-strong">{fmt(last.value, line.unit)}</p>
@@ -168,11 +186,13 @@ function LineBlock({ line, period }: { line: FinancialLine; period: PeriodKey })
 
       <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
         {isInstant ? '분기말 잔액 · ' : ''}
-        {last.form} · {last.filed} 접수
+        {formName(last.form)} · {last.filed} 접수
         {line.tag ? (
           <>
             {' · '}
-            <span className="break-all">태그 {line.tag}</span>
+            <span className="break-all">
+              {TERMS.xbrl_tag.plain} {line.tag}
+            </span>
           </>
         ) : null}
       </p>
@@ -225,7 +245,8 @@ export function FundamentalsCard({
         <div className="min-w-0">
           <h2 className="text-[16px] font-bold tracking-tight text-fg-strong">재무제표</h2>
           <p className="mt-1 text-[11.5px] break-keep text-subtle">
-            {fundamentals.entityName ?? fundamentals.ticker} · SEC 공시 · CIK {fundamentals.cik}
+            {fundamentals.entityName ?? fundamentals.ticker} · {TERMS.sec.plain}(SEC) 공시 · {TERMS.cik.plain}{' '}
+            {fundamentals.cik}
           </p>
         </div>
         <SegmentedControl
@@ -240,7 +261,7 @@ export function FundamentalsCard({
       {/* 판단 재료 세 칸 — 숫자를 늘어놓기 전에 읽을 것 셋 */}
       <div className="card grid grid-cols-3 divide-x divide-border p-0">
         <div className="p-3">
-          <p className="text-[11.5px] text-muted">주가수익비율</p>
+          <TermInline id="per" className="block text-[11.5px]" />
           <p className="tnum mt-1 text-[16px] font-bold text-fg-strong">
             {v.per === null ? NO_VALUE : `${formatNumber(v.per, 1)}배`}
           </p>
@@ -250,7 +271,7 @@ export function FundamentalsCard({
           </p>
         </div>
         <div className="p-3">
-          <p className="text-[11.5px] text-muted">매출 성장</p>
+          <TermInline id="revenue_growth" className="block text-[11.5px]" />
           <p className="tnum mt-1 text-[16px] font-bold text-fg-strong">
             {revGrowth ? (
               <>
@@ -268,7 +289,7 @@ export function FundamentalsCard({
           </p>
         </div>
         <div className="p-3">
-          <p className="text-[11.5px] text-muted">영업이익률</p>
+          <TermInline id="operating_margin" className="block text-[11.5px]" />
           <p className="tnum mt-1 text-[16px] font-bold text-fg-strong">
             {margin ? `${formatNumber(margin.value, 1)}%` : NO_VALUE}
           </p>
@@ -283,8 +304,10 @@ export function FundamentalsCard({
       </div>
 
       <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
-        {v.note} 영업이익률은 같은 기간의 영업이익을 매출로 나눈 값입니다. 이 숫자들은 회사가 공시한 값으로 계산한
-        것이며, 앞으로의 실적을 뜻하지 않습니다.
+        {v.note} <strong>{TERMS.per.plain}</strong>({TERMS.per.term})는 지금 주가를 1주가 번 돈으로 나눈 값이라, 숫자가
+        클수록 번 돈에 비해 주가가 비싸다는 뜻입니다. <strong>{TERMS.operating_margin.plain}</strong>은 같은 기간에
+        본업으로 번 돈을 판 돈으로 나눈 비율입니다. 이 숫자들은 회사가 공시한 값으로 계산한 것이며, 앞으로의 실적을
+        뜻하지 않습니다.
       </p>
 
       {hasGap ? (
@@ -342,8 +365,8 @@ export function FundamentalsCard({
       </details>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <Badge tone="neutral" size="xs">
-          출처 SEC EDGAR
+        <Badge tone="neutral" size="xs" title={`${TERMS.sec.plain} 전자공시 시스템`}>
+          출처 {TERMS.sec.plain}(SEC EDGAR)
         </Badge>
         <span className="text-[11.5px] text-subtle">
           공시는 분기·연간 단위라 실시간이 아니며, 수정 공시가 나오면 값이 바뀝니다.

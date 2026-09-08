@@ -194,8 +194,13 @@ function BasicCard({ item }: { item: EconomyBasic }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-[14px] leading-snug font-bold break-keep text-fg-strong">{item.name}</h3>
+          {/* 원래 이름은 큰 글씨 아래 제 줄에 둔다. 예전에는 배지와 같은 줄에서 잘렸는데,
+              큰 글씨를 쉬운 우리말로 바꾸면서 원래 이름이 길어져 대부분 '…' 로 끝났다.
+              지우지 않고 남기는 이유는, 지우면 다른 자료에서 본 말과 이어 볼 수가 없어서다. */}
+          {item.englishName ? (
+            <p className="mt-0.5 text-[11.5px] break-keep text-subtle">{item.englishName}</p>
+          ) : null}
           <p className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-subtle">
-            <span className="min-w-0 truncate">{item.englishName}</span>
             <Badge tone={item.official ? 'neutral' : 'warn'} size="2xs">
               <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
               {item.official ? '공식 통계' : '비공식 개념'}

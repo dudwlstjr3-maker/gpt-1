@@ -1981,6 +1981,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<article class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:flex-start;gap:8px">' + lamp(riskSignal(i.level), 'lg', i.name) +
       '<div style="min-width:0;flex:1"><h3 style="margin:0;font-size:13.5px;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(i.name) + '</h3>' +
+      /* 원래 이름은 지우지 않고 작게 남긴다 — 기사에서 본 말과 이어지게 */
+      (i.term ? '<p style="margin:2px 0 0;font-size:11.5px;word-break:keep-all;color:var(--subtle)">' + esc(i.term) + '</p>' : '') +
       '<p style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + SCOPE_LABEL[i.scope] + ' · ' +
       (i.direction === 'higher_is_riskier' ? '값이 클수록 위험' : '값이 작을수록 위험') + '</p></div>' +
       badge(RISK_BADGE[i.level], RISK_GLYPH[i.level] + ' ' + RISK_LABEL[i.level], '', 'sm') + '</div>' +
@@ -3735,8 +3737,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
               '<div class="card" style="padding:12px">' +
               '<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">' +
               '<div style="min-width:0"><h3 style="margin:0;font-size:14px;line-height:1.4;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(b.name) + '</h3>' +
+              /* 원래 이름은 제 줄에. 배지와 같은 줄에 두면 길어진 이름이 '…' 로 잘린다 */
+              (b.englishName ? '<p style="margin:2px 0 0;font-size:11.5px;word-break:keep-all;color:var(--subtle)">' + esc(b.englishName) + '</p>' : '') +
               '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:11.5px;color:var(--subtle)">' +
-              '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(b.englishName) + '</span>' +
               badge(b.official ? 'b-neutral' : 'b-warn', (b.official ? '◎ 공식 통계' : '△ 비공식 개념')) + '</div></div>' +
               '<div style="flex-shrink:0;text-align:right">' +
               '<div class="tnum" style="font-size:22px;line-height:1;font-weight:700;color:var(--fg-strong)">' + esc(basicShow(b.value, b.precision, b.suffix)) + '</div>' +
@@ -3858,7 +3861,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   /* 인도월 곡선 읽기 — src/lib/futuresCurve.mjs 를 그대로 옮긴 것.
      문턱(0.5%)과 문구가 저쪽과 어긋나면 검증 스크립트가 잡는다. */
   var FUT_FLAT_PCT = 0.5;
-  var FUT_SHAPE_LABEL = { contango: '콘탱고', backwardation: '백워데이션', flat: '거의 평평' };
+  var FUT_SHAPE_LABEL = { contango: '먼 달이 더 비쌈', backwardation: '가까운 달이 더 비쌈', flat: '달마다 값이 비슷' };
+  var FUT_SHAPE_TERM = { contango: '콘탱고 · Contango', backwardation: '백워데이션 · Backwardation', flat: '평평 · Flat' };
   var FUT_SHAPE_GLYPH = { contango: '▲', backwardation: '▼', flat: '＝' };
   function futMeaning(shape, months) {
     const m = isNum(months) && months > 0 ? months + '개월 뒤' : '먼 달';
@@ -3884,7 +3888,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     if (spreadPct >= FUT_FLAT_PCT) shape = 'contango';
     else if (spreadPct <= -FUT_FLAT_PCT) shape = 'backwardation';
     return { shape: shape, spreadPct: spreadPct, months: months, near: near.value, far: far.value,
-      label: FUT_SHAPE_LABEL[shape], glyph: FUT_SHAPE_GLYPH[shape], meaning: futMeaning(shape, months), farN: far.n };
+      label: FUT_SHAPE_LABEL[shape], term: FUT_SHAPE_TERM[shape], glyph: FUT_SHAPE_GLYPH[shape],
+      meaning: futMeaning(shape, months), farN: far.n };
   }
   /* 네 점뿐이라 축은 두지 않고 모양만 보여준다 */
   function futCurveSvg(curve) {
@@ -3912,6 +3917,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<p style="margin:0;font-size:12px;font-weight:600;color:var(--fg)"><span aria-hidden="true">' + read.glyph + ' </span>' +
       esc(read.label) + '<span class="tnum" style="margin-left:8px;font-weight:400;color:var(--muted)">' +
       esc(fmtSigned(read.spreadPct, 1)) + '%</span></p>' +
+      '<p style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + esc(read.term) + '</p>' +
       '<p class="tnum" style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">근월 ' +
       esc(fmtNum(read.near, precision) + (suffix || '')) + ' → ' + esc(futContractLabel(read.farN)) + ' ' +
       esc(fmtNum(read.far, precision) + (suffix || '')) + '</p></div></div>' +

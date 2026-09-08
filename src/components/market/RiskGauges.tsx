@@ -445,6 +445,8 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
           <h3 id={`risk-${indicator.id}`} className="text-[13.5px] font-bold break-keep text-fg-strong">
             {indicator.name}
           </h3>
+          {/* 원래 이름은 지우지 않고 작게 남긴다 — 기사에서 본 말과 이어지게 */}
+          {indicator.term ? <p className="mt-0.5 text-[11.5px] break-keep text-subtle">{indicator.term}</p> : null}
           <p className="mt-0.5 text-[11.5px] text-subtle">
             {SCOPE_LABEL[indicator.scope]} · {indicator.direction === 'higher_is_riskier' ? '값이 클수록 위험' : '값이 작을수록 위험'}
           </p>

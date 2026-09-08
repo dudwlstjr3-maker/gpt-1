@@ -58,16 +58,32 @@ export function curveShape(curve) {
     near: near.value,
     far: far.value,
     label: SHAPE_LABEL[shape],
+    term: SHAPE_TERM[shape],
     glyph: SHAPE_GLYPH[shape],
     meaning: meaningOf(shape, months),
   };
 }
 
-/** 모양 이름. 색만으로 뜻을 전하지 않기 위해 글자와 기호를 함께 둔다. */
+/**
+ * 모양 이름 — 큰 글씨는 쉬운 우리말.
+ *
+ * '콘탱고' · '백워데이션' 은 아는 사람에게만 짧은 말이고 모르는 사람에게는 아무
+ * 뜻이 없다. 그렇다고 지우면 기사에서 그 말을 봤을 때 같은 것인지 알 수 없으므로,
+ * 원래 이름은 SHAPE_TERM 으로 따로 작게 붙인다.
+ *
+ * 색만으로 뜻을 전하지 않기 위해 기호(SHAPE_GLYPH)도 함께 둔다.
+ */
 export const SHAPE_LABEL = {
-  contango: '콘탱고',
-  backwardation: '백워데이션',
-  flat: '거의 평평',
+  contango: '먼 달이 더 비쌈',
+  backwardation: '가까운 달이 더 비쌈',
+  flat: '달마다 값이 비슷',
+};
+
+/** 작게 붙는 원래 이름 */
+export const SHAPE_TERM = {
+  contango: '콘탱고 · Contango',
+  backwardation: '백워데이션 · Backwardation',
+  flat: '평평 · Flat',
 };
 
 export const SHAPE_GLYPH = {

@@ -105,7 +105,7 @@ export async function fetchLine(
   def: FinancialLineDef,
   max: number,
 ): Promise<{ line: FinancialLine; entityName: string | null }> {
-  const base = { id: def.id, label: def.label, hint: def.hint, unit: def.unit, kind: def.kind };
+  const base = { id: def.id, label: def.label, term: def.term, hint: def.hint, unit: def.unit, kind: def.kind };
   let lastError: string | null = null;
 
   for (const tag of def.tags) {

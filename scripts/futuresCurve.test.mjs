@@ -11,7 +11,8 @@ const mk = (...vals) => vals.map((value, i) => ({ n: i + 1, value }));
 test('먼 달이 비싸면 콘탱고', () => {
   const r = curveShape(mk(70, 71, 72, 73));
   assert.equal(r.shape, 'contango');
-  assert.equal(r.label, '콘탱고');
+  assert.equal(r.label, '먼 달이 더 비쌈');
+  assert.equal(r.term, '콘탱고 · Contango');
   assert.ok(r.spreadPct > 0);
   assert.equal(r.months, 3);
   assert.match(r.meaning, /3개월 뒤/);

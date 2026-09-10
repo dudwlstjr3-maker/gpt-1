@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { Notice, Skeleton } from '@/components/ui/States';
-import { Badge, FreshnessBadge } from '@/components/ui/Badge';
+import { Badge, StatusLine } from '@/components/ui/Badge';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { useFormatter } from '@/components/market/useFormatter';
 import { indicesFor, type CatalogItem } from '@/lib/catalog';
@@ -57,18 +57,18 @@ function IndexRow({
   const inner = (
     <>
       <div className="min-w-0 flex-1">
-        {/* 이름은 자르지 않는다. '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면
-            그게 무엇인지 알 수 없다 — 이름은 값을 읽기 위한 열쇠라, 잘리면 카드 전체가
-            쓸모없어진다. 좁은 화면에서는 두 줄로 접고 낱말 단위로 끊는다. */}
-        <p className="text-[15px] leading-snug font-bold break-keep text-fg-strong">{item.name}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
-          <span className="tnum">{item.symbol}</span>
-          {quote ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>기준 {formatKstTime(quote.meta.asOf)}</span>
-            </>
-          ) : null}
+        {/* 이름은 한 줄이다. 자르면 '다우존스 산업평…' 이 무엇인지 알 수 없고,
+            접으면 줄마다 높이가 달라져 열네 줄이 들쭉날쭉해진다. 대신 자리를 비웠다 —
+            '15분 지연' 배지를 이 줄에서 빼 아래 잔글씨로 내렸다. */}
+        <p className="text-[15px] leading-snug font-bold whitespace-nowrap text-fg-strong">{item.name}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
+          <span className="whitespace-nowrap">
+            <span className="tnum">{item.symbol}</span>
+            {quote ? <span> · 기준 {formatKstTime(quote.meta.asOf)}</span> : null}
+          </span>
+          {/* 장 상태는 적지 않는다 — 이 판은 시장별로 묶여 있어 열네 줄에
+              같은 '마감' 을 되풀이하게 된다. 지연 여부만 밝힌다. */}
+          {quote ? <StatusLine freshness={quote.meta.freshness} delayMinutes={delay} /> : null}
         </p>
       </div>
 
@@ -104,8 +104,6 @@ function IndexRow({
           </p>
         )}
       </div>
-
-      {quote ? <FreshnessBadge freshness={quote.meta.freshness} delayMinutes={delay} /> : null}
     </>
   );
 

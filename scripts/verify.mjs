@@ -986,15 +986,20 @@ async function main() {
       /\.notice > span:first-child\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     /*
-     * 예전에는 여기서 "이름이 길면 잘려야 한다" 를 확인했다. 이름이 옆 칸을 밀고
-     * 들어가 글자가 겹치던 것을 막으려던 것이고, 그때는 자르는 것이 유일한 수단이었다.
+     * 이 검사는 두 번 뒤집혔다. 뒤집힌 자리를 적어 둔다 — 다음 사람이 같은 길을
+     * 되짚지 않도록.
      *
-     * 지금은 뒤집었다. '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면 그게 무엇인지
-     * 알 수 없고, 이름은 값을 읽기 위한 열쇠라 잘리면 그 칸 전체가 쓸모없어진다.
-     * 겹침은 **낱말 단위로 접어서** 막는다 — 자르지 않고도 겹치지 않는다.
+     *  ① 처음엔 "이름이 길면 잘려야 한다" 였다. 이름이 옆 칸을 밀고 들어가 글자가
+     *     겹치던 것을 막으려던 것이고, 그때는 자르는 것이 유일한 수단이었다.
+     *  ② 다음엔 "자르지 말고 접어라" 였다. '다우존스 산업평…' 은 무엇인지 알 수 없다.
+     *  ③ 지금은 "접지도 말고 한 줄로" 다. 접으면 카드마다 높이가 달라져 목록이
+     *     들쭉날쭉해진다.
+     *
+     * 자르지도 접지도 않으려면 자리가 있어야 한다. 그래서 '마감'·'15분 지연' 알약을
+     * 이름 줄에서 빼 아래 잔글씨로 내렸다. 자리가 실제로 남는지는 [8-27] 이 잰다.
      */
-    check('종목 이름을 자르지 않고 접음 (미리보기)',
-      /\.pcard-name\s*\{[^}]*word-break:\s*keep-all/.test(tpl) &&
+    check('종목 이름을 한 줄로 세움 (미리보기)',
+      /\.pcard-name\s*\{[^}]*white-space:\s*nowrap/.test(tpl) &&
       !/\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
     check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
   }
@@ -1503,11 +1508,30 @@ async function main() {
 
     /* 손가락으로 누를 자리 */
     const price = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    /*
+     * 별표를 누를 자리는 32×44 여야 한다.
+     *
+     * 숫자를 그대로 맞춰 보지 않고 계산한다. 예전에는 leading-none(16px 상자)에
+     * 위아래 14px 을 넓혀 44px 을 만들었는데, 이름과 위쪽을 맞추려고 줄 높이를
+     * leading-snug(22px 상자)로 바꾸면서 11px 이 됐다. 둘 다 44px 이다 —
+     * 적힌 숫자가 아니라 나오는 크기를 봐야 이런 바꿈에 걸려 넘어지지 않는다.
+     */
+    const LEADING = { 'leading-none': 1, 'leading-tight': 1.25, 'leading-snug': 1.375, 'leading-normal': 1.5 };
+    const starM = price.match(/className="relative shrink-0 text-base (leading-[a-z]+) after:absolute after:-inset-x-(\d+) after:-inset-y-\[(\d+(?:\.\d+)?)px\]/);
+    const starTap = starM
+      ? { w: 16 + 2 * Number(starM[2]) * 4, h: 16 * (LEADING[starM[1]] ?? 1) + 2 * Number(starM[3]) }
+      : { w: 0, h: 0 };
     check('관심 별표를 손가락으로 누를 수 있음(16px 글리프에 32×44 자리)',
-      /after:-inset-x-2 after:-inset-y-\[14px\]/.test(price) && /after:content-\[''\]/.test(price));
+      starTap.w >= 32 && starTap.h >= 44 && /after:content-\[''\]/.test(price),
+      `${starTap.w}×${Math.round(starTap.h)}`);
     // 넓힌 가로(8px)가 옆 칸 간격(gap-2 = 8px)과 같아야 이름 링크를 덮지 않는다
-    check('넓힌 자리가 이름 링크를 덮지 않음', /items-center gap-2"/.test(price));
-    check('미리보기 별표도 같은 자리', /\.star::after \{ content: ''; position: absolute; inset: -14px -8px; \}/.test(tpl7));
+    check('넓힌 자리가 이름 링크를 덮지 않음',
+      /items-start gap-2">/.test(price) && /after:-inset-x-2/.test(price));
+    const tplStar = tpl7.match(/\.star \{[^}]*line-height: ([\d.]+)[^}]*\}[\s\S]{0,120}?\.star::after \{[^}]*inset: -([\d.]+)px -(\d+)px/);
+    const tplTap = tplStar
+      ? { w: 16 + 2 * Number(tplStar[3]), h: 16 * Number(tplStar[1]) + 2 * Number(tplStar[2]) }
+      : { w: 0, h: 0 };
+    check('미리보기 별표도 같은 자리', tplTap.w >= 32 && tplTap.h >= 44, `${tplTap.w}×${Math.round(tplTap.h)}`);
     for (const f of ['src/app/watchlist/page.tsx', 'src/app/more/page.tsx']) {
       const t = await readFile(f, 'utf8');
       check(`${f.split('/')[2]} 의 순서·삭제 버튼이 40px`, !/h-7 w-7/.test(t) && /h-10 w-10/.test(t));
@@ -2187,7 +2211,6 @@ async function main() {
         bad.length ? bad[0].l.trim().slice(0, 60) : (line ? '확인' : '이름 줄 없음'));
     }
     const idx = await readFile('src/components/market/MarketIndexBoard.tsx', 'utf8');
-    check('이름을 낱말 단위로 접음', /break-keep/.test(idx));
     check('아주 좁은 화면에서는 미니 차트를 접어 이름 자리를 내줌', /min-\[360px\]:block/.test(idx));
 
     const pc = await readFile('src/components/market/PriceCard.tsx', 'utf8');
@@ -2212,13 +2235,101 @@ async function main() {
       const m = t.match(re);
       return m ? Number(m[1]) : 0;
     };
-    const pcName = nameSize(pc, /className="block text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold break-keep text-fg-strong/);
-    const ixName = nameSize(idx, /className="text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold break-keep text-fg-strong/);
+    const pcName = nameSize(pc, /className="block text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold whitespace-nowrap text-fg-strong/);
+    const ixName = nameSize(idx, /className="text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold whitespace-nowrap text-fg-strong/);
     check('가격 카드 이름이 배지(10.5px)보다 확실히 큼', pcName >= 15, `${pcName}px`);
     check('지수 판 이름도 배지보다 확실히 큼', ixName >= 15, `${ixName}px`);
 
     const tplSz = await readFile('tools/preview/template.html', 'utf8');
     check('미리보기도 같은 차례', /\.pcard-name \{ font-size: 16px/.test(tplSz) && /badge\(cls, SESSION_LABEL\[p\], null, '2xs'\)/.test(tplSz));
+
+    /*
+     * 이름은 한 줄이다.
+     *
+     * 접는 것도 자르는 것 못지않게 나쁘다. 목록에서 어떤 카드는 한 줄, 어떤 카드는
+     * 두 줄이면 높이가 제각각이라 눈이 걸리고, 스크롤 중에 값이 어디쯤 있을지
+     * 짐작할 수 없다. 자르지도 접지도 않으려면 자리가 있어야 한다 — 그 자리는
+     * '마감'·'15분 지연' 알약을 이름 줄에서 빼서 만들었다.
+     */
+    const heat = await readFile('src/components/market/HeatBoard.tsx', 'utf8');
+    const oneLine = [
+      ['가격 카드', pc, /className="block text-\[16px\] leading-snug font-bold whitespace-nowrap/],
+      ['지수 판', idx, /className="text-\[15px\] leading-snug font-bold whitespace-nowrap/],
+      ['시장 화면 종목 줄', region, /className="min-w-0 text-\[13px\] whitespace-nowrap/],
+      ['불타는 카드', heat, /font-bold whitespace-nowrap text-fg-strong[\s\S]{0,120}clamp\(13px/],
+    ];
+    for (const [label, src, re] of oneLine) check(`${label} 이름이 한 줄`, re.test(src));
+
+    /*
+     * 이름이 그 한 줄에 정말 들어가는가.
+     *
+     * 한 줄로 세운 이상 넘치면 옆 칸을 밀거나 잘린다. 그래서 자리를 재 둔다.
+     * 아래 칸 너비는 320px 화면에서 브라우저로 잰 값이고(가장 좁은 줄 기준),
+     * 글자 너비는 어림한다 — 한글은 한 글자가 거의 1em, 대문자는 0.68em,
+     * 숫자 0.6em, 나머지 라틴 글자 0.55em, 공백·부호 0.32em.
+     * '다우존스 산업평균' 을 124.5px 로 어림하는데 실측이 125px 이었다.
+     *
+     * 이 검사가 하는 일은 정확한 예측이 아니라 **여유가 남았는지** 보는 것이다.
+     * 카탈로그에 긴 이름이 새로 들어오면 화면에서 깨지기 전에 여기서 걸린다.
+     */
+    const em = (name) => {
+      let w = 0;
+      for (const ch of name) {
+        if (/[\uAC00-\uD7AF\u3130-\u318F\u4E00-\u9FFF\u3040-\u30FF]/.test(ch)) w += 1;
+        else if (/[A-Z]/.test(ch)) w += 0.68;
+        else if (/[0-9]/.test(ch)) w += 0.6;
+        else if (/[a-z]/.test(ch)) w += 0.55;
+        else w += 0.32;
+      }
+      return w;
+    };
+    /**
+     * [자리 이름, 글자 크기(px), 320px 에서 잰 칸 너비(px)]
+     *
+     * 칸 너비는 브라우저로 직접 쟀다 (320×1200, 화면마다 가장 좁은 줄 기준).
+     * 지수 판·시장 줄은 오른쪽 숫자 칸이 넓을수록 이름 칸이 좁아지므로,
+     * 그 화면에서 제일 긴 값이 붙은 줄에서 잰 값이다.
+     */
+    const BOX = [
+      ['가격 카드', 16, 246],
+      ['지수 판', 15, 195],
+      ['불타는 카드', 13, 118],
+      ['시장 화면 종목 줄', 13, 128],
+    ];
+    const catalogSrc = await readFile('src/lib/catalog.ts', 'utf8');
+    const names = [...catalogSrc.matchAll(/name: '([^']+)'/g)].map((m) => m[1]);
+    check('카탈로그에서 이름을 읽어 옴', names.length >= 20, `${names.length}개`);
+    const MARGIN = 6;
+    for (const [label, fs, box] of BOX) {
+      let worst = null;
+      for (const n of names) {
+        const w = em(n) * fs;
+        if (!worst || w > worst.w) worst = { n, w };
+      }
+      const slack = Math.round(box - worst.w);
+      check(`${label} — 가장 긴 이름도 한 줄에 들어감`, slack >= MARGIN,
+        `'${worst.n}' ${Math.round(worst.w)}px / ${box}px · 여유 ${slack}px`);
+    }
+
+    /*
+     * 곁들이는 말은 이름 아래로.
+     *
+     * 알약 하나는 글씨를 10.5px 로 줄여도 테두리와 좌우 여백으로 24px 을 더 먹는다.
+     * 둘이면 60px 이고, 그 60px 이 이름 칸에서 나갔다. 크기를 줄이는 것만으로는
+     * 모자랐다 — 자리를 옮겨야 했다.
+     */
+    const badgeSrc2 = badgeSrc;
+    check('상태 잔글씨가 따로 있음', /export function StatusLine\(/.test(badgeSrc2));
+    check("'마감'·'지연' 은 테두리 없는 잔글씨", /words\.join\(' · '\)/.test(badgeSrc2));
+    check("믿기 전에 봐야 하는 것만 알약으로 남음",
+      /freshness === 'stale' \? '오래된 데이터' : freshness === 'demo' \? 'DEMO' : null/.test(badgeSrc2));
+    check('가격 카드가 이름 줄에서 알약을 뺐음',
+      !/SessionBadge/.test(pc) && !/FreshnessBadge/.test(pc) && /<StatusLine/.test(pc));
+    check('지수 판도 마찬가지', !/FreshnessBadge/.test(idx) && /<StatusLine/.test(idx));
+    check('미리보기도 같은 규칙',
+      /const statusNote = \(phase, fresh, delay\)/.test(tplSz) &&
+      /statusNote\(q\.session, q\.meta\.freshness, delay\)/.test(tplSz) &&
+      /statusNote\(null, q\.meta\.freshness, delay\)/.test(tplSz));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

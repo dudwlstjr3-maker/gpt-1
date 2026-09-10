@@ -195,7 +195,7 @@ export default function MarketRegionPage() {
                   return (
                     <li key={q.id}>
                       <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-2 hover:opacity-80">
-                        <span className="min-w-0 text-[13px] break-keep text-fg">{q.name}</span>
+                        <span className="min-w-0 text-[13px] whitespace-nowrap text-fg">{q.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="tnum text-[13px] font-semibold text-fg-strong">
                             {q.price === null ? NO_VALUE : f.price(q)}

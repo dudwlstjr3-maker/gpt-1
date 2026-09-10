@@ -103,18 +103,25 @@ function HeatCard({ pick }: { pick: HeatPick }) {
     >
       <div className="heat-glow" aria-hidden="true" />
 
+      {/* 불꽃은 이름 옆이 아니라 위 줄, 자리 이름 옆에 둔다.
+          두 장을 나란히 놓는 카드라 320px 에서 폭이 120px 뿐인데, 32px 짜리 불꽃이
+          이름 옆에 서면 84px 만 남아 '마이크로소프트' 가 두 줄로 접혔다. */}
       <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0">
-          <p className="text-[11.5px] leading-snug font-bold break-keep text-current">{pick.slot}</p>
-          <Link
-            href={`/asset/${q.id}`}
-            className="mt-1 block text-[15px] leading-snug font-bold break-keep text-fg-strong hover:underline"
-          >
-            {q.name}
-          </Link>
-          <p className="mt-0.5 text-[11.5px] text-subtle">{q.symbol}</p>
-        </div>
+        <p className="min-w-0 text-[11.5px] leading-snug font-bold break-keep text-current">{pick.slot}</p>
         {up ? <Flame t={t} /> : <Frost t={t} />}
+      </div>
+      <div className="min-w-0">
+        {/* 이름은 한 줄이다. 카드 폭은 화면 폭을 반으로 나눈 값이라, 좁아지면
+            글자도 같이 줄여 한 줄을 지킨다 — 320px 에서 13px, 366px 부터 15px.
+            자르지는 않는다. '마이크로소프…' 은 무엇인지 알 수 없다. */}
+        <Link
+          href={`/asset/${q.id}`}
+          className="mt-1 block leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
+          style={{ fontSize: 'clamp(13px, 4.1vw, 15px)' }}
+        >
+          {q.name}
+        </Link>
+        <p className="mt-0.5 text-[11.5px] text-subtle">{q.symbol}</p>
       </div>
 
       {pick.note ? <p className="mt-2 text-[11.5px] break-keep text-warn">{pick.note}</p> : null}

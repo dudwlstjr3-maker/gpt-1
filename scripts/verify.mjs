@@ -6,7 +6,7 @@
  *   npm run verify
  */
 
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -2554,6 +2554,126 @@ async function main() {
     const tplGl = Number(tpl14.match(/const TREND_GL = (\d+)/)?.[1] ?? 0);
     check('왼쪽 눈금 자리가 가장 긴 값을 담을 만큼 넓음', gl >= 58, `${gl}px`);
     check('미리보기도 같은 자리', tplGl === gl, `${tplGl} vs ${gl}`);
+  }
+
+  /* ---------------- 8-30. 옷을 갈아입힌 뒤 ---------------- */
+  console.log('\n[8-30] 조용한 단말 — 글꼴 · 재질 · 숫자 · 단추');
+  {
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const tpl15 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 글꼴 — 직접 싣는다 */
+    check('Pretendard 를 직접 실음', /@font-face \{[\s\S]{0,200}Pretendard Variable/.test(css));
+    check('글꼴이 맨 앞에 섬', /--font-sans:\s*\n?\s*'Pretendard Variable'/.test(css));
+    check('기다리는 동안 글자를 감추지 않음', /font-display: swap/.test(css));
+    const font = await stat('public/fonts/pretendard-subset.woff2').catch(() => null);
+    check('자른 글꼴이 실려 있음', font !== null && font.size > 50_000, font ? `${Math.round(font.size / 1024)}KB` : '없음');
+    /*
+     * 원본은 2.0MB 다. 잘라 싣는 이유가 무게라, 무게가 다시 불면 이유가 사라진다.
+     * 400KB 는 첫 화면을 기다리게 하지 않는 선이다.
+     */
+    check('자른 글꼴이 400KB 를 넘지 않음', font !== null && font.size < 400_000,
+      font ? `${Math.round(font.size / 1024)}KB` : '');
+    check('다시 자르는 길이 있음', /"font": "node tools\/font\/subset\.mjs"/.test(await readFile('package.json', 'utf8')));
+    check('글꼴 라이선스를 함께 둠', (await stat('tools/font/LICENSE-Pretendard.txt').catch(() => null)) !== null);
+    check('미리보기도 같은 글꼴을 품고 감', /font-family: 'Pretendard Variable'/.test(tpl15) && /__FONT__/.test(tpl15));
+
+    /* ② 재질 — 테두리 대신 바탕 단차 */
+    check('카드에 테두리를 두르지 않음', /\.card \{\n\s*background: var\(--surface\);\n\s*border-radius/.test(css));
+    check('카드에 그림자를 얹지 않음', !/\.card \{[^}]*box-shadow/.test(css));
+    check('미리보기 카드도 마찬가지', /\.card \{ background: var\(--surface\); border-radius: var\(--box-radius\); \}/.test(tpl15));
+
+    /* ③ 모서리 — 눈금을 둘로 접는다 */
+    check('모서리 값이 한 곳에 적혀 있음', /--box-radius: 10px;/.test(css) && /--box-radius-sm: 6px;/.test(css));
+    check('Tailwind 눈금도 그 둘로 모임',
+      /--radius-lg: var\(--box-radius\);/.test(css) && /--radius-2xl: var\(--box-radius\);/.test(css));
+    const strayRadius = [...tpl15.matchAll(/border-radius:\s*(\d+)px/g)]
+      .map((m) => Number(m[1]))
+      .filter((v) => v > 4 && v < 90);
+    check('미리보기에 떠도는 모서리 값이 없음', strayRadius.length === 0, strayRadius.join(', '));
+
+    /* ④ 숫자 — 소수점 이하는 한 단 연하게 */
+    const fig = await readFile('src/components/ui/Figure.tsx', 'utf8');
+    check('숫자 자리가 따로 있음', /export function Figure\(/.test(fig));
+    check('소수점 이하를 연하게', /\.figure-dec \{[^}]*opacity/.test(css));
+    check('붙는 단위를 한 호 작게', /\.figure-unit \{[^}]*font-size: 0\.78em/.test(css));
+    /*
+     * 0 부터 세어 올리는 연출은 넣지 않는다. 이 앱은 값이 없을 때 0 으로 채우지
+     * 않기로 되어 있는데, 0 에서 시작하는 애니메이션은 짧게나마 그 약속을 어긴다.
+     */
+    check('숫자를 0 부터 세어 올리지 않음', !/countUp|CountUp|from 0/.test(fig));
+    check('값이 바뀐 자리를 잠깐 물들임', /@keyframes figure-flash/.test(css));
+    check('축소 모션을 켠 사람에게는 물들이지 않음',
+      /prefers-reduced-motion[\s\S]{0,160}\.figure-flash[\s\S]{0,80}animation: none/.test(css));
+    const pc2 = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    check('가격이 그 자리를 씀', /<Figure text=\{f\.price\(quote\)\} flashColor=\{color\} \/>/.test(pc2));
+    check('미리보기도 같은 모양', /\.figure-dec \{ opacity: 0\.55; \}/.test(tpl15));
+
+    /* ⑤ 단추 — 무게를 셋으로 */
+    check('단추 무게가 셋으로 나뉨',
+      /\.btn-primary \{/.test(css) && /\.btn \{/.test(css) && /\.btn-quiet \{/.test(css));
+    const chart2 = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    check('차트 위 알약 여섯 개가 정리됨',
+      /className="btn-group"/.test(chart2) && /className="btn-quiet"/.test(chart2) &&
+      !/rounded-md border border-border bg-surface-2 px-2 py-1/.test(chart2));
+    check('미리보기도 셋으로 나눔', /\.ghost-primary \{/.test(tpl15) && /\.ghost-quiet \{/.test(tpl15));
+
+    /* ⑥ 눈금값이 잘리지 않는가 — 글꼴을 바꾸면 글자 폭이 달라진다 */
+    const marginLeft = Number(chart2.match(/const MARGIN = \{ top: \d+, right: \d+, bottom: \d+, left: (\d+) \}/)?.[1] ?? 0);
+    const tplLeft = Number(tpl15.match(/const M = \{ top: \d+, right: \d+, bottom: \d+, left: (\d+) \}/)?.[1] ?? 0);
+    check('차트 눈금값 자리가 넉넉함', marginLeft >= 58, `${marginLeft}px`);
+    check('미리보기도 같은 자리', tplLeft === marginLeft, `${tplLeft} vs ${marginLeft}`);
+  }
+
+  /* ---------------- 8-31. 오늘의 한 줄 · 찾기 ---------------- */
+  console.log('\n[8-31] 오늘의 한 줄 · 찾기');
+  {
+    const tpl16 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* 오늘의 한 줄 — 새 데이터 없이, 이미 있는 것에서 뽑는다 */
+    const line = await readFile('src/lib/todayLine.mjs', 'utf8');
+    const view = await readFile('src/components/market/TodayLine.tsx', 'utf8');
+    check('문장 짓는 규칙이 따로 있음', /export function todayLine\(/.test(line));
+    /*
+     * 금지어를 원본에서 찾으면 주석에 적어 둔 "이런 말은 쓰지 않는다" 까지 걸린다.
+     * 나오는 문장을 직접 지어서 본다 — 검사해야 할 것은 규칙이 아니라 결과다.
+     */
+    const { todayLine: makeLine } = await import('../src/lib/todayLine.mjs');
+    const sentences = [
+      makeLine({ scores: [{ market: 'us', score: 12, deltaDay: -9 }] }),
+      makeLine({
+        scores: [{ market: 'crypto', score: 88, deltaDay: 11 }],
+        picks: [{ quote: { name: '비트코인', changePct: -9 }, heat: { times: 4 } }],
+      }),
+      makeLine({ indicators: [{ level: 'alert', name: 'VIX' }, { level: 'alert', name: '하이일드' }] }),
+    ].filter(Boolean);
+    const banned = sentences.filter((t) => /매수|매도|사세요|파세요|기회|추천|전망|예상|오를|내릴|수익/.test(t));
+    check('지어낸 문장에 사라·팔라·전망 같은 말이 없음', banned.length === 0, banned.join(' / '));
+    check('세 갈래 모두 문장이 나옴', sentences.length === 3, `${sentences.length}/3`);
+    check('할 말이 없으면 줄을 그리지 않음', /return null;/.test(line) && /if \(!line\) return null;/.test(view));
+    check('세 마디를 한꺼번에 늘어놓지 않음', /if \(mood && heat\)[\s\S]{0,120}if \(mood && risk\)/.test(line));
+    check('홈 맨 위에 섬', /<TodayLine \/>\s*\n\s*<FngSection \/>/.test(await readFile('src/app/page.tsx', 'utf8')));
+    check('미리보기도 같은 문장을 지음',
+      /function todayLineText\(\)/.test(tpl16) && /TODAY_MOVE_MIN = 1\.5/.test(tpl16) && /TODAY_HEAT_MIN = 1\.6/.test(tpl16));
+
+    /* 찾기 */
+    const search = await readFile('src/lib/search.mjs', 'utf8');
+    const dialog = await readFile('src/components/ui/SearchDialog.tsx', 'utf8');
+    check('찾는 규칙이 따로 있음', /export function searchEntries\(/.test(search));
+    check('초성으로도 찾음', /export function initials\(/.test(search) && /isInitialQuery/.test(search));
+    check('앞에서 맞은 것이 먼저 옴', /at === 0 \? 0 : 100/.test(search));
+    check('바깥에 물어보지 않음 (앱 안의 것만)',
+      /CATALOG/.test(dialog) && /TERMS/.test(dialog) && !/fetch\(/.test(dialog));
+    const shellSrc = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    check('어느 화면에서든 Ctrl+K 로 열림',
+      /if \(!e\.metaKey && !e\.ctrlKey\) return;/.test(shellSrc) &&
+      /window\.addEventListener\('keydown'/.test(shellSrc));
+    check('글자를 치는 중에는 가로채지 않음',
+      /HTMLInputElement \|\| el instanceof HTMLTextAreaElement/.test(shellSrc));
+    check('상단에도 여는 자리가 있음',
+      /aria-label="찾기 \(Ctrl\+K\)"/.test(await readFile('src/components/market/StatusBar.tsx', 'utf8')));
+    /* 기준 칸 안의 fixed 는 화면이 아니라 그 칸에 붙는다 — 큰 그림 창과 같은 이유 */
+    check('찾기 창도 문서 맨 위로 옮겨 그림', /createPortal\(/.test(dialog) && /document\.body,/.test(dialog));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

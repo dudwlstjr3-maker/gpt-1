@@ -12,6 +12,8 @@ import { Badge, ModeBadge } from '@/components/ui/Badge';
 import { formatKstTimeSec, formatRelative } from '@/lib/format';
 import { sessionHint } from '@/lib/marketHours';
 import { MARKET_LABEL, SESSION_LABEL, type MarketSession, type SessionPhase } from '@/types';
+import { useOpenSearch } from '@/components/providers/SearchProvider';
+import { SearchGlyph } from '@/components/ui/SearchDialog';
 
 const PHASE_COLOR: Record<SessionPhase, string> = {
   regular: 'var(--ok)',
@@ -55,6 +57,7 @@ function SessionChip({ session }: { session: MarketSession }) {
 }
 
 export function StatusBar() {
+  const openSearch = useOpenSearch();
   const { snapshot, revalidating, error, refresh } = useData();
   const [, tick] = useState(0);
 
@@ -115,17 +118,24 @@ export function StatusBar() {
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={refresh}
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
-            aria-label="지금 새로고침"
-          >
-            <span aria-hidden="true" className={revalidating ? 'animate-spin' : ''}>
-              ↻
-            </span>
-            {revalidating ? '갱신 중' : '새로고침'}
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {/*
+             * 찾기.
+             *
+             * 지금까지 이 앱을 돌아다니는 길은 탭 일곱 개와 화면 안의 링크뿐이었다.
+             * 이름을 아는 사람에게는 그게 제일 먼 길이라, 어느 화면에서든 닿는
+             * 자리에 둔다. 데스크톱은 Ctrl+K 로도 열린다.
+             */}
+            <button type="button" onClick={openSearch} className="btn" aria-label="찾기 (Ctrl+K)" title="찾기 (Ctrl+K)">
+              <SearchGlyph />
+            </button>
+            <button type="button" onClick={refresh} className="btn" aria-label="지금 새로고침">
+              <span aria-hidden="true" className={revalidating ? 'animate-spin' : ''}>
+                ↻
+              </span>
+              {revalidating ? '갱신 중' : '새로고침'}
+            </button>
+          </div>
         </div>
 
         {/* 2행: 세션 칩. DEMO 시나리오 배지도 여기 둔다 — 위 줄은 높이가 고정이어야 하고,

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { markInternalNav } from './BackBar';
 import { BottomTabs } from './Navigation';
 import { StatusBar } from '@/components/market/StatusBar';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { AlertsEngine } from '@/components/alerts/AlertsEngine';
+import { SearchDialog } from '@/components/ui/SearchDialog';
+import { SearchProvider } from '@/components/providers/SearchProvider';
 import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorkerRegistrar';
 
 /**
@@ -38,6 +40,27 @@ export function AppShell({ children }: { children: ReactNode }) {
    * 뒤로 가기 버튼이 "앱 밖으로 튕겨 나가는 뒤로가기" 를 부르지 않게 하는 근거다.
    * 첫 화면(들어온 그 페이지)은 이동이 아니므로 세지 않는다.
    */
+  /*
+   * 찾기 창은 여기서 연다.
+   *
+   * 어느 화면에서든 Ctrl+K (맥은 ⌘K) 로 열려야 하므로, 화면마다 붙이지 않고
+   * 껍데기 한 곳에서 듣는다. 글자를 치는 중(input·textarea)일 때는 가로채지 않는다.
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'k' && e.key !== 'K' && e.key !== 'ㅏ') return;
+      if (!e.metaKey && !e.ctrlKey) return;
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      setSearchOpen(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {
@@ -48,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   return (
-    <>
+    <SearchProvider onOpen={openSearch}>
       <div className="app-frame">
         <StatusBar />
         {/* 본문이 배치 분기의 기준이 된다 — 창 폭이 아니라 이 칸의 폭을 본다 */}
@@ -67,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <BottomTabs />
       <AlertsEngine />
       <ServiceWorkerRegistrar />
-    </>
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+    </SearchProvider>
   );
 }

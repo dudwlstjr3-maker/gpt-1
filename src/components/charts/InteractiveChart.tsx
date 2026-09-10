@@ -61,7 +61,11 @@ export interface ChartMarker {
   color: string;
 }
 
-const MARGIN = { top: 10, right: 46, bottom: 22, left: 50 };
+/*
+ * 왼쪽은 눈금값이 앉는 자리다. 50 이었는데 '4,425.06' 이 50 을 그대로 먹어
+ * 앞의 '4' 가 그림 밖으로 6 만큼 밀려 나갔다. 값이 잘리면 다른 값이 되어 보인다.
+ */
+const MARGIN = { top: 10, right: 46, bottom: 22, left: 58 };
 /** 표식 번호 배지가 들어갈 위쪽 여백 */
 const MARKER_TOP = 15;
 /** 표식(번호 붙은 세로 점선) 위에 올렸다고 볼 가로 거리 */
@@ -104,7 +108,7 @@ function ChartButton({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="flex h-[26px] min-w-[28px] items-center justify-center rounded px-1 text-[13px] leading-none font-semibold text-muted hover:bg-surface-3 hover:text-fg disabled:opacity-35 disabled:hover:bg-transparent"
+      className="btn-icon"
     >
       <span aria-hidden="true">{children}</span>
     </button>
@@ -469,7 +473,7 @@ export function InteractiveChart({
         </ul>
         <div className="flex shrink-0 items-center gap-1">
           {!showTable ? (
-            <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5" role="group" aria-label="차트 확대·축소">
+            <div className="btn-group" role="group" aria-label="차트 확대·축소">
               <ChartButton label="축소" onClick={() => vp.zoomBy(1.4)}>
                 −
               </ChartButton>
@@ -482,20 +486,12 @@ export function InteractiveChart({
             </div>
           ) : null}
           {expandable && !showTable ? (
-            <button
-              type="button"
-              onClick={() => setBig(true)}
-              className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
-            >
+            <button type="button" onClick={() => setBig(true)} className="btn">
               크게
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setShowTable((v) => !v)}
-            aria-expanded={showTable}
-            className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
-          >
+          {/* 표는 곁들이는 길이다 — 차트를 못 보는 사람과, 값을 정확히 읽고 싶은 사람용 */}
+          <button type="button" onClick={() => setShowTable((v) => !v)} aria-expanded={showTable} className="btn-quiet">
             {showTable ? '차트로 보기' : '표로 보기'}
           </button>
         </div>

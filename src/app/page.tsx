@@ -3,6 +3,7 @@
 /**
  * 홈 — 권장 순서대로 배치.
  *  1) 시장 상태와 업데이트 시각 (상단 상태바, AppShell)
+ *  1.5) 오늘의 한 줄 — 아래 카드들에서 오늘 할 말이 있는 것만 뽑아 첫 화면에
  *  2) Fear & Greed 카드 3개
  *  3) 관심 가격과 주요 지수
  *  4) 오늘의 시장 요약
@@ -17,6 +18,7 @@ import { FngSection } from '@/components/market/FngSection';
 import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
 import { HeatBoard } from '@/components/market/HeatBoard';
+import { TodayLine } from '@/components/market/TodayLine';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskGaugesSection } from '@/components/market/RiskGauges';
 import { HomeLower } from '@/components/market/HomeLower';
@@ -51,6 +53,8 @@ export default function HomePage() {
   return (
     <div className="pt-2">
       <h1 className="sr-only">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>
+      {/* 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다. */}
+      <TodayLine />
       <FngSection />
       {/* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다.
           같은 질문이 아니라서 나란히 둔다. */}

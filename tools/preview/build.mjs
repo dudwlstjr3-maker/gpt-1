@@ -226,9 +226,22 @@ async function main() {
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
+  if (!tpl.includes('__FONT__')) throw new Error('template.html 에 __FONT__ 자리표시자가 없습니다.');
+
+  /*
+   * 글꼴을 파일 안에 심는다.
+   *
+   * 미리보기는 파일 하나로 오간다 — 열어 보는 사람의 컴퓨터에 Pretendard 가
+   * 깔려 있을 리 없고, 바깥 주소를 걸면 인터넷이 없거나 막힌 자리에서 글자가
+   * 딴 글꼴로 떨어진다. 223KB 를 실어 그 일을 없앤다.
+   */
+  const fontPath = 'public/fonts/pretendard-subset.woff2';
+  const fontB64 = fs.readFileSync(path.join(HERE, '../../', fontPath)).toString('base64');
 
   // </script> 가 데이터 안에 있으면 스크립트 태그가 먼저 닫힌다. < 를 이스케이프한다.
-  const html = tpl.replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
+  const html = tpl
+    .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)
+    .replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
 

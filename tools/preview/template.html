@@ -4,6 +4,14 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 
 <style>
+/* Pretendard Variable (SIL Open Font License 1.1) — github.com/orioncactus/pretendard */
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: url('__FONT__') format('woff2-variations');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
 /* ==========================================================================
    Market Mood 3 — 구현물 미리보기
    색상 토큰은 실제 앱(src/app/globals.css)의 값을 그대로 가져왔다.
@@ -20,6 +28,11 @@
   --desk-shadow: 0 0 0 1px rgb(0 0 0 / 0.5), 0 18px 60px -20px rgb(0 0 0 / 0.8);
   /* 넓은 화면에서 앱이 차지하는 폭 — 이 앱이 상정한 가장 넓은 폰과 같다 */
   --frame-w: 430px;
+
+  /* 모서리는 둘로 통일한다. 한 화면에 대여섯 가지 곡률이 있으면 눈이
+     "같은 종류의 상자"를 알아보지 못한다. 앱과 같은 값이다. */
+  --box-radius: 10px;
+  --box-radius-sm: 6px;
   --surface: #141a26;
   --surface-2: #1b2333;
   --surface-3: #232d40;
@@ -85,8 +98,10 @@
 
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
 
-  --font-ui: 'IBM Plex Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont,
-    'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* 앱과 같은 글꼴. build.mjs 가 자른 woff2 를 data URI 로 심어 넣는다 —
+     이 파일 하나만 열어도 앱과 같은 글자로 보여야 하기 때문이다. */
+  --font-ui: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Noto Sans KR', 'Malgun Gothic', sans-serif;
 }
 
 @media (prefers-color-scheme: light) {
@@ -227,7 +242,7 @@ body {
 :where(a, button, [tabindex]):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--box-radius-sm);
 }
 
 .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -351,7 +366,7 @@ main {
   gap: 8px;
   border: 1px solid var(--border);
   background: var(--surface-2);
-  border-radius: 9px;
+  border-radius: var(--box-radius);
   padding: 4px 8px;
   font-size: 12.5px;
 }
@@ -368,7 +383,7 @@ main {
 
 /* --------------------------------- 컨트롤 --------------------------------- */
 
-.seg { display: inline-flex; border: 1px solid var(--border); background: var(--surface-2); border-radius: 9px; padding: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--box-radius); padding: 2px; }
 .seg button {
   border: 0;
   background: transparent;
@@ -376,22 +391,39 @@ main {
   font-size: 12.5px;
   font-weight: 600;
   padding: 4px 9px;
-  border-radius: 7px;
+  border-radius: var(--box-radius-sm);
   white-space: nowrap;
 }
 .seg button[aria-pressed='true'] { background: var(--surface-3); color: var(--fg-strong); }
 .seg.lg button { font-size: 13px; padding: 8px 11px; }
 
+/* 단추 무게를 셋으로 나눈다 — 앱의 .btn / .btn-primary / .btn-quiet 와 같다.
+   .ghost 가 이 미리보기의 '자주 쓰지만 주인공은 아닌 것' 자리다. */
 .ghost {
-  border: 1px solid var(--border);
+  border: 0;
   background: var(--surface-2);
   color: var(--muted);
-  border-radius: 9px;
-  padding: 4px 10px;
+  border-radius: var(--box-radius-sm);
+  height: 32px;
+  padding: 0 10px;
   font-size: 12.5px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
 }
-.ghost:hover { color: var(--fg); }
+.ghost:hover { background: var(--surface-3); color: var(--fg); }
+.ghost-primary { background: var(--accent); color: var(--accent-fg); }
+.ghost-primary:hover { background: var(--accent); filter: brightness(1.06); }
+.ghost-quiet { background: none; padding: 0 4px; }
+.ghost-quiet:hover { background: none; text-decoration: underline; text-underline-offset: 3px; }
+
+/* 숫자 — 소수점 이하는 한 단 연하게, 단위는 한 호 작게. 앱의 .figure 와 같다. */
+.figure { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.figure-dec { opacity: 0.55; }
+.figure-unit { margin-left: 1px; font-size: 0.78em; opacity: 0.72; }
 
 /* ---------------------------------- 배지 ---------------------------------- */
 
@@ -406,7 +438,7 @@ main {
 .cmodal {
   display: flex; flex-direction: column;
   width: 100%; max-width: 760px; max-height: 100%;
-  border: 1px solid var(--border); border-radius: 16px;
+  border: 1px solid var(--border); border-radius: var(--box-radius);
   background: var(--surface); box-shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -12px rgb(0 0 0 / .6);
 }
 .cmodal-head {
@@ -418,7 +450,7 @@ main {
 .cmodal-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); word-break: keep-all; }
 .cmodal-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
 .zoomable { position: relative; display: block; width: 100%; cursor: zoom-in; border: 0; background: none; padding: 0; text-align: left; }
-.zoomable:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.zoomable:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--box-radius-sm); }
 .zoomable .zoomhint {
   position: absolute; top: 4px; right: 4px; opacity: 0;
   border: 1px solid var(--border); border-radius: 4px; background: var(--surface-2);
@@ -439,7 +471,7 @@ main {
 .backbar button {
   display: inline-flex; align-items: center; gap: 4px;
   margin-left: -6px; padding: 4px 6px; border: 0; background: none;
-  border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--muted); font-family: inherit;
+  border-radius: var(--box-radius-sm); font-size: 13px; font-weight: 600; color: var(--muted); font-family: inherit;
 }
 .backbar button:hover { color: var(--fg); }
 
@@ -465,7 +497,9 @@ main {
 
 /* ---------------------------------- 카드 ---------------------------------- */
 
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+/* 카드는 테두리가 아니라 바탕의 단차로 구분한다. 카드가 열 장 서면 테두리도
+   열 줄이라 화면이 격자 종이처럼 잘게 나뉜다. 앱의 .card 와 같은 규칙이다. */
+.card { background: var(--surface); border-radius: var(--box-radius); }
 
 section.block { padding: 0 12px; margin-top: 20px; }
 .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -478,7 +512,7 @@ section.block { padding: 0 12px; margin-top: 20px; }
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  border-radius: 10px;
+  border-radius: var(--box-radius);
   padding: 8px 11px;
   font-size: 12.5px;
   line-height: 1.65;
@@ -508,7 +542,7 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .fng-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 
 .deltas { display: flex; gap: 8px; margin-top: 4px; }
-.delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: 9px; padding: 8px 2px; }
+.delta { flex: 1; text-align: center; background: var(--surface-2); border-radius: var(--box-radius); padding: 8px 2px; }
 /* 한 칸만 남았을 때는 가로로 눕힌다 */
 .delta.one { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .delta.one small { display: inline; }
@@ -553,7 +587,7 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .star[aria-pressed='true'] { color: var(--warn); }
 
 /* 화면 읽는 법 — 한 줄만 남기고 접어 둔다 */
-.rguide { border: 1px solid var(--border); background: var(--surface-2); border-radius: 9px; padding: 8px 10px; }
+.rguide { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--box-radius); padding: 8px 10px; }
 /* 여는 버튼은 문장 옆이 아니라 아래에 둔다. 390px 에서 옆에 두면 한 줄이
    절반 폭으로 눌려 네 줄로 쪼개진다 — 읽으라고 남긴 한 줄이 제일 안 읽히게 된다. */
 .rguide-head p { margin: 0; font-size: 12.5px; line-height: 1.7; word-break: keep-all; color: var(--muted); }
@@ -584,14 +618,14 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .futlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .futlist li:last-child { border-bottom: 0; padding-bottom: 0; }
 .futlist li:first-child { padding-top: 0; }
-.futcurve { grid-column: 1 / -1; margin-top: 8px; border-radius: 8px; background: var(--surface-2); padding: 8px; }
+.futcurve { grid-column: 1 / -1; margin-top: 8px; border-radius: var(--box-radius-sm); background: var(--surface-2); padding: 8px; }
 
 /* --------------------------------- 지표 타일 --------------------------------- */
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 @container app (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @container app (min-width: 1024px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--box-radius); padding: 12px; }
 .tile .t-label { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .t-val { font-size: 14.5px; font-weight: 700; margin-top: 2px; }
 .tile .t-sub { font-size: 11.5px; color: var(--subtle); }
@@ -666,7 +700,7 @@ dl.kv dd { margin: 0; text-align: right; color: var(--fg); }
 .comp-body { background: var(--surface-2); border-top: 1px solid var(--border); padding: 12px 12px; }
 .comp-desc { margin: 0 0 9px; font-size: 12.5px; color: var(--muted); line-height: 1.65; word-break: keep-all; }
 
-.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--box-radius); background: var(--surface); }
 
 /* 차트마다 붙는 표 대안. 앱의 .scroll-x / .data-table 과 같은 모양을 낸다. */
 .scroll-x { overflow-x: auto; }
@@ -703,14 +737,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
 .chartbox { position: relative; width: 100%; }
 .chartbox svg { display: block; width: 100%; }
-.zoombar { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 7px; padding: 2px; }
+.zoombar { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--box-radius-sm); padding: 2px; }
 .zoombar button {
   min-width: 28px; height: 26px; padding: 0 4px; border: 0; background: none; cursor: pointer;
-  border-radius: 5px; font-size: 13px; font-weight: 600; line-height: 1; color: var(--muted); font-family: inherit;
+  border-radius: var(--box-radius-sm); font-size: 13px; font-weight: 600; line-height: 1; color: var(--muted); font-family: inherit;
 }
 .zoombar button:hover:not(:disabled) { background: var(--surface-3); color: var(--fg); }
 .zoombar button:disabled { opacity: .35; cursor: default; }
-.chartbox svg { touch-action: pan-y; cursor: grab; border-radius: 6px; outline: none; }
+.chartbox svg { touch-action: pan-y; cursor: grab; border-radius: var(--box-radius-sm); outline: none; }
 .chartbox svg.dragging { cursor: grabbing; }
 .chartbox svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
@@ -723,7 +757,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   pointer-events: none;
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--box-radius);
   padding: 8px 9px;
   font-size: 12.5px;
   box-shadow: var(--shadow);
@@ -1217,7 +1251,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
   /* --- 듀얼 축 라인 차트 (툴팁 + 키보드 + 표 대안) --- */
   const CHARTS = {};
-  const M = { top: 10, right: 46, bottom: 22, left: 52 };
+  /* 왼쪽은 눈금값이 앉는 자리. '4,425.06' 이 그 폭을 그대로 먹어 앞의 '4' 가
+     그림 밖으로 밀려 나갔다. 값이 잘리면 다른 값이 되어 보인다. 앱과 같은 값이다. */
+  const M = { top: 10, right: 46, bottom: 22, left: 58 };
   /* 두 칸으로 나눌 때 칸 사이 틈 · 더 쓰는 세로 길이 · 차트 안 글자 크기 */
   const SPLIT_GAP = 16, SPLIT_EXTRA = 76, TICK_FONT = 11;
 
@@ -1891,10 +1927,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     if (!g) return '';
     return (
       '<details style="margin-top:8px"><summary style="cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--accent)">이게 무슨 지표인가요? ▾</summary>' +
-      '<div style="margin-top:8px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
+      '<div style="margin-top:8px;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
       /* 기준점이 있는 지수는 그것부터. 기준을 모르면 숫자를 읽을 수 없다. */
-      (g.baseline ? '<p style="margin:8px 0 0;border-radius:6px;background:var(--surface-3);padding:8px 8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">기준 · </b>' + esc(g.baseline) + '</p>' : '') +
+      (g.baseline ? '<p style="margin:8px 0 0;border-radius: var(--box-radius-sm);background:var(--surface-3);padding:8px 8px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">기준 · </b>' + esc(g.baseline) + '</p>' : '') +
       '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:8px">' +
       [['▲', '오르면', g.whenUp], ['▼', '내리면', g.whenDown]].map(([gl, lb, tx]) =>
         '<div style="display:flex;align-items:flex-start;gap:8px">' +
@@ -2124,7 +2160,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     if (!b && !r) return '';
     const u = (v) => esc(fmtNum(v, i.precision) + (i.suffix || ''));
     const cell = (title, big, small, color) =>
-      '<div style="border-radius:9px;background:var(--surface-2);padding:8px">' +
+      '<div style="border-radius: var(--box-radius);background:var(--surface-2);padding:8px">' +
       '<div style="font-size:11.5px;color:var(--subtle)">' + title + '</div>' +
       '<div style="margin-top:4px;font-size:13px;font-weight:700;color:' + (color || 'var(--fg-strong)') + '">' + big + '</div>' +
       '<div class="tnum" style="margin-top:4px;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + small + '</div></div>';
@@ -2176,7 +2212,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:' + RISK_COLOR[i.level] + '"><b>지금 읽는 법 · </b>' + esc(i.reading) + '</p></div>' +
 
       /* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */
-      '<dl style="margin:8px 0 0;border-radius:9px;background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:8px">' +
+      '<dl style="margin:8px 0 0;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:8px">' +
       [['▲', '값이 오르면', i.whenUp], ['▼', '값이 내리면', i.whenDown]].map(([gl, lb, tx]) =>
         '<div style="display:flex;align-items:flex-start;gap:8px">' +
         '<span aria-hidden="true" style="margin-top:1px;flex-shrink:0;font-size:11.5px;color:var(--muted)">' + gl + '</span>' +
@@ -2253,7 +2289,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       const col = scoreColor(m.score);
       return (
         '<li><button type="button" data-crisis="' + m.t + '" aria-pressed="' + on + '" ' +
-        'style="width:100%;text-align:left;border-radius:9px;padding:8px 10px;cursor:pointer;border:1px solid ' +
+        'style="width:100%;text-align:left;border-radius: var(--box-radius);padding:8px 10px;cursor:pointer;border:1px solid ' +
         (on ? 'color-mix(in srgb,' + col + ' 45%,var(--border))' : 'var(--border)') + ';background:' +
         (on ? 'color-mix(in srgb,' + col + ' 8%,var(--surface))' : 'var(--surface)') + '">' +
         '<div style="display:flex;align-items:flex-start;gap:8px">' +
@@ -2282,7 +2318,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<span class="tnum" style="font-size:11.5px;color:var(--subtle)">' + ev.markers.length + '건</span></div>' +
       '<p style="margin:4px 0 10px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.</p>' +
       (lowest && currentScore !== null
-        ? '<p style="margin:0 0 10px;border-radius:9px;background:var(--surface-2);padding:8px 10px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' +
+        ? '<p style="margin:0 0 10px;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' +
           '표시된 사건 중 가장 낮았던 때는 <b style="color:' + scoreColor(lowest.score) + '">' + esc(lowest.label) + '</b> 의 ' +
           '<b class="tnum" style="color:' + scoreColor(lowest.score) + '">' + esc(fmtNum(lowest.score, 1)) + '점</b>입니다. 지금은 ' +
           '<b class="tnum" style="color:' + scoreColor(currentScore) + '">' + esc(fmtNum(currentScore, 1)) + '점</b>' +
@@ -2290,7 +2326,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         : '') +
       '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' + rows + '</ul>' +
       '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
-      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px">' +
+      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius: var(--box-radius)">' +
       '<table class="data-table"><caption class="sr">과거 위기 시점의 자체 산출 심리 점수</caption>' +
       '<thead><tr><th scope="col">시점</th><th scope="col">사건</th><th scope="col">점수</th><th scope="col">단계</th></tr></thead><tbody>' +
       ev.markers.map((m) =>
@@ -2369,7 +2405,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       [['현재 점수', cy.score === null ? NO : fmtNum(cy.score, 1), scoreColor(cy.score)],
        ['20일 평균', cy.ma20 === null ? NO : fmtNum(cy.ma20, 1), 'var(--fg)'],
        ['10일 기울기', cy.slope === null ? NO : fmtSigned(cy.slope, 2), dirColor(cy.slope)]].map(([l, v, col]) =>
-        '<div style="flex:1;background:var(--surface-2);border-radius:9px;padding:8px 6px;text-align:center">' +
+        '<div style="flex:1;background:var(--surface-2);border-radius: var(--box-radius);padding:8px 6px;text-align:center">' +
         '<div style="font-size:11.5px;color:var(--muted)">' + l + '</div>' +
         '<div class="tnum" style="font-size:13px;font-weight:700;margin-top:2px;color:' + col + '">' + esc(v) + '</div></div>').join('') +
       '</div>' +
@@ -2904,6 +2940,62 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     );
   }
 
+  /* ---------------- 오늘의 한 줄 ----------------
+     src/lib/todayLine.mjs 를 그대로 옮긴 것. 문구가 저쪽과 어긋나면 검사가 잡는다.
+     새 데이터는 쓰지 않는다 — 아래 카드들에 이미 있는 것에서 오늘 가장 할 말이
+     있는 것만 뽑는다. 할 말이 없으면 줄을 그리지 않는다. */
+  const TODAY_MOVE_MIN = 1.5;
+  const TODAY_HEAT_MIN = 1.6;
+  const r1 = (v) => Math.round(v * 10) / 10;
+
+  function todayMoodClause(scores) {
+    const ok = (scores || []).filter((x) => x && x.score !== null && isNum(x.deltaDay) && Math.abs(x.deltaDay) >= TODAY_MOVE_MIN);
+    if (!ok.length) return null;
+    const top = ok.reduce((a, b2) => (Math.abs(b2.deltaDay) > Math.abs(a.deltaDay) ? b2 : a));
+    const name = MARKET_LABEL[top.market] || top.market;
+    const size = r1(Math.abs(top.deltaDay));
+    return top.deltaDay > 0
+      ? name + ' 투자심리가 어제보다 ' + size + '점 탐욕 쪽으로 갔고'
+      : name + ' 투자심리가 어제보다 ' + size + '점 공포 쪽으로 갔고';
+  }
+
+  function todayHeatClause(picks) {
+    const ok = (picks || []).filter((x) => x && x.heat && isNum(x.heat.times) && x.heat.times >= TODAY_HEAT_MIN && x.quote);
+    if (!ok.length) return null;
+    const top = ok.reduce((a, b2) => (b2.heat.times > a.heat.times ? b2 : a));
+    return top.quote.name + '가 평소의 ' + r1(top.heat.times) + '배로 ' + ((top.quote.changePct || 0) >= 0 ? '올라' : '내려') + ' 움직였습니다';
+  }
+
+  function todayRiskClause(indicators) {
+    const alert = (indicators || []).filter((i) => i && i.level === 'alert');
+    if (!alert.length) return null;
+    const names = alert.slice(0, 2).map((i) => i.name).join(' · ');
+    return alert.length > 2
+      ? names + ' 등 ' + alert.length + '개 지표가 경계 구간에 있습니다'
+      : names + (alert.length > 1 ? '가' : '이') + ' 경계 구간에 있습니다';
+  }
+
+  function todayLineText() {
+    const s2 = snap();
+    const quotes = s2.sections.quotes.data;
+    const picks = [];
+    if (quotes) {
+      INDEX_MARKETS.forEach((m) => {
+        const board = pickHeat((quotes[m] || []).filter((q) => HEAT_TRADABLE[q.kind]));
+        if (board) picks.push(board.top, board.bottom);
+      });
+    }
+    const mood = todayMoodClause(s2.sections.fng.data);
+    const heat = todayHeatClause(picks);
+    const risk = todayRiskClause((s2.sections.risk.data || {}).indicators);
+    if (mood && heat) return mood + ', ' + heat + '.';
+    if (mood && risk) return mood + ', ' + risk + '.';
+    if (mood) return mood.replace(/고$/, '습니다') + '.';
+    if (heat) return heat + '.';
+    if (risk) return risk + '.';
+    return null;
+  }
+
   function viewHome() {
     const s = snap();
     const fng = s.sections.fng.data || [];
@@ -2928,6 +3020,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
     return (
       '<h1 class="sr">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+      // 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다.
+      (() => {
+        const t = todayLineText();
+        return t
+          ? '<p style="margin:16px 0 0;padding:0 12px;font-size:15px;line-height:1.7;word-break:keep-all;color:var(--fg-strong)">' +
+            '<span aria-hidden="true" style="margin-right:4px;color:var(--accent)">—</span>' + esc(t) + '</p>'
+          : '';
+      })() +
 
       '<section class="block" style="padding-inline:0">' +
       '<div class="block-head" style="padding-inline:12px"><div style="min-width:0"><h2>시장별 투자심리</h2>' +
@@ -3162,7 +3262,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ? '<div class="card" style="padding:12px"><h2 style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--fg-strong)">투자자별 당일 순매수</h2>' +
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
           [['외국인', flows.foreign], ['기관', flows.institution], ['개인', flows.individual]].map(([l, v]) =>
-            '<div style="background:var(--surface-2);border-radius:9px;padding:8px;text-align:center">' +
+            '<div style="background:var(--surface-2);border-radius: var(--box-radius);padding:8px;text-align:center">' +
             '<div style="font-size:11.5px;color:var(--muted)">' + l + '</div>' +
             '<div class="tnum" style="font-size:13px;font-weight:700;margin-top:2px;color:' + dirColor(v) + '">' +
             (v === null ? NO : (v > 0 ? '+' : '-') + esc(koCompact(Math.abs(v) * 1e8, 1)) + '원') + '</div></div>').join('') +
@@ -3356,7 +3456,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ' aria-label="' + m + '월 ' + day + '일' + (isToday ? ' (오늘)' : '') +
         (list.length ? ', 일정 ' + list.length + '건' + (high ? ', 중요 ' + high + '건' : '') + ', ' +
           [...new Set(list.map(function (e) { return scopeLabel(e.market); }))].join(' ') : ', 일정 없음') + '"' +
-        ' style="display:flex;flex-direction:column;align-items:center;min-height:44px;padding:4px 0;border-radius:7px;border:1px solid ' +
+        ' style="display:flex;flex-direction:column;align-items:center;min-height:44px;padding:4px 0;border-radius: var(--box-radius-sm);border:1px solid ' +
         (sel ? 'var(--accent)' : isToday ? 'var(--border-strong)' : 'transparent') + ';background:' +
         (sel ? 'color-mix(in srgb,var(--accent) 14%,transparent)' : list.length ? 'var(--surface-2)' : 'transparent') + '">' +
         '<span class="tnum" style="font-size:12.5px;line-height:1;font-weight:600;color:' + col + '">' + day + '</span>' +
@@ -3379,9 +3479,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return (
       '<div class="card" style="padding:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">' +
-      '<button type="button" data-calmove="-1" aria-label="이전 달" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);color:var(--muted)">‹</button>' +
+      '<button type="button" data-calmove="-1" aria-label="이전 달" style="width:28px;height:28px;border-radius: var(--box-radius-sm);border:1px solid var(--border);color:var(--muted)">‹</button>' +
       '<p class="tnum" style="margin:0;font-size:13px;font-weight:700;color:var(--fg-strong)">' + y + '년 ' + m + '월</p>' +
-      '<button type="button" data-calmove="1" aria-label="다음 달" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);color:var(--muted)">›</button></div>' +
+      '<button type="button" data-calmove="1" aria-label="다음 달" style="width:28px;height:28px;border-radius: var(--box-radius-sm);border:1px solid var(--border);color:var(--muted)">›</button></div>' +
       '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px" role="grid" aria-label="' + y + '년 ' + m + '월 일정 달력">' +
       WEEKDAYS.map(function (w, i) {
         return '<div style="padding-bottom:4px;text-align:center;font-size:11.5px;font-weight:600;color:' +
@@ -3608,7 +3708,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       }).join('') + '</ul>' +
       '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:12px" class="drivers-grid">' +
       [['가장 큰 상승 요인', f.topPositive], ['가장 큰 하락 요인', f.topNegative]].map(([l, dr]) =>
-        '<div style="background:var(--surface-2);border-radius:9px;padding:12px">' +
+        '<div style="background:var(--surface-2);border-radius: var(--box-radius);padding:12px">' +
         '<div style="font-size:11.5px;color:var(--muted)">' + l + '</div>' +
         '<div style="font-size:13px;font-weight:600;margin-top:2px;word-break:keep-all">' + esc(dr ? dr.label : '해당 없음') + '</div>' +
         (dr ? '<div style="font-size:11.5px;color:var(--subtle)">' + esc(dr.detail) + '</div>' : '') + '</div>').join('') +
@@ -3861,7 +3961,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         : '') +
       // 그림을 못 보는 사람에게도 같은 내용이 가야 한다
       '<details style="margin-top:2px"><summary style="cursor:pointer;list-style:none;text-align:right;font-size:11.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
-      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px"><table class="data-table">' +
+      '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius: var(--box-radius)"><table class="data-table">' +
       '<thead><tr><th>연도</th>' + clean.map((s) => '<th>' + esc(s.label) + '</th>').join('') + '</tr></thead><tbody>' +
       mine.points.slice(-12).reverse().map((p) =>
         '<tr><th class="tnum" style="font-weight:400">' + yr(p.t) + '</th>' +
@@ -3890,7 +3990,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return (
       '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px">' +
       '<details><summary style="cursor:pointer;list-style:none;font-size:12.5px;font-weight:600;color:var(--accent)">이게 무슨 숫자인가요? ▾</summary>' +
-      '<div style="margin-top:8px;border-radius:9px;background:var(--surface-2);padding:8px 10px">' +
+      '<div style="margin-top:8px;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' + esc(g.plain) + '</p>' +
       '<dl style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:8px">' +
       rows.map(function (r) {
@@ -3959,7 +4059,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
                  '표로 보기' 줄도 같은 button 을 그대로 두고 안 보이게만 한다. */
               (trend ||
                 '<div style="max-width:430px">' +
-                '<div style="position:relative;width:100%;border-radius:6px;outline:1px dashed var(--border);outline-offset:-1px" role="status">' +
+                '<div style="position:relative;width:100%;border-radius: var(--box-radius-sm);outline:1px dashed var(--border);outline-offset:-1px" role="status">' +
                 '<svg viewBox="0 0 300 92" style="display:block;width:100%;height:auto" aria-hidden="true"></svg>' +
                 '<p style="position:absolute;inset:0;margin:0;display:flex;align-items:center;justify-content:center;padding:0 12px;' +
                 'text-align:center;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
@@ -4765,8 +4865,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .tl-lamp i { display: block; border-radius: 999px; }
 
 .tl-tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; list-style: none; margin: 0; padding: 0; }
-.tl-tally li { border: 1px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; }
-.tl-legend { border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; }
+.tl-tally li { border: 1px solid var(--border); border-radius: var(--box-radius); padding: 8px; text-align: center; }
+.tl-legend { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--box-radius); padding: 8px 10px; }
 .tl-legend ul { display: flex; flex-wrap: wrap; gap: 4px 12px; list-style: none; margin: 0; padding: 0; }
 .tl-legend li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
 .bandmark {

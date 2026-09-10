@@ -10,6 +10,7 @@ import { useFormatter } from '@/components/market/useFormatter';
 import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
 import { FundamentalsCard } from '@/components/market/FundamentalsCard';
 import { FreshnessBadge, ModeBadge, SessionBadge } from '@/components/ui/Badge';
+import { Figure } from '@/components/ui/Figure';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, SkeletonCard } from '@/components/ui/States';
 import { convertCurrency, formatKoreanCompact, formatKstFull, NO_VALUE } from '@/lib/format';
@@ -171,8 +172,8 @@ export default function AssetPage() {
         <div className="card p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="tnum text-2xl leading-tight font-bold text-fg-strong">
-                {q.price === null ? NO_VALUE : f.price(q)}
+              <p className="text-2xl leading-tight font-bold text-fg-strong">
+                <Figure text={q.price === null ? NO_VALUE : f.price(q)} flashColor={color} />
               </p>
               <p className="tnum mt-1 flex items-center gap-2 text-[13px] font-semibold" style={{ color }}>
                 <span aria-hidden="true">{f.glyph(dir)}</span>

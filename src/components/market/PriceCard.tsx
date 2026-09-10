@@ -7,6 +7,7 @@
 
 import Link from 'next/link';
 import { StatusLine } from '@/components/ui/Badge';
+import { Figure } from '@/components/ui/Figure';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { useFormatter } from './useFormatter';
@@ -94,10 +95,10 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
             {/* 숫자는 자르면 안 된다. '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
                 좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
             <p
-              className="tnum leading-tight font-bold whitespace-nowrap text-fg-strong"
+              className="leading-tight font-bold whitespace-nowrap text-fg-strong"
               style={{ fontSize: 'clamp(15px, 4.6cqw, 18px)' }}
             >
-              {f.price(quote)}
+              <Figure text={f.price(quote)} flashColor={color} />
             </p>
             <p className="tnum mt-0.5 flex items-center gap-1 text-xs font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span>

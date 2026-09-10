@@ -60,7 +60,7 @@ function IndexRow({
         {/* 이름은 자르지 않는다. '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면
             그게 무엇인지 알 수 없다 — 이름은 값을 읽기 위한 열쇠라, 잘리면 카드 전체가
             쓸모없어진다. 좁은 화면에서는 두 줄로 접고 낱말 단위로 끊는다. */}
-        <p className="text-[13.5px] leading-snug font-semibold break-keep text-fg-strong">{item.name}</p>
+        <p className="text-[15px] leading-snug font-bold break-keep text-fg-strong">{item.name}</p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
           <span className="tnum">{item.symbol}</span>
           {quote ? (
@@ -93,7 +93,7 @@ function IndexRow({
           <Skeleton className="h-[30px] w-[62px] rounded-md" />
         ) : hasValue ? (
           <>
-            <p className="tnum text-[13.5px] leading-tight font-bold text-fg-strong">{f.price(quote)}</p>
+            <p className="tnum text-[15px] leading-tight font-bold whitespace-nowrap text-fg-strong">{f.price(quote)}</p>
             <p className="tnum mt-0.5 text-[12.5px] font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span> {f.changePct(quote)}
             </p>

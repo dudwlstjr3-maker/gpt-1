@@ -49,7 +49,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
                 320px 에서 '스테이블코인 시총' 이 잘리던 자리다. 두 줄까지 접는다. */}
             <Link
               href={`/asset/${quote.id}`}
-              className="block text-sm leading-snug font-semibold break-keep text-fg-strong hover:underline"
+              className="block text-[16px] leading-snug font-bold break-keep text-fg-strong hover:underline"
             >
               {quote.name}
             </Link>
@@ -138,7 +138,7 @@ export function PriceRow({ quote }: { quote: Quote }) {
     >
       <div className="min-w-0">
         {/* 이름은 자르지 않는다 — 무엇의 값인지 모르면 옆의 숫자도 못 읽는다 */}
-        <p className="text-[13px] leading-snug font-semibold break-keep text-fg">{quote.name}</p>
+        <p className="text-[14.5px] leading-snug font-bold break-keep text-fg">{quote.name}</p>
         <p className="text-[11.5px] text-subtle">
           {quote.symbol} · 기준 {formatKstTime(quote.meta.asOf)}
         </p>

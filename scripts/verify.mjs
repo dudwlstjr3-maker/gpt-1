@@ -985,7 +985,17 @@ async function main() {
     check('알림 상자의 글리프가 눌리지 않음 (미리보기)',
       /\.notice > span:first-child\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
-    check('종목 이름이 길면 잘림 (미리보기)', /\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
+    /*
+     * 예전에는 여기서 "이름이 길면 잘려야 한다" 를 확인했다. 이름이 옆 칸을 밀고
+     * 들어가 글자가 겹치던 것을 막으려던 것이고, 그때는 자르는 것이 유일한 수단이었다.
+     *
+     * 지금은 뒤집었다. '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면 그게 무엇인지
+     * 알 수 없고, 이름은 값을 읽기 위한 열쇠라 잘리면 그 칸 전체가 쓸모없어진다.
+     * 겹침은 **낱말 단위로 접어서** 막는다 — 자르지 않고도 겹치지 않는다.
+     */
+    check('종목 이름을 자르지 않고 접음 (미리보기)',
+      /\.pcard-name\s*\{[^}]*word-break:\s*keep-all/.test(tpl) &&
+      !/\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
     check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
   }
 
@@ -2187,6 +2197,28 @@ async function main() {
 
     const region = await readFile('src/app/market/[region]/page.tsx', 'utf8');
     check('시장 화면 부제도 자르지 않음', !/truncate text-\[12\.5px\] text-subtle">\{SUBTITLE/.test(region));
+
+    /*
+     * 무엇이 먼저 읽혀야 하는가.
+     *
+     * '마감' · '15분 지연' 은 값을 읽고 난 뒤에 확인하는 곁들임이고, 종목 이름은
+     * 그 칸이 무엇인지 말하는 열쇠다. 둘이 비슷한 크기로 서 있으면 눈이 어디를
+     * 먼저 볼지 헷갈린다. 이름이 배지보다 확실히 커야 한다.
+     */
+    const badgeSrc = await readFile('src/components/ui/Badge.tsx', 'utf8');
+    check('장 상태 배지가 제일 작은 칸을 기본으로 씀', /SessionBadge\(\{ phase, size = '2xs'/.test(badgeSrc));
+    check('지연 배지도 제일 작은 칸', /size = '2xs'/.test(badgeSrc.slice(badgeSrc.indexOf('FreshnessBadge') - 400)));
+    const nameSize = (t, re) => {
+      const m = t.match(re);
+      return m ? Number(m[1]) : 0;
+    };
+    const pcName = nameSize(pc, /className="block text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold break-keep text-fg-strong/);
+    const ixName = nameSize(idx, /className="text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold break-keep text-fg-strong/);
+    check('가격 카드 이름이 배지(10.5px)보다 확실히 큼', pcName >= 15, `${pcName}px`);
+    check('지수 판 이름도 배지보다 확실히 큼', ixName >= 15, `${ixName}px`);
+
+    const tplSz = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 같은 차례', /\.pcard-name \{ font-size: 16px/.test(tplSz) && /badge\(cls, SESSION_LABEL\[p\], null, '2xs'\)/.test(tplSz));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

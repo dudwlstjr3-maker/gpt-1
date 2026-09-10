@@ -110,7 +110,13 @@ const SESSION_TONE: Record<SessionPhase, Tone> = {
   always: 'ok',
 };
 
-export function SessionBadge({ phase, size = 'xs' }: { phase: SessionPhase; size?: 'xs' | 'sm' }) {
+/**
+ * 장 상태 배지 — 기본을 제일 작은 칸으로 둔다.
+ *
+ * '마감' · '장중' 은 곁들이는 말이지 카드에서 읽을 거리가 아니다. 종목 이름과
+ * 비슷한 크기로 있으면 눈이 어디를 먼저 볼지 헷갈린다.
+ */
+export function SessionBadge({ phase, size = '2xs' }: { phase: SessionPhase; size?: '2xs' | 'xs' | 'sm' }) {
   return (
     <Badge tone={SESSION_TONE[phase]} size={size}>
       {SESSION_LABEL[phase]}

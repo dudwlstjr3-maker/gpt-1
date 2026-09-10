@@ -20,6 +20,9 @@ export interface Viewport {
   t1: number;
 }
 
+/** 페이지가 방금 움직였으면 그 손짓의 연장으로 보고 휠을 가로채지 않는다 */
+const SCROLL_GRACE_MS = 350;
+
 /** 확대해도 이보다 좁아지지 않는다 — 점 몇 개만 남으면 차트가 아니게 된다 */
 const MIN_SPAN_RATIO = 1 / 400;
 const MIN_SPAN_MS = 2 * 86400_000;
@@ -62,6 +65,7 @@ export function useChartViewport({
   plotLeft,
   plotWidth,
   enabled,
+  mode = 'all',
   onTap,
 }: {
   ref: React.RefObject<SVGSVGElement | null>;
@@ -69,6 +73,16 @@ export function useChartViewport({
   plotLeft: number;
   plotWidth: number;
   enabled: boolean;
+  /**
+   * 어떤 조작을 받을지.
+   *
+   *  'all'   — 끌기·핀치·휠·더블클릭 (상세용 큰 차트)
+   *  'wheel' — 휠만 (카드 안의 작은 그림)
+   *
+   * 작은 그림은 눌러서 큰 창을 여는 것이 본래 조작이라, 끌기까지 받으면 끌고
+   * 손을 뗀 자리에서 창이 열린다. 휠은 누르는 동작과 겹치지 않아 함께 둘 수 있다.
+   */
+  mode?: 'all' | 'wheel';
   /**
    * 끌지 않고 짚기만 했을 때 (터치로 크로스헤어를 세울 때 쓴다).
    * 세로 위치도 함께 넘긴다 — 그림 밖(축 글씨 자리)을 짚었는지 가려내야 한다.
@@ -128,6 +142,23 @@ export function useChartViewport({
   const reset = useCallback(() => setView(null), []);
 
   /* ---------------- 휠 확대·축소 ---------------- */
+
+  /*
+   * 페이지를 굴리던 손이 그래프 위를 지나가는 것뿐이면 가로채지 않는다.
+   *
+   * 생활 화면처럼 그림이 아홉 장 쌓인 목록에서, 위로 굴려 올라가는 길목마다
+   * 그림이 확대되면 화면을 되돌릴 수가 없다. 방금 페이지가 움직였다면 그 손짓의
+   * 연장으로 보고 그냥 흘려보낸다 — 멈췄다가 그림을 겨누고 굴리면 확대된다.
+   */
+  const lastPageScroll = useRef(0);
+  useEffect(() => {
+    const mark = () => {
+      lastPageScroll.current = Date.now();
+    };
+    window.addEventListener('scroll', mark, { passive: true });
+    return () => window.removeEventListener('scroll', mark);
+  }, []);
+
   useEffect(() => {
     const el = ref.current;
     if (!el || !enabled) return;
@@ -139,6 +170,7 @@ export function useChartViewport({
       const atFull = v.t1 - v.t0 >= f.t1 - f.t0 - 1;
       // 이미 전체가 보이는데 더 축소하려는 휠은 페이지 스크롤로 넘긴다
       if (zoomOut && atFull) return;
+      if (atFull && Date.now() - lastPageScroll.current < SCROLL_GRACE_MS) return;
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       zoomBy(zoomOut ? 1.18 : 1 / 1.18, timeAtPx(e.clientX - rect.left));
@@ -174,7 +206,7 @@ export function useChartViewport({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || !enabled) return;
+    if (!el || !enabled || mode !== 'all') return;
     const g = gesture.current;
 
     const localX = (clientX: number) => clientX - el.getBoundingClientRect().left;
@@ -277,7 +309,7 @@ export function useChartViewport({
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onUp);
     };
-  }, [ref, enabled, apply, timeAtPx]);
+  }, [ref, enabled, mode, apply, timeAtPx]);
 
   return { view: effective, zoomed, reset, zoomBy, panByRatio, dragging, selection };
 }

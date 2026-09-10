@@ -141,7 +141,7 @@ export function FngCard({
         />
       </div>
 
-      <div className="mt-2 space-y-2 border-t border-border pt-2">
+      <div className="mt-2 mb-2 space-y-2 border-t border-border pt-2">
         <DriverRow
           kind="up"
           label={score.topPositive?.label ?? null}
@@ -154,9 +154,19 @@ export function FngCard({
         />
       </div>
 
-      {/* 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
-          이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다. */}
-      <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+      {/*
+       * 버튼과 산출 시각은 카드 **바닥**에 붙인다 (mt-auto).
+       *
+       * 카드 셋은 가장 키 큰 것에 맞춰 같은 높이로 서는데, 요인 줄은 시장마다
+       * 0~2줄이고 줄바꿈까지 달라서 안쪽 내용의 길이가 제각각이다. 그대로 두면
+       * 짧은 카드는 아래가 통째로 비어 — 미국은 120px 이 비었다 — 같은 크기의
+       * 카드인데도 크기가 다른 것처럼 보였다. 바닥에 붙여 두면 버튼과 시각이
+       * 카드마다 같은 높이에 서고, 남는 자리는 안쪽 여백으로 흩어진다.
+       *
+       * 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
+       * 이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다.
+       */}
+      <div className="mt-auto flex items-center gap-2 border-t border-border pt-2">
         <Link
           href={`/market/${score.market}`}
           className="flex-1 rounded-md bg-accent px-2 py-2 text-center text-[12.5px] font-semibold text-accent-fg hover:opacity-90"

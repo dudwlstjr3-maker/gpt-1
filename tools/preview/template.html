@@ -518,13 +518,16 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
 .sparkrow small { font-size: 11.5px; color: var(--muted); }
 
-.drivers { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.drivers { border-top: 1px solid var(--border); margin: 12px 0; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .driver { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
 .driver .g { font-size: 11.5px; font-weight: 700; margin-top: 1px; flex-shrink: 0; }
 .driver .lbl { color: var(--muted); }
 .driver .det { display: block; font-size: 11.5px; color: var(--subtle); }
 
-.fngfoot { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* 바닥에 붙인다 (margin-top:auto). 카드 셋은 가장 키 큰 것에 맞춰 같은 높이로
+   서는데 요인 줄이 시장마다 0~2줄이라, 그대로 두면 짧은 카드 아래가 통째로 비어
+   같은 크기의 카드인데도 크기가 달라 보였다. 앱의 FngCard 와 같은 규칙이다. */
+.fngfoot { border-top: 1px solid var(--border); margin-top: auto; padding-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fngfoot small { font-size: 11.5px; color: var(--subtle); }
 
 /* --------------------------------- 가격 카드 --------------------------------- */
@@ -3737,7 +3740,17 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
    * 나라 이름은 범례가 아니라 선 끝에 직접 붙인다 — 옅은 선 셋이 서로 교차하면
    * 묶음 범례로는 어느 선이 어느 나라인지 알 길이 없다.
    */
-  const TREND_GL = 52, TREND_GR = 40, TREND_W = 300;
+  /* 왼쪽 눈금 자리는 52 였는데 '89,514달러' 가 51.2 를 먹어 앞의 '8' 이 잘려 나갔다.
+     카드마다 재서 정하지 않는다 — 그러면 값의 크기에 따라 그림 시작점이 달라져
+     카드 아홉 장의 선이 서로 어긋난다. 앱의 BasicTrend 와 같은 값이다. */
+  const TREND_GL = 60, TREND_GR = 40, TREND_W = 300;
+
+  /*
+   * 생활 지수 작은 그림의 보는 구간 — 지표 id 별로 기억한다.
+   * 휠로만 좁힌다. 이 그림은 눌러서 큰 창을 여는 것이 본래 조작이라, 끌기까지
+   * 받으면 끌고 손을 뗀 자리에서 창이 열린다. 앱의 BasicTrend 와 같은 규칙이다.
+   */
+  const BTREND_VIEW = {};
 
   /** 이름표가 겹치지 않게 위아래로 밀어낸다 */
   function trendSpread(ys, min, lo, hi) {
@@ -3761,8 +3774,26 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     let mine = clean.filter((s) => s.label === '한국')[0] || clean[0];
 
     const h = 92, top = 9, bottom = h - 17;
-    const all = clean.reduce((a, s) => a.concat(s.points), []);
-    const tx = extent(all.map((p) => p.t));
+    const everyPoint = clean.reduce((a, s) => a.concat(s.points), []);
+    const fullT = extent(everyPoint.map((p) => p.t));
+    /* 보는 구간. 양 끝 바깥의 점 하나씩은 남겨야 선이 그림 가장자리까지 이어진다. */
+    const saved = BTREND_VIEW[b.id];
+    const tx = saved && saved.t1 - saved.t0 < fullT[1] - fullT[0] - 1
+      ? [Math.max(saved.t0, fullT[0]), Math.min(saved.t1, fullT[1])]
+      : fullT;
+    const btZoomed = tx[1] - tx[0] < fullT[1] - fullT[0] - 1;
+    const win = (pts) => {
+      if (!btZoomed) return pts;
+      let lo = 0, hi = pts.length - 1;
+      while (lo < pts.length - 1 && pts[lo + 1].t <= tx[0]) lo += 1;
+      while (hi > 0 && pts[hi - 1].t >= tx[1]) hi -= 1;
+      if (hi - lo < 1) { lo = Math.max(0, lo - 1); hi = Math.min(pts.length - 1, hi + 1); }
+      return pts.slice(lo, hi + 1);
+    };
+    /* 그리는 데 쓰는 건 좁힌 쪽, 큰 창과 표에 쓰는 건 원래 것 */
+    const vclean = clean.map((s) => ({ label: s.label, points: win(s.points) }));
+    const vmine = vclean.filter((s) => s.label === mine.label)[0] || vclean[0];
+    const all = vclean.reduce((a, s) => a.concat(s.points), []);
     const vy = extent(all.map((p) => p.v));
     const x = scale(tx, [TREND_GL, TREND_W - TREND_GR]);
     const y = scale(vy, [bottom, top]);
@@ -3771,12 +3802,12 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const path = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
     const shortL = (l) => String(l).replace(/\s*[(（].*$/, '');
 
-    const ends = clean.map((s) => {
+    const ends = vclean.map((s) => {
       const p = s.points[s.points.length - 1];
       return { label: s.label, x: x(p.t), y: y(p.v), mine: s.label === mine.label };
     });
     const ey = trendSpread(ends.map((e) => e.y), 11, top, bottom);
-    const last = mine.points[mine.points.length - 1];
+    const last = vmine.points[vmine.points.length - 1];
 
     /* 큰 창에서는 나라마다 색이 달라야 범례가 일을 한다.
        작은 그림은 이름을 선 끝에 붙여 구분하지만, 큰 창은 범례가 위에 선다. */
@@ -3792,9 +3823,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       /* 최대 폭 430px — 카드가 두 칸으로 서면서 그림이 카드 폭을 다 쓰게 됐는데,
          그대로 두면 넓은 화면에서 눈금 글씨가 본문보다 커진다.
          height:auto — px 로 못박으면 폭이 넓어져도 그림이 가운데에 작게 남는다. */
-      '<div style="max-width:430px">' + zoomable(b.name,  bigSeries,
+      '<div style="max-width:430px" data-btrend="' + esc(b.id) + '">' + zoomable(b.name,  bigSeries,
       '<svg viewBox="0 0 ' + TREND_W + ' ' + h + '" width="100%" height="' + h + '" style="width:100%;height:auto" role="img" ' +
-      'aria-label="' + esc(b.name + ' — ' + yr(tx[0]) + '년부터 ' + yr(tx[1]) + '년까지, ' + mine.label + ' 마지막 값 ' + fmt(last.v)) + '">' +
+      'aria-label="' + esc(b.name + ' — ' + yr(tx[0]) + '년부터 ' + yr(tx[1]) + '년까지, ' + mine.label + ' 마지막 값 ' + fmt(last.v) +
+        (btZoomed ? ' (일부 구간만 보는 중)' : '')) + '">' +
       // 위아래 눈금선. 눈금이 없으면 "미국이 위에 있다" 까지만 알고 얼마나 위인지는 모른다.
       [[top, vy[1]], [bottom, vy[0]]].map((g) =>
         '<line x1="' + TREND_GL + '" x2="' + (TREND_W - TREND_GR) + '" y1="' + g[0] + '" y2="' + g[0] + '" stroke="var(--border)" stroke-width="1"/>' +
@@ -3804,10 +3836,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         ? '<line x1="' + TREND_GL + '" x2="' + (TREND_W - TREND_GR) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) +
           '" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 3"/>'
         : '') +
-      clean.filter((s) => s.label !== mine.label).map((s) =>
+      /* 구간 밖의 점까지 이어 그린 선이 눈금 자리로 삐져나오지 않게 잘라 낸다 */
+      '<defs><clipPath id="bt-' + esc(b.id) + '"><rect x="' + TREND_GL + '" y="0" width="' + (TREND_W - TREND_GL - TREND_GR) + '" height="' + h + '"/></clipPath></defs>' +
+      '<g clip-path="url(#bt-' + esc(b.id) + ')">' +
+      vclean.filter((s) => s.label !== mine.label).map((s) =>
         '<path d="' + path(s.points) + '" fill="none" stroke="var(--series-2)" stroke-width="1.2" opacity=".55"/>').join('') +
-      '<path d="' + path(mine.points) + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" fill="var(--accent)"/>' +
+      '<path d="' + path(vmine.points) + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" fill="var(--accent)"/></g>' +
       ends.map((e, i) =>
         (Math.abs(ey[i] - e.y) > 1.5
           ? '<line x1="' + (e.x + 2).toFixed(1) + '" x2="' + (TREND_W - TREND_GR + 4) + '" y1="' + e.y.toFixed(1) + '" y2="' + ey[i].toFixed(1) +
@@ -3818,6 +3853,12 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<text x="' + TREND_GL + '" y="' + (h - 1) + '" font-size="10" fill="var(--subtle)">' + yr(tx[0]) + '</text>' +
       '<text x="' + (TREND_W - TREND_GR) + '" y="' + (h - 1) + '" font-size="10" fill="var(--subtle)" text-anchor="end">' + yr(tx[1]) + '</text>' +
       '</svg>') +
+      /* 되돌아갈 길. 확대했을 때만 나타나므로 평소에는 자리를 먹지 않는다 —
+         '표로 보기' 가 이미 서 있는 줄이라 줄 자체가 새로 생기지도 않는다. */
+      (btZoomed
+        ? '<div style="margin-top:2px;text-align:right"><button type="button" data-btreset="' + esc(b.id) +
+          '" style="border:0;background:none;font-size:11.5px;font-weight:600;color:var(--accent);cursor:pointer">전체 구간</button></div>'
+        : '') +
       // 그림을 못 보는 사람에게도 같은 내용이 가야 한다
       '<details style="margin-top:2px"><summary style="cursor:pointer;list-style:none;text-align:right;font-size:11.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
       '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius:9px"><table class="data-table">' +
@@ -4345,6 +4386,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     if (!t) return;
     const d = t.dataset;
 
+    if (d.btreset) {
+      delete BTREND_VIEW[d.btreset];
+      return redrawBTrend(d.btreset);
+    }
+
     if (d.back) {
       state.view = prevView && prevView !== state.view ? prevView : 'home';
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -4457,7 +4503,16 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   });
 
   /* ---------------- 이동 · 확대 입력 ----------------
-     페이지 스크롤을 잡아먹지 않도록, 이미 전체가 보이는데 '축소' 방향으로 굴린 휠은 넘긴다. */
+     페이지 스크롤을 잡아먹지 않도록 두 가지를 지킨다.
+      ① 이미 전체가 보이는데 '축소' 방향으로 굴린 휠은 넘긴다.
+      ② 페이지를 굴리던 손이 그래프 위를 지나가는 것뿐이면 가로채지 않는다.
+         생활 화면처럼 그림이 아홉 장 쌓인 목록에서, 위로 굴려 올라가는 길목마다
+         그림이 확대되면 화면을 되돌릴 수가 없다. 멈췄다가 겨누고 굴리면 확대된다. */
+  const SCROLL_GRACE_MS = 350;
+  let lastPageScroll = 0;
+  window.addEventListener('scroll', () => { lastPageScroll = Date.now(); }, { passive: true });
+  const scrolling = () => Date.now() - lastPageScroll < SCROLL_GRACE_MS;
+
   document.addEventListener(
     'wheel',
     (e) => {
@@ -4467,9 +4522,58 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       if (!c || !c.full) return;
       const zoomOut = e.deltaY > 0;
       if (zoomOut && !isZoomed(c)) return;
+      if (!isZoomed(c) && scrolling()) return;
       e.preventDefault();
       const px = e.clientX - box.getBoundingClientRect().left;
       zoomChart(box.dataset.chart, zoomOut ? 1.18 : 1 / 1.18, timeAtPx(c, px));
+    },
+    { passive: false },
+  );
+
+  /* 생활 지수의 작은 그림 — 휠만 받는다. 같은 규칙을 그대로 쓴다. */
+  function redrawBTrend(id) {
+    const box = document.querySelector('[data-btrend="' + id + '"]');
+    const list = (snap().sections.basics && snap().sections.basics.data) || [];
+    const item = list.filter((x) => x.id === id)[0];
+    if (box && item) box.outerHTML = basicTrend(item);
+  }
+
+  document.addEventListener(
+    'wheel',
+    (e) => {
+      const box = e.target.closest && e.target.closest('[data-btrend]');
+      if (!box) return;
+      const svg = box.querySelector('svg[role="img"]');
+      const list = (snap().sections.basics && snap().sections.basics.data) || [];
+      const item = list.filter((x) => x.id === box.dataset.btrend)[0];
+      if (!svg || !item) return;
+      const raw = (item.historyByCountry && item.historyByCountry.length)
+        ? item.historyByCountry
+        : (item.history && item.history.length > 1 ? [{ label: '한국', points: item.history }] : []);
+      const pts = raw.reduce((a, s2) => a.concat((s2.points || []).filter((q) => isNum(q.v))), []);
+      if (pts.length < 2) return;
+      const full = extent(pts.map((q) => q.t));
+      const cur = BTREND_VIEW[item.id] || { t0: full[0], t1: full[1] };
+      const atFull = cur.t1 - cur.t0 >= full[1] - full[0] - 1;
+      const zoomOut = e.deltaY > 0;
+      if (zoomOut && atFull) return;
+      if (atFull && scrolling()) return;
+      e.preventDefault();
+      /* 그림 안의 좌표는 viewBox(0~300) 눈금인데 휠은 화면 픽셀로 온다. 배율로 맞춰야
+         커서가 짚은 자리가 확대의 중심이 된다. */
+      const r = svg.getBoundingClientRect();
+      const k = r.width / TREND_W;
+      const rel = Math.min(1, Math.max(0, (e.clientX - r.left - TREND_GL * k) / ((TREND_W - TREND_GL - TREND_GR) * k)));
+      const a = cur.t0 + (cur.t1 - cur.t0) * rel;
+      const f = zoomOut ? 1.18 : 1 / 1.18;
+      let t0 = a - (a - cur.t0) * f;
+      let t1 = a + (cur.t1 - a) * f;
+      const minSpan = Math.max((full[1] - full[0]) / 400, 2 * 86400000);
+      let span = Math.min(Math.max(t1 - t0, minSpan), full[1] - full[0]);
+      if (t0 < full[0]) t0 = full[0];
+      if (t0 + span > full[1]) t0 = full[1] - span;
+      BTREND_VIEW[item.id] = { t0: t0, t1: t0 + span };
+      redrawBTrend(item.id);
     },
     { passive: false },
   );

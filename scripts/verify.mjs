@@ -1400,7 +1400,17 @@ async function main() {
     /* ④ 미리보기도 같은 모양 */
     check('미리보기도 두 칸 격자를 씀', /\.bgrid \{ display: grid/.test(tpl4));
     check('미리보기 두 칸 기준이 앱과 같음(768px)', /@container app \(min-width: 768px\) \{ \.bgrid/.test(tpl4));
-    check('미리보기에서 옛 좌우 배치가 사라짐', !/btrend/.test(tpl4));
+    /*
+     * 옛 좌우 배치(.btrend)가 되살아나지 않았는가.
+     *
+     * 예전에는 글자와 그림을 좌우로 나눠 놓았는데, 넓은 화면에서 카드가 952px 을
+     * 차지하면서 세로로 4,727px 을 굴러야 했다. 그 배치의 클래스 이름이 btrend 였다.
+     *
+     * 검사는 'btrend' 라는 글자가 보이면 실패하게 되어 있었는데, 뒤에 작은 그림의
+     * 휠 확대를 붙이면서 data-btrend 표식이 생겨 애먼 데서 걸렸다. 막으려는 것은
+     * 이름이 아니라 **그 배치**라, 이제 같은 이름의 CSS 규칙이 있는지만 본다.
+     */
+    check('미리보기에서 옛 좌우 배치가 사라짐', !/\.btrend\s*\{/.test(tpl4));
     check('미리보기 그림도 폭을 따라가고 상한이 있음',
       /style="width:100%;height:auto"/.test(tpl4) && /max-width:430px/.test(tpl4));
     check('미리보기도 값을 이름 줄 오른쪽에 둠', /font-size:22px;line-height:1;font-weight:700/.test(tpl4));
@@ -2481,6 +2491,69 @@ async function main() {
       tplViewport.every((v) => v === 480), tplViewport.filter((v) => v !== 480).join(', '));
     check('미리보기 배치 분기가 칸 폭을 봄',
       (tpl8.match(/@container app \(min-width:/g) ?? []).length >= 8);
+  }
+
+  /* ---------------- 8-29. 작은 그림도 휠로 확대되는가 ---------------- */
+  console.log('\n[8-29] 그래프 확대 · 카드 높이');
+  {
+    /*
+     * 사용자가 짚은 것 둘.
+     *  ① "홈 맨 처음 화면에 미국 크립토 화면의 창 크기가 다르잖아"
+     *  ② "각 그래프마다 마우스 휠로 원하는 부분을 확대 축소 할 수 있게"
+     */
+
+    /* ① 심리 카드 — 상자는 같은 높이인데 안이 짧아 아래가 비어 보였다 */
+    const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('심리 카드의 버튼과 산출 시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
+    check('요인 줄이 바닥 줄과 붙지 않게 아래 여백을 둠', /className="mt-2 mb-2 space-y-2 border-t/.test(fngCardSrc));
+    const tpl14 = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 바닥에 붙임', /\.fngfoot \{[^}]*margin-top: auto/.test(tpl14));
+
+    /*
+     * ② 휠 확대.
+     *
+     * 큰 차트는 원래 됐다. 안 되던 것은 카드 안의 작은 그림(생활 경제 지수)이다.
+     * 여기에 끌기까지 붙이면 끌고 손을 뗀 자리에서 큰 창이 열리므로 휠만 받는다.
+     */
+    const hook = await readFile('src/components/charts/useChartViewport.ts', 'utf8');
+    check("휠만 받는 방식이 있음", /mode\?: 'all' \| 'wheel'/.test(hook));
+    check('휠만 받을 때는 끌기·핀치를 붙이지 않음', /if \(!el \|\| !enabled \|\| mode !== 'all'\) return;/.test(hook));
+    check('휠은 커서 자리를 기준으로 확대함', /zoomBy\(zoomOut \? 1\.18 : 1 \/ 1\.18, timeAtPx\(e\.clientX - rect\.left\)\)/.test(hook));
+
+    /*
+     * 페이지를 굴리던 손이 그래프 위를 지나가는 것뿐이면 가로채지 않는다.
+     * 생활 화면은 그림이 아홉 장 쌓여 있어, 이 유예가 없으면 위로 굴려 올라가는
+     * 길목마다 그림이 확대되어 화면을 되돌릴 수가 없다.
+     */
+    check('페이지를 굴리는 중이면 휠을 가로채지 않음',
+      /SCROLL_GRACE_MS/.test(hook) && /Date\.now\(\) - lastPageScroll\.current < SCROLL_GRACE_MS/.test(hook));
+    check('미리보기도 같은 유예를 둠',
+      /const SCROLL_GRACE_MS = 350;/.test(tpl14) && (tpl14.match(/scrolling\(\)\) return;/g) ?? []).length >= 2);
+
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    check('생활 지수의 작은 그림이 휠을 받음', /useChartViewport\(\{[\s\S]{0,320}mode: 'wheel'/.test(trend));
+    check('그림 안 눈금과 화면 픽셀의 배율을 맞춤', /const k = size\.w > 0 \? size\.w \/ VIEW_W : 0/.test(trend));
+    check('구간 밖으로 삐져나온 선을 잘라 냄', /clipPath=\{`url\(#\$\{id\}-clip\)`\}/.test(trend));
+    check('확대했을 때만 되돌아갈 길이 나타남', /vp\.zoomed \? \(/.test(trend) && /전체 구간/.test(trend));
+    /*
+     * 좁힌 구간은 **그림에만** 쓴다. 큰 창과 표에는 원래 값이 그대로 가야 한다 —
+     * 확대해 놓고 표를 열었더니 표까지 잘려 있으면 값을 확인할 길이 없어진다.
+     */
+    check('큰 창에는 원래 구간이 감', /const bigSeries: ChartSeries\[\] = clean\.map/.test(trend));
+    check('표에도 원래 구간이 감', /mine\.points\n?\s*\.slice\(-12\)/.test(trend));
+    check('미리보기도 같은 규칙',
+      /const BTREND_VIEW = \{\};/.test(tpl14) &&
+      /const vclean = clean\.map/.test(tpl14) &&
+      /data-btreset=/.test(tpl14));
+
+    /*
+     * 눈금값이 잘리지 않는가.
+     * '89,514달러' 가 51.2 를 먹는데 자리가 46 뿐이라 앞의 '8' 이 그림 밖으로 나갔다.
+     */
+    const gl = Number(trend.match(/const GUTTER_L = (\d+)/)?.[1] ?? 0);
+    const tplGl = Number(tpl14.match(/const TREND_GL = (\d+)/)?.[1] ?? 0);
+    check('왼쪽 눈금 자리가 가장 긴 값을 담을 만큼 넓음', gl >= 58, `${gl}px`);
+    check('미리보기도 같은 자리', tplGl === gl, `${tplGl} vs ${gl}`);
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

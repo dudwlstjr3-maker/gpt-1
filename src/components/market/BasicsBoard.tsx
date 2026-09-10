@@ -335,7 +335,7 @@ export function BasicsBoard() {
                      * 세 칸은 넣지 않는다 — 카드가 310px 밑으로 내려가면 이름과 값이
                      * 한 줄에 못 서고 그래프 눈금이 뭉갠다.
                      */}
-                    <ul className="grid gap-2 md:grid-cols-2">
+                    <ul className="grid gap-2 @min-[768px]:grid-cols-2">
                       {g.items.map((item) => (
                         <BasicCard key={item.id} item={item} />
                       ))}

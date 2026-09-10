@@ -64,7 +64,7 @@ export function FlowsNewsSection() {
         자금 흐름과 뉴스
       </h2>
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-1">
+      <div className="grid grid-cols-1 gap-2 @min-[768px]:grid-cols-2 @min-[1024px]:grid-cols-1">
         <SectionGate section={flows} onRetry={refresh} loading={<SkeletonCard height={90} lines={1} />}>
           {(f) => <FlowsCard flows={f} />}
         </SectionGate>

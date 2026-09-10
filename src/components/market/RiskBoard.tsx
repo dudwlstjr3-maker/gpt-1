@@ -49,7 +49,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
           section={section}
           onRetry={refresh}
           loading={
-            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 @min-[1024px]:grid-cols-2">
               {[0, 1, 2, 3].map((i) => (
                 <SkeletonCard key={i} height={70} lines={2} />
               ))}
@@ -150,7 +150,7 @@ export function RiskBoard({ market }: { market: MarketId }) {
                     <EmptyState title="해당 시장의 지표가 없습니다" description="필터를 바꿔 보세요." />
                   </div>
                 ) : (
-                  <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 @min-[1024px]:grid-cols-2">
                     {items.map((i) => (
                       <RiskCard key={i.id} indicator={i} />
                     ))}

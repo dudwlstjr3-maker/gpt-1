@@ -95,7 +95,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
                 좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
             <p
               className="tnum leading-tight font-bold whitespace-nowrap text-fg-strong"
-              style={{ fontSize: 'clamp(15px, 4.6vw, 18px)' }}
+              style={{ fontSize: 'clamp(15px, 4.6cqw, 18px)' }}
             >
               {f.price(quote)}
             </p>

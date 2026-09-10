@@ -76,7 +76,7 @@ function IndexRow({
           62px 까지 눌려 '다우존스 산업평균' 이 두 줄로 쪼개졌다. 이름이 먼저다 —
           무엇의 값인지 모르면 옆의 숫자도 읽을 수 없고, 흐름은 눌러 들어가면 크게 볼 수 있다. */}
       {hasValue ? (
-        <span className="hidden shrink-0 min-[360px]:block">
+        <span className="hidden shrink-0 @min-[360px]:block">
           <Sparkline
             points={quote.spark}
             width={56}
@@ -170,7 +170,7 @@ export function MarketIndexBoard() {
       ) : null}
 
       <div className={failed ? 'mt-3 px-3' : 'px-3'}>
-        <div className="space-y-2 lg:grid lg:grid-cols-3 lg:items-start lg:gap-2 lg:space-y-0">
+        <div className="space-y-2 @min-[1024px]:grid @min-[1024px]:grid-cols-3 @min-[1024px]:items-start @min-[1024px]:gap-2 @min-[1024px]:space-y-0">
           {groups.map((g) => (
             <section key={g.market} aria-labelledby={`idx-${g.market}`} className="card overflow-hidden">
               <div

@@ -698,12 +698,28 @@ async function main() {
     const html = await (await fetch(`${BASE}/indicators`)).text();
     check('지표 화면에 위험 신호등 보기가 있음', html.includes('위험 신호등'));
     check('지표 화면에 전체 지표 보기가 있음', html.includes('전체 지표'));
-    // 홈에서 각 시장으로 바로 들어간다
-    const home = await (await fetch(`${BASE}/`)).text();
+    /*
+     * 홈에서 각 시장으로 바로 들어간다.
+     *
+     * 홈에서는 서버가 보낸 HTML 이 아니라 원본을 본다. 심리 카드는 스냅샷을
+     * 받아 그리는 client 화면이라 서버 HTML 에는 뼈대만 있고, 링크는 붙은 뒤에
+     * 생긴다. 예전에는 좌측 사이드바가 서버에서 같은 링크를 찍어 줘서 이 검사가
+     * 통과했는데 — 사이드바를 접자 드러났다. 화면에서 길이 사라진 게 아니라
+     * 검사가 엉뚱한 곳을 보고 있었다.
+     */
+    const fngCard = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('홈의 심리 카드에서 그 시장으로 바로 들어감',
+      /href=\{`\/market\/\$\{score\.market\}`\}/.test(fngCard));
+    // 서버가 찍어 주는 화면에도 길이 남아 있어야 한다 (지수 · 더보기)
+    const idxHtml = await (await fetch(`${BASE}/indices`)).text();
+    const moreHtml = await (await fetch(`${BASE}/more`)).text();
     for (const m of ['us', 'crypto']) {
-      check(`홈에 ${m} 시장으로 가는 길이 있음`, home.includes(`/market/${m}`));
+      check(`지수·더보기에 ${m} 시장으로 가는 길이 있음`,
+        idxHtml.includes(`/market/${m}`) && moreHtml.includes(`/market/${m}`));
     }
-    check('홈에 한국 시장으로 가는 길은 없음', !home.includes('/market/kr'));
+    // 한국은 심리 점수를 낼 만큼의 무료 데이터가 없어 시장 화면이 없다 — 없는 곳으로 가는 문을 그리지 않는다
+    check('한국 시장으로 가는 길은 없음',
+      !idxHtml.includes('/market/kr') && !moreHtml.includes('/market/kr'));
   }
 
   /* ---------------- 8-2. 위험 눈금이 상한이 아님을 밝히는가 ---------------- */
@@ -1367,7 +1383,8 @@ async function main() {
     const tpl4 = await readFile('tools/preview/template.html', 'utf8');
 
     /* ① 폭 — 넓은 화면에서는 두 칸 */
-    check('생활 카드가 넓은 화면에서 두 칸으로 섬', /grid gap-[\d.]+ md:grid-cols-2/.test(board));
+    // 칸이 넓어지면 두 칸. 화면 폭이 아니라 **본문 칸**의 폭을 본다 ([8-28] 참고)
+    check('생활 카드가 칸이 넓어지면 두 칸으로 섬', /grid gap-[\d.]+ @min-\[768px\]:grid-cols-2/.test(board));
     check('한 줄 세로 나열이 남아 있지 않음', !/<ul className="space-y-2\.5">/.test(board));
     // 세 칸이면 카드가 310px 밑으로 내려가 이름과 값이 한 줄에 못 선다.
     check('세 칸까지 쪼개지는 않음', !/grid-cols-3/.test(board));
@@ -1382,7 +1399,7 @@ async function main() {
 
     /* ④ 미리보기도 같은 모양 */
     check('미리보기도 두 칸 격자를 씀', /\.bgrid \{ display: grid/.test(tpl4));
-    check('미리보기 두 칸 기준이 앱과 같음(768px)', /@media \(min-width: 768px\) \{ \.bgrid/.test(tpl4));
+    check('미리보기 두 칸 기준이 앱과 같음(768px)', /@container app \(min-width: 768px\) \{ \.bgrid/.test(tpl4));
     check('미리보기에서 옛 좌우 배치가 사라짐', !/btrend/.test(tpl4));
     check('미리보기 그림도 폭을 따라가고 상한이 있음',
       /style="width:100%;height:auto"/.test(tpl4) && /max-width:430px/.test(tpl4));
@@ -2330,6 +2347,99 @@ async function main() {
       /const statusNote = \(phase, fresh, delay\)/.test(tplSz) &&
       /statusNote\(q\.session, q\.meta\.freshness, delay\)/.test(tplSz) &&
       /statusNote\(null, q\.meta\.freshness, delay\)/.test(tplSz));
+  }
+
+  /* ---------------- 8-28. 넓은 화면에서도 손안의 화면인가 ---------------- */
+  console.log('\n[8-28] 넓은 화면에서도 손안의 화면');
+  {
+    /*
+     * 사용자가 짚은 것: "윈도우 인터넷으로 볼 때도 핸드폰이랑 비슷하게."
+     *
+     * 창을 넓혔다고 카드를 서너 열로 펼치면 같은 앱이 아니게 된다 — 어제 폰에서
+     * 본 것이 오늘 회사 컴퓨터에서 다른 자리에 있으면 다시 찾아야 한다.
+     * 그래서 480px 부터는 430px 로 고정하고 양옆에 바닥을 깐다.
+     *
+     * 폭이 고정되면 따라오는 것이 있다. 본문 안의 배치 분기가 더는 **화면 폭**을
+     * 봐서는 안 된다는 것이다. 1440px 짜리 창에서 sm:grid-cols-2 는 그대로
+     * 발동해서, 430px 짜리 칸 안에 두 열을 밀어 넣는다. 아래 ③ 이 그것을 막는다.
+     */
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const shell = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    const nav = await readFile('src/components/nav/Navigation.tsx', 'utf8');
+    const tpl8 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 틀 — 넓어져도 430px */
+    check('화면 틀이 있음', /\.app-frame \{[^}]*margin-inline: auto/.test(css));
+    check('틀은 넓은 화면에서만 폭을 묶음',
+      /@media \(min-width: 480px\) \{[\s\S]{0,200}\.app-frame \{[\s\S]{0,120}max-width: var\(--frame-w\)/.test(css));
+    check('틀 폭이 한 곳에 적혀 있음', /--frame-w: 430px/.test(css));
+    check('틀 바깥 바닥색이 두 테마 모두 있음',
+      (css.match(/--desk:/g) ?? []).length >= 2 && /background: var\(--desk\)/.test(css));
+    check('앱 셸이 그 틀을 씀', /className="app-frame"/.test(shell));
+
+    /* ② 길은 하나 — 하단 탭, 사이드바 없음 */
+    check('좌측 사이드바를 두지 않음', !/DesktopSidebar/.test(nav) && !/DesktopSidebar/.test(shell));
+    check('하단 탭이 화면 폭과 무관하게 늘 있음',
+      /className="frame-fixed fixed bottom-0/.test(nav) && !/lg:hidden/.test(nav));
+    /*
+     * frame-fixed 는 좌우 위치를 통째로 쥔다. inset-x-0 같은 유틸리티를 같이
+     * 붙이면 그쪽이 이긴다 — Tailwind 에서 유틸리티가 컴포넌트 레이어보다 세다.
+     * 실제로 그래서 탭 막대가 화면 왼쪽 바깥으로 215px 밀려 나갔었다.
+     */
+    const clash = [...(shell + nav + (await readFile('src/components/alerts/AlertsEngine.tsx', 'utf8')))
+      .matchAll(/className="[^"]*frame-fixed[^"]*"/g)].filter((m) => /inset-x-\d/.test(m[0]));
+    check('틀에 붙는 것에 inset-x 유틸리티를 겹쳐 쓰지 않음', clash.length === 0,
+      clash.length ? clash[0][0].slice(0, 60) : '');
+
+    /* ③ 본문 안의 분기는 화면 폭이 아니라 칸 폭을 본다 */
+    check('본문이 기준 칸이 됨', /\.app-main \{[^}]*container-type: inline-size/.test(css));
+    check('앱 셸이 본문에 그 표시를 붙임', /className="main-pad app-main/.test(shell));
+
+    const CHROME = ['Signal.tsx', 'ChartModal.tsx', 'StatusBar.tsx'];
+    const stray = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      if (CHROME.some((c) => f.endsWith(c))) continue;
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        const cls = m[1] ?? m[2] ?? '';
+        for (const bp of cls.matchAll(/(?<![\w@[-])(sm|md|lg|xl|min-\[\d+px\]):/g)) {
+          stray.push(`${f.split('/').pop()} ${bp[0]}`);
+        }
+      }
+    }
+    check('본문에 화면 폭 기준 분기가 남아 있지 않음', stray.length === 0,
+      stray.length ? `${stray.length}곳 (예: ${stray[0]})` : '');
+
+    // vw 도 같은 함정이다. 1440px 창에서 85vw 는 1224px 이라 430px 칸을 넘는다.
+    const vw = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (/\d+(?:\.\d+)?vw/.test(t)) vw.push(f.split('/').pop());
+    }
+    check('화면 폭 단위(vw) 대신 칸 폭 단위(cqw)를 씀', vw.length === 0,
+      vw.length ? vw.join(', ') : '');
+
+    /*
+     * 칸(container)이 되면 그 안의 position:fixed 는 화면이 아니라 그 칸을
+     * 기준으로 붙는다. 큰 그림 창을 제자리에서 그리면 뒷배경이 본문 크기만큼만
+     * 덮여 상태바와 하단 탭이 그대로 드러난다.
+     */
+    const modal = await readFile('src/components/charts/ChartModal.tsx', 'utf8');
+    check('큰 그림 창을 문서 맨 위로 옮겨 그림', /createPortal\(/.test(modal) && /document\.body,/.test(modal));
+    check('큰 그림 창도 틀과 같은 폭', /max-w-\[var\(--frame-w\)\]/.test(modal));
+
+    /* ④ 미리보기도 같은 규칙 */
+    check('미리보기에도 틀이 있음',
+      /@media \(min-width: 480px\) \{[\s\S]{0,160}\.app \{[\s\S]{0,120}max-width: var\(--frame-w\)/.test(tpl8));
+    check('미리보기도 본문이 기준 칸', /container-type: inline-size/.test(tpl8));
+    check('미리보기에서도 사이드바를 뺐음',
+      !/class="sidebar"/.test(tpl8) && !/getElementById\('sidenav'\)/.test(tpl8));
+    const tplViewport = [...tpl8.matchAll(/@media \(min-width: (\d+)px\)/g)].map((m) => Number(m[1]));
+    // 남아도 되는 것은 틀 자체를 켜는 480px 하나뿐이다. 나머지 배치는 칸 폭을 봐야 한다.
+    check('미리보기에 남은 화면 폭 분기는 틀을 켜는 것뿐',
+      tplViewport.every((v) => v === 480), tplViewport.filter((v) => v !== 480).join(', '));
+    check('미리보기 배치 분기가 칸 폭을 봄',
+      (tpl8.match(/@container app \(min-width:/g) ?? []).length >= 8);
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

@@ -96,6 +96,12 @@
   --skeleton-shine: #2a3448;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+
+  /* 넓은 화면에서 화면 틀 바깥에 깔리는 바닥색. 앱 배경(--bg)보다 한 단 어둡다 */
+  --desk: #05070b;
+  /* 넓은 화면에서 앱이 차지하는 폭 — 이 앱이 상정한 가장 넓은 폰과 같다 */
+  --frame-w: 430px;
+  --desk-shadow: 0 0 0 1px rgb(0 0 0 / 0.5), 0 18px 60px -20px rgb(0 0 0 / 0.8);
 }
 
 :root[data-theme='light'] {
@@ -169,6 +175,10 @@
   --skeleton-shine: #f2f5f9;
 
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 20px -14px rgb(16 24 40 / 0.24);
+
+  /* 넓은 화면에서 화면 틀 바깥에 깔리는 바닥색 */
+  --desk: #e3e8f1;
+  --desk-shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 18px 50px -22px rgb(15 23 42 / 0.35);
 }
 
 @theme inline {
@@ -206,7 +216,8 @@ html {
 }
 
 body {
-  background: var(--bg);
+  /* 화면 틀 바깥의 바닥. 좁은 화면에서는 틀이 화면을 꽉 채워 보이지 않는다. */
+  background: var(--desk);
   color: var(--fg);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -440,14 +451,67 @@ body {
     padding-top: env(safe-area-inset-top, 0px);
   }
 
-  /* 하단 탭 높이만큼 본문 여백 확보 */
+  /* 하단 탭 높이만큼 본문 여백 확보.
+     탭은 이제 넓은 화면에서도 그대로 있으므로 화면 폭에 따라 달라지지 않는다. */
   .main-pad {
     padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
-  @media (min-width: 1024px) {
-    .main-pad {
-      padding-bottom: 32px;
+  /* ------------------------ 손안의 크기로 고정 ------------------------ */
+  /*
+   * 넓은 화면에서도 폰과 같은 화면을 보여준다.
+   *
+   * 왜. 이건 손에 들고 10초 안에 훑는 화면으로 만든 것이다. 창을 넓혔다고
+   * 카드를 서너 열로 펼치면 같은 앱이 아니게 된다 — 어제 폰에서 본 것이
+   * 오늘 회사 컴퓨터에서 다른 자리에 있으면 다시 찾아야 한다.
+   * 화면 하나를 두 벌로 만들어 두면 손볼 때마다 두 벌을 맞춰야 하는 일도 따라온다.
+   *
+   * 480px 을 경계로 잡았다. 그보다 좁으면 지금까지와 똑같이 화면을 꽉 채우고,
+   * 넓어지면 430px 로 고정하고 양옆에 바닥(--desk)을 깐다. 430px 은 이 앱이
+   * 상정한 가장 넓은 폰(iPhone Pro Max)의 폭이고, 그래프도 그 폭에 맞춰 그린다.
+   *
+   * 폭이 고정되므로 본문 안의 배치 분기(sm:·lg: …)는 화면 폭이 아니라
+   * **이 칸의 폭**을 봐야 한다. 그래서 main 을 컨테이너로 세우고, 본문은
+   * @min-[…]: 를 쓴다. 나중에 이 폭을 넓히면 그 배치들이 저절로 되살아난다.
+   */
+  .app-frame {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100dvh;
+    margin-inline: auto;
+    background: var(--bg);
+  }
+
+  .app-main {
+    container-type: inline-size;
+    container-name: app;
+  }
+
+  /*
+   * 화면에 붙되(fixed) 틀과 같은 폭·같은 자리에 서는 것들 — 하단 탭, 알림.
+   *
+   * 좌우 위치를 이 클래스가 통째로 쥔다. inset-x-0 같은 유틸리티를 함께 붙이면
+   * 그쪽이 이긴다 — Tailwind 에서 유틸리티 레이어가 컴포넌트 레이어보다 세다.
+   * (실제로 그래서 탭 막대가 화면 왼쪽 바깥으로 215px 밀려 나갔었다.)
+   */
+  .frame-fixed {
+    inset-inline: 0;
+  }
+
+  @media (min-width: 480px) {
+    .app-frame {
+      max-width: var(--frame-w);
+      border-inline: 1px solid var(--border);
+      box-shadow: var(--desk-shadow);
+    }
+    .frame-fixed {
+      inset-inline: auto;
+      left: 50%;
+      width: 100%;
+      max-width: var(--frame-w);
+      transform: translateX(-50%);
+      border-inline: 1px solid var(--border);
     }
   }
 

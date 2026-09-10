@@ -15,6 +15,11 @@
 
   --bg: #0a0d14;
   --bg-elev: #0f141e;
+  /* 넓은 화면에서 화면 틀 바깥에 깔리는 바닥색 */
+  --desk: #05070b;
+  --desk-shadow: 0 0 0 1px rgb(0 0 0 / 0.5), 0 18px 60px -20px rgb(0 0 0 / 0.8);
+  /* 넓은 화면에서 앱이 차지하는 폭 — 이 앱이 상정한 가장 넓은 폰과 같다 */
+  --frame-w: 430px;
   --surface: #141a26;
   --surface-2: #1b2333;
   --surface-3: #232d40;
@@ -89,6 +94,8 @@
     color-scheme: light;
     --bg: #f4f6fa;
     --bg-elev: #ffffff;
+    --desk: #e3e8f1;
+    --desk-shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 18px 50px -22px rgb(15 23 42 / 0.35);
     --surface: #ffffff;
     --surface-2: #f1f4f9;
     --surface-3: #e6ebf3;
@@ -144,6 +151,8 @@
   color-scheme: light;
   --bg: #f4f6fa;
   --bg-elev: #ffffff;
+  --desk: #e3e8f1;
+  --desk-shadow: 0 0 0 1px rgb(15 23 42 / 0.06), 0 18px 50px -22px rgb(15 23 42 / 0.35);
   --surface: #ffffff;
   --surface-2: #f1f4f9;
   --surface-3: #e6ebf3;
@@ -202,7 +211,8 @@ html { overflow-x: hidden; overflow-x: clip; }
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* 화면 틀 바깥의 바닥. 좁은 화면에서는 틀이 화면을 꽉 채워 보이지 않는다. */
+  background: var(--desk);
   color: var(--fg);
   font-family: var(--font-ui);
   font-size: 15px;
@@ -233,7 +243,8 @@ button { font: inherit; cursor: pointer; }
 }
 .preview-inner {
   margin: 0 auto;
-  max-width: 1240px;
+  /* 아래 앱이 430px 짜리 칸이라, 이 머리말만 1240px 로 펼쳐 두면 둘이 따로 논다 */
+  max-width: 880px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -259,45 +270,50 @@ button { font: inherit; cursor: pointer; }
 .preview-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 
 /* ---------------------------------- 앱 셸 ---------------------------------- */
-
-.app { display: flex; min-height: 100vh; }
-
-.sidebar {
-  display: none;
-  width: 224px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  padding: 16px 12px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-.brand { padding: 0 10px 18px; }
-.brand strong { display: block; font-size: 16px; color: var(--fg-strong); letter-spacing: -0.01em; }
-.brand span { display: block; font-size: 12.5px; color: var(--subtle); margin-top: 2px; }
-
-.navlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.navbtn {
-  width: 100%;
+/*
+ * 넓은 화면에서도 폰과 같은 화면을 보여준다.
+ *
+ * 손에 들고 10초 안에 훑는 화면으로 만든 것이라, 창을 넓혔다고 카드를 서너 열로
+ * 펼치면 같은 앱이 아니게 된다. 480px 을 경계로, 그보다 좁으면 지금까지와 똑같이
+ * 화면을 꽉 채우고 넓어지면 430px 로 고정하고 양옆에 바닥(--desk)을 깐다.
+ *
+ * 폭이 고정되므로 본문 안의 배치 분기는 화면 폭이 아니라 **이 칸의 폭**을 봐야 한다.
+ * 그래서 main 을 기준 칸(container)으로 세우고 아래는 모두 @container 로 묻는다.
+ */
+.app {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100dvh;
+  margin-inline: auto;
+  background: var(--bg);
 }
-.navbtn:hover { background: var(--surface-2); color: var(--fg); }
-.navbtn[aria-current='page'] { background: var(--surface-2); color: var(--accent); }
-.navbtn svg { flex-shrink: 0; }
+main {
+  flex: 1;
+  width: 100%;
+  padding-bottom: 84px;
+  container-type: inline-size;
+  container-name: app;
+}
 
-.col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 84px; }
+/* 화면에 붙되(fixed) 틀과 같은 폭·같은 자리에 서는 것 — 하단 탭 */
+.frame-fixed { inset-inline: 0; }
+
+@media (min-width: 480px) {
+  .app {
+    max-width: var(--frame-w);
+    border-inline: 1px solid var(--border);
+    box-shadow: var(--desk-shadow);
+  }
+  .frame-fixed {
+    inset-inline: auto;
+    left: 50%;
+    width: 100%;
+    max-width: var(--frame-w);
+    transform: translateX(-50%);
+    border-inline: 1px solid var(--border);
+  }
+}
 
 /* --------------------------------- 상태바 --------------------------------- */
 
@@ -309,7 +325,7 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(12px);
 }
-.statusbar-inner { max-width: 1180px; margin: 0 auto; padding: 8px 12px; }
+.statusbar-inner { padding: 8px 12px; }
 .sb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 /* 한 줄로 못박는다. 배지는 상태에 따라 생겼다 없어지는데(오류·오래된 데이터·시나리오),
    줄바꿈을 허용하면 배지 하나에 이 줄이 25px → 52px 이 되고, 이 머리말은 sticky 라
@@ -345,7 +361,7 @@ main { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding-bottom: 
 .sb-foot { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 8px; }
 .sb-foot p { margin: 0; font-size: 12.5px; color: var(--muted); order: 2; flex-basis: 100%; }
 .sb-toggles { display: flex; gap: 8px; order: 1; }
-@media (min-width: 560px) {
+@container app (min-width: 560px) {
   .sb-foot p { order: 1; flex-basis: auto; }
   .sb-toggles { order: 2; }
 }
@@ -479,8 +495,8 @@ section.block { padding: 0 12px; margin-top: 20px; }
   /* contain 이 없으면 가로 스크롤 영역이 문서 전체의 스크롤 폭으로 새어 나간다 */
   contain: paint; }
 .fng-scroll::-webkit-scrollbar { display: none; }
-.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: min(85vw, 340px); }
-@media (min-width: 1024px) {
+.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: min(85cqw, 340px); }
+@container app (min-width: 1024px) {
   .fng-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
   .fng-scroll > * { width: auto; }
 }
@@ -514,8 +530,8 @@ section.block { padding: 0 12px; margin-top: 20px; }
 /* --------------------------------- 가격 카드 --------------------------------- */
 
 .grid-cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
-@media (min-width: 640px) { .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1100px) { .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container app (min-width: 640px) { .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container app (min-width: 1100px) { .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .pcard { padding: 12px; }
 .pcard-top { display: flex; align-items: flex-start; gap: 8px; }
@@ -570,8 +586,8 @@ section.block { padding: 0 12px; margin-top: 20px; }
 /* --------------------------------- 지표 타일 --------------------------------- */
 
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-@media (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container app (min-width: 640px) { .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container app (min-width: 1024px) { .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
 .tile .t-label { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .t-val { font-size: 14.5px; font-weight: 700; margin-top: 2px; }
@@ -623,7 +639,7 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .backbtn { border: 0; background: none; color: var(--muted); font-size: 16px; padding: 0 4px 0 0; }
 
 .summary-grid { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-@media (min-width: 900px) { .summary-grid { flex-direction: row; align-items: center; gap: 24px; } }
+@container app (min-width: 900px) { .summary-grid { flex-direction: row; align-items: center; gap: 24px; } }
 .summary-grid > .meta { flex: 1; width: 100%; max-width: 560px; }
 
 dl.kv { margin: 12px 0 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
@@ -662,7 +678,7 @@ table.data-table thead th { font-size: 11.5px; font-weight: 600; color: var(--mu
    차지하면서 글자는 350자뿐이라, 폭은 남아돌고 세로로는 4,700px 을 굴러야 했다.
    세 칸은 넣지 않는다 — 310px 밑으로 내려가면 이름과 값이 한 줄에 못 선다. */
 .bgrid { display: grid; gap: 8px; }
-@media (min-width: 768px) { .bgrid { grid-template-columns: 1fr 1fr; } }
+@container app (min-width: 768px) { .bgrid { grid-template-columns: 1fr 1fr; } }
 table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.data th, table.data td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
 table.data tr:last-child td, table.data tr:last-child th { border-bottom: 0; }
@@ -724,14 +740,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
 .tabbar {
   position: fixed;
-  inset-inline: 0;
   bottom: 0;
   z-index: 40;
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 93%, transparent);
   backdrop-filter: blur(12px);
 }
-.tabbar ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 520px; }
+.tabbar ul { list-style: none; margin: 0; padding: 0; display: flex; }
 .tabbar li { flex: 1; }
 .tabbar button {
   width: 100%;
@@ -747,15 +762,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   gap: 2px;
 }
 .tabbar button[aria-current='page'] { color: var(--accent); }
-@media (min-width: 1024px) {
-  .sidebar { display: block; }
-  .tabbar { display: none; }
-  main { padding-bottom: 32px; }
-}
 
 /* --------------------------------- 하단 고지 --------------------------------- */
 
-.disclaimer { border-top: 1px solid var(--border); padding: 20px 12px 26px; max-width: 1180px; margin: 32px auto 0; width: 100%; }
+.disclaimer { border-top: 1px solid var(--border); padding: 20px 12px 26px; margin: 32px 0 0; width: 100%; }
 .disclaimer .strong { font-size: 13px; font-weight: 700; color: var(--fg); margin: 8px 0 0; }
 .disclaimer .fine { font-size: 11.5px; color: var(--subtle); line-height: 1.75; margin: 8px 0 0; word-break: keep-all; max-width: 76ch; }
 
@@ -797,17 +807,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 </div>
 
 <div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <strong>Market Mood 3</strong>
-      <span>미국 · 한국 · 크립토 투자심리</span>
-    </div>
-    <nav aria-label="주요 메뉴">
-      <ul class="navlist" id="sidenav"></ul>
-    </nav>
-  </aside>
-
-  <div class="col">
     <header class="statusbar">
       <div class="statusbar-inner" id="statusbar"></div>
     </header>
@@ -827,10 +826,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     <!-- 홈 탭을 옮겨도 문서가 짧아지지 않게 맨 끝에서 모자란 만큼만 채우는 자리.
          본문 밑이 아니라 여기에 둔다 — 본문 밑이면 짧은 탭에서 고지문 위가 한 화면쯤 빈다. -->
     <div id="tailgap" aria-hidden="true"></div>
-  </div>
 </div>
 
-<nav class="tabbar" aria-label="주요 메뉴">
+<nav class="tabbar frame-fixed" aria-label="주요 메뉴">
   <ul id="tabnav"></ul>
 </nav>
 
@@ -1800,7 +1798,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       (up ? heatFlame(t) : heatFrost(t)) + '</div>' +
       '<div style="min-width:0">' +
       /* 카드 폭은 화면 폭의 절반이라, 좁아지면 글자도 같이 줄여 한 줄을 지킨다 */
-      '<div style="margin-top:4px;font-size:clamp(13px, 4.1vw, 15px);line-height:1.35;font-weight:700;white-space:nowrap;color:var(--fg-strong)">' + esc(q.name) + '</div>' +
+      '<div style="margin-top:4px;font-size:clamp(13px, 4.1cqw, 15px);line-height:1.35;font-weight:700;white-space:nowrap;color:var(--fg-strong)">' + esc(q.name) + '</div>' +
       '<div style="margin-top:2px;font-size:11.5px;color:var(--subtle)">' + esc(q.symbol) + '</div></div>' +
       (pick.note ? '<p style="margin:8px 0 0;font-size:11.5px;word-break:keep-all;color:var(--warn)">' + esc(pick.note) + '</p>' : '') +
       '<p class="tnum" style="margin:8px 0 0;font-size:22px;line-height:1;font-weight:700;letter-spacing:-.02em;color:currentColor">' +
@@ -4235,28 +4233,12 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
   ];
 
-  /** 사이드바에만 노출하는 시장별 바로가기 */
-  const MARKET_NAV = [
-    { region: 'us', label: '미국' },
-    { region: 'crypto', label: '크립토' },
-    /* 선물은 하단 탭에 넣지 않는다 — 앱과 같다. 320px 에서 여덟 칸이면 글자가 뭉갠다. */
-    { view: 'futures', label: '선물' },
-  ];
-
+  /*
+   * 넓은 화면의 좌측 사이드바는 접었다 — 앱과 같다.
+   * 폰이든 데스크톱이든 길은 하단 탭 하나다. 사이드바에만 있던 시장별 바로가기는
+   * '더보기' 와 지수 화면에 그대로 있다.
+   */
   function renderNav() {
-    document.getElementById('sidenav').innerHTML =
-      NAV.map((n) =>
-        '<li><button type="button" class="navbtn" data-go="' + n.id + '"' +
-        (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('') +
-      '<li aria-hidden="true" style="height:1px;background:var(--border);margin:12px 6px"></li>' +
-      '<li style="padding:0 10px 4px;font-size:11.5px;font-weight:600;color:var(--subtle)">시장별 화면</li>' +
-      MARKET_NAV.map((m) =>
-        '<li><button type="button" class="navbtn" ' +
-        (m.view ? 'data-go="' + m.view + '"' : 'data-go-region="' + m.region + '"') +
-        ' style="font-size:13px;padding:8px 10px"' +
-        ((m.view ? state.view === m.view : state.view === 'marketRegion' && state.region === m.region)
-          ? ' aria-current="page"' : '') + '>' + m.label + '</button></li>').join('');
-
     document.getElementById('tabnav').innerHTML = NAV.filter((n) => n.id !== 'indicators').map((n) =>
       '<li><button type="button" data-go="' + n.id + '"' + (state.view === n.id ? ' aria-current="page"' : '') + '>' + n.icon + n.label + '</button></li>').join('');
   }
@@ -4637,14 +4619,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
 <style>
 /* 넓은 화면에서의 다중 열 배치 */
-@media (min-width: 1024px) {
+@container app (min-width: 1024px) {
   .dash { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 0 8px; }
   .market-grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
 }
-@media (min-width: 640px) and (max-width: 1023px) {
+@container app (min-width: 640px) and (max-width: 1023px) {
   .grid-flows { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
-@media (min-width: 640px) {
+@container app (min-width: 640px) {
   .drivers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
@@ -4697,13 +4679,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .riskcards { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .hubgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .idxgrid { display: flex; flex-direction: column; gap: 8px; }
-@media (min-width: 1000px) { .idxgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
+@container app (min-width: 1000px) { .idxgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
 .mktgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .risktile { display: block; padding: 12px; }
 .risktile:hover { background: var(--surface-2); }
-@media (min-width: 640px) { .riskgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1100px) { .riskgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (min-width: 1024px) {
+@container app (min-width: 640px) { .riskgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container app (min-width: 1100px) { .riskgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container app (min-width: 1024px) {
   .riskcards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hubgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .mktgrid { grid-template-columns: 340px minmax(0, 1fr); align-items: start; }

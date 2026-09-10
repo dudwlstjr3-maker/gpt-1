@@ -13,9 +13,16 @@
  *  - 열려 있는 동안 뒤 페이지는 스크롤되지 않는다.
  *  - 초점이 창 밖으로 새 나가지 않는다(Tab 순환).
  *  - prefers-reduced-motion 이면 나타나는 동작을 생략한다.
+ *
+ * 왜 body 로 옮겨 그리나 (createPortal)
+ *   본문(main)이 배치 분기의 기준 칸(container-type: inline-size)이 되면서
+ *   그 안의 position:fixed 는 화면이 아니라 **그 칸**을 기준으로 붙게 됐다.
+ *   창을 제자리에서 그리면 뒷배경이 본문 크기만큼만 덮여 상단 상태바와
+ *   하단 탭이 그대로 드러난다. 그래서 문서 맨 위로 옮겨 그린다.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export function ChartModal({
   open,
@@ -30,6 +37,10 @@ export function ChartModal({
   subtitle?: string;
   children: React.ReactNode;
 }) {
+  /* 서버에서는 document 가 없다. 처음 그릴 때는 아무것도 내지 않고, 붙은 뒤에 옮겨 그린다. */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   /** 열기 전에 초점이 있던 곳 — 닫을 때 여기로 돌려준다 */
@@ -75,11 +86,11 @@ export function ChartModal({
     [onClose],
   );
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-[2px] sm:p-6 motion-safe:animate-[fadeIn_120ms_ease-out]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-[2px] motion-safe:animate-[fadeIn_120ms_ease-out]"
       onMouseDown={(e) => {
         // 창 안에서 끌다가 바깥에서 손을 떼도 닫히면 안 된다. 눌린 자리로 판단한다.
         if (e.target === e.currentTarget) onClose();
@@ -91,7 +102,8 @@ export function ChartModal({
         aria-modal="true"
         aria-label={title}
         onKeyDown={onKeyDown}
-        className="flex max-h-full w-full flex-col rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow-card)] sm:max-h-[92vh] sm:w-full sm:max-w-3xl"
+        /* 화면 틀과 같은 폭. 앱이 430px 짜리 칸인데 창만 768px 로 열리면 딴 앱처럼 보인다. */
+        className="flex max-h-full w-full max-w-[var(--frame-w)] flex-col rounded-2xl border border-border bg-bg-elevated shadow-[var(--shadow-card)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
@@ -110,7 +122,8 @@ export function ChartModal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

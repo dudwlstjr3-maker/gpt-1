@@ -77,7 +77,7 @@ export function StatusBar() {
       className="sticky top-0 z-30 border-b border-border pt-safe"
       style={{ background: 'color-mix(in srgb, var(--bg) 88%, transparent)', backdropFilter: 'blur(12px)' }}
     >
-      <div className="mx-auto w-full max-w-6xl px-3 py-2">
+      <div className="w-full px-3 py-2">
         {/* 1행: 시각 + 상태 배지 */}
         <div className="flex items-center justify-between gap-2">
           {/*

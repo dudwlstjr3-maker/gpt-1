@@ -3,15 +3,21 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { markInternalNav } from './BackBar';
-import { BottomTabs, DesktopSidebar } from './Navigation';
+import { BottomTabs } from './Navigation';
 import { StatusBar } from '@/components/market/StatusBar';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { AlertsEngine } from '@/components/alerts/AlertsEngine';
 import { ServiceWorkerRegistrar } from '@/components/pwa/ServiceWorkerRegistrar';
 
 /**
- * 공통 레이아웃.
- * 모바일: 상단 상태바 + 하단 탭 / 데스크톱: 좌측 사이드바 + 다중 열
+ * 공통 레이아웃 — 폰이든 데스크톱이든 한 벌이다.
+ *
+ * 상단 상태바 + 본문 + 하단 탭. 넓은 화면에서는 이 한 벌이 430px 짜리 틀 안에
+ * 들어가고 양옆에 바닥이 깔린다 (globals.css 의 .app-frame).
+ *
+ * 예전에는 1024px 부터 좌측 사이드바 + 다중 열로 갈라졌다. 접었다 —
+ * 손에 들고 10초 안에 훑는 화면으로 만든 것이라 창을 넓혔다고 카드를 서너 열로
+ * 펼치면 같은 앱이 아니게 되고, 화면 하나를 손볼 때마다 두 벌을 맞춰야 했다.
  *
  * 화면이 바뀔 때 새 내용이 **스르륵 올라오며 나타난다**.
  * 예전에는 눌리는 순간 통째로 갈아치워져서, 어디로 왔는지 알아채기 전에
@@ -42,20 +48,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   return (
-    <div className="flex min-h-screen">
-      <DesktopSidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+    <>
+      <div className="app-frame">
         <StatusBar />
-        <main id="main" className="main-pad mx-auto w-full max-w-6xl flex-1">
+        {/* 본문이 배치 분기의 기준이 된다 — 창 폭이 아니라 이 칸의 폭을 본다 */}
+        <main id="main" className="main-pad app-main w-full flex-1">
           <div key={pathname} className="view-enter">
             {children}
           </div>
           <Disclaimer />
         </main>
       </div>
+      {/*
+       * 하단 탭과 알림은 틀 **바깥**에 둔다.
+       * 틀은 container-type 을 가진 칸이 아니지만, 본문(main)은 그렇다 —
+       * 그 안에 position:fixed 를 두면 화면이 아니라 그 칸을 기준으로 붙는다.
+       */}
       <BottomTabs />
       <AlertsEngine />
       <ServiceWorkerRegistrar />
-    </div>
+    </>
   );
 }

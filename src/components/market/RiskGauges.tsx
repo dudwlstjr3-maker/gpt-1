@@ -376,7 +376,7 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
               칸이 좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
           <span
             className="tnum font-bold whitespace-nowrap text-fg-strong"
-            style={{ fontSize: 'clamp(12.5px, 3.9vw, 15px)' }}
+            style={{ fontSize: 'clamp(12.5px, 3.9cqw, 15px)' }}
           >
             {formatRiskValue(indicator.value, indicator)}
           </span>
@@ -549,7 +549,7 @@ export function RiskGaugesSection() {
         loading={
           <>
             <Skeleton className="mb-2 h-9" />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-3 @min-[1280px]:grid-cols-4">
               {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-[104px]" />
               ))}
@@ -583,7 +583,7 @@ export function RiskGaugesSection() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-3 @min-[1280px]:grid-cols-4">
                 {digest.indicators.map((i) => (
                   <RiskTile key={i.id} indicator={i} />
                 ))}

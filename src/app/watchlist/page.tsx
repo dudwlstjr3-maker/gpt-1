@@ -114,7 +114,7 @@ export default function WatchlistPage() {
               section={section}
               onRetry={refresh}
               loading={
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2 @min-[1280px]:grid-cols-3">
                   {[0, 1, 2].map((i) => (
                     <SkeletonCard key={i} height={44} lines={1} />
                   ))}
@@ -125,7 +125,7 @@ export default function WatchlistPage() {
                 quotes.length === 0 ? (
                   <EmptyState title="시세를 찾을 수 없습니다" description="선택한 항목이 현재 응답에 없습니다." />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2 @min-[1280px]:grid-cols-3">
                     {quotes.map((q) => (
                       <PriceCard key={q.id} quote={q} />
                     ))}

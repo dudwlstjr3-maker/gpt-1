@@ -144,9 +144,9 @@ export default function MarketRegionPage() {
         />
       </div>
 
-      <div className="mt-3 px-3 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-4">
+      <div className="mt-3 px-3 @min-[1024px]:grid @min-[1024px]:grid-cols-[340px_minmax(0,1fr)] @min-[1024px]:items-start @min-[1024px]:gap-4">
         {/* 좌측: 심리 · 위험 · 시장 고유 정보 */}
-        <div className="space-y-2 lg:sticky lg:top-32">
+        <div className="space-y-2 @min-[1024px]:sticky @min-[1024px]:top-32">
           {fng && snapshot ? <FngCard score={fng} mode={snapshot.mode} /> : <SkeletonCard height={140} lines={2} />}
 
           <RiskForMarket market={region} />
@@ -214,7 +214,7 @@ export default function MarketRegionPage() {
         </div>
 
         {/* 우측: 시세 목록 + 일정 + 뉴스 */}
-        <div className="mt-4 lg:mt-0">
+        <div className="mt-4 @min-[1024px]:mt-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <SegmentedControl label="정렬" size="xs" value={sort} onChange={setSort} options={SORT_OPTIONS} />
             <button
@@ -236,7 +236,7 @@ export default function MarketRegionPage() {
               section={quotesSection}
               onRetry={refresh}
               loading={
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2">
                   {[0, 1, 2, 3].map((i) => (
                     <SkeletonCard key={i} height={44} lines={1} />
                   ))}
@@ -251,7 +251,7 @@ export default function MarketRegionPage() {
                     description={onlyWatched ? '카드의 ☆ 를 눌러 관심목록에 추가하세요.' : undefined}
                   />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2">
                     {list.map((q) => (
                       <PriceCard key={q.id} quote={q} />
                     ))}

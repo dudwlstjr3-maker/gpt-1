@@ -45,7 +45,7 @@ export function HomePrices() {
         section={section}
         onRetry={refresh}
         loading={
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2 @min-[1280px]:grid-cols-3">
             {[0, 1, 2, 3].map((i) => (
               <SkeletonCard key={i} height={44} lines={1} />
             ))}
@@ -65,7 +65,7 @@ export function HomePrices() {
               }
             />
           ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2 @min-[1280px]:grid-cols-3">
               {ordered.map((q) => (
                 <PriceCard key={q.id} quote={q} />
               ))}

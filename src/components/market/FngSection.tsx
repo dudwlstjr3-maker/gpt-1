@@ -31,7 +31,7 @@ export function FngSection() {
         section={section}
         onRetry={refresh}
         loading={
-          <div className="grid grid-cols-1 gap-3 px-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 px-3 @min-[1024px]:grid-cols-3">
             {MARKET_IDS.map((m) => (
               <SkeletonCard key={m} height={150} lines={2} />
             ))}
@@ -41,15 +41,15 @@ export function FngSection() {
         {(scores) => (
           <>
             {/* 모바일: 가로 스와이프 */}
-            <div className="snap-row px-3 lg:hidden">
+            <div className="snap-row px-3 @min-[1024px]:hidden">
               {scores.map((s) => (
-                <div key={s.market} className="snap-item w-[85vw] max-w-[340px]">
+                <div key={s.market} className="snap-item w-[85cqw] max-w-[340px]">
                   <FngCard score={s} mode={mode} standalone={false} />
                 </div>
               ))}
             </div>
             {/* 데스크톱: 3열 */}
-            <div className="hidden gap-2 px-3 lg:grid lg:grid-cols-3">
+            <div className="hidden gap-2 px-3 @min-[1024px]:grid @min-[1024px]:grid-cols-3">
               {scores.map((s) => (
                 <FngCard key={s.market} score={s} mode={mode} standalone={false} />
               ))}

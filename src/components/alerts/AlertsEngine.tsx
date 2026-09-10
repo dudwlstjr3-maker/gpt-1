@@ -199,8 +199,16 @@ export function AlertsEngine() {
 
   if (toasts.length === 0) return null;
 
+  /*
+   * 알림도 화면 틀 안에 뜬다. 넓은 화면에서 앱은 가운데 430px 짜리 칸이라,
+   * 창 오른쪽 위 구석에 뜨면 앱과 동떨어진 자리에서 말을 거는 꼴이 된다.
+   */
   return (
-    <div className="fixed inset-x-3 top-3 z-50 flex flex-col gap-2 lg:left-auto lg:right-4 lg:w-80" role="status" aria-live="polite">
+    <div
+      className="frame-fixed fixed top-3 z-50 flex flex-col gap-2 px-3"
+      role="status"
+      aria-live="polite"
+    >
       {toasts.map((t) => (
         <div key={t.id} className="card flex items-start gap-2 p-3" style={{ borderColor: 'var(--accent)' }}>
           <span aria-hidden="true" className="mt-0.5 text-sm">

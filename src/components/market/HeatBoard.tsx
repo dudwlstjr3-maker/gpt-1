@@ -117,7 +117,7 @@ function HeatCard({ pick }: { pick: HeatPick }) {
         <Link
           href={`/asset/${q.id}`}
           className="mt-1 block leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
-          style={{ fontSize: 'clamp(13px, 4.1vw, 15px)' }}
+          style={{ fontSize: 'clamp(13px, 4.1cqw, 15px)' }}
         >
           {q.name}
         </Link>

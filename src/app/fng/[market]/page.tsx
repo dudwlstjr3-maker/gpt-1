@@ -214,7 +214,7 @@ export default function FngDetailPage() {
       {/* 요약 */}
       <section className="mt-5 px-3" aria-label="점수 요약">
         <div className="card p-3">
-          <div className="flex flex-col items-center gap-2 lg:flex-row lg:items-center lg:gap-6">
+          <div className="flex flex-col items-center gap-2 @min-[1024px]:flex-row @min-[1024px]:items-center @min-[1024px]:gap-6">
             <Gauge score={detail.score} size={200} />
             <div className="w-full flex-1">
               {unavailable ? (
@@ -327,7 +327,7 @@ export default function FngDetailPage() {
         <h2 id="fng-cycle-title" className="mb-2 text-base font-bold text-fg-strong">
           사이클과 구간 통계
         </h2>
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 @min-[1024px]:grid-cols-2">
           <FngCycleView cycle={detail.cycle} />
           {detail.bandStats ? (
             <BandStatsView stats={detail.bandStats} />
@@ -356,7 +356,7 @@ export default function FngDetailPage() {
               value: c.contributionDay,
             }))}
           />
-          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-2 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-2 @min-[640px]:grid-cols-2">
             <div className="rounded-lg bg-surface-2 p-2">
               <p className="text-[11.5px] text-muted">가장 큰 상승 요인</p>
               <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">

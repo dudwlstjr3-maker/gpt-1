@@ -542,6 +542,23 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .rguide-body .notice { margin: 0; }
 
 /* 선물 판 — 한 줄에 이름·막대·값 */
+/* 오늘 불타는 것과 얼어붙은 것 — 세기(--t)에 따라 위쪽에서 열기·냉기가 번진다.
+   색만으로 뜻을 전하지 않으므로 이건 거들 뿐이고, 뜻은 늘 글자가 말한다. */
+.heat-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.heat-card { position: relative; overflow: hidden; isolation: isolate; padding: 12px; }
+.heat-card .heat-glow {
+  position: absolute; inset: -40% -20% auto -20%; height: 200px; z-index: -1;
+  opacity: calc(.08 + var(--t) * .5); filter: blur(28px); pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0%, currentColor, transparent 70%);
+}
+.heat-mark { width: 32px; height: 32px; flex-shrink: 0; color: currentColor; }
+/* 세게 타오를 때만 아주 조금 흔들린다. 멈춰 있어도 그림이 다 보이는 상태에서 시작한다. */
+.heat-card[data-hot='true'] .heat-flame { transform-origin: 50% 85%; animation: heat-flicker 2.6s ease-in-out infinite; }
+@keyframes heat-flicker {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(calc(1 + var(--t) * .07)); opacity: calc(1 - var(--t) * .14); }
+}
+
 .futlist { list-style: none; margin: 0; padding: 0; }
 .futlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .futlist li:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -1685,6 +1702,128 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     );
   }
 
+  /* ---------------- 오늘 불타는 것과 얼어붙은 것 ----------------
+     src/lib/heatRank.mjs 를 그대로 옮긴 것. 단계와 문구가 저쪽과 어긋나면 검사가 잡는다. */
+  var HEAT_MIN_SAMPLE = 7;
+  var HEAT_WORD = {
+    3: { up: '활활 타오릅니다', down: '꽁꽁 얼어붙었습니다' },
+    2: { up: '불타오릅니다', down: '싸늘하게 식었습니다' },
+    1: { up: '불이 붙었습니다', down: '차갑게 식었습니다' },
+    0: { up: '불씨 정도입니다', down: '살짝 식었습니다' },
+  };
+  var HEAT_TRADABLE = { equity: 1, index: 1, crypto: 1, commodity: 1 };
+
+  function heatSigma(spark) {
+    const v = (Array.isArray(spark) ? spark : []).map((x) => x && x.v).filter(isNum);
+    if (v.length < HEAT_MIN_SAMPLE + 1) return null;
+    const r = [];
+    for (let i = 1; i < v.length; i += 1) if (v[i - 1] !== 0) r.push(((v[i] - v[i - 1]) / v[i - 1]) * 100);
+    if (r.length < HEAT_MIN_SAMPLE) return null;
+    const m = r.reduce((a, b) => a + b, 0) / r.length;
+    const sd = Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1));
+    return isNum(sd) && sd > 0 ? sd : null;
+  }
+  function heatOf(pct, sd) {
+    if (!isNum(pct) || !isNum(sd) || !(sd > 0)) return null;
+    const z = pct / sd, a = Math.abs(z), up = pct >= 0;
+    const level = a >= 3 ? 3 : a >= 2 ? 2 : a >= 1 ? 1 : 0;
+    return { z: z, times: a, level: level, up: up,
+      word: HEAT_WORD[level][up ? 'up' : 'down'], strength: Math.min(1, a / 3) };
+  }
+  function pickHeat(quotes) {
+    const rows = (quotes || [])
+      .filter((q) => q && isNum(q.changePct) && q.price !== null && q.price !== undefined)
+      .map((q) => { const sd = heatSigma(q.spark); return { quote: q, sigma: sd, heat: heatOf(q.changePct, sd) }; });
+    if (rows.length < 2) return null;
+    rows.sort((a, b) => b.quote.changePct - a.quote.changePct);
+    const top = rows[0], bot = rows[rows.length - 1];
+    /* 다 오른 날에 '가장 많이 내린 것' 이라고 적으면 오른 것을 내렸다고 말하는 셈이다 */
+    const noFall = bot.quote.changePct >= 0, noRise = top.quote.changePct < 0;
+    return {
+      count: rows.length,
+      top: Object.assign({}, top, { slot: noRise ? '가장 덜 내린 것' : '가장 많이 오른 것',
+        note: noRise ? '이 시장에서는 오른 것이 하나도 없습니다.' : null }),
+      bottom: Object.assign({}, bot, { slot: noFall ? '가장 덜 오른 것' : '가장 많이 내린 것',
+        note: noFall ? '이 시장에서는 내린 것이 하나도 없습니다.' : null }),
+    };
+  }
+
+  /* 불꽃 — 좌우 대칭이면 물방울로 보인다. 혀끝을 꺾고 불똥을 붙인다. */
+  function heatFlame(t) {
+    return '<svg viewBox="0 0 24 24" class="heat-mark heat-flame" aria-hidden="true">' +
+      '<path d="M13.4 1.8c-.3 2.6.4 4.3 1.7 5.9 1.6 2 3.1 3.6 3.1 6.4a6.3 6.3 0 0 1-12.6 0c0-2 .7-3.5 1.8-4.8.1 1.1.6 1.9 1.4 2.4.2-3.8 1.7-6.9 4.6-9.9Z" fill="currentColor" opacity="' + (0.2 + 0.45 * t).toFixed(2) + '"/>' +
+      '<path d="M12.6 10.4c-.2 1.5.2 2.3.9 3.2.8 1 1.4 1.7 1.4 2.9a2.9 2.9 0 0 1-5.8 0c0-1.3.7-2 1.4-2.9.6-.8 1.6-1.9 2.1-3.2Z" fill="currentColor" opacity="' + (0.55 + 0.45 * t).toFixed(2) + '"/>' +
+      (t > 0.55 ? '<circle cx="6.4" cy="6.6" r="1.15" fill="currentColor" opacity="' + (0.35 * t).toFixed(2) + '"/>' : '') +
+      '</svg>';
+  }
+  function heatFrost(t) {
+    const arms = [0, 60, 120].map((d) => '<g transform="rotate(' + d + ' 12 12)">' +
+      '<line x1="12" y1="2.5" x2="12" y2="21.5"/><line x1="12" y1="5.5" x2="9" y2="8"/>' +
+      '<line x1="12" y1="5.5" x2="15" y2="8"/><line x1="12" y1="18.5" x2="9" y2="16"/>' +
+      '<line x1="12" y1="18.5" x2="15" y2="16"/></g>').join('');
+    return '<svg viewBox="0 0 24 24" class="heat-mark" aria-hidden="true" stroke="currentColor" fill="none" ' +
+      'stroke-width="' + (1.1 + 1.1 * t).toFixed(2) + '" stroke-linecap="round" opacity="' + (0.45 + 0.5 * t).toFixed(2) + '">' +
+      arms + '</svg>';
+  }
+
+  function heatCard(pick) {
+    const q = pick.quote, up = q.changePct >= 0, t = pick.heat ? pick.heat.strength : 0;
+    const col = dirColor(q.changePct);
+    return '<article class="card heat-card" data-hot="' + up + '" style="--t:' + t.toFixed(2) + ';color:' + col + '" ' +
+      'aria-label="' + esc(q.name) + ' ' + esc(pick.slot) + '">' +
+      '<div class="heat-glow" aria-hidden="true"></div>' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">' +
+      '<div style="min-width:0">' +
+      '<p style="margin:0;font-size:11.5px;line-height:1.35;font-weight:700;word-break:keep-all;color:currentColor">' + esc(pick.slot) + '</p>' +
+      '<div style="margin-top:4px;font-size:15px;line-height:1.35;font-weight:700;word-break:keep-all;color:var(--fg-strong)">' + esc(q.name) + '</div>' +
+      '<div style="margin-top:2px;font-size:11.5px;color:var(--subtle)">' + esc(q.symbol) + '</div></div>' +
+      (up ? heatFlame(t) : heatFrost(t)) + '</div>' +
+      (pick.note ? '<p style="margin:8px 0 0;font-size:11.5px;word-break:keep-all;color:var(--warn)">' + esc(pick.note) + '</p>' : '') +
+      '<p class="tnum" style="margin:8px 0 0;font-size:22px;line-height:1;font-weight:700;letter-spacing:-.02em;color:currentColor">' +
+      dirGlyph(q.changePct) + ' ' + esc(fmtPct(q.changePct)) + '<span class="sr">' + dirLabel(q.changePct) + '</span></p>' +
+      '<p class="tnum" style="margin:4px 0 0;font-size:12.5px;white-space:nowrap;color:var(--fg)">' + esc(fmtValue(q.price, q)) + '</p>' +
+      '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">' +
+      (pick.heat
+        ? '<p style="margin:0;font-size:15px;line-height:1.35;font-weight:700;word-break:keep-all;color:currentColor">' + esc(pick.heat.word) + '</p>' +
+          '<p class="tnum" style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">평소 하루 ' +
+          esc(fmtNum(pick.sigma, 2)) + '% 움직이던 것이 오늘 ' + esc(fmtNum(pick.heat.times, 1)) + '배로</p>'
+        : '<p style="margin:0;font-size:13px;font-weight:700;word-break:keep-all;color:var(--muted)">얼마나 유별난지 잴 수 없습니다</p>' +
+          '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">평소 움직이던 폭을 낼 만큼 지나온 값이 오지 않았습니다.</p>') +
+      '</div>' +
+      (q.spark && q.spark.length > 1
+        ? '<div style="margin-top:8px">' + sparkline(q.spark, 'currentColor', 160, 32, true) + '</div>'
+        : '<p style="margin:8px 0 0;font-size:11.5px;word-break:keep-all;color:var(--subtle)">지나온 값을 받지 못해 선을 그리지 않습니다.</p>') +
+      '</article>';
+  }
+
+  var HEAT_NOTE = { us: '지수와 개별주', kr: '지수와 개별주', crypto: '24시간 거래' };
+
+  function heatSection() {
+    const data = snap().sections.quotes.data || {};
+    const boards = ['us', 'kr', 'crypto']
+      .map((m) => ({ m: m, b: pickHeat((data[m] || []).filter((q) => HEAT_TRADABLE[q.kind])) }))
+      .filter((x) => x.b);
+    return '<section class="block"><div style="margin-bottom:8px">' +
+      '<h2 style="margin:0;font-size:16px;font-weight:700;color:var(--fg-strong)">오늘 불타는 것과 얼어붙은 것</h2>' +
+      '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '시장마다 가장 많이 오른 것 하나와 가장 많이 내린 것 하나씩입니다. 몇 % 움직였는지가 아니라 ' +
+      '<b style="color:var(--muted)">그 종목이 평소 움직이던 폭에 견줘</b> 오늘이 얼마나 유별났는지로 골랐습니다 — ' +
+      '그냥 % 로 줄을 세우면 원래 많이 움직이는 크립토가 늘 이깁니다.</p></div>' +
+      (boards.length === 0
+        ? '<p style="font-size:13px;color:var(--muted)">고를 만한 종목이 없습니다.</p>'
+        : boards.map((x) =>
+            '<div style="margin-bottom:16px">' +
+            '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">' +
+            '<h3 style="margin:0;font-size:13px;font-weight:700;color:var(--fg)">' + MARKET_LABEL[x.m] + '</h3>' +
+            '<p style="margin:0;font-size:11.5px;color:var(--subtle)">' + HEAT_NOTE[x.m] + ' ' + x.b.count + '개 중에서</p></div>' +
+            '<div class="heat-pair">' + heatCard(x.b.top) + heatCard(x.b.bottom) + '</div></div>').join('')) +
+      '<p style="margin:0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
+      '평소의 1배 미만이면 불씨 정도·살짝 식음, 1~2배면 불이 붙음·차갑게 식음, 2~3배면 불타오름·싸늘하게 식음, ' +
+      '3배 이상이면 활활 타오름·꽁꽁 얼어붙음입니다. <b style="color:var(--muted)">말은 세게 썼지만 뜻은 하나입니다 — ' +
+      '얼마나 크게 움직였는가.</b> 좋다·나쁘다가 아니고, 사라거나 팔라는 뜻은 더더욱 아닙니다. ' +
+      '크게 오른 뒤에 더 오를지 내릴지는 이 숫자가 말해 주지 않습니다.</p></section>';
+  }
+
   function priceCard(q) {
     const un = q.price === null;
     const col = dirColor(q.changePct);
@@ -2791,6 +2930,9 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +
       '<button type="button" class="linkbtn" data-go="indices">지수 전체 →</button></div>' +
       '<div class="grid-cards">' + ordered.slice(0, 9).map(priceCard).join('') + '</div></section>' +
+
+      /* 가격을 훑고 난 다음 자리 — "오늘 무슨 일이 있었나" 를 여섯 칸으로 잡는다 */
+      heatSection() +
 
       '<div class="dash">' +
       '<section class="block"><div class="block-head"><h2>오늘의 시장 요약</h2></div>' +

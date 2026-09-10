@@ -16,6 +16,7 @@ import { useData } from '@/components/providers/DataProvider';
 import { FngSection } from '@/components/market/FngSection';
 import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
+import { HeatBoard } from '@/components/market/HeatBoard';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskGaugesSection } from '@/components/market/RiskGauges';
 import { HomeLower } from '@/components/market/HomeLower';
@@ -56,6 +57,9 @@ export default function HomePage() {
       <RegimeBoardCard />
       <RiskGaugesSection />
       <HomePrices />
+
+      {/* 가격을 훑고 난 다음 자리다. "오늘 무슨 일이 있었나" 를 여섯 칸으로 잡는다. */}
+      <HeatBoard />
 
       <SummaryCard />
 

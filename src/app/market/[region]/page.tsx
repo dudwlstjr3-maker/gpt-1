@@ -120,7 +120,7 @@ export default function MarketRegionPage() {
           </Link>
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-fg-strong">{MARKET_LABEL[region]} 시장</h1>
-            <p className="mt-0.5 truncate text-[12.5px] text-subtle">{SUBTITLE[region]}</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug break-keep text-subtle">{SUBTITLE[region]}</p>
           </div>
         </div>
         {session ? (
@@ -195,7 +195,7 @@ export default function MarketRegionPage() {
                   return (
                     <li key={q.id}>
                       <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-2 hover:opacity-80">
-                        <span className="truncate text-[13px] text-fg">{q.name}</span>
+                        <span className="min-w-0 text-[13px] break-keep text-fg">{q.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="tnum text-[13px] font-semibold text-fg-strong">
                             {q.price === null ? NO_VALUE : f.price(q)}

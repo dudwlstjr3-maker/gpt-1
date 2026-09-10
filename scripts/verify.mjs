@@ -2075,6 +2075,120 @@ async function main() {
       (fundT?.lines ?? []).map((l) => l.label).join(' / ').slice(0, 80));
   }
 
+  /* ---------------- 8-26. 불타는 것 · 얼어붙은 것 ---------------- */
+  console.log('\n[8-26] 오늘 불타는 것과 얼어붙은 것');
+  {
+    /*
+     * 몇 % 움직였는지로 줄을 세우면 크립토가 늘 이긴다. 원래 많이 움직이는 것이라
+     * 하루 8% 가 평범할 수 있고, 코스피가 8% 움직이면 사건이다. 그래서 그 종목이
+     * **평소 움직이던 폭에 견줘** 오늘이 얼마나 유별났는지로 고른다.
+     *
+     * 말은 세게 쓰되 '얼마나 크게 움직였는가' 까지만 말한다 — 좋다·나쁘다도,
+     * 사라·팔라도 아니다. 그 선을 코드가 지키는지 여기서 본다.
+     */
+    const heatSrc = existsSync('src/lib/heatRank.mjs') ? await readFile('src/lib/heatRank.mjs', 'utf8') : '';
+    const heatView = existsSync('src/components/market/HeatBoard.tsx')
+      ? await readFile('src/components/market/HeatBoard.tsx', 'utf8') : '';
+    const homeSrc = await readFile('src/app/page.tsx', 'utf8');
+    const cssSrc = await readFile('src/app/globals.css', 'utf8');
+    const tpl14 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 고르는 규칙 */
+    check('고르는 규칙이 순수 모듈로 분리됨', /export function pickHeat/.test(heatSrc) && /export function dailySigma/.test(heatSrc));
+    check('% 가 아니라 평소 폭에 견줘 고름', /평소 움직이던 폭에 견줘/.test(heatSrc) && /changePct \/ sigma/.test(heatSrc));
+    check('표본이 모자라면 배수를 지어내지 않음', /MIN_SAMPLE/.test(heatSrc) && /return null/.test(heatSrc));
+    check('단위 테스트가 있음', existsSync('scripts/heatRank.test.mjs'));
+
+    /* ② 말의 선 — 여기가 이 화면에서 제일 미끄러지기 쉬운 자리다 */
+    const words = [...heatSrc.matchAll(/(?:up|down): '([^']+)'/g)].map((m) => m[1]);
+    check('단계마다 말이 있음 (오름 4 · 내림 4)', words.length === 8, words.join(' / '));
+    check('사라·팔라로 읽히는 낱말이 없음',
+      words.every((w) => !/(매수|매도|사세요|파세요|대박|폭등|기회|추천|수익|손실)/.test(w)),
+      words.filter((w) => /(매수|매도|대박|폭등|기회|추천|수익)/.test(w)).join(', ') || '없음');
+    check('화면이 그 뜻을 밝힘 (움직임이지 좋다·나쁘다가 아니다)',
+      /좋다·나쁘다가 아니고/.test(heatView) && /사라거나 팔라는 뜻은 더더욱 아닙니다/.test(heatView));
+
+    /* ③ 다 오른 날 · 다 내린 날 */
+    check('다 오른 날에는 자리 이름을 바꿈', /가장 덜 오른 것/.test(heatSrc) && /내린 것이 하나도 없습니다/.test(heatSrc));
+    check('다 내린 날도 마찬가지', /가장 덜 내린 것/.test(heatSrc) && /오른 것이 하나도 없습니다/.test(heatSrc));
+
+    /* ④ 화면 */
+    check('홈에 붙어 있음', /<HeatBoard \/>/.test(homeSrc) && /HeatBoard/.test(homeSrc));
+    check('색은 설정에 따라 JS 가 정함 (앱에 --up 토큰이 없다)',
+      /color: f\.color\(dir\)/.test(heatView) && !/var\(--up\)/.test(heatView));
+    check('방향을 기호와 글자로도 말함', /f\.glyph\(dir\)/.test(heatView) && /sr-only/.test(heatView));
+    check('세기에 따라 번지는 빛이 있음', /heat-glow/.test(cssSrc) && /--t/.test(cssSrc));
+    check('움직임을 싫어하면 멈춤', /prefers-reduced-motion[\s\S]{0,160}heat-flame/.test(cssSrc));
+    check('좁은 화면에서도 두 장을 나란히', /grid-cols-2/.test(heatView));
+
+    /* ⑤ 미리보기도 같은 규칙 */
+    check('미리보기에 같은 판이 있음', /function heatSection/.test(tpl14) && /function pickHeat/.test(tpl14));
+    check('미리보기 문구가 앱과 같음',
+      words.every((w) => tpl14.includes(w)),
+      words.filter((w) => !tpl14.includes(w)).join(', ') || '여덟 개 모두 같음');
+    check('미리보기도 두 장을 나란히', /\.heat-pair/.test(tpl14));
+
+    /* ⑥ 실제로 나오는가 */
+    const snapH = (await getJson('/api/snapshot?scenario=normal')).body;
+    const quotes = snapH.sections?.quotes?.data ?? {};
+    const TRADE = new Set(['equity', 'index', 'crypto', 'commodity']);
+    const { pickHeat } = await import('../src/lib/heatRank.mjs');
+    let boards = 0;
+    for (const m of ['us', 'kr', 'crypto']) {
+      const b = pickHeat((quotes[m] ?? []).filter((q) => TRADE.has(q.kind)));
+      if (!b) continue;
+      boards += 1;
+      check(`${m} — 오른 것과 내린 것을 골라 냄`, Boolean(b.top && b.bottom),
+        `${b.top.quote.name} ${b.top.quote.changePct}% / ${b.bottom.quote.name} ${b.bottom.quote.changePct}%`);
+      // 자리 이름이 실제 방향과 어긋나면 안 된다
+      if (b.bottom.quote.changePct >= 0) {
+        check(`${m} — 오른 것을 내렸다고 말하지 않음`, b.bottom.slot === '가장 덜 오른 것' && Boolean(b.bottom.note));
+      }
+      if (b.top.quote.changePct < 0) {
+        check(`${m} — 내린 것을 올랐다고 말하지 않음`, b.top.slot === '가장 덜 내린 것' && Boolean(b.top.note));
+      }
+    }
+    check('세 시장 모두 판이 만들어짐', boards === 3, `${boards}/3`);
+  }
+
+  /* ---------------- 8-27. 이름이 잘리지 않는가 ---------------- */
+  console.log('\n[8-27] 이름과 숫자가 잘리지 않는가');
+  {
+    /*
+     * '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면 그게 무엇인지 알 수 없다.
+     * 이름은 값을 읽기 위한 열쇠라, 잘리면 그 칸 전체가 쓸모없어진다.
+     * 숫자는 더 나쁘다 — '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+     *
+     * 그래서 **이름과 숫자 자리에는 truncate 를 쓰지 않는다.** 좁으면 접거나
+     * (이름) 글자 크기를 줄인다(숫자).
+     */
+    const files = [
+      ['src/components/market/MarketIndexBoard.tsx', /\{item\.name\}/],
+      ['src/components/market/PriceCard.tsx', /\{quote\.name\}/],
+      ['src/app/market/[region]/page.tsx', /\{q\.name\}/],
+    ];
+    for (const [f, re] of files) {
+      const t = await readFile(f, 'utf8');
+      const line = t.split('\n').find((l) => re.test(l) || (re.source.includes('quote.name') && /quote\.name/.test(l)));
+      // 이름이 들어가는 줄, 또는 그 바로 앞 줄(여러 줄로 쓴 경우)에 truncate 가 없어야 한다
+      const nameBlocks = t.split('\n').map((l, i) => ({ l, i })).filter((x) => re.test(x.l));
+      const bad = nameBlocks.filter((x) => /truncate/.test(x.l) || /truncate/.test(t.split('\n')[x.i - 1] ?? ''));
+      check(`${f.split('/').pop()} — 이름을 자르지 않음`, bad.length === 0,
+        bad.length ? bad[0].l.trim().slice(0, 60) : (line ? '확인' : '이름 줄 없음'));
+    }
+    const idx = await readFile('src/components/market/MarketIndexBoard.tsx', 'utf8');
+    check('이름을 낱말 단위로 접음', /break-keep/.test(idx));
+    check('아주 좁은 화면에서는 미니 차트를 접어 이름 자리를 내줌', /min-\[360px\]:block/.test(idx));
+
+    const pc = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    check('가격은 자르지 않고 글자를 줄임', /clamp\(15px/.test(pc) && !/tnum truncate text-lg/.test(pc));
+    const rg = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    check('위험 지표 값도 자르지 않음', !/tnum truncate text-\[15px\]/.test(rg) && /clamp\(12\.5px/.test(rg));
+
+    const region = await readFile('src/app/market/[region]/page.tsx', 'utf8');
+    check('시장 화면 부제도 자르지 않음', !/truncate text-\[12\.5px\] text-subtle">\{SUBTITLE/.test(region));
+  }
+
   /* ---------------- 8-9. LIVE 연결 ---------------- */
   console.log('\n[8-9] 실데이터 연결');
   {

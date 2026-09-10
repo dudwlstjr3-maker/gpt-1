@@ -372,7 +372,12 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
         </p>
       ) : (
         <div className="mt-2 flex items-baseline justify-between gap-1">
-          <span className="tnum truncate text-[15px] font-bold text-fg-strong">
+          {/* 숫자는 자르지 않는다 — '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+              칸이 좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
+          <span
+            className="tnum font-bold whitespace-nowrap text-fg-strong"
+            style={{ fontSize: 'clamp(12.5px, 3.9vw, 15px)' }}
+          >
             {formatRiskValue(indicator.value, indicator)}
           </span>
           <span className="tnum shrink-0 text-[11.5px]" style={{ color: c.color(indicator.change) }}>

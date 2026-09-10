@@ -477,3 +477,39 @@ body {
     background: var(--surface);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 오늘 불타는 것과 얼어붙은 것                                          */
+/*                                                                     */
+/* 세기(--t)에 따라 카드 위쪽에서 열기·냉기가 번진다. 색만으로 뜻을      */
+/* 전하지 않으므로 이건 거들 뿐이고, 무슨 뜻인지는 늘 글자가 말한다.     */
+/* ------------------------------------------------------------------ */
+
+.heat-card .heat-glow {
+  position: absolute;
+  inset: -40% -20% auto -20%;
+  height: 200px;
+  z-index: -1;
+  opacity: calc(0.08 + var(--t) * 0.5);
+  filter: blur(28px);
+  pointer-events: none;
+}
+/* 카드가 물든 색을 그대로 쓴다. 토큰을 따로 부르면 한국식/글로벌 전환에서
+   글자 색과 번짐 색이 어긋난다 — 등락 색은 설정에 따라 JS 가 정하기 때문이다. */
+.heat-card .heat-glow {
+  background: radial-gradient(ellipse at 50% 0%, currentColor, transparent 70%);
+}
+
+/* 세게 타오를 때만 아주 조금 흔들린다. 멈춰 있어도 그림이 다 보이는 상태에서
+   시작한다 — 움직임이 글보다 먼저 눈에 들면 안 된다. */
+.heat-card[data-hot='true'] .heat-flame {
+  transform-origin: 50% 85%;
+  animation: heat-flicker 2.6s ease-in-out infinite;
+}
+@keyframes heat-flicker {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(calc(1 + var(--t) * 0.07)); opacity: calc(1 - var(--t) * 0.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heat-card[data-hot='true'] .heat-flame { animation: none; }
+}

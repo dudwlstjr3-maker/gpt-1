@@ -45,7 +45,12 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
             </button>
           ) : null}
           <div className="min-w-0">
-            <Link href={`/asset/${quote.id}`} className="block truncate text-sm font-semibold text-fg-strong hover:underline">
+            {/* 이름을 자르지 않는다 — 무엇의 값인지 모르면 아래 숫자도 못 읽는다.
+                320px 에서 '스테이블코인 시총' 이 잘리던 자리다. 두 줄까지 접는다. */}
+            <Link
+              href={`/asset/${quote.id}`}
+              className="block text-sm leading-snug font-semibold break-keep text-fg-strong hover:underline"
+            >
               {quote.name}
             </Link>
             {/* 기준 시각을 기호 옆에 붙인다. 예전에는 카드마다 아래에 구분선을 긋고
@@ -78,7 +83,14 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
       ) : (
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className="tnum truncate text-lg leading-tight font-bold text-fg-strong">{f.price(quote)}</p>
+            {/* 숫자는 자르면 안 된다. '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+                좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
+            <p
+              className="tnum leading-tight font-bold whitespace-nowrap text-fg-strong"
+              style={{ fontSize: 'clamp(15px, 4.6vw, 18px)' }}
+            >
+              {f.price(quote)}
+            </p>
             <p className="tnum mt-0.5 flex items-center gap-1 text-xs font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span>
               <span>{f.change(quote)}</span>
@@ -125,7 +137,8 @@ export function PriceRow({ quote }: { quote: Quote }) {
       className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-surface-2"
     >
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold text-fg">{quote.name}</p>
+        {/* 이름은 자르지 않는다 — 무엇의 값인지 모르면 옆의 숫자도 못 읽는다 */}
+        <p className="text-[13px] leading-snug font-semibold break-keep text-fg">{quote.name}</p>
         <p className="text-[11.5px] text-subtle">
           {quote.symbol} · 기준 {formatKstTime(quote.meta.asOf)}
         </p>

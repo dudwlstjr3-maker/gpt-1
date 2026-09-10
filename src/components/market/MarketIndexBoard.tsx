@@ -57,7 +57,10 @@ function IndexRow({
   const inner = (
     <>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-semibold text-fg-strong">{item.name}</p>
+        {/* 이름은 자르지 않는다. '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면
+            그게 무엇인지 알 수 없다 — 이름은 값을 읽기 위한 열쇠라, 잘리면 카드 전체가
+            쓸모없어진다. 좁은 화면에서는 두 줄로 접고 낱말 단위로 끊는다. */}
+        <p className="text-[13.5px] leading-snug font-semibold break-keep text-fg-strong">{item.name}</p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
           <span className="tnum">{item.symbol}</span>
           {quote ? (
@@ -69,15 +72,20 @@ function IndexRow({
         </p>
       </div>
 
+      {/* 아주 좁은 화면(320px)에서는 미니 차트를 접는다. 56px 을 차지하는 통에 이름 칸이
+          62px 까지 눌려 '다우존스 산업평균' 이 두 줄로 쪼개졌다. 이름이 먼저다 —
+          무엇의 값인지 모르면 옆의 숫자도 읽을 수 없고, 흐름은 눌러 들어가면 크게 볼 수 있다. */}
       {hasValue ? (
-        <Sparkline
-          points={quote.spark}
-          width={56}
-          height={22}
-          fill={false}
-          color={color === 'var(--muted-fg)' ? 'var(--accent)' : color}
-          ariaLabel={`${item.name} 최근 추이`}
-        />
+        <span className="hidden shrink-0 min-[360px]:block">
+          <Sparkline
+            points={quote.spark}
+            width={56}
+            height={22}
+            fill={false}
+            color={color === 'var(--muted-fg)' ? 'var(--accent)' : color}
+            ariaLabel={`${item.name} 최근 추이`}
+          />
+        </span>
       ) : null}
 
       <div className="shrink-0 text-right">

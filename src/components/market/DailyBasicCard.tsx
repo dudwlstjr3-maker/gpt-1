@@ -48,9 +48,10 @@ export function DailyBasicCard() {
             <div className="card p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
+                  {/* 위가 이름, 아래가 그 이름을 풀어 쓴 말 — 생활 지수 화면과 같은 차례다 */}
                   <p className="text-[14px] font-bold text-fg-strong">{item.name}</p>
-                  <p className="mt-0.5 text-[11.5px] text-subtle">
-                    {item.englishName}
+                  <p className="mt-0.5 text-[11.5px] break-keep text-subtle">
+                    {item.plainName}
                     {group ? ` · ${group.label}` : ''}
                   </p>
                 </div>

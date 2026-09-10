@@ -2105,9 +2105,27 @@ async function main() {
     check('하이일드 OAS 를 우리말로 바꿈', /위험한 회사가 더 무는 이자/.test(riskSrc) && !/name: '하이일드/.test(riskSrc));
     check('미리보기도 원래 이름을 그림', /i\.term \?/.test(tpl13));
 
-    /* 생활 경제 지수 */
-    check('생활 지수도 원래 이름을 제 줄에 둠', /\{item\.englishName\}<\/p>/.test(basicsView));
-    check('원래 이름을 잘리는 자리에 두지 않음', !/truncate">\{item\.englishName\}/.test(basicsView));
+    /*
+     * 생활 경제 지수 — 위가 이름, 아래가 그 이름을 풀어 쓴 말.
+     *
+     * 한동안 뒤집혀 있었다. '국민 한 사람 몫의 생산' 이 제목 자리에 크게 서고
+     * '1인당 GDP' 가 그 아래 작게 붙었다. 쉬운 말을 앞세우려던 것이었는데,
+     * 제목 자리에 설명이 서면 그게 무엇의 이름인지 알 수 없고 다른 자료에서 본
+     * 말과 이어 볼 수도 없다. 쉬운 말은 이름을 도우라고 있는 것이지 이름을
+     * 대신하라고 있는 것이 아니다.
+     */
+    const nameIdx = basicsView.indexOf('{item.name}');
+    const plainIdx = basicsView.indexOf('{item.plainName}');
+    check('생활 지수는 이름이 위, 풀어 쓴 말이 아래',
+      nameIdx > 0 && plainIdx > nameIdx,
+      `이름 ${nameIdx} · 풀어 쓴 말 ${plainIdx}`);
+    check('제목 자리는 굵은 14px, 풀어 쓴 말은 11.5px',
+      /<h3 className="text-\[14px\] leading-snug font-bold break-keep text-fg-strong">\{item\.name\}<\/h3>/.test(basicsView) &&
+      /text-\[11\.5px\] break-keep text-subtle">\{item\.plainName\}/.test(basicsView));
+    check('풀어 쓴 말을 잘리는 자리에 두지 않음', !/truncate">\{item\.plainName\}/.test(basicsView));
+    const dailyCard = await readFile('src/components/market/DailyBasicCard.tsx', 'utf8');
+    check('홈의 오늘의 생활 카드도 같은 차례',
+      dailyCard.indexOf('{item.name}') > 0 && dailyCard.indexOf('{item.plainName}') > dailyCard.indexOf('{item.name}'));
 
     /* 실제로 화면에 나오는 이름이 바뀌었는가 */
     const snapT = (await getJson('/api/snapshot?scenario=normal')).body;
@@ -2117,9 +2135,32 @@ async function main() {
     check('위험 지표가 원래 이름을 함께 내려보냄', risks.filter((i) => i.term).length >= 5,
       `${risks.filter((i) => i.term).length}/${risks.length}`);
     const basicsT = snapT.sections?.basics?.data ?? [];
-    check('생활 지수 이름에 영어 약어가 앞장서지 않음',
-      basicsT.every((b) => !/^[A-Z]{2,}/.test(b.name)), basicsT.map((b) => b.name).join(' / ').slice(0, 80));
-    check('생활 지수가 원래 이름을 함께 내려보냄', basicsT.every((b) => typeof b.englishName === 'string' && b.englishName.length > 0));
+    /*
+     * 이름은 우리말이어야 한다.
+     *
+     * 막으려는 것은 'ROE' 처럼 약자 하나만 덩그러니 서 있는 경우다.
+     * 'OECD 경기선행지수' 는 걸리지 않는다 — 발표 기관의 약자가 이름의 일부이고,
+     * 그 뒤에 우리말 이름이 그대로 따라온다. 그래서 앞글자가 아니라
+     * '·' 앞쪽에 우리말이 들어 있는지를 본다.
+     */
+    const headOf = (n) => String(n).split(' · ')[0];
+    const noKorean = basicsT.filter((b) => !/[가-힣]/.test(headOf(b.name)));
+    check('생활 지수 이름이 우리말로 되어 있음', noKorean.length === 0,
+      noKorean.length ? noKorean.map((b) => b.name).join(' / ') : basicsT.map((b) => b.name).join(' / ').slice(0, 80));
+    check('생활 지수가 풀어 쓴 말을 함께 내려보냄',
+      basicsT.every((b) => typeof b.plainName === 'string' && b.plainName.length > 0));
+    /*
+     * 이름 자리에 이름이 들어 있는가.
+     *
+     * 풀어 쓴 말은 문장이라 서술어로 끝난다 — '…생산', '…나뉘는지', '…몇 배'.
+     * 이름은 그렇지 않다. 둘이 다시 뒤바뀌면 이 검사가 먼저 잡는다.
+     */
+    const swapped = basicsT.filter((b) => /(는지|인지|몇 배|얼마|따진|더한)$/.test(b.name));
+    check('이름 자리에 설명이 들어 있지 않음', swapped.length === 0,
+      swapped.map((b) => b.name).join(' / '));
+    check('풀어 쓴 말은 영어로 시작하지 않음',
+      basicsT.every((b) => !/^[A-Za-z]/.test(b.plainName)),
+      basicsT.filter((b) => /^[A-Za-z]/.test(b.plainName)).map((b) => b.plainName).join(' / '));
     const fundT = (await getJson('/api/asset/aapl?scenario=normal')).body?.fundamentals;
     check('재무 항목이 우리말 이름과 원래 이름을 둘 다 내려보냄',
       (fundT?.lines ?? []).every((l) => l.label && l.term && !/[A-Za-z]{2,}/.test(l.label)),

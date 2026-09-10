@@ -72,8 +72,10 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
   /** 네 나라 비교값을 만든다. 한국이 대표값이 된다. */
   const build = (
     id: string,
+    /** 이름을 풀어 쓴 쉬운 말 — 이름 아래 작게 붙는다 */
+    plainName: string,
+    /** 이 지표의 이름 — 카드 제목 자리에 크게 선다 */
     name: string,
-    englishName: string,
     data: Map<string, SeriesPoint[]> | null,
     opts: {
       precision: number;
@@ -125,7 +127,7 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
     return {
       id,
       name,
-      englishName,
+      plainName,
       value: tf(last.v),
       previous: prev ? tf(prev.v) : null,
       precision: opts.precision,
@@ -229,8 +231,8 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
       const asOf = Date.parse(`${kr.date}T00:00:00Z`);
       out.push({
         id: 'bigmac',
-        name: '빅맥지수',
-        englishName: 'Big Mac Index',
+        name: '빅맥지수 · Big Mac Index',
+        plainName: '햄버거 값으로 따져 본 원화의 값어치',
         value: kr.vsUsdPct,
         previous: krHist.length > 1 ? krHist[krHist.length - 2].v : null,
         precision: 1,

@@ -516,10 +516,21 @@ export interface BasicComparison {
 
 export interface EconomyBasic {
   id: string;
-  /** 한국어 이름 (예: 빅맥지수) */
+  /**
+   * 이 지표의 이름 (예: '1인당 GDP · GDP per capita').
+   *
+   * 카드에서 제목 자리에 크게 선다. 한동안 여기에 이름이 아니라 이름을 풀어 쓴
+   * 말('국민 한 사람 몫의 생산')이 들어 있었는데, 제목 자리에 설명이 서면
+   * 그게 무엇의 이름인지 알 수 없다 — 다른 자료에서 본 말과 이어 볼 수도 없다.
+   */
   name: string;
-  /** 원어 이름 (예: Big Mac Index) */
-  englishName: string;
+  /**
+   * 그 이름을 풀어 쓴 쉬운 말 (예: '국민 한 사람 몫의 생산').
+   *
+   * 이름 아래 작게 붙는다. 이름만으로는 무슨 숫자인지 모르는 사람을 위한 것이지,
+   * 이름을 대신하는 것이 아니다.
+   */
+  plainName: string;
   /** 대표 숫자. 값이 없으면 null — 0 으로 채우지 않는다 */
   value: number | null;
   /** 직전 발표치 */

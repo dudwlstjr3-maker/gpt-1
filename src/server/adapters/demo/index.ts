@@ -893,8 +893,10 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
   const mk = (
     id: string,
+    /** 이름을 풀어 쓴 쉬운 말 — 이름 아래 작게 붙는다 */
+    plainName: string,
+    /** 이 지표의 이름 — 카드 제목 자리에 크게 선다 */
     name: string,
-    englishName: string,
     value: number | null,
     previous: number | null,
     precision: number,
@@ -942,7 +944,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     return {
       id,
       name,
-      englishName,
+      plainName,
       value: missing ? null : value,
       previous: missing ? null : previous,
       precision,
@@ -1057,8 +1059,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'bigmac',
-      '빅맥지수',
-      'Big Mac Index',
+      '햄버거 값으로 따져 본 원화의 값어치',
+      '빅맥지수 · Big Mac Index',
       round(bigmacNow, 1),
       round(undervaluedKrw(bigmacRate, at(120)), 1),
       1,

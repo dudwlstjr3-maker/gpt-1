@@ -33,7 +33,10 @@ test('가장 유별난 것 하나와 방향을 적는다', () => {
 });
 
 test('경계 구간 지표를 두 개까지 이름으로 적는다', () => {
-  assert.match(riskClause([{ level: 'alert', name: 'VIX' }]), /VIX이 경계 구간/);
+  // 조사는 앞말의 받침이 정한다 — 'VIX' 는 '빅스' 라 받침이 없고, '국면' 은 있다
+  assert.match(riskClause([{ level: 'alert', name: 'VIX' }]), /VIX가 경계 구간/);
+  assert.match(riskClause([{ level: 'alert', name: '장단기 금리차' }]), /금리차가 경계 구간/);
+  assert.match(riskClause([{ level: 'alert', name: '국면' }]), /국면이 경계 구간/);
   assert.match(riskClause([{ level: 'alert', name: 'A' }, { level: 'alert', name: 'B' }]), /A · B가 경계 구간/);
   assert.match(
     riskClause([{ level: 'alert', name: 'A' }, { level: 'alert', name: 'B' }, { level: 'alert', name: 'C' }]),

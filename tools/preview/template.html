@@ -2852,15 +2852,16 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<div class="sub" style="margin-top:2px">변동성·신용 스프레드·고점 대비 낙폭·추세를 지난 20년 분포와 견줘, 지금이 역사적으로 어디쯤인지 한 숫자로 보여 줍니다.</div>' +
       '</div></div>' +
       (digest
-        ? regimeBody(digest, true) +
-          /* 앱과 같이 조작 가능한 차트를 쓴다. 조작 안 되는 그림이 하나만 섞여 있으면
-             사용자는 그게 고장 난 줄 안다. */
-          '<div class="card" style="padding:12px;margin-top:12px">' +
-          lineChart([{ id: 'regime', name: '국면 점수', points: digest.history.map(function (h) { return { t: h.t, v: h.score }; }),
-                       color: 'var(--accent)', axis: 'left', precision: 1, fixed0to100: true, area: true }],
-                    190, '국면 점수 추이') +
-          '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
-          '매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은 기간과 비교한 값입니다.</p></div>' +
+        /*
+         * 곡선은 여기서 다시 그리지 않는다 (regimeBody 의 두 번째 인자를 끈다).
+         *
+         * 바로 위 regimeBody 안에 이미 그 곡선이 있고 눌러서 크게 볼 수도 있는데,
+         * 그 아래에 같은 곡선을 한 번 더 크게 그리고 있었다 — 한 화면에 같은 그림이
+         * 두 번이었다. 게다가 '심리 상세' 의 점수 추이도 0~100 짜리 선 그래프라,
+         * 탭을 옮겨 다니면 비슷한 곡선만 세 번 보는 꼴이었다.
+         * 이 화면이 저 화면들과 다른 점은 곡선이 아니라 아래쪽 검증 결과다.
+         */
+        ? regimeBody(digest, false) +
           '<ul style="margin:12px 0 0;padding:0;list-style:none;display:grid;gap:4px">' +
           digest.board.axes.map((a) =>
             '<li class="card" style="padding:12px;display:flex;gap:8px;align-items:flex-start">' +
@@ -2948,6 +2949,19 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   const TODAY_HEAT_MIN = 1.6;
   const r1 = (v) => Math.round(v * 10) / 10;
 
+  /* 조사(이/가)는 개수가 아니라 앞말의 받침이 정한다 — '수수료가', '국면이'.
+     한글이 아니면 읽는 소리로 본다. 앱의 src/lib/particle.mjs 와 같은 규칙이다. */
+  const DIGIT_FINAL = { '0': 1, '1': 1, '3': 1, '6': 1, '7': 1, '8': 1 };
+  function subjectParticle(word) {
+    const text = String(word || '').trim();
+    if (!text) return '가';
+    const last = Array.from(text).pop();
+    const code = last.codePointAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 !== 0 ? '이' : '가';
+    if (/[0-9]/.test(last)) return DIGIT_FINAL[last] ? '이' : '가';
+    return '가';
+  }
+
   function todayMoodClause(scores) {
     const ok = (scores || []).filter((x) => x && x.score !== null && isNum(x.deltaDay) && Math.abs(x.deltaDay) >= TODAY_MOVE_MIN);
     if (!ok.length) return null;
@@ -3028,6 +3042,25 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
             '<span aria-hidden="true" style="margin-right:4px;color:var(--accent)">—</span>' + esc(t) + '</p>'
           : '';
       })() +
+      /*
+       * 빨간불 한 줄.
+       *
+       * '시장 위험 신호등' 여섯 장이 여기 있었는데 '경제지표' 탭으로 보냈다.
+       * 그 블록은 "빨간불은 팔아라가 아니다" 라는 설명을 함께 읽어야 제대로
+       * 읽히는데, 설명을 읽어야 읽히는 것은 10초 화면에 맞지 않는다.
+       * 빨간불이 켜진 날에만 이 줄이 뜬다. 앱의 RiskAlertLine 과 같다.
+       */
+      (() => {
+        const d = s.sections.risk && s.sections.risk.data;
+        if (!d || !d.alertCount) return '';
+        const names = d.indicators.filter((i) => i.level === 'alert').slice(0, 2).map((i) => i.name);
+        const tail = d.alertCount > names.length ? ' 등이' : subjectParticle(names.join(' · '));
+        return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:baseline;margin:12px 0 0;padding:0 12px;' +
+          'border:0;background:none;text-align:left;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--warn);cursor:pointer">' +
+          '<span aria-hidden="true" style="flex-shrink:0">▲</span><span style="min-width:0;flex:1">' +
+          '<b>빨간불 ' + d.alertCount + '개</b> — ' + esc(names.join(' · ')) + tail + ' 평소 범위를 벗어났습니다. ' +
+          '<b style="text-decoration:underline;text-underline-offset:2px">경제지표에서 보기</b></span></button>';
+      })() +
 
       '<section class="block" style="padding-inline:0">' +
       '<div class="block-head" style="padding-inline:12px"><div style="min-width:0"><h2>시장별 투자심리</h2>' +
@@ -3041,15 +3074,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       /* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다. */
       regimeBlock() +
 
-      '<section class="block"><div class="block-head"><h2>시장 위험 신호등</h2>' +
-      '<button type="button" class="linkbtn" data-go="risk">기준과 해설 →</button></div>' +
-      (s.sections.risk && s.sections.risk.data
-        ? '<div style="margin-bottom:8px">' + signalTally(s.sections.risk.data) + '</div>' +
-          riskHeadline(s.sections.risk.data) +
-          '<div class="riskgrid" style="margin-top:8px">' + s.sections.risk.data.indicators.map(riskTile).join('') + '</div>' +
-          '<div style="margin-top:8px">' + signalLegend("사라·팔라는 신호가 아닙니다.") + '</div>'
-        : '<p style="font-size:13px;color:var(--muted)">위험 지표를 산출할 데이터가 없습니다.</p>') +
-      '</section>' +
 
       /* 지수는 '지수' 탭으로 떼어 놨다. 설명 두 줄이던 것을 머리 옆 링크 하나로 줄였다. */
       '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +

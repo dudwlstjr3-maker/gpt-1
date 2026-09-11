@@ -1205,7 +1205,16 @@ async function main() {
     const regimeBoard = await readFile('src/components/market/RegimeBoard.tsx', 'utf8');
     const regimeDetail = await readFile('src/components/market/RegimeDetail.tsx', 'utf8');
     check('국면 홈 카드의 곡선을 눌러 크게 볼 수 있음', regimeBoard.includes('<ExpandTrigger'));
-    check('국면 20년 곡선이 조작 가능한 차트임', regimeDetail.includes('<InteractiveChart'));
+    /*
+     * 국면 상세에는 곡선이 하나뿐이어야 한다.
+     *
+     * 예전에는 regimeBody 의 곡선을 감춰 놓고(compact) 바로 아래에 같은 20년
+     * 곡선을 크게 한 번 더 그렸다 — 한 화면에 같은 그림이 두 번이었다.
+     * 이제 감추지 않고 그 하나만 쓴다. 눌러서 크게 보는 길은 그대로다.
+     */
+    check('국면 상세가 곡선을 한 번만 그림',
+      !regimeDetail.includes('<InteractiveChart') && /<RegimeBoardBody digest=\{digest\} \/>/.test(regimeDetail));
+    check('그 곡선도 눌러 크게 볼 수 있음', regimeBoard.includes('<ExpandTrigger'));
     for (const page of ['/basics', '/regime']) {
       const res = await fetch(`${BASE}${page}`);
       check(`${page} 응답 200`, res.status === 200, `status=${res.status}`);
@@ -1237,7 +1246,9 @@ async function main() {
     check('미리보기에 상자그림이 있음', tpl2.includes('function bandBox') && tpl2.includes('function bandAxis'));
     check('미리보기에 큰 창이 있음', tpl2.includes('function openZoom') && tpl2.includes('cmodal'));
     check('미리보기 큰 창도 Esc 로 닫힘', /Escape' && document\.querySelector\('\.cmodal-back'\)/.test(tpl2));
-    check('미리보기 국면 곡선도 조작 가능', tpl2.includes("lineChart([{ id: 'regime'"));
+    // 국면 곡선은 regimeBody 안의 하나뿐이다 — 그 아래에 같은 것을 또 그리지 않는다
+    check('미리보기 국면 상세도 곡선을 한 번만 그림',
+      !tpl2.includes("lineChart([{ id: 'regime'") && /\? regimeBody\(digest, false\) \+/.test(tpl2));
     check('미리보기 배지도 작게', tpl2.includes("size === '2xs'"));
   }
 
@@ -2652,7 +2663,41 @@ async function main() {
     check('세 갈래 모두 문장이 나옴', sentences.length === 3, `${sentences.length}/3`);
     check('할 말이 없으면 줄을 그리지 않음', /return null;/.test(line) && /if \(!line\) return null;/.test(view));
     check('세 마디를 한꺼번에 늘어놓지 않음', /if \(mood && heat\)[\s\S]{0,120}if \(mood && risk\)/.test(line));
-    check('홈 맨 위에 섬', /<TodayLine \/>\s*\n\s*<FngSection \/>/.test(await readFile('src/app/page.tsx', 'utf8')));
+    const homeSrc = await readFile('src/app/page.tsx', 'utf8');
+    check('홈 맨 위에 섬', /<TodayLine \/>[\s\S]{0,200}<FngSection \/>/.test(homeSrc) &&
+      homeSrc.indexOf('<TodayLine />') < homeSrc.indexOf('<FngSection />'));
+
+    /*
+     * 시장 위험 신호등 여섯 장을 홈에서 뺐다.
+     *
+     * 그 블록은 "빨간불은 '위험하니 팔아라' 가 아니라 '이 지표가 평소보다 크게
+     * 벗어나 있다' 는 뜻" 이라는 설명 문단을 함께 읽어야 제대로 읽힌다.
+     * 설명을 읽어야 읽히는 것은 10초 안에 훑는 화면에 맞지 않는다.
+     *
+     * 여섯 중 둘(공포지수 · 위험한 회사 이자)은 이미 심리 점수의 구성요소라
+     * 홈에서 점수로 한 번, 신호등으로 또 한 번 본 셈이기도 했다.
+     * 나머지 넷은 '경제지표' 탭이 맡는다 — 거기서는 설명과 함께 읽힌다.
+     */
+    check('홈에서 위험 신호등 여섯 장을 뺌',
+      !/<RiskGaugesSection \/>/.test(homeSrc) && /<RiskAlertLine \/>/.test(homeSrc));
+    const alertLine = await readFile('src/components/market/RiskAlertLine.tsx', 'utf8');
+    check('빨간불이 켜진 날에만 한 줄이 뜸', /digest\.alertCount === 0\) return null;/.test(alertLine));
+    check('그 줄이 경제지표로 데려감', /href="\/indicators"/.test(alertLine));
+    check('경제지표 탭에는 그대로 있음',
+      /RiskGaugesSection|RiskBoard/.test(await readFile('src/app/indicators/page.tsx', 'utf8')));
+    check('미리보기도 같은 줄을 씀', /빨간불 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
+
+    /*
+     * 조사는 앞말의 받침이 정한다.
+     * '수수료이 평소 범위를 벗어났습니다' 가 나오고 있었고, 다른 한 곳은 지표
+     * **개수**로 조사를 고르고 있었다 — 이름과 아무 상관이 없었다.
+     */
+    const { subject } = await import('../src/lib/particle.mjs');
+    const particleCases = [['수수료', '가'], ['금리차', '가'], ['국면', '이'], ['VIX', '가'], ['S&P 500', '이']];
+    const wrong = particleCases.filter(([w, want]) => subject(w) !== want);
+    check('조사를 받침으로 고름', wrong.length === 0, wrong.map(([w]) => w).join(', '));
+    check('두 곳 모두 그 규칙을 씀',
+      /import \{ subject \} from '\.\/particle\.mjs'/.test(line) && /from '@\/lib\/particle\.mjs'/.test(alertLine));
     check('미리보기도 같은 문장을 지음',
       /function todayLineText\(\)/.test(tpl16) && /TODAY_MOVE_MIN = 1\.5/.test(tpl16) && /TODAY_HEAT_MIN = 1\.6/.test(tpl16));
 

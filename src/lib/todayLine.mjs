@@ -16,6 +16,8 @@
  *  - 최대 두 마디. 세 마디부터는 한 줄이 아니라 문단이 된다.
  */
 
+import { subject } from './particle.mjs';
+
 /** 몇 점부터 "눈에 띄게" 움직인 것으로 볼까 */
 export const MOVE_MIN = 1.5;
 /** 평소 폭의 몇 배부터 문장에 올릴까 */
@@ -66,9 +68,10 @@ export function riskClause(indicators) {
   const alert = (Array.isArray(indicators) ? indicators : []).filter((i) => i && i.level === 'alert');
   if (alert.length === 0) return null;
   const names = alert.slice(0, 2).map((i) => i.name).join(' · ');
+  // 조사는 개수가 아니라 앞말의 받침이 정한다 — '수수료가', '금리차가', '국면이'
   return alert.length > 2
     ? `${names} 등 ${alert.length}개 지표가 경계 구간에 있습니다`
-    : `${names}${alert.length > 1 ? '가' : '이'} 경계 구간에 있습니다`;
+    : `${names}${subject(names)} 경계 구간에 있습니다`;
 }
 
 /**

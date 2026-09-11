@@ -13,7 +13,6 @@ import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { RegimeBoardBody } from '@/components/market/RegimeBoard';
-import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
 import {
   EVIDENCE_BUCKETS,
   EVIDENCE_FINDINGS,
@@ -28,43 +27,18 @@ import {
 import type { EvidenceEpisode } from '@/lib/regimeEvidence.d.mts';
 import type { RegimeDigest } from '@/types';
 
-/* ------------------------------ 20년 곡선 ------------------------------ */
-
-/**
- * 20년 곡선.
+/*
+ * 20년 곡선은 여기서 다시 그리지 않는다.
  *
- * 직접 그리지 않고 이 앱의 상세용 차트를 그대로 쓴다. 그래야 끌기·확대·축소·
- * 키보드 조작·표로 보기·크게 보기가 다른 차트와 똑같이 동작한다.
- * 예전에는 여기만 손으로 그린 정적 SVG 였는데, 조작이 안 되는 그림이 하나만
- * 섞여 있으면 사용자는 그게 고장 난 줄 안다.
+ * 바로 위 RegimeBoardBody 안에 이미 그 곡선이 있고, 눌러서 크게 볼 수도 있다.
+ * 그 아래에 같은 곡선을 한 번 더 크게 그리고 있었다 — 한 화면에 같은 그림이
+ * 두 번이었다. 게다가 '심리 상세' 의 점수 추이도 0~100 짜리 선 그래프라,
+ * 탭을 옮겨 다니면 비슷한 곡선만 세 번 보는 꼴이었다.
+ *
+ * 이 화면이 저 화면들과 다른 점은 곡선이 아니라 **아래쪽 검증 결과**다.
+ * "20년 만의 공포" 라는 문장을 띄우는 화면이라면, 예전에 그 문장이 떴을 때
+ * 실제로 무슨 일이 있었는지를 보여 주는 것이 이 화면의 몫이다.
  */
-function BigChart({ history }: { history: { t: number; score: number }[] }) {
-  if (history.length < 8) {
-    return <p className="card p-3 text-[13px] text-muted">곡선을 그릴 만큼 자료가 쌓이지 않았습니다.</p>;
-  }
-  const years = Math.round((history[history.length - 1].t - history[0].t) / (365.25 * 86_400_000));
-  const series: ChartSeries[] = [
-    {
-      id: 'regime',
-      name: '국면 점수',
-      points: history.map((h) => ({ t: h.t, v: h.score })),
-      color: 'var(--accent)',
-      axis: 'left',
-      precision: 1,
-      fixed0to100: true,
-      area: true,
-    },
-  ];
-  return (
-    <div className="card p-3">
-      <InteractiveChart series={series} height={190} label={`국면 점수 ${years}년 추이`} />
-      <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
-        매 시점의 분포를 그 시점까지의 자료로만 만들어 계산했습니다. 곡선의 왼쪽 끝은 20년치가 다 쌓이기 전이라 더 짧은
-        기간과 비교한 값입니다.
-      </p>
-    </div>
-  );
-}
 
 /* ------------------------------ 검증 결과 ------------------------------ */
 
@@ -163,10 +137,10 @@ export function RegimeDetail() {
         <SectionGate section={section} onRetry={refresh} loading={<SkeletonCard height={150} lines={4} />}>
           {(digest: RegimeDigest) => (
             <>
-              <RegimeBoardBody digest={digest} compact />
-              <div className="mt-3">
-                <BigChart history={digest.history} />
-              </div>
+              {/* compact 를 끈다. 예전에는 켜 두고(곡선을 감추고) 바로 아래에 같은 곡선을
+                  크게 한 번 더 그렸다. 이제 그 큰 그림을 뺐으니, 여기 곡선이 이 화면의
+                  하나뿐인 곡선이다 — 눌러서 크게 볼 수 있는 것도 그대로다. */}
+              <RegimeBoardBody digest={digest} />
               <ul className="mt-3 space-y-2">
                 {digest.board.axes.map((a) => (
                   <li key={a.id} className="card flex items-start gap-2 p-3">

@@ -19,6 +19,8 @@
  *   지키지 않으면 차단한다 — 그건 약관이 아니라 접속 조건이라 코드가 지킨다.
  */
 
+import { CATALOG_BY_ID } from '@/lib/catalog';
+import { topic } from '@/lib/particle.mjs';
 import { TERMS } from '@/lib/terms';
 
 export interface CompanyRef {
@@ -44,6 +46,26 @@ export const COMPANIES: CompanyRef[] = [
 ];
 
 export const COMPANY_BY_ASSET = new Map(COMPANIES.map((c) => [c.assetId, c]));
+
+/**
+ * 재무제표를 못 보여 주는 이유.
+ *
+ * 두 가지를 갈라 적는다. 예전에는 한 문장으로 뭉뚱그렸는데, 그러면 메타나
+ * AMD 앞에서 "SEC 공시가 있는 미국 상장사만 보여줍니다" 라고 말하게 된다 —
+ * 그 회사들은 미국 상장사이고 공시도 있다. 틀린 말을 하는 셈이다.
+ *
+ *  ① 애초에 공시가 없는 것 — 지수·원자재·환율·코인·한국 종목.
+ *  ② 공시는 있는데 아직 잇지 않은 것 — 회사 번호(CIK)를 확인해 companyCatalog
+ *     에 적어야 잇힌다. CIK 를 짐작으로 적으면 엉뚱한 회사의 재무제표가 나오므로
+ *     확인한 것만 적는다.
+ */
+export function fundamentalsUnavailableReason(assetId: string): string {
+  const item = CATALOG_BY_ID.get(assetId);
+  if (item && item.market === 'us' && item.kind === 'equity') {
+    return `${item.name}${topic(item.name)} 미국 상장사지만 회사 번호(CIK)를 확인하지 못해 아직 재무제표를 잇지 않았습니다. 시세와 그래프는 그대로 나옵니다.`;
+  }
+  return 'SEC 공시가 있는 미국 상장사만 재무제표를 보여줍니다. 지수·원자재·환율·코인에는 공시가 없습니다.';
+}
 
 export type FinancialLineId =
   | 'revenue'

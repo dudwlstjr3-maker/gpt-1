@@ -3010,6 +3010,127 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-32. 핫한 종목 늘리기 ---------------- */
+  console.log('\n[8-32] 핫한 종목 — 목록 · 값 · 합성 세계');
+  {
+    const cat = await readFile('src/lib/catalog.ts', 'utf8');
+    const stooq = await readFile('src/server/adapters/live/providers/stooq.ts', 'utf8');
+    const gecko = await readFile('src/server/adapters/live/providers/coingecko.ts', 'utf8');
+
+    /* 늘린 이름들이 목록에 있는가 */
+    const HOT_US = ['meta', 'googl', 'avgo', 'amd', 'nflx', 'pltr', 'coin', 'mstr', 'mu', 'smci'];
+    const HOT_COIN = ['doge', 'ada', 'trx', 'avax', 'link'];
+    const missingCat = [...HOT_US, ...HOT_COIN].filter((id) => !new RegExp(`\\{\\s*id:\\s*'${id}'`).test(cat));
+    check('핫한 종목이 카탈로그에 들어옴 — 미국 10 · 코인 5',
+      missingCat.length === 0, missingCat.join(', '));
+
+    /*
+     * 목록에만 있고 받아올 길이 없으면 LIVE 에서 빈 줄만 늘어난다.
+     * 늘린 종목은 전부 제공사 심볼을 함께 적었는지 본다.
+     */
+    const noSymbol = HOT_US.filter((id) => !new RegExp(`^\\s*${id}: '${id}\\.us',`, 'm').test(stooq));
+    check('늘린 미국 종목마다 Stooq 심볼이 있음', noSymbol.length === 0, noSymbol.join(', '));
+    const noCoin = HOT_COIN.filter((id) => !new RegExp(`^\\s*${id}: '[a-z0-9-]+',`, 'm').test(gecko));
+    check('늘린 코인마다 CoinGecko id 가 있음', noCoin.length === 0, noCoin.join(', '));
+
+    /*
+     * 한국 개별 종목은 늘리지 않았다 — 무료로 닿는 시세 제공처가 없다.
+     * 그 사정을 코드에 적어 둔다. 안 적으면 다음 사람이 같은 길을 다시 판다.
+     */
+    check('한국 종목을 왜 안 늘렸는지 적어 둠',
+      /무료로 닿는 시세 제공처가 없다/.test(cat) && /빈 줄만 늘어난다/.test(cat));
+    check('손으로 고른 목록임을 밝힘', /손으로 고른 목록이다/.test(cat) && /다시\n\s*\*\s*들여다봐야/.test(cat));
+
+    /* 화면까지 실제로 값이 오는가 */
+    const quotes = (await getJson('/api/snapshot?scenario=normal')).body?.sections?.quotes?.data ?? {};
+    const byId = new Map();
+    for (const rows of Object.values(quotes)) for (const q of rows ?? []) byId.set(q.id, q);
+    const blank = [...HOT_US, ...HOT_COIN].filter((id) => {
+      const q = byId.get(id);
+      return !q || q.price === null || q.price === undefined || !Number.isFinite(q.changePct);
+    });
+    check('늘린 종목 전부에 값과 등락이 옴 — 15개', blank.length === 0, blank.join(', '));
+
+    /*
+     * 값이 오기만 하면 안 된다. 자릿수가 말이 돼야 한다.
+     * 0.42달러짜리 미국 주식이 찍히던 것을 여기서 잡는다.
+     */
+    const odd = HOT_US.filter((id) => {
+      const v = byId.get(id)?.price;
+      return !(v > 1 && v < 20000);
+    });
+    check('미국 종목 값이 주식다운 자릿수임', odd.length === 0, odd.join(', '));
+
+    /* 큰 그림도 그려지는가 — 구간마다 점이 와야 한다 */
+    for (const id of ['smci', 'avax']) {
+      const ranges = (await getJson(`/api/asset/${id}`)).body?.ranges ?? {};
+      const empty = Object.entries(ranges).filter(([, v]) => !(v?.length > 1)).map(([k]) => k);
+      check(`${id} 의 모든 구간에 그림이 있음`, Object.keys(ranges).length === 5 && empty.length === 0,
+        empty.join(', '));
+    }
+
+    /*
+     * 합성 세계가 가라앉던 것.
+     *
+     * 가격을 (1 + r) 로 곱해 나가면 쌓이는 것은 r 의 평균이 아니라 log(1+r) 의
+     * 평균이라, 많이 흔들리는 종목일수록 까닭 없이 값이 내려갔다. 게다가 변동성이
+     * 치솟은 날에는 r 이 -1 을 넘어 가격이 음수가 되는 걸 바닥값으로 막아야 했고,
+     * 한 번 바닥에 닿은 종목은 다시 올라오지 못했다. exp 로 쌓으면 둘 다 없다.
+     */
+    const world = await readFile('src/server/adapters/demo/world.ts', 'utf8');
+    check('가격을 로그 공간에서 쌓음 (exp)',
+      (world.match(/p \*= Math\.exp\(/g) ?? []).length === 3);
+    check('음수를 막는 바닥값이 더는 필요 없음',
+      !/Math\.max\(p \* \(1 \+/.test(world));
+    check('왜 곱하지 않고 exp 인지 적어 둠',
+      /로그 수익률/.test(world) && /바닥에 닿은 종목은 다시 올라오지 못했다/.test(world));
+
+    /* 10년을 걸어도 한쪽으로 기울지 않는가 — 오르는 종목과 내리는 종목이 섞여야 한다 */
+    const usRows = (quotes.us ?? []).filter((q) => q.kind === 'equity' && Number.isFinite(q.changePct));
+    const up = usRows.filter((q) => q.changePct > 0).length;
+    check('오르는 종목과 내리는 종목이 함께 있음',
+      usRows.length >= 15 && up > 0 && up < usRows.length, `${up}/${usRows.length} 상승`);
+
+    /*
+     * 늘린 종목은 새 case 를 적지 않아도 이어진다.
+     * 한 줄 적는 것을 잊어 빈 카드가 나오는 일을 구조로 막는다.
+     */
+    const demoIdx = await readFile('src/server/adapters/demo/index.ts', 'utf8');
+    check('이름이 같은 시계열을 자동으로 이음',
+      /if \(s\[item\.id\]\) return \{ values: s\[item\.id\], dates: d \};/.test(demoIdx) &&
+      /if \(c\[item\.id\]\) return \{ values: c\[item\.id\], dates: cd \};/.test(demoIdx));
+
+    /*
+     * 재무제표가 없는 이유를 두 가지로 갈랐다.
+     * 한 문장으로 뭉치면 메타 앞에서 "SEC 공시가 있는 미국 상장사만 보여줍니다"
+     * 라고 말하게 된다 — 메타는 미국 상장사이고 공시도 있다. 틀린 말이 된다.
+     */
+    const cc = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    check('재무제표 없는 이유를 한 곳에서 정함',
+      /export function fundamentalsUnavailableReason\(/.test(cc));
+    check('공시가 없는 것과 아직 안 이은 것을 갈라 말함',
+      /market === 'us' && item\.kind === 'equity'/.test(cc) && /회사 번호\(CIK\)를 확인하지 못해/.test(cc));
+    check('CIK 를 짐작으로 적지 않는다고 밝힘', /짐작으로 적으면 엉뚱한 회사의 재무제표가 나오므로/.test(cc));
+    check('조사를 이름의 받침이 정함', /\$\{topic\(item\.name\)\}/.test(cc));
+    const reasons = {};
+    for (const id of ['meta', 'mu', 'doge']) {
+      reasons[id] = (await getJson(`/api/asset/${id}`)).body?.fundamentalsUnavailable ?? '';
+    }
+    check('미국 종목에는 아직 안 이었다고 말함',
+      /미국 상장사지만/.test(reasons.meta) && /미국 상장사지만/.test(reasons.mu));
+    check('받침 있는 이름에 은, 없는 이름에 는',
+      reasons.mu.startsWith('마이크론은') && reasons.meta.startsWith('메타는'),
+      `${reasons.mu.slice(0, 6)} / ${reasons.meta.slice(0, 5)}`);
+    check('코인에는 공시가 없다고 말함', /공시가 없습니다/.test(reasons.doge) && !/미국 상장사지만/.test(reasons.doge));
+
+    /*
+     * 시총 300위 문턱은 그대로다 — 늘린 종목도 그 문을 지난다.
+     * 제공사가 순위를 주지 않는 동안에는 문이 열려 있고, 주기 시작하면 걸러진다.
+     */
+    const heat = await readFile('src/lib/heatRank.mjs', 'utf8');
+    check('시총 문턱이 그대로 있음', /CAP_RANK_MAX = 300/.test(heat) && /export function withinCap\(/.test(heat));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

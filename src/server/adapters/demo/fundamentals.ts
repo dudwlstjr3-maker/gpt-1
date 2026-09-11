@@ -13,7 +13,7 @@
  */
 
 import { mulberry32, hashSeed } from '@/lib/rng';
-import { COMPANY_BY_ASSET, FINANCIAL_LINES, MAX_PERIODS } from '@/lib/companyCatalog';
+import { COMPANY_BY_ASSET, FINANCIAL_LINES, MAX_PERIODS, fundamentalsUnavailableReason } from '@/lib/companyCatalog';
 import { valuation } from '@/lib/fundamentals.mjs';
 import { SeriesUnavailableError } from '@/server/http';
 import type { AdapterContext } from '@/server/adapters/types';
@@ -73,9 +73,7 @@ export function buildFundamentals(
   const company = COMPANY_BY_ASSET.get(assetId);
   const shape = SHAPE[assetId];
   if (!company || !shape) {
-    throw new SeriesUnavailableError(
-      'SEC 공시가 있는 미국 상장사만 재무제표를 보여줍니다. 지수·원자재·환율·코인에는 공시가 없습니다.',
-    );
+    throw new SeriesUnavailableError(fundamentalsUnavailableReason(assetId));
   }
 
   const day = Math.floor(ctx.now.getTime() / 86400_000);

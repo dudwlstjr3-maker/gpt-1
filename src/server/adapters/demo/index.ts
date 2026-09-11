@@ -110,7 +110,21 @@ function seriesFor(world: DemoWorld, item: CatalogItem): SeriesRef | null {
     case 'funding': return { values: c.funding, dates: cd };
     case 'open_interest': return { values: c.openInterest.map((v) => v / 1e9), dates: cd };
     case 'liquidations': return { values: c.liquidations.map((v) => v / 1e9), dates: cd };
-    default: return null;
+
+    /*
+     * 위에 이름이 없는 것은 세계(world.ts)에서 **같은 이름의 시계열**을 그대로 쓴다.
+     *
+     * 위의 case 들은 손이 가야 하는 것들이다 — 단위를 바꾸거나(10억 달러로 나누기),
+     * 호가 단위로 반올림하거나, 두 계열을 빼서 만든다. 그런 손질이 필요 없는
+     * 종목은 id 와 시계열 이름이 같으므로 여기서 한 번에 이어 준다. 종목을 늘릴
+     * 때마다 case 를 한 줄씩 더 적지 않아도 되고, 적는 것을 잊어 빈 카드가
+     * 나오는 일도 없다.
+     */
+    default: {
+      if (s[item.id]) return { values: s[item.id], dates: d };
+      if (c[item.id]) return { values: c[item.id], dates: cd };
+      return null;
+    }
   }
 }
 

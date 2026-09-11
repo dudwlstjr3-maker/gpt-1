@@ -50,6 +50,33 @@ export const CATALOG: CatalogItem[] = [
   { id: 'msft', name: '마이크로소프트', symbol: 'MSFT', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 14 },
   { id: 'amzn', name: '아마존', symbol: 'AMZN', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 15 },
   { id: 'tsla', name: '테슬라', symbol: 'TSLA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 16 },
+  /*
+   * 아래는 '핫한 종목' — 거래가 몰리고 이야기가 몰리는 이름들이다.
+   *
+   * 무엇을 보고 골랐나
+   *   시가총액 순위가 아니라 **얼마나 자주 화제가 되는가** 로 골랐다. 그래서
+   *   시총으로는 더 큰 회사(존슨앤드존슨·월마트)가 빠지고, 그보다 작아도
+   *   사람들이 매일 들여다보는 이름(팔란티어·코인베이스)이 들어와 있다.
+   *
+   * 손으로 고른 목록이다
+   *   자동으로 추려낸 것이 아니라 사람이 정한 것이라, 시간이 지나면 어긋난다.
+   *   '핫하다' 는 것 자체가 그때그때 달라지는 성질이기 때문이다. 한 번씩 다시
+   *   들여다봐야 하는 목록으로 알고 둔다.
+   *
+   * 한국 개별 종목은 왜 안 늘렸나
+   *   무료로 닿는 시세 제공처가 없다. 지금 있는 다섯 종목도 LIVE 에서는
+   *   '무료 제공사에 없는 항목' 으로 비어 있다. 늘려 봐야 빈 줄만 늘어난다.
+   */
+  { id: 'meta', name: '메타', symbol: 'META', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 17 },
+  { id: 'googl', name: '알파벳', symbol: 'GOOGL', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 18 },
+  { id: 'avgo', name: '브로드컴', symbol: 'AVGO', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 19 },
+  { id: 'amd', name: 'AMD', symbol: 'AMD', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 20 },
+  { id: 'nflx', name: '넷플릭스', symbol: 'NFLX', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 21 },
+  { id: 'pltr', name: '팔란티어', symbol: 'PLTR', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 22 },
+  { id: 'coin', name: '코인베이스', symbol: 'COIN', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 23 },
+  { id: 'mstr', name: '스트래티지', symbol: 'MSTR', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 24, note: '비트코인을 많이 들고 있어 코인 시세를 따라 크게 움직입니다' },
+  { id: 'mu', name: '마이크론', symbol: 'MU', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 25 },
+  { id: 'smci', name: '슈퍼마이크로', symbol: 'SMCI', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 26 },
 
   /* ------------------------------- 한국 ------------------------------- */
   { id: 'kospi', name: '코스피', symbol: 'KOSPI', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 1 , baseline: '1980년 1월 4일 = 100'},
@@ -71,13 +98,19 @@ export const CATALOG: CatalogItem[] = [
   { id: 'xrp', name: '리플', symbol: 'XRP', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 3 },
   { id: 'sol', name: '솔라나', symbol: 'SOL', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 4 },
   { id: 'bnb', name: 'BNB', symbol: 'BNB', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 5 },
-  { id: 'total_mcap', name: '전체 시가총액', symbol: 'TOTAL', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: true, hasVolume: false, order: 6 },
-  { id: 'total_vol', name: '24시간 거래량', symbol: 'VOL24', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 7 },
-  { id: 'btc_dom', name: '비트코인 점유율', symbol: 'BTC.D', market: 'crypto', kind: 'stat', unit: 'percent', precision: 2, currency: null, home: true, hasVolume: false, order: 8, note: '전체 크립토 시총에서 비트코인이 차지하는 비중 (도미넌스)' },
-  { id: 'stable_mcap', name: '스테이블코인 시총', symbol: 'STABLE', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 9 },
-  { id: 'funding', name: '선물 펀딩비', symbol: 'FUNDING', market: 'crypto', kind: 'stat', unit: 'percent', precision: 4, currency: null, home: false, hasVolume: false, order: 10, note: '양수 = 롱 포지션이 비용 지불' },
-  { id: 'open_interest', name: '미결제약정', symbol: 'OI', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 11 },
-  { id: 'liquidations', name: '24시간 청산 규모', symbol: 'LIQ', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 3, currency: null, home: false, hasVolume: false, order: 12 },
+  /* 거래가 몰리는 코인들. 미국 종목과 같은 기준으로 골랐다 (위 주석 참고). */
+  { id: 'doge', name: '도지코인', symbol: 'DOGE', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 6 },
+  { id: 'ada', name: '에이다', symbol: 'ADA', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 7 },
+  { id: 'trx', name: '트론', symbol: 'TRX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 8 },
+  { id: 'avax', name: '아발란체', symbol: 'AVAX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 9 },
+  { id: 'link', name: '체인링크', symbol: 'LINK', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 10 },
+  { id: 'total_mcap', name: '전체 시가총액', symbol: 'TOTAL', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: true, hasVolume: false, order: 11 },
+  { id: 'total_vol', name: '24시간 거래량', symbol: 'VOL24', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 12 },
+  { id: 'btc_dom', name: '비트코인 점유율', symbol: 'BTC.D', market: 'crypto', kind: 'stat', unit: 'percent', precision: 2, currency: null, home: true, hasVolume: false, order: 13, note: '전체 크립토 시총에서 비트코인이 차지하는 비중 (도미넌스)' },
+  { id: 'stable_mcap', name: '스테이블코인 시총', symbol: 'STABLE', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 14 },
+  { id: 'funding', name: '선물 펀딩비', symbol: 'FUNDING', market: 'crypto', kind: 'stat', unit: 'percent', precision: 4, currency: null, home: false, hasVolume: false, order: 15, note: '양수 = 롱 포지션이 비용 지불' },
+  { id: 'open_interest', name: '미결제약정', symbol: 'OI', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 16 },
+  { id: 'liquidations', name: '24시간 청산 규모', symbol: 'LIQ', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 3, currency: null, home: false, hasVolume: false, order: 17 },
 ];
 
 export const CATALOG_BY_ID = new Map(CATALOG.map((c) => [c.id, c]));

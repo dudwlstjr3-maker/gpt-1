@@ -2678,6 +2678,33 @@ async function main() {
      * 홈에서 점수로 한 번, 신호등으로 또 한 번 본 셈이기도 했다.
      * 나머지 넷은 '경제지표' 탭이 맡는다 — 거기서는 설명과 함께 읽힌다.
      */
+    /*
+     * 카드 폭은 한 화면 안에서 같아야 한다.
+     *
+     * 심리 카드만 85cqw(최대 340px)라 다른 카드보다 66px 좁았다. 홈을 위에서
+     * 아래로 훑으면 왼쪽 선은 맞는데 오른쪽 선만 혼자 들어가 있었고, 두 번째
+     * 카드는 틀 끝에서 잘려 조각으로 보였다 — 같은 크기의 카드 둘이 다른 크기로
+     * 보인 것이다. 이제 한 장이 칸을 꽉 채우고, "옆에 더 있다" 는 점이 말한다.
+     */
+    const fngSec = await readFile('src/components/market/FngSection.tsx', 'utf8');
+    check('심리 카드가 칸을 꽉 채움',
+      /className="snap-item w-\[calc\(100cqw-24px\)\]"/.test(fngSec) && !/max-w-\[340px\]/.test(fngSec));
+    check('옆에 더 있다는 것을 점이 알림', /function Carousel\(/.test(fngSec) && /count > 1 \?/.test(fngSec));
+    check('미리보기도 같은 폭', /\.fng-scroll > \* \{[^}]*width: calc\(100cqw - 24px\)/.test(tpl16) && /\.fng-dots/.test(tpl16));
+
+    /*
+     * 요약 카드가 맨 위 한 줄과 같은 말을 하고 있었다.
+     *   한 줄 : 크립토 투자심리가 어제보다 10점 탐욕 쪽으로 갔고 …
+     *   요약  : 오늘 가장 크게 움직인 것 — 크립토 심리 78.3점 탐욕 (어제보다 +10.0) …
+     * 요약의 첫 줄에서 심리 부분을 뺐다. 심리 이야기는 다음 줄이 '왜' 로 이어받는다.
+     */
+    const summarySrc = await readFile('src/server/summary.ts', 'utf8');
+    check('요약 첫 줄이 심리 점수를 되풀이하지 않음',
+      !/심리 \$\{formatScore/.test(summarySrc) && /대표 시세 중 가장 크게 움직인 것/.test(summarySrc));
+    const sumT = (await getJson('/api/snapshot?scenario=normal')).body?.sections?.summary?.data;
+    const first = (sumT?.lines ?? [])[0]?.text ?? '';
+    check('내려온 요약도 심리 점수로 시작하지 않음', !/심리 \d/.test(first), first.slice(0, 60));
+
     check('홈에서 위험 신호등 여섯 장을 뺌',
       !/<RiskGaugesSection \/>/.test(homeSrc) && /<RiskAlertLine \/>/.test(homeSrc));
     const alertLine = await readFile('src/components/market/RiskAlertLine.tsx', 'utf8');

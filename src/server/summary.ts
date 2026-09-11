@@ -8,7 +8,7 @@
  *  - 투자 추천·매매 지시·수익 보장 표현을 쓰지 않는다.
  */
 
-import { formatNumber, formatScore, formatSigned } from '@/lib/format';
+import { formatNumber, formatSigned } from '@/lib/format';
 import type { FngScore, MacroIndicator, MarketSummary, Quote, SummaryLine } from '@/types';
 import { MARKET_LABEL } from '@/types';
 
@@ -23,12 +23,21 @@ export function buildSummary(
   const lines: SummaryLine[] = [];
 
   /*
-   * 이 카드는 홈에서 심리 카드 · 위험 신호등 · 가격 카드 **아래**에 선다.
-   * 그래서 세 점수와 대표 시세를 다시 늘어놓으면 방금 본 것을 한 번 더 읽는 꼴이 된다.
-   * 여기서는 위에서 안 보이는 것만 적는다 — 눈에 띄게 움직인 것, 그리고 그 원인.
+   * 이 카드는 홈에서 다른 것들 **아래**에 선다. 그래서 위에서 이미 본 것을
+   * 다시 늘어놓으면 여기까지 내려온 사람은 새로 아는 것이 없다.
+   *
+   * 위에 무엇이 있는지가 바뀌었다. 홈 맨 위에 '오늘의 한 줄'
+   * (src/lib/todayLine.mjs)이 생기면서 **심리 점수의 어제 대비 변화**를 그 줄이
+   * 말하게 됐다. 그런데 이 카드의 첫 줄도 같은 말을 하고 있었다 —
+   *
+   *   한 줄 : 크립토 투자심리가 어제보다 10점 탐욕 쪽으로 갔고 …
+   *   이 카드: 오늘 가장 크게 움직인 것 — 크립토 심리 78.3점 탐욕 (어제보다 +10.0) …
+   *
+   * 그래서 첫 줄에서 심리 부분을 뺐다. 심리 이야기는 바로 다음 줄이 '왜' 로
+   * 이어받는다 — 한 줄이 무슨 일인지 말하고, 이 카드가 그 까닭을 말한다.
    */
 
-  /* ---------- 1줄: 가장 크게 움직인 것 (사실) ---------- */
+  /* ---------- 1줄: 대표 시세 중 가장 크게 움직인 것 (사실) ---------- */
   const scored = fng.filter((f) => f.score !== null);
   const moved = [...scored]
     .filter((f) => f.deltaDay !== null && Math.abs(f.deltaDay) >= 0.5)
@@ -40,22 +49,11 @@ export function buildSummary(
     (a, b) => Math.abs(b.changePct as number) - Math.abs(a.changePct as number),
   )[0];
 
-  if (moved[0] || biggest) {
-    const bits: string[] = [];
-    if (moved[0]) {
-      const f = moved[0];
-      bits.push(
-        `${MARKET_LABEL[f.market]} 심리 ${formatScore(f.score)}점 ${f.stage?.label ?? ''} (어제보다 ${formatSigned(f.deltaDay, 1)})`,
-      );
-    }
-    if (biggest) bits.push(`${biggest.name} ${formatSigned(biggest.changePct, 2)}%`);
+  if (biggest) {
     lines.push({
       kind: 'fact',
-      text: `오늘 가장 크게 움직인 것 — ${bits.join(' · ')}.`,
-      evidence: [
-        ...(moved[0] ? [`fng:${moved[0].market}`] : []),
-        ...(biggest ? [`quote:${biggest.id}`] : []),
-      ],
+      text: `대표 시세 중 가장 크게 움직인 것 — ${biggest.name} ${formatSigned(biggest.changePct, 2)}%.`,
+      evidence: [`quote:${biggest.id}`],
     });
   }
 

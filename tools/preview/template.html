@@ -529,7 +529,14 @@ section.block { padding: 0 12px; margin-top: 20px; }
   /* contain 이 없으면 가로 스크롤 영역이 문서 전체의 스크롤 폭으로 새어 나간다 */
   contain: paint; }
 .fng-scroll::-webkit-scrollbar { display: none; }
-.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: min(85cqw, 340px); }
+/* 카드 폭은 이 화면의 다른 카드와 같아야 한다. 예전에는 85cqw(최대 340px)라
+   다음 카드가 살짝 보였는데, 그 대가로 이 카드만 66px 좁아 위아래 카드와
+   테두리 선이 안 맞았고 두 번째 카드는 틀 끝에서 잘렸다. 앱과 같은 값이다. */
+.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: calc(100cqw - 24px); }
+/* "옆에 더 있다" 는 이 점이 말한다 */
+.fng-dots { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+.fng-dots span { display: block; width: 6px; height: 6px; border-radius: 999px; background: var(--surface-3); }
+.fng-dots span[data-on='true'] { background: var(--muted); }
 @container app (min-width: 1024px) {
   .fng-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
   .fng-scroll > * { width: auto; }
@@ -3067,7 +3074,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       // 카드마다 되풀이하던 줄. 셋이 같은 값이라 머리에 한 번만 적는다.
       '<div class="sub" style="margin-top:2px">자체 산출 지수 · ' + esc((fng[0] || {}).formulaVersion || '') + '</div></div>' +
       '<span class="hint" style="flex-shrink:0">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
-      '<div class="fng-scroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
+      '<div class="fng-scroll" id="fngscroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
+      (fng.length > 1
+        ? '<div class="fng-dots" id="fngdots" aria-hidden="true">' +
+          fng.map((x, i) => '<span data-on="' + (i === 0) + '"></span>').join('') + '</div>'
+        : '') +
       '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
       '</section>' +
 
@@ -4452,6 +4463,23 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     tail.style.height = Math.max(0, Math.round(lowerFloor - r.height)) + 'px';
   }
 
+  /*
+   * 심리 카드를 옆으로 밀면 아래 점이 따라 움직인다.
+   * 카드가 칸을 꽉 채우게 되면서 "옆에 더 있다" 를 알려 줄 것이 없어졌다 —
+   * 점은 그 일만 한다. 앱의 FngSection 안 Carousel 과 같은 셈법이다.
+   */
+  function bindFngDots() {
+    const row = document.getElementById('fngscroll');
+    const dots = document.getElementById('fngdots');
+    if (!row || !dots) return;
+    const n = dots.children.length;
+    row.addEventListener('scroll', () => {
+      const step = row.scrollWidth / n;
+      const at = Math.max(0, Math.min(n - 1, Math.round(row.scrollLeft / step)));
+      for (let i = 0; i < n; i += 1) dots.children[i].setAttribute('data-on', String(i === at));
+    }, { passive: true });
+  }
+
   function render() {
     closeZoom();
     document.documentElement.setAttribute('data-cm', state.colorMode);
@@ -4494,6 +4522,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       viewEl.classList.add('view-enter');
     }
     renderNav();
+    bindFngDots();
     Object.keys(CHARTS).forEach((id) => { if (document.getElementById(id)) drawChart(id); else delete CHARTS[id]; });
     document.querySelectorAll('.preview [data-scenario]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scenario === state.scenario)));
   }

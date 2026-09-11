@@ -18,10 +18,33 @@
  * 못 재면 재지 않는다
  *   지나온 값이 모자라면 배수를 지어내지 않고 null 을 준다. 화면은 그 자리에
  *   "얼마나 유별난지 잴 수 없습니다" 라고 적는다.
+ *
+ * 작은 종목은 후보에서 뺀다
+ *   시총 순위가 300위 밖이면 고르지 않는다. 작은 종목은 하루 30% 씩도 움직여서,
+ *   평소 폭으로 나눠도 배수가 크게 나오는 날이 잦다. 그것까지 후보에 넣으면
+ *   '오늘 유별났던 것' 자리가 늘 그런 종목 차지가 되고, 정작 큰 시장에서 일어난
+ *   일은 밀려난다.
  */
 
 /** 배수를 재려면 하루치 변동이 최소 이만큼은 있어야 한다 */
 export const MIN_SAMPLE = 7;
+
+/** 시총 순위가 이 안에 드는 것만 고른다 */
+export const CAP_RANK_MAX = 300;
+
+/**
+ * 후보로 볼 것인가.
+ *
+ * 순위를 **아는데** 300위 밖이면 뺀다. 모르면 그대로 둔다 — 지수처럼 애초에
+ * 순위 개념이 없는 것도 있고, 지금 목록은 사람이 골라 담은 것이라 전부 각
+ * 시장의 대형주·상위 코인이기 때문이다. 바깥에서 이름이 쏟아져 들어오는 날
+ * (한국 전종목처럼) 제공사가 순위를 함께 주고, 그때 이 문이 일한다.
+ */
+export function withinCap(quote, maxRank = CAP_RANK_MAX) {
+  const rank = quote?.capRank;
+  if (rank === null || rank === undefined) return true;
+  return Number.isFinite(rank) && rank <= maxRank;
+}
 
 /**
  * 이 종목이 평소 하루에 얼마나 움직이는가 (%, 표준편차).
@@ -75,9 +98,10 @@ export function heatOf(changePct, sigma) {
  * **오른 것을 내렸다고 말하는 셈**이라 거짓말이 된다. 그래서 자리 이름을 바꾼다 —
  * '가장 덜 오른 것'. 반대로 다 내린 날은 '가장 덜 내린 것' 이 된다.
  */
-export function pickHeat(quotes) {
+export function pickHeat(quotes, { maxCapRank = CAP_RANK_MAX } = {}) {
   const rows = (Array.isArray(quotes) ? quotes : [])
     .filter((q) => q && Number.isFinite(q.changePct) && q.price !== null && q.price !== undefined)
+    .filter((q) => withinCap(q, maxCapRank))
     .map((q) => {
       const sigma = dailySigma(q.spark);
       return { quote: q, sigma, heat: heatOf(q.changePct, sigma) };

@@ -34,6 +34,12 @@ import { MARKET_LABEL, INDEX_MARKET_IDS, type MarketId } from '@/types';
 /** 값이 있는 것만 고른다. 지표·통계(펀딩비·청산 규모)는 '종목' 이 아니라 뺀다. */
 const TRADABLE = new Set(['equity', 'index', 'crypto', 'commodity']);
 
+/*
+ * 시총 순위로 거르는 일은 pickHeat 이 한다 (heatRank.mjs 의 CAP_RANK_MAX = 300).
+ * 순위를 아는 것만 걸러지고, 모르는 것은 그대로 둔다 — 지수처럼 순위 개념이
+ * 없는 것도 있고, 지금 목록은 사람이 골라 담은 것이라 전부 대형주·상위 코인이다.
+ */
+
 const MARKET_NOTE: Record<string, string> = {
   us: '지수와 개별주',
   kr: '지수와 개별주',
@@ -183,7 +189,9 @@ export function HeatBoard() {
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
           시장마다 가장 많이 오른 것 하나와 가장 많이 내린 것 하나씩입니다. 몇 % 움직였는지가 아니라{' '}
           <strong className="font-semibold text-muted">그 종목이 평소 움직이던 폭에 견줘</strong> 오늘이 얼마나
-          유별났는지로 골랐습니다 — 그냥 % 로 줄을 세우면 원래 많이 움직이는 크립토가 늘 이깁니다.
+          유별났는지로 골랐습니다 — 그냥 % 로 줄을 세우면 원래 많이 움직이는 크립토가 늘 이깁니다.{' '}
+          <strong className="font-semibold text-muted">시총 300위 밖은 후보에서 뺍니다</strong> — 작은 종목은 하루
+          30% 씩도 움직여서, 그것까지 넣으면 이 자리가 늘 그런 종목 차지가 됩니다.
         </p>
       </div>
 

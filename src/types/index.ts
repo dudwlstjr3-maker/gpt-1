@@ -135,6 +135,14 @@ export interface Quote {
   /** 거래량 (없으면 null) */
   volume: number | null;
   volumeUnit?: Unit;
+  /**
+   * 시총 순위. 제공사가 주는 것만 채우고, 모르면 null 이다 — 지어내지 않는다.
+   *
+   * '오늘 불타는 것과 얼어붙은 것' 이 이 값을 본다. 순위가 300위 밖이면 후보에서
+   * 뺀다 (src/lib/heatRank.mjs 의 CAP_RANK_MAX). 작은 종목은 하루 30% 씩도
+   * 움직여서, 그것까지 후보에 넣으면 '오늘 유별났던 것' 이 늘 그 자리가 된다.
+   */
+  capRank?: number | null;
   /** 30포인트 내외의 미니 차트 */
   spark: SeriesPoint[];
   session: SessionPhase;

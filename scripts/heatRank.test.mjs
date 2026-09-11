@@ -4,7 +4,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dailySigma, heatOf, pickHeat, HEAT_WORD } from '../src/lib/heatRank.mjs';
+import { dailySigma, heatOf, pickHeat, HEAT_WORD, withinCap } from '../src/lib/heatRank.mjs';
 
 /** 하루 step% 씩 번갈아 오르내리는 선 — 평소 폭이 대략 step 이 된다 */
 const wobble = (n, step, base = 100) => {
@@ -114,4 +114,40 @@ test('사라·팔라로 읽히는 낱말을 쓰지 않는다', () => {
   const words = Object.values(HEAT_WORD).flatMap((v) => [v.up, v.down]);
   for (const w of words) assert.doesNotMatch(w, /(매수|매도|사세요|파세요|대박|폭등|기회|추천|수익)/, w);
   assert.equal(words.length, 8);
+});
+
+/* ---------------- 시총 순위로 거르기 ---------------- */
+
+test('순위를 모르면 그대로 둔다', () => {
+  assert.equal(withinCap({ capRank: null }), true);
+  assert.equal(withinCap({}), true);
+  assert.equal(withinCap(undefined), true);
+});
+
+test('300위 안쪽만 후보다', () => {
+  assert.equal(withinCap({ capRank: 1 }), true);
+  assert.equal(withinCap({ capRank: 300 }), true);
+  assert.equal(withinCap({ capRank: 301 }), false);
+  assert.equal(withinCap({ capRank: 4210 }), false);
+});
+
+test('순위 밖인 것은 고르지 않는다', () => {
+  const q = (id, pct, rank) => ({
+    id, name: id, price: 100, changePct: pct, capRank: rank,
+    spark: Array.from({ length: 20 }, (_, i) => ({ t: i, v: 100 + (i % 3) })),
+  });
+  // 잡주가 +40% 로 제일 크게 움직였지만 순위 밖이라 빠진다
+  const board = pickHeat([q('잡주', 40, 4210), q('큰주', 3, 12), q('작은하락', -5, 900), q('큰하락', -2, 40)]);
+  assert.equal(board.count, 2);
+  assert.equal(board.top.quote.id, '큰주');
+  assert.equal(board.bottom.quote.id, '큰하락');
+});
+
+test('기준을 바꿔 부를 수 있다', () => {
+  const q = (id, pct, rank) => ({
+    id, name: id, price: 100, changePct: pct, capRank: rank,
+    spark: Array.from({ length: 20 }, (_, i) => ({ t: i, v: 100 + (i % 3) })),
+  });
+  const wide = pickHeat([q('a', 5, 10), q('b', -5, 900)], { maxCapRank: 1000 });
+  assert.equal(wide.count, 2);
 });

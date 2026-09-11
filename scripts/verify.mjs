@@ -2211,6 +2211,42 @@ async function main() {
   console.log('\n[8-26] 오늘 불타는 것과 얼어붙은 것');
   {
     /*
+     * 작은 종목은 후보에서 뺀다.
+     *
+     * 작은 종목은 하루 30% 씩도 움직인다. 평소 폭으로 나눠도 배수가 크게 나오는
+     * 날이 잦아서, 그것까지 후보에 넣으면 '오늘 유별났던 것' 자리가 늘 그런 종목
+     * 차지가 되고 정작 큰 시장에서 일어난 일은 밀려난다.
+     *
+     * 문은 순위를 **아는** 것에만 닫힌다. 모르면 그대로 둔다 — 지수처럼 순위
+     * 개념이 없는 것도 있고, 지금 카탈로그는 사람이 골라 담은 것이라 개별주·코인
+     * 열다섯이 전부 각 시장의 대형주·상위 코인이기 때문이다. 그래서 오늘은
+     * 걸러지는 것이 없다. 바깥에서 이름이 쏟아져 들어오는 날(한국 전종목처럼)
+     * 제공사가 순위를 함께 주고, 그때 이 문이 일한다.
+     */
+    const capSrc = await readFile('src/lib/heatRank.mjs', 'utf8');
+    const { withinCap, CAP_RANK_MAX, pickHeat: pick300 } = await import('../src/lib/heatRank.mjs');
+    check('시총 기준이 300위', CAP_RANK_MAX === 300, String(CAP_RANK_MAX));
+    check('순위를 모르면 그대로 둠', withinCap({}) === true && withinCap({ capRank: null }) === true);
+    check('300위 밖은 뺌', withinCap({ capRank: 301 }) === false && withinCap({ capRank: 300 }) === true);
+    check('고르는 자리에서 실제로 걸러짐', /\.filter\(\(q\) => withinCap\(q, maxCapRank\)\)/.test(capSrc));
+    {
+      const mk = (id, pct, rank) => ({
+        id, name: id, price: 100, changePct: pct, capRank: rank,
+        spark: Array.from({ length: 20 }, (_, i) => ({ t: i, v: 100 + (i % 3) })),
+      });
+      const board = pick300([mk('잡주', 40, 4210), mk('큰주', 3, 12), mk('큰하락', -2, 40)]);
+      check('순위 밖 급등주가 자리를 차지하지 못함', board.count === 2 && board.top.quote.id === '큰주',
+        board.top.quote.id);
+    }
+    check('Quote 에 순위 자리가 있고 모르면 null', /capRank\?: number \| null;/.test(await readFile('src/types/index.ts', 'utf8')));
+    check('화면이 그 규칙을 밝힘',
+      /시총 300위 밖은 후보에서 뺍니다/.test(await readFile('src/components/market/HeatBoard.tsx', 'utf8')));
+    const tplHeat = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 같은 문을 씀',
+      /HEAT_CAP_RANK_MAX = 300/.test(tplHeat) && /\.filter\(heatWithinCap\)/.test(tplHeat) &&
+      /시총 300위 밖은 후보에서 뺍니다/.test(tplHeat));
+
+    /*
      * 몇 % 움직였는지로 줄을 세우면 크립토가 늘 이긴다. 원래 많이 움직이는 것이라
      * 하루 8% 가 평범할 수 있고, 코스피가 8% 움직이면 사건이다. 그래서 그 종목이
      * **평소 움직이던 폭에 견줘** 오늘이 얼마나 유별났는지로 고른다.

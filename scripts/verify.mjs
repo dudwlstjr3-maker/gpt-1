@@ -2749,6 +2749,40 @@ async function main() {
     check('미리보기도 같은 폭', /\.fng-scroll > \* \{[^}]*width: calc\(100cqw - 24px\)/.test(tpl16) && /\.fng-dots/.test(tpl16));
 
     /*
+     * 폭만 맞춰서는 모자랐다 — 높이도 같아야 한다.
+     *
+     * 요인 줄은 시장마다 0~2줄이라 카드 안쪽 내용의 길이가 제각각이다. 카드가
+     * 제 내용만큼만 자라면 옆으로 밀 때마다 카드 아래 빈 자리가 늘었다 줄었다
+     * 한다. 미리보기에서 실제로 그랬다 — 크립토 446px, 미국 403px, 아래 빈 자리
+     * 49px 차이. 카드 셋이 가장 키 큰 것에 맞춰 서고, 남는 자리는 안쪽으로
+     * 흩어져야 한다 (바닥의 단추와 시각은 margin-top:auto 로 붙인다).
+     */
+    const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('앱 카드가 칸 높이를 꽉 채움', /className="card flex h-full flex-col p-3"/.test(fngCardSrc));
+    check('앱 카드의 단추·시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
+
+    /*
+     * height:100% 가 오히려 높이를 어긋나게 했다.
+     *
+     * 높이가 정해지지 않은 칸 안에서 100% 는 auto 로 풀리고, 그러면서 늘어나는
+     * 동작(align-self:stretch)까지 꺼버린다. 앱은 카드를 감싼 칸이 따로 있어
+     * 안 걸렸고, 감싼 칸이 없는 미리보기에서만 터졌다.
+     */
+    const fngCardCss = tpl16.match(/\.fngcard \{[^}]*\}/)?.[0] ?? '';
+    check('미리보기 카드에 height:100% 가 없음', fngCardCss !== '' && !/height:\s*100%/.test(fngCardCss), fngCardCss);
+    check('미리보기 카드가 늘어나 같은 높이로 섬', /align-self:\s*stretch/.test(fngCardCss), fngCardCss);
+    check('미리보기도 단추·시각을 바닥에 붙임', /\.fngfoot \{[^}]*margin-top:\s*auto/.test(tpl16));
+
+    /*
+     * 바닥 모양도 앱과 같아야 한다. 미리보기는 시각과 단추를 한 줄에 몰아 넣어
+     * 단추가 글자만 했다. 앱은 단추 둘이 한 줄을 나눠 갖고(하나는 강조색),
+     * 산출 시각은 그 아래 줄이다.
+     */
+    check('미리보기 단추가 한 줄을 나눠 가짐', /\.fngfoot > button \{[^}]*flex:\s*1 1 0/.test(tpl16));
+    check('미리보기도 강조 단추가 하나', /class="ghost ghost-primary" data-go-region=/.test(tpl16));
+    check('미리보기도 산출 시각이 아랫줄', /<p class="fngstamp"/.test(tpl16) && /\.fngstamp \{/.test(tpl16));
+
+    /*
      * 요약 카드가 맨 위 한 줄과 같은 말을 하고 있었다.
      *   한 줄 : 크립토 투자심리가 어제보다 10점 탐욕 쪽으로 갔고 …
      *   요약  : 오늘 가장 크게 움직인 것 — 크립토 심리 78.3점 탐욕 (어제보다 +10.0) …

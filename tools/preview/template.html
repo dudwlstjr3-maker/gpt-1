@@ -547,7 +547,19 @@ section.block { padding: 0 12px; margin-top: 20px; }
   .fng-scroll > * { width: auto; }
 }
 
-.fngcard { display: flex; flex-direction: column; padding: 16px; height: 100%; }
+/*
+ * 카드 셋은 같은 높이로 선다.
+ *
+ * height:100% 를 적어 두었는데 그게 오히려 높이를 어긋나게 했다. 높이가 정해지지
+ * 않은 칸 안에서 100% 는 auto 로 풀리고, 그러면서 늘어나는 동작(align-self:stretch)
+ * 까지 꺼버린다. 그래서 카드가 저마다 제 내용만큼만 자랐다 — 요인 줄이 둘인 크립토는
+ * 446px, 하나뿐인 미국은 403px. 옆으로 밀 때마다 카드 아래 빈 자리가 49px 씩
+ * 늘었다 줄었다 했다.
+ *
+ * 높이를 적지 않고 늘어나게 두면 셋이 가장 키 큰 것에 맞춰 선다. 남는 자리는
+ * 아래(.fngfoot 의 margin-top:auto)가 아니라 안쪽 여백으로 흩어진다.
+ */
+.fngcard { display: flex; flex-direction: column; padding: 12px; align-self: stretch; }
 .fngcard header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .fngcard h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--fg-strong); }
 .fngcard .sub { font-size: 11.5px; color: var(--subtle); margin-top: 2px; }
@@ -561,10 +573,10 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .delta small { display: block; font-size: 11.5px; color: var(--muted); }
 .delta b { display: block; font-size: 13px; margin-top: 1px; }
 
-.sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.sparkrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .sparkrow small { font-size: 11.5px; color: var(--muted); }
 
-.drivers { border-top: 1px solid var(--border); margin: 12px 0; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.drivers { border-top: 1px solid var(--border); margin: 8px 0; padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .driver { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.45; word-break: keep-all; }
 .driver .g { font-size: 11.5px; font-weight: 700; margin-top: 1px; flex-shrink: 0; }
 .driver .lbl { color: var(--muted); }
@@ -573,8 +585,11 @@ section.block { padding: 0 12px; margin-top: 20px; }
 /* 바닥에 붙인다 (margin-top:auto). 카드 셋은 가장 키 큰 것에 맞춰 같은 높이로
    서는데 요인 줄이 시장마다 0~2줄이라, 그대로 두면 짧은 카드 아래가 통째로 비어
    같은 크기의 카드인데도 크기가 달라 보였다. 앱의 FngCard 와 같은 규칙이다. */
-.fngfoot { border-top: 1px solid var(--border); margin-top: auto; padding-top: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.fngfoot small { font-size: 11.5px; color: var(--subtle); }
+/* 앱과 같은 모양 — 단추 둘이 한 줄을 나눠 갖고, 산출 시각은 그 아래 줄이다.
+   예전에는 시각과 단추를 한 줄에 몰아 넣어 단추가 글자만 해졌고, 앱 화면과도 달랐다. */
+.fngfoot { border-top: 1px solid var(--border); margin-top: auto; padding-top: 8px; display: flex; align-items: center; gap: 8px; }
+.fngfoot > button { flex: 1 1 0; min-width: 0; }
+.fngstamp { margin: 8px 0 0; font-size: 11.5px; color: var(--subtle); }
 
 /* --------------------------------- 가격 카드 --------------------------------- */
 
@@ -1764,10 +1779,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<div class="drivers">' + driver('up', f.topPositive) + driver('down', f.topNegative) + '</div>' +
       /* 산출 시각·충족률도 늘 적는다. 없다가 생기면 카드 바닥이 19px 자란다.
          대신 100% 가 아니면 색으로 표시해 떨어진 날을 놓치지 않게 한다. */
-      '<div class="fngfoot"><small' + (f.coverage < 0.999 ? ' style="color:var(--warn)"' : '') + '>산출 ' +
-      esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</small>' +
-      '<button type="button" class="ghost" data-go-region="' + f.market + '" style="margin-right:8px">' + esc(MARKET_LABEL[f.market]) + ' 시장 →</button>' +
+      '<div class="fngfoot">' +
+      '<button type="button" class="ghost ghost-primary" data-go-region="' + f.market + '">' + esc(MARKET_LABEL[f.market]) + ' 시장 →</button>' +
       '<button type="button" class="ghost" data-go-fng="' + f.market + '">심리 상세 →</button></div>' +
+      '<p class="fngstamp"' + (f.coverage < 0.999 ? ' style="color:var(--warn)"' : '') + '>산출 ' +
+      esc(kTime(f.computedAt)) + ' · 충족률 ' + Math.round(f.coverage * 100) + '%</p>' +
       '</article>'
     );
   }

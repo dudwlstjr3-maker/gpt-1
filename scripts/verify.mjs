@@ -1544,6 +1544,25 @@ async function main() {
     // 본문용 크기가 실제로 쓰이는지 — 눈금만 정의하고 안 쓰면 의미가 없다
     check('본문이 11.5px 이상에 놓임', SRC_SIZES.filter((x) => x.v >= 11.5).length > SRC_SIZES.length * 0.7);
 
+    /*
+     * 누를 자리는 적어도 24×24 (WCAG 2.2 AA 2.5.8 Target Size).
+     *
+     * 재 보니 네 화면에서 스무 곳 넘게 모자랐다. 글자만 있는 단추·링크는 글자
+     * 높이가 그대로 누를 자리가 되어서다 — 11.5px 글자면 17px, 12.5px 면 19px.
+     * 보이는 크기는 그대로 두고 세로로만 24px 을 보장하는 .tap 을 붙였다.
+     *
+     * 별표(★)는 여기 해당하지 않는다. ::after 로 32×44 를 따로 잡아 두었다.
+     */
+    check('누를 자리를 24px 로 보장하는 길이 있음',
+      /\.tap \{[\s\S]{0,120}min-height: 24px/.test(await readFile('src/app/globals.css', 'utf8')));
+    const tapUsers = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (/className="tap |className="tap"/.test(t)) tapUsers.push(f.split('/').pop());
+    }
+    check('작은 글자 단추들이 그것을 씀', tapUsers.length >= 10, `${tapUsers.length}곳`);
+    check('미리보기도 같은 규칙', /\.linkbtn \{[^}]*min-height: 24px/.test(await readFile('tools/preview/template.html', 'utf8')));
+
     /* 손가락으로 누를 자리 */
     const price = await readFile('src/components/market/PriceCard.tsx', 'utf8');
     /*
@@ -2314,7 +2333,8 @@ async function main() {
       const m = t.match(re);
       return m ? Number(m[1]) : 0;
     };
-    const pcName = nameSize(pc, /className="block text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold whitespace-nowrap text-fg-strong/);
+    // 사이에 다른 클래스가 끼어도(min-h-[24px] 등) 크기만 본다
+    const pcName = nameSize(pc, /className="block[^"]*text-\[(\d+(?:\.\d+)?)px\][^"]*whitespace-nowrap text-fg-strong/);
     const ixName = nameSize(idx, /className="text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold whitespace-nowrap text-fg-strong/);
     check('가격 카드 이름이 배지(10.5px)보다 확실히 큼', pcName >= 15, `${pcName}px`);
     check('지수 판 이름도 배지보다 확실히 큼', ixName >= 15, `${ixName}px`);
@@ -2332,7 +2352,7 @@ async function main() {
      */
     const heat = await readFile('src/components/market/HeatBoard.tsx', 'utf8');
     const oneLine = [
-      ['가격 카드', pc, /className="block text-\[16px\] leading-snug font-bold whitespace-nowrap/],
+      ['가격 카드', pc, /className="block[^"]*text-\[16px\][^"]*whitespace-nowrap/],
       ['지수 판', idx, /className="text-\[15px\] leading-snug font-bold whitespace-nowrap/],
       ['시장 화면 종목 줄', region, /className="min-w-0 text-\[13px\] whitespace-nowrap/],
       ['불타는 카드', heat, /font-bold whitespace-nowrap text-fg-strong[\s\S]{0,120}clamp\(13px/],

@@ -34,7 +34,7 @@ export function CriteriaSummaryCard() {
         <h3 id="home-criteria-title" className="text-[13px] font-bold text-fg-strong">
           내 기준
         </h3>
-        <Link href="/criteria" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/criteria" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           {sum.total === 0 ? '조건 만들기 →' : '자세히 보기 →'}
         </Link>
       </div>

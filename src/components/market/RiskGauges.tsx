@@ -538,7 +538,7 @@ export function RiskGaugesSection() {
         <h2 id="risk-seven-title" className="text-base font-bold text-fg-strong">
           시장 위험 신호등
         </h2>
-        <Link href="/indicators" className="text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/indicators" className="tap text-[12.5px] font-semibold text-accent hover:underline">
           기준과 해설 →
         </Link>
       </div>
@@ -616,7 +616,7 @@ export function RiskForMarket({ market }: { market: 'us' | 'kr' | 'crypto' }) {
           <div className="card p-3">
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-bold text-fg-strong">{MARKET_LABEL[market]} 관련 위험 지표</h2>
-              <Link href="/indicators" className="text-[12.5px] font-semibold text-accent hover:underline">
+              <Link href="/indicators" className="tap text-[12.5px] font-semibold text-accent hover:underline">
                 신호등 전체 →
               </Link>
             </div>

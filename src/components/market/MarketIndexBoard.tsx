@@ -190,7 +190,7 @@ export function MarketIndexBoard() {
                 {MARKET_IDS.includes(g.market) ? (
                   <Link
                     href={`/market/${g.market}`}
-                    className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline"
+                    className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline"
                   >
                     시장 화면 →
                   </Link>

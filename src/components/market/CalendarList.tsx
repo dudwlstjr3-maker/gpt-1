@@ -117,7 +117,7 @@ export function CalendarPreview() {
         <h2 id="calendar-preview-title" className="text-base font-bold text-fg-strong">
           오늘의 경제 일정
         </h2>
-        <Link href="/calendar" className="text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/calendar" className="tap text-[12.5px] font-semibold text-accent hover:underline">
           전체 캘린더 →
         </Link>
       </div>

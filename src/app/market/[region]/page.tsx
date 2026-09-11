@@ -268,7 +268,7 @@ export default function MarketRegionPage() {
                 <h2 id={`cal-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 일정
                 </h2>
-                <Link href="/calendar" className="text-[12.5px] font-semibold text-accent hover:underline">
+                <Link href="/calendar" className="tap text-[12.5px] font-semibold text-accent hover:underline">
                   전체 캘린더 →
                 </Link>
               </div>

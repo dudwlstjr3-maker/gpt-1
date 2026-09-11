@@ -35,7 +35,7 @@ export default function WatchlistPage() {
     <div className="pt-2">
       <div className="flex items-baseline justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">관심목록</h1>
-        <Link href="/market/us" className="text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/market/us" className="tap text-[12.5px] font-semibold text-accent hover:underline">
           종목 추가 →
         </Link>
       </div>

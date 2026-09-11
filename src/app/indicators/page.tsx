@@ -123,7 +123,7 @@ export default function IndicatorsPage() {
       <BackBar />
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">경제 · 위험 지표</h1>
-        <Link href="/basics" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/basics" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           생활 경제 지수 →
         </Link>
       </div>

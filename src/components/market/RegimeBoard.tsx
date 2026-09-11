@@ -245,7 +245,7 @@ export function RegimeBoardCard() {
         <h2 id="regime-title" className="text-base font-bold text-fg-strong">
           국면 전광판
         </h2>
-        <Link href="/regime" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/regime" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           자세히 →
         </Link>
       </div>

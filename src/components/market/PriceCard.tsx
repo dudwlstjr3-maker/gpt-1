@@ -56,7 +56,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
               않고 자리를 먼저 비웠다 — 위의 배지를 아래로 내린 이유가 이것이다. */}
           <Link
             href={`/asset/${quote.id}`}
-            className="block text-[16px] leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
+            className="block min-h-[24px] text-[16px] leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
           >
             {quote.name}
           </Link>

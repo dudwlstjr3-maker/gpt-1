@@ -139,7 +139,7 @@ function GuidePanel({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="text-[12.5px] font-semibold text-accent hover:underline"
+        className="tap text-[12.5px] font-semibold text-accent hover:underline"
       >
         {open ? '설명 접기 ▴' : '이게 무슨 숫자인가요? ▾'}
       </button>

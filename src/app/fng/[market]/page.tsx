@@ -190,7 +190,7 @@ export default function FngDetailPage() {
     <div className="pt-2 pb-4">
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/" aria-label="뒤로" className="text-muted">
+          <Link href="/" aria-label="뒤로" className="tap min-w-[24px] justify-center text-muted">
             ←
           </Link>
           <h1 className="truncate text-lg font-bold text-fg-strong">{MARKET_LABEL[market]} 투자심리 상세</h1>

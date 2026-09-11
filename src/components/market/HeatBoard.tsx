@@ -116,7 +116,7 @@ function HeatCard({ pick }: { pick: HeatPick }) {
             자르지는 않는다. '마이크로소프…' 은 무엇인지 알 수 없다. */}
         <Link
           href={`/asset/${q.id}`}
-          className="mt-1 block leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
+          className="mt-1 block min-h-[24px] leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
           style={{ fontSize: 'clamp(13px, 4.1cqw, 15px)' }}
         >
           {q.name}

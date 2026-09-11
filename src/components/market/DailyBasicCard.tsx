@@ -28,7 +28,7 @@ export function DailyBasicCard() {
         <h2 id="daily-basic-title" className="text-base font-bold text-fg-strong">
           오늘의 경제 이야기
         </h2>
-        <Link href="/basics" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+        <Link href="/basics" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           전체 보기 →
         </Link>
       </div>
@@ -69,7 +69,7 @@ export function DailyBasicCard() {
                 <p className="tnum text-[20px] leading-none font-bold text-fg-strong">
                   {item.value === null ? NO_VALUE : `${formatNumber(item.value, item.precision)}${item.suffix}`}
                 </p>
-                <Link href="/basics" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+                <Link href="/basics" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
                   읽는 법 보기 →
                 </Link>
               </div>

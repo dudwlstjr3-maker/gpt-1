@@ -24,9 +24,9 @@ interface Health {
 
 function Section({ title, children, description }: { title: string; children: React.ReactNode; description?: string }) {
   return (
-    <section className="mt-4 px-3">
-      <h2 className="mb-1.5 text-[12px] font-bold text-muted">{title}</h2>
-      {description ? <p className="mb-1.5 text-[11px] break-keep text-subtle">{description}</p> : null}
+    <section className="mt-5 px-3">
+      <h2 className="mb-2 text-[13px] font-bold text-muted">{title}</h2>
+      {description ? <p className="mb-2 text-[12.5px] break-keep text-subtle">{description}</p> : null}
       <div className="card p-3">{children}</div>
     </section>
   );
@@ -110,7 +110,7 @@ export default function MorePage() {
             현재 LIVE 모드입니다. 시나리오 전환은 DEMO 모드에서만 동작합니다. (MARKET_MOOD_MODE=demo 로 전환 가능)
           </Notice>
         ) : null}
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-2 space-y-2">
           {DEMO_SCENARIOS.map((s) => {
             const active = settings.scenario === s.id;
             return (
@@ -119,7 +119,7 @@ export default function MorePage() {
                   type="button"
                   onClick={() => update({ scenario: s.id })}
                   aria-pressed={active}
-                  className="flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left"
+                  className="flex w-full items-start gap-2 rounded-lg border px-2 py-2 text-left"
                   style={{
                     borderColor: active ? 'var(--accent)' : 'var(--border)',
                     background: active ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--surface-2)',
@@ -132,7 +132,7 @@ export default function MorePage() {
                   />
                   <span className="min-w-0">
                     <span className="block text-[13px] font-semibold text-fg">{s.label}</span>
-                    <span className="block text-[11px] break-keep text-subtle">{s.description}</span>
+                    <span className="block text-[12.5px] break-keep text-subtle">{s.description}</span>
                   </span>
                 </button>
               </li>
@@ -148,17 +148,17 @@ export default function MorePage() {
             if (!item) return null;
             return (
               <li key={id} className="flex items-center gap-2 py-2">
-                <span className="tnum w-5 shrink-0 text-[11px] text-subtle">{idx + 1}</span>
+                <span className="tnum w-5 shrink-0 text-[12.5px] text-subtle">{idx + 1}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] text-fg">{item.name}</p>
-                  <p className="text-[10px] text-subtle">{MARKET_LABEL[item.market]}</p>
+                  <p className="text-[11.5px] text-subtle">{MARKET_LABEL[item.market]}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => moveHomeItem(id, -1)}
                   disabled={idx === 0}
                   aria-label={`${item.name} 위로`}
-                  className="h-7 w-7 rounded-md border border-border text-xs text-muted disabled:opacity-35"
+                  className="h-10 w-10 rounded-md border border-border text-[13px] text-muted disabled:opacity-35"
                 >
                   ↑
                 </button>
@@ -167,7 +167,7 @@ export default function MorePage() {
                   onClick={() => moveHomeItem(id, 1)}
                   disabled={idx === settings.homeItems.length - 1}
                   aria-label={`${item.name} 아래로`}
-                  className="h-7 w-7 rounded-md border border-border text-xs text-muted disabled:opacity-35"
+                  className="h-10 w-10 rounded-md border border-border text-[13px] text-muted disabled:opacity-35"
                 >
                   ↓
                 </button>
@@ -175,7 +175,7 @@ export default function MorePage() {
                   type="button"
                   onClick={() => toggleHomeItem(id)}
                   aria-label={`${item.name} 홈에서 숨기기`}
-                  className="h-7 w-7 rounded-md border border-border text-xs"
+                  className="h-10 w-10 rounded-md border border-border text-[13px]"
                   style={{ color: 'var(--danger)' }}
                 >
                   ✕
@@ -186,21 +186,21 @@ export default function MorePage() {
         </ul>
 
         <div className="mt-3 border-t border-border pt-2">
-          <p className="mb-1.5 text-[11px] text-muted">추가할 항목</p>
+          <p className="mb-2 text-[12.5px] text-muted">추가할 항목</p>
           <div className="space-y-2">
             {MARKET_IDS.map((m) => {
               const candidates = catalogFor(m).filter((c) => !settings.homeItems.includes(c.id));
               if (candidates.length === 0) return null;
               return (
                 <div key={m}>
-                  <p className="mb-1 text-[10px] text-subtle">{MARKET_LABEL[m]}</p>
-                  <div className="flex flex-wrap gap-1.5">
+                  <p className="mb-1 text-[11.5px] text-subtle">{MARKET_LABEL[m]}</p>
+                  <div className="flex flex-wrap gap-2">
                     {candidates.map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => toggleHomeItem(c.id)}
-                        className="rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[11px] text-muted hover:text-fg"
+                        className="rounded-full border border-border bg-surface-2 px-2 py-1 text-[12.5px] text-muted hover:text-fg"
                       >
                         + {c.name}
                       </button>
@@ -222,15 +222,17 @@ export default function MorePage() {
             { href: '/indicators', label: '경제·위험 지표 전체', desc: '기준금리·물가·고용·PMI·스프레드·밸류에이션' },
             { href: '/basics', label: '생활 경제 지수', desc: '1인당 GDP·지니계수·빅맥지수·PPP 환율·엥겔계수·소비자심리' },
             { href: '/indices', label: '시장 지수', desc: 'S&P 500 · 나스닥 · KOSPI · VIX · 달러지수' },
+            { href: '/futures', label: '선물 시장', desc: '지수·에너지·금속·농산물·통화·금리 선물 등락률 (거래소 유료 시세는 비어 있습니다)' },
+            { href: '/regime', label: '국면 전광판', desc: '지금이 지난 20년 중 어디쯤인지 + 과거에 그랬을 때 무슨 일이 있었는지' },
             { href: '/criteria', label: '내 기준', desc: '내가 정한 조건이 지금 맞는지 확인 (매매 판단은 하지 않습니다)' },
             { href: '/alerts', label: '알림 설정', desc: '단계 변경·점수 돌파·목표가·급등락·지표 발표 전' },
             { href: '/calendar', label: '경제 캘린더', desc: 'FOMC·금통위·CPI·고용보고서·만기·실적' },
           ].map((l) => (
             <li key={l.href}>
-              <Link href={l.href} className="flex items-center justify-between gap-2 py-2.5">
+              <Link href={l.href} className="flex items-center justify-between gap-2 py-2">
                 <span className="min-w-0">
                   <span className="block text-[13px] font-semibold text-fg">{l.label}</span>
-                  <span className="block truncate text-[11px] text-subtle">{l.desc}</span>
+                  <span className="block truncate text-[12.5px] text-subtle">{l.desc}</span>
                 </span>
                 <span aria-hidden="true" className="shrink-0 text-muted">
                   →
@@ -242,7 +244,7 @@ export default function MorePage() {
       </Section>
 
       <Section title="데이터 진단">
-        <dl className="space-y-1.5 text-[12px]">
+        <dl className="space-y-2 text-[13px]">
           <div className="flex items-center justify-between gap-2">
             <dt className="text-muted">현재 모드</dt>
             <dd>{snapshot ? <ModeBadge mode={snapshot.mode} /> : '—'}</dd>
@@ -253,11 +255,15 @@ export default function MorePage() {
           </div>
           <div className="flex items-start justify-between gap-2">
             <dt className="shrink-0 text-muted">마지막 전체 업데이트</dt>
-            <dd className="tnum text-right text-fg">{snapshot ? formatKstFull(snapshot.lastFullUpdate) : '—'}</dd>
+            <dd className="tnum min-w-0 text-right text-fg">{snapshot ? formatKstFull(snapshot.lastFullUpdate) : '—'}</dd>
           </div>
           <div className="flex items-start justify-between gap-2">
             <dt className="shrink-0 text-muted">모드 사유</dt>
-            <dd className="text-right break-keep text-fg">{health?.reason ?? (healthError ? `진단 실패: ${healthError}` : '확인 중…')}</dd>
+            {/* min-w-0 이 없으면 flex 자식이 내용보다 좁아지지 못한다. 320px 에서
+                이 한 줄 때문에 페이지 전체가 51px 옆으로 밀려 가로 스크롤이 생겼다. */}
+            <dd className="min-w-0 text-right break-words text-fg">
+              {health?.reason ?? (healthError ? `진단 실패: ${healthError}` : '확인 중…')}
+            </dd>
           </div>
           {health && health.missingEnv.length > 0 ? (
             <div className="flex items-start justify-between gap-2">
@@ -274,11 +280,11 @@ export default function MorePage() {
         </dl>
         {snapshot ? (
           <div className="mt-3 border-t border-border pt-2">
-            <p className="mb-1.5 text-[11px] text-muted">섹션별 상태</p>
-            <ul className="grid grid-cols-2 gap-1.5">
+            <p className="mb-2 text-[12.5px] text-muted">섹션별 상태</p>
+            <ul className="grid grid-cols-2 gap-2">
               {Object.entries(snapshot.sections).map(([key, s]) => (
                 <li key={key} className="flex items-center justify-between gap-1 rounded-md bg-surface-2 px-2 py-1">
-                  <span className="truncate text-[11px] text-muted">{key}</span>
+                  <span className="truncate text-[12.5px] text-muted">{key}</span>
                   <Badge
                     size="xs"
                     tone={s.status === 'ok' ? 'ok' : s.status === 'error' ? 'danger' : s.status === 'loading' ? 'accent' : 'warn'}

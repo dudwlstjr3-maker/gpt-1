@@ -6,7 +6,8 @@
  */
 
 import Link from 'next/link';
-import { FreshnessBadge, SessionBadge } from '@/components/ui/Badge';
+import { StatusLine } from '@/components/ui/Badge';
+import { Figure } from '@/components/ui/Figure';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { useFormatter } from './useFormatter';
@@ -25,47 +26,80 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
 
   return (
     <article className="card relative p-3" aria-label={`${quote.name} 시세`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {showStar ? (
-            <button
-              type="button"
-              onClick={() => toggleWatch(quote.id)}
-              aria-pressed={watched}
-              aria-label={watched ? `${quote.name} 관심목록에서 제거` : `${quote.name} 관심목록에 추가`}
-              className="shrink-0 text-sm leading-none"
-              style={{ color: watched ? 'var(--warn)' : 'var(--subtle-fg)' }}
-            >
-              {watched ? '★' : '☆'}
-            </button>
-          ) : null}
-          <div className="min-w-0">
-            <Link href={`/asset/${quote.id}`} className="block truncate text-sm font-semibold text-fg-strong hover:underline">
-              {quote.name}
-            </Link>
-            {/* 기준 시각을 기호 옆에 붙인다. 예전에는 카드마다 아래에 구분선을 긋고
-                시각 하나만 적은 줄이 따로 있었다 — 여덟 장이면 줄 여덟, 선 여덟이었다. */}
-            <p className="truncate text-[10px] text-subtle">
+      {/*
+       * 이름 줄에는 이름만 둔다.
+       * 예전에는 오른쪽 끝에 '마감'·'15분 지연' 알약 두 개가 서 있었다. 둘이 60px 을
+       * 가져가는 통에 좁은 화면에서 이름 칸이 눌려 두 줄로 접혔다. 상태는 아래 줄로 내렸다.
+       */}
+      <div className="flex min-w-0 items-start gap-2">
+        {showStar ? (
+          /*
+           * 별표는 글자로는 작아야 맞지만 손가락에는 14px 이 너무 작았다.
+           * 글리프는 그대로 두고 ::after 로 누를 자리만 32×44 로 넓힌다.
+           * 가로로 넓힌 8px 이 옆 칸과의 간격(gap-2)과 같아서 이름 링크를 덮지 않는다.
+           * 줄 높이는 이름과 같게 둔다 — 그래야 위쪽을 맞췄을 때 나란히 선다.
+           */
+          <button
+            type="button"
+            onClick={() => toggleWatch(quote.id)}
+            aria-pressed={watched}
+            aria-label={watched ? `${quote.name} 관심목록에서 제거` : `${quote.name} 관심목록에 추가`}
+            className="relative shrink-0 text-base leading-snug after:absolute after:-inset-x-2 after:-inset-y-[11px] after:content-['']"
+            style={{ color: watched ? 'var(--warn)' : 'var(--subtle-fg)' }}
+          >
+            {watched ? '★' : '☆'}
+          </button>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          {/* 이름은 한 줄이다. 접으면 카드마다 높이가 달라져 목록이 들쭉날쭉해지고,
+              자르면 '스테이블코인 시…' 이 무엇인지 알 수 없다. 그래서 접지도 자르지도
+              않고 자리를 먼저 비웠다 — 위의 배지를 아래로 내린 이유가 이것이다. */}
+          <Link
+            href={`/asset/${quote.id}`}
+            className="block min-h-[24px] text-[16px] leading-snug font-bold whitespace-nowrap text-fg-strong hover:underline"
+          >
+            {quote.name}
+          </Link>
+          {/* 기호 · 기준 시각 · 장 상태 · 지연 — 값을 읽고 난 뒤에 확인하는 것들을
+              한 줄에 모았다. 카드에서 제일 작은 글씨이고, 순서가 곧 중요도다. */}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
+            <span className="whitespace-nowrap">
               {quote.symbol} <span className="tnum">· {formatKstTime(quote.meta.asOf)}</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <SessionBadge phase={quote.session} />
-          <FreshnessBadge freshness={quote.meta.freshness} delayMinutes={delay} />
+            </span>
+            <StatusLine
+              phase={quote.session}
+              freshness={quote.meta.freshness}
+              delayMinutes={delay}
+            />
+          </p>
         </div>
       </div>
 
+      {/*
+       * 값을 못 받아도 카드가 차지하는 자리는 그대로 둔다.
+       * 값 줄(41px)과 거래량 줄(17px)이 통째로 빠지면 카드가 135px 에서 106px 로 줄어
+       * 아래 카드들이 위로 딸려 올라온다. 목록에서 한 종목만 실패해도 화면이 흔들린다.
+       */}
       {unavailable ? (
-        <div className="mt-2 rounded-lg px-2.5 py-2" style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)' }}>
-          <p className="text-[11px] break-keep" style={{ color: 'var(--warn)' }}>
+        <div
+          className="mt-2 flex items-center rounded-lg px-2 py-2"
+          style={{ background: 'color-mix(in srgb, var(--warn) 10%, transparent)', minHeight: 64 }}
+        >
+          <p className="text-[12.5px] break-keep" style={{ color: 'var(--warn)' }}>
             {quote.unavailableReason ?? '값을 받지 못했습니다.'}
           </p>
         </div>
       ) : (
         <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className="tnum truncate text-lg leading-tight font-bold text-fg-strong">{f.price(quote)}</p>
+            {/* 숫자는 자르면 안 된다. '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+                좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
+            <p
+              className="leading-tight font-bold whitespace-nowrap text-fg-strong"
+              style={{ fontSize: 'clamp(15px, 4.6cqw, 18px)' }}
+            >
+              <Figure text={f.price(quote)} flashColor={color} />
+            </p>
             <p className="tnum mt-0.5 flex items-center gap-1 text-xs font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span>
               <span>{f.change(quote)}</span>
@@ -89,7 +123,7 @@ export function PriceCard({ quote, showStar = true }: { quote: Quote; showStar?:
        * 이용 조건은 종목 상세 화면이 말한다. 값을 잘못 읽게 만드는 것(환산 불가)만 띄운다.
        */}
       {quote.volume !== null || f.conversionUnavailable(quote) ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-subtle">
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
           {quote.volume !== null ? <span>거래량 {formatKoreanCompact(quote.volume, 1)}</span> : null}
           {f.conversionUnavailable(quote) ? (
             <span style={{ color: 'var(--warn)' }}>환율 없음 — 환산 불가</span>
@@ -109,11 +143,12 @@ export function PriceRow({ quote }: { quote: Quote }) {
   return (
     <Link
       href={`/asset/${quote.id}`}
-      className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 hover:bg-surface-2"
+      className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 hover:bg-surface-2"
     >
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold text-fg">{quote.name}</p>
-        <p className="text-[10px] text-subtle">
+        {/* 이름은 한 줄, 자르지 않는다 — 무엇의 값인지 모르면 옆의 숫자도 못 읽는다 */}
+        <p className="text-[14.5px] leading-snug font-bold whitespace-nowrap text-fg">{quote.name}</p>
+        <p className="text-[11.5px] text-subtle">
           {quote.symbol} · 기준 {formatKstTime(quote.meta.asOf)}
         </p>
       </div>
@@ -122,7 +157,7 @@ export function PriceRow({ quote }: { quote: Quote }) {
         <p className="tnum text-[13px] font-bold text-fg-strong">
           {quote.price === null ? NO_VALUE : f.price(quote)}
         </p>
-        <p className="tnum text-[11px] font-semibold" style={{ color }}>
+        <p className="tnum text-[12.5px] font-semibold" style={{ color }}>
           <span aria-hidden="true">{f.glyph(dir)}</span> {f.changePct(quote)}
         </p>
       </div>
@@ -148,13 +183,13 @@ export function StatTile({
     tone === 'alert' ? 'var(--danger)' : tone === 'watch' ? 'var(--warn)' : tone === 'unknown' ? 'var(--muted-fg)' : 'var(--fg-strong)';
   const toneLabel = tone === 'alert' ? '주의' : tone === 'watch' ? '관찰' : tone === 'unknown' ? '정보 없음' : '정상';
   return (
-    <div className="card-flat min-w-0 p-2.5">
-      <p className="truncate text-[10px] text-muted">{label}</p>
+    <div className="card-flat min-w-0 p-3">
+      <p className="truncate text-[11.5px] text-muted">{label}</p>
       <p className="tnum mt-0.5 truncate text-sm font-bold" style={{ color }}>
         {value}
       </p>
-      {sub ? <p className="tnum truncate text-[10px] text-subtle">{sub}</p> : null}
-      <p className="mt-1 flex items-center gap-1 text-[10px]" style={{ color: tone === 'normal' ? 'var(--subtle-fg)' : color }}>
+      {sub ? <p className="tnum truncate text-[11.5px] text-subtle">{sub}</p> : null}
+      <p className="mt-1 flex items-center gap-1 text-[11.5px]" style={{ color: tone === 'normal' ? 'var(--subtle-fg)' : color }}>
         <span aria-hidden="true">{tone === 'alert' ? '▲' : tone === 'watch' ? '△' : '·'}</span>
         <span className="truncate">
           {toneLabel}

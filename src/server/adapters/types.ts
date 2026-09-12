@@ -8,9 +8,11 @@
 import type {
   CalendarEvent,
   DataMode,
+  DataSource,
   DemoScenario,
   EconomyBasic,
   FlowSummary,
+  FuturesBoard,
   MacroIndicator,
   MarketId,
   NewsItem,
@@ -18,13 +20,17 @@ import type {
   Quote,
   RangeKey,
   SeriesPoint,
+  Fundamentals,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
+import type { RegimeSeries } from '@/server/regime';
 
 export interface AdapterContext {
   now: Date;
   /** DEMO 모드에서만 유효 */
   scenario: DemoScenario;
+  /** 선물 판에서 고른 기간 ('1D' | '1W' | '1M' | '3M' | 'YTD') */
+  futuresRange?: string;
 }
 
 export interface BenchmarkSeries {
@@ -54,6 +60,15 @@ export interface MarketAdapter {
   /** 거시·위험 지표 */
   getMacro(ctx: AdapterContext): Promise<MacroIndicator[]>;
 
+  /**
+   * 국면 전광판이 쓰는 20년치 원자료.
+   *
+   * 다른 메서드와 달리 **길이가 길다**. 20년 분포를 만드는 게 목적이라
+   * 최근 값만 주면 안 된다. 축 하나가 통째로 없으면 그냥 빼고 주면 되고,
+   * 그건 커버리지 규칙이 알아서 처리한다.
+   */
+  getRegimeSeries(ctx: AdapterContext): Promise<{ series: RegimeSeries; sources: DataSource[] }>;
+
   /** 생활 속 경제 이야기 (1인당 GDP, 빅맥지수 등) */
   getBasics(ctx: AdapterContext): Promise<EconomyBasic[]>;
 
@@ -66,8 +81,28 @@ export interface MarketAdapter {
   /** 뉴스 */
   getNews(ctx: AdapterContext): Promise<NewsItem[]>;
 
+  /**
+   * 선물 시장 판.
+   *
+   * 값을 못 넣는 항목도 빼지 않고 사유를 담아 돌려준다 — 거래소 유료 시세를
+   * 조용히 빼면 목록이 왜 짧은지 알 수 없고, 아무 데서나 긁어 오면 이 앱이
+   * 지키기로 한 '제공업체 이용약관·재배포 권한' 규칙을 어긴다.
+   */
+  getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard>;
+
   /** 종목 상세 차트 */
   getAssetSeries(id: string, range: RangeKey, ctx: AdapterContext): Promise<SeriesPoint[]>;
+
+  /**
+   * 미국 상장사 재무제표 (SEC 공시).
+   *
+   * 가격만 있는 화면에는 "왜 이 값인가" 를 물을 재료가 없다. 매출·이익·이익률과
+   * 주가를 이익으로 나눈 값이 여기서 온다.
+   *
+   * price 를 함께 받는 이유는 PER 때문이다 — 공시에는 주가가 없다.
+   * 공시가 없는 대상(지수·원자재·환율·코인)이면 SeriesUnavailableError 를 던진다.
+   */
+  getFundamentals(id: string, price: number | null, ctx: AdapterContext): Promise<Fundamentals>;
 
   /** 통화 전환용 환율 */
   getUsdKrw(ctx: AdapterContext): Promise<number | null>;

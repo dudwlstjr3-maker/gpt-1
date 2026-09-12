@@ -11,13 +11,16 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { buildRiskHeadline } from '@/lib/riskHeadline';
+import { guideFor } from '@/lib/indicatorGuide';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, Skeleton, EmptyState } from '@/components/ui/States';
 import { Badge, type Tone } from '@/components/ui/Badge';
 import { SignalDot, SignalLegend, SignalLight, SignalTally, type SignalTallyItem } from '@/components/ui/Signal';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { riskSignal, SIGNAL_ORDER, signalColor } from '@/lib/scale';
+import { nextBoundary, recentPosition, positionWord } from '@/lib/riskJudgement.mjs';
 import { useChangeColor } from './useChangeColor';
 import { formatNumber, formatSigned, formatKstTime, NO_VALUE } from '@/lib/format';
 import {
@@ -144,7 +147,7 @@ export function RiskBandBar({
         {indicator.offScale ? (
           <span
             aria-hidden="true"
-            className="absolute top-1/2 -translate-y-1/2 text-[11px] leading-none font-bold"
+            className="absolute top-1/2 -translate-y-1/2 text-[12.5px] leading-none font-bold"
             style={{
               [indicator.offScale === 'above' ? 'right' : 'left']: -11,
               color: RISK_COLOR[indicator.level],
@@ -156,13 +159,13 @@ export function RiskBandBar({
       </div>
 
       {showLabels ? (
-        <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11.5px]">
           <span className="tnum shrink-0 text-subtle">
             {indicator.offScale === 'below' ? '‹ ' : ''}
             {tick(indicator.scaleMin)}
           </span>
           <span
-            className="inline-flex min-w-0 items-center gap-1 rounded-full px-1.5 py-0.5 font-semibold"
+            className="inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-0.5 font-semibold"
             style={{
               color: RISK_COLOR[indicator.level],
               background: `color-mix(in srgb, ${RISK_COLOR[indicator.level]} 14%, transparent)`,
@@ -185,6 +188,67 @@ export function RiskBandBar({
 }
 
 /**
+ * 판단 재료 두 칸.
+ *
+ * 왜 필요한가
+ *   화면에는 값(11.55)·방향(▼ -1.39)·색 띠·구간 목록이 다 있었다. 그런데 정작
+ *   사람이 알고 싶은 두 가지는 직접 계산해야 했다.
+ *     ① 다음 단계까지 얼마나 남았나 — 15 에서 11.55 를 빼야 나온다
+ *     ② 요즘 값들 중에서는 어디쯤인가 — 스파크라인 모양만 보고 짐작해야 했다
+ *   숫자를 보고 판단하려면 이 둘이 있어야 한다. 둘 다 이미 있는 데이터로 계산된다.
+ *
+ * 매매 신호가 아니다. 여기 있는 것은 전부 뺄셈과 순위다. 경계값이 이 앱이 정한
+ * 구간이라는 사실은 화면이 따로 밝히고 있다.
+ */
+function JudgeStrip({ indicator }: { indicator: RiskIndicator }) {
+  const b = nextBoundary(indicator);
+  const r = recentPosition(indicator.spark, indicator.value);
+  if (!b && !r) return null;
+
+  const unit = (v: number) => `${formatNumber(v, indicator.precision)}${indicator.suffix}`;
+
+  return (
+    <dl className="mt-2 grid grid-cols-2 gap-2">
+      <div className="rounded-lg bg-surface-2 px-2 py-2">
+        <dt className="text-[11.5px] text-subtle">{b?.dir === 'better' ? '한 단계 낮아지려면' : '다음 단계'}</dt>
+        <dd className="mt-1">
+          {b ? (
+            <>
+              <span className="text-[13px] font-bold" style={{ color: RISK_COLOR[b.level as RiskIndicator['level']] }}>
+                {RISK_LEVEL_LABEL[b.level as RiskIndicator['level']]}
+              </span>
+              <span className="tnum mt-1 block text-[11.5px] leading-relaxed break-keep text-muted">
+                {unit(b.at)}
+                {b.dir === 'better' ? (b.delta < 0 ? ' 아래로' : ' 위로') : '부터'} · 지금보다{' '}
+                {formatSigned(b.delta, indicator.precision)}
+              </span>
+            </>
+          ) : (
+            <span className="text-[13px] text-muted">{NO_VALUE}</span>
+          )}
+        </dd>
+      </div>
+
+      <div className="rounded-lg bg-surface-2 px-2 py-2">
+        <dt className="text-[11.5px] text-subtle">최근 {r?.days ?? 30}일 안에서</dt>
+        <dd className="mt-1">
+          {r ? (
+            <>
+              <span className="text-[13px] font-bold text-fg-strong">{positionWord(r.pct)}</span>
+              <span className="tnum mt-1 block text-[11.5px] leading-relaxed break-keep text-muted">
+                {unit(r.min)} ~ {unit(r.max)} 중 {Math.round(r.pct)}%
+              </span>
+            </>
+          ) : (
+            <span className="text-[13px] text-muted">움직임이 없어 위치를 말할 수 없습니다</span>
+          )}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+/**
  * 막대가 어디까지만 그려지는지 밝히는 한 줄.
  *
  * 눈금 끝을 "위험의 끝"으로 읽으면 VIX 40 과 VIX 80 이 같아 보인다.
@@ -193,7 +257,7 @@ export function RiskBandBar({
 export function ScaleNote({ indicator }: { indicator: RiskIndicator }) {
   if (!indicator.scaleNote) return null;
   return (
-    <p className="mt-1.5 text-[10px] leading-relaxed break-keep text-subtle">
+    <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
       <span aria-hidden="true">※ </span>
       {indicator.scaleNote}
     </p>
@@ -209,17 +273,17 @@ export function ScaleNote({ indicator }: { indicator: RiskIndicator }) {
  */
 function UpDownExplainer({ whenUp, whenDown }: { whenUp: string; whenDown: string }) {
   return (
-    <dl className="mt-2.5 space-y-1.5 rounded-lg bg-surface-2 px-2.5 py-2">
+    <dl className="mt-2 space-y-2 rounded-lg bg-surface-2 px-2 py-2">
       {[
         { glyph: '▲', label: '값이 오르면', text: whenUp },
         { glyph: '▼', label: '값이 내리면', text: whenDown },
       ].map((row) => (
-        <div key={row.label} className="flex items-start gap-1.5">
-          <span aria-hidden="true" className="mt-px shrink-0 text-[10px] text-muted">
+        <div key={row.label} className="flex items-start gap-2">
+          <span aria-hidden="true" className="mt-px shrink-0 text-[11.5px] text-muted">
             {row.glyph}
           </span>
           <dt className="sr-only">{row.label}</dt>
-          <dd className="min-w-0 text-[11px] leading-relaxed break-keep text-muted">
+          <dd className="min-w-0 text-[12.5px] leading-relaxed break-keep text-muted">
             <span className="font-semibold text-fg">{row.label} · </span>
             {row.text}
           </dd>
@@ -232,11 +296,11 @@ function UpDownExplainer({ whenUp, whenDown }: { whenUp: string; whenDown: strin
 /** 구간 기준을 그대로 펼쳐 보여주는 목록. 어디까지가 초록이고 어디부터 빨강인지 숨기지 않는다. */
 function RiskZoneList({ indicator }: { indicator: RiskIndicator }) {
   return (
-    <ul className="flex flex-wrap gap-x-2.5 gap-y-1">
+    <ul className="flex flex-wrap gap-x-2 gap-y-1">
       {indicator.bands.map((b, i) => {
         const active = b.level === indicator.level;
         return (
-          <li key={i} className="flex items-center gap-1 text-[10px]">
+          <li key={i} className="flex items-center gap-1 text-[11.5px]">
             <span
               aria-hidden="true"
               className="inline-block shrink-0 rounded-sm"
@@ -261,22 +325,38 @@ function RiskZoneList({ indicator }: { indicator: RiskIndicator }) {
 /* 컴팩트 타일 (홈)                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 신호등 타일 — 누르면 **그 자리에서** 해설이 열린다.
+ *
+ * 예전에는 타일 여섯 장이 전부 /indicators 로 나갔다. 바로 위 '기준과 해설 →' 도
+ * 같은 곳이라, 홈 한 화면에서 같은 데로 가는 링크가 일곱 개였다. 궁금해서 눌렀는데
+ * 화면이 통째로 바뀌고 돌아올 길은 없으니, 몇 번 하면 여기가 어디인지 모르게 된다.
+ *
+ * 해설은 이미 indicatorGuide 에 있다. 다른 화면에 가서 읽을 이유가 없다.
+ * 그래서 타일을 누르면 아래로 펼쳐지고, 다시 누르면 접힌다. 화면은 그대로다.
+ */
 export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
   const c = useChangeColor();
   const unavailable = indicator.value === null;
+  const [open, setOpen] = useState(false);
+  const guide = guideFor(indicator.id);
+  const panelId = `risk-tile-${indicator.id}`;
 
   return (
-    <Link
-      href="/indicators"
-      className="card block p-2.5 transition-colors hover:bg-surface-2"
-      aria-label={`${indicator.name} 상세 보기`}
+    <div className="card p-3">
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      aria-expanded={open}
+      aria-controls={guide ? panelId : undefined}
+      className="block w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]"
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-2">
         <SignalLight signal={riskSignal(indicator.level)} size="sm" label={indicator.shortName} />
-        {/* 시장과 단계를 한 줄에 붙인다. 세 줄로 쌓으면 타일 일곱 장이 그만큼 길어진다. */}
+        {/* 시장과 단계를 한 줄에 붙인다. 세 줄로 쌓으면 타일이 그만큼 길어진다. */}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] font-semibold text-fg">{indicator.shortName}</p>
-          <p className="flex items-center gap-1 text-[9.5px] text-subtle">
+          <p className="truncate text-[12.5px] font-semibold text-fg">{indicator.shortName}</p>
+          <p className="flex items-center gap-1 text-[10.5px] text-subtle">
             <span className="truncate">{SCOPE_LABEL[indicator.scope]}</span>
             <span aria-hidden="true">·</span>
             <span className="shrink-0 font-bold" style={{ color: RISK_COLOR[indicator.level] }}>
@@ -287,15 +367,20 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
       </div>
 
       {unavailable ? (
-        <p className="mt-1.5 text-[10px]" style={{ color: 'var(--warn)' }}>
+        <p className="mt-2 text-[11.5px]" style={{ color: 'var(--warn)' }}>
           {indicator.unavailableReason ?? '값 없음'}
         </p>
       ) : (
-        <div className="mt-1.5 flex items-baseline justify-between gap-1">
-          <span className="tnum truncate text-[15px] font-bold text-fg-strong">
+        <div className="mt-2 flex items-baseline justify-between gap-1">
+          {/* 숫자는 자르지 않는다 — '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+              칸이 좁으면 글자 크기가 줄어들지언정 끝까지 보이게 한다. */}
+          <span
+            className="tnum font-bold whitespace-nowrap text-fg-strong"
+            style={{ fontSize: 'clamp(12.5px, 3.9cqw, 15px)' }}
+          >
             {formatRiskValue(indicator.value, indicator)}
           </span>
-          <span className="tnum shrink-0 text-[10px]" style={{ color: c.color(indicator.change) }}>
+          <span className="tnum shrink-0 text-[11.5px]" style={{ color: c.color(indicator.change) }}>
             {c.glyph(indicator.change)} {formatRiskChange(indicator.change, indicator)}
           </span>
         </div>
@@ -304,7 +389,48 @@ export function RiskTile({ indicator }: { indicator: RiskIndicator }) {
       <div className="mt-2">
         <RiskBandBar indicator={indicator} showLabels={false} height={10} />
       </div>
-    </Link>
+
+      <p className="mt-2 flex items-center justify-end gap-1 text-[10.5px] text-subtle">
+        {open ? '접기' : '무슨 뜻인가요'}
+        <span aria-hidden="true" className={open ? 'rotate-180 transition-transform' : 'transition-transform'}>
+          ⌄
+        </span>
+      </p>
+    </button>
+
+    {open && guide ? (
+      <div id={panelId} className="mt-2 border-t border-border pt-2">
+        <p className="text-[12.5px] leading-relaxed break-keep text-fg">{guide.plain}</p>
+        <dl className="mt-2 grid gap-2">
+          <div>
+            <dt className="text-[11.5px] font-semibold" style={{ color: 'var(--tl-red)' }}>
+              올라가면
+            </dt>
+            <dd className="m-0 text-[11.5px] leading-relaxed break-keep text-muted">{guide.whenUp}</dd>
+          </div>
+          <div>
+            <dt className="text-[11.5px] font-semibold" style={{ color: 'var(--tl-green)' }}>
+              내려가면
+            </dt>
+            <dd className="m-0 text-[11.5px] leading-relaxed break-keep text-muted">{guide.whenDown}</dd>
+          </div>
+        </dl>
+        {/* 구간 기준까지 보려면 그때 나가면 된다. 먼저 나가게 만들지는 않는다. */}
+        <Link
+          href="/indicators"
+          className="mt-2 inline-block text-[11.5px] font-semibold text-accent hover:underline"
+        >
+          구간 기준과 다른 지표 보기 →
+        </Link>
+      </div>
+    ) : null}
+
+    {open && !guide ? (
+      <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
+        이 지표의 해설은 아직 준비되지 않았습니다.
+      </p>
+    ) : null}
+    </div>
   );
 }
 
@@ -317,14 +443,16 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
   const unavailable = indicator.value === null;
 
   return (
-    <article className="card p-3.5" aria-labelledby={`risk-${indicator.id}`}>
+    <article className="card p-3" aria-labelledby={`risk-${indicator.id}`}>
       <div className="flex items-start gap-2">
         <SignalLight signal={riskSignal(indicator.level)} size="lg" label={indicator.name} />
         <div className="min-w-0 flex-1">
           <h3 id={`risk-${indicator.id}`} className="text-[13.5px] font-bold break-keep text-fg-strong">
             {indicator.name}
           </h3>
-          <p className="mt-0.5 text-[10px] text-subtle">
+          {/* 원래 이름은 지우지 않고 작게 남긴다 — 기사에서 본 말과 이어지게 */}
+          {indicator.term ? <p className="mt-0.5 text-[11.5px] break-keep text-subtle">{indicator.term}</p> : null}
+          <p className="mt-0.5 text-[11.5px] text-subtle">
             {SCOPE_LABEL[indicator.scope]} · {indicator.direction === 'higher_is_riskier' ? '값이 클수록 위험' : '값이 작을수록 위험'}
           </p>
         </div>
@@ -334,10 +462,10 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
         </Badge>
       </div>
 
-      <div className="mt-2.5 flex items-end justify-between gap-3">
+      <div className="mt-2 flex items-end justify-between gap-3">
         <div className="min-w-0">
           {unavailable ? (
-            <p className="text-[12px]" style={{ color: 'var(--warn)' }}>
+            <p className="text-[13px]" style={{ color: 'var(--warn)' }}>
               {indicator.unavailableReason ?? '값을 받지 못했습니다.'}
             </p>
           ) : (
@@ -345,7 +473,7 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
               <p className="tnum text-xl leading-tight font-bold text-fg-strong">
                 {formatRiskValue(indicator.value, indicator)}
               </p>
-              <p className="tnum mt-0.5 text-[11.5px] font-semibold" style={{ color: c.color(indicator.change) }}>
+              <p className="tnum mt-0.5 text-[12.5px] font-semibold" style={{ color: c.color(indicator.change) }}>
                 <span aria-hidden="true">{c.glyph(indicator.change)}</span> {formatRiskChange(indicator.change, indicator)}
                 <span className="ml-1 font-normal text-subtle">
                   이전 {formatRiskValue(indicator.previous, indicator)}
@@ -365,20 +493,22 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
 
       <div className="mt-3">
         <RiskBandBar indicator={indicator} />
+        {/* 뺄셈은 화면이 대신 한다 — 15 에서 11.55 를 빼게 만들지 않는다 */}
+        <JudgeStrip indicator={indicator} />
         <ScaleNote indicator={indicator} />
       </div>
 
       {/* 구간 기준을 그대로 노출한다 */}
-      <div className="mt-2.5">
+      <div className="mt-2">
         <RiskZoneList indicator={indicator} />
       </div>
 
-      <div className="mt-3 space-y-1.5 border-t border-border pt-2.5">
-        <p className="text-[11px] leading-relaxed break-keep text-muted">
+      <div className="mt-3 space-y-2 border-t border-border pt-2">
+        <p className="text-[12.5px] leading-relaxed break-keep text-muted">
           <span className="font-semibold text-fg">무슨 지표인가 · </span>
           {indicator.why}
         </p>
-        <p className="text-[11px] leading-relaxed break-keep" style={{ color: RISK_COLOR[indicator.level] }}>
+        <p className="text-[12.5px] leading-relaxed break-keep" style={{ color: RISK_COLOR[indicator.level] }}>
           <span className="font-semibold">지금 읽는 법 · </span>
           {indicator.reading}
         </p>
@@ -387,7 +517,7 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
       {/* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */}
       <UpDownExplainer whenUp={indicator.whenUp} whenDown={indicator.whenDown} />
 
-      <p className="mt-2 text-[10px] text-subtle">
+      <p className="mt-2 text-[11.5px] text-subtle">
         기준 {formatKstTime(indicator.meta.asOf)} · 출처 {indicator.meta.sources[0]?.name ?? '알 수 없음'}
       </p>
     </article>
@@ -398,7 +528,7 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
 /* 홈 섹션                                                              */
 /* ------------------------------------------------------------------ */
 
-export function RiskSevenSection() {
+export function RiskGaugesSection() {
   const { snapshot, refresh } = useData();
   const section = snapshot?.sections.risk ?? null;
 
@@ -408,7 +538,7 @@ export function RiskSevenSection() {
         <h2 id="risk-seven-title" className="text-base font-bold text-fg-strong">
           시장 위험 신호등
         </h2>
-        <Link href="/indicators" className="text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/indicators" className="tap text-[12.5px] font-semibold text-accent hover:underline">
           기준과 해설 →
         </Link>
       </div>
@@ -419,7 +549,7 @@ export function RiskSevenSection() {
         loading={
           <>
             <Skeleton className="mb-2 h-9" />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-3 @min-[1280px]:grid-cols-4">
               {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-[104px]" />
               ))}
@@ -439,7 +569,7 @@ export function RiskSevenSection() {
               </div>
 
               <div
-                className="mb-2 flex items-start gap-2 rounded-xl border px-3 py-2.5"
+                className="mb-2 flex items-start gap-2 rounded-xl border px-3 py-2"
                 style={{
                   borderColor: `color-mix(in srgb, ${signalColor(worst)} 38%, var(--border))`,
                   background: 'var(--surface)',
@@ -448,12 +578,12 @@ export function RiskSevenSection() {
               >
                 <SignalLight signal={worst} size="sm" label="종합" />
                 {/* 이름은 아래 게이지들이 댄다. 문장은 개수만 말한다. */}
-                <p className="min-w-0 flex-1 text-[12px] leading-relaxed break-keep text-fg">
+                <p className="min-w-0 flex-1 text-[13px] leading-relaxed break-keep text-fg">
                   {buildRiskHeadline(digest.indicators, false)}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 @min-[640px]:grid-cols-3 @min-[1280px]:grid-cols-4">
                 {digest.indicators.map((i) => (
                   <RiskTile key={i.id} indicator={i} />
                 ))}
@@ -486,23 +616,23 @@ export function RiskForMarket({ market }: { market: 'us' | 'kr' | 'crypto' }) {
           <div className="card p-3">
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-bold text-fg-strong">{MARKET_LABEL[market]} 관련 위험 지표</h2>
-              <Link href="/indicators" className="text-[11px] font-semibold text-accent hover:underline">
+              <Link href="/indicators" className="tap text-[12.5px] font-semibold text-accent hover:underline">
                 신호등 전체 →
               </Link>
             </div>
-            <ul className="space-y-2.5">
+            <ul className="space-y-2">
               {items.map((i) => (
                 <li key={i.id}>
                   <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="flex min-w-0 items-center gap-2">
                       <SignalDot signal={riskSignal(i.level)} size={8} />
-                      <span className="truncate text-[12px] text-fg">{i.shortName}</span>
+                      <span className="truncate text-[13px] text-fg">{i.shortName}</span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      <span className="tnum text-[12px] font-bold text-fg-strong">
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="tnum text-[13px] font-bold text-fg-strong">
                         {formatRiskValue(i.value, i)}
                       </span>
-                      <span className="text-[10px] font-semibold" style={{ color: RISK_COLOR[i.level] }}>
+                      <span className="text-[11.5px] font-semibold" style={{ color: RISK_COLOR[i.level] }}>
                         {RISK_LEVEL_GLYPH[i.level]} {RISK_LEVEL_LABEL[i.level]}
                       </span>
                     </span>

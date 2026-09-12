@@ -18,12 +18,23 @@
  *    "미국 선이 위에 있다" 까지만 알 수 있지 얼마나 위인지는 알 수 없다.
  *  - 눈금을 두 개만 두는 것은 작은 그림에 촘촘히 넣으면 오히려 안 읽히기 때문이다.
  *  - 차트를 못 보는 사람을 위해 같은 내용을 표로도 제공한다 (이 앱의 모든 차트가 그렇다).
+ *
+ * 조작
+ *  - **휠**로 커서 자리를 기준으로 확대·축소한다. 버튼은 두지 않는다 — 90px 남짓한
+ *    그림에 조작 버튼까지 넣으면 정작 선 볼 자리가 없어진다.
+ *  - 끌기는 받지 않는다. 이 그림은 **누르면 큰 창으로 열리는 것**이 본래 조작이라,
+ *    끌기까지 받으면 끌고 손을 뗀 자리에서 창이 열린다. 휠은 누르는 동작과 겹치지 않는다.
+ *  - 확대한 뒤에는 '표로 보기' 옆에 '전체 구간' 이 나타난다. 휠이 없는 손가락 화면에서는
+ *    큰 창을 열어 끌기·핀치로 본다.
  */
 
-import { useId, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { formatNumber } from '@/lib/format';
 import type { SeriesPoint } from '@/types';
-import { downsample, extent, linePath, linearScale } from './chartUtils';
+import { downsample, extent, linePath, linearScale, useSize } from './chartUtils';
+import { ChartModal, ExpandTrigger } from './ChartModal';
+import { InteractiveChart, type ChartSeries } from './InteractiveChart';
+import { useChartViewport } from './useChartViewport';
 
 export interface TrendSeries {
   label: string;
@@ -32,8 +43,15 @@ export interface TrendSeries {
 
 const HIGHLIGHT = '한국';
 
-/** 눈금값 자리 · 나라 이름 자리. 카드마다 같아야 여러 장이 나란히 섰을 때 줄이 맞는다. */
-const GUTTER_L = 52;
+/**
+ * 눈금값 자리 · 나라 이름 자리. 카드마다 같아야 여러 장이 나란히 섰을 때 줄이 맞는다.
+ *
+ * 왼쪽은 52 였는데 '89,514달러' 가 51.2 를 먹어 앞의 '8' 이 그림 밖으로 5.2 만큼
+ * 잘려 나갔다 (1인당 GDP 카드의 미국 값). 자릿수가 가장 많은 값에 맞춰 60 으로 넓힌다.
+ * 카드마다 재서 정하지 않는 이유는, 그러면 값의 크기에 따라 그림 시작점이 달라져
+ * 카드 아홉 장의 선이 서로 어긋나기 때문이다.
+ */
+const GUTTER_L = 60;
 const GUTTER_R = 40;
 const VIEW_W = 300;
 
@@ -73,7 +91,7 @@ export function BasicTrend({
   series,
   precision,
   suffix,
-  height = 104,
+  height = 92,
   label,
 }: {
   series: TrendSeries[];
@@ -84,45 +102,172 @@ export function BasicTrend({
 }) {
   const id = useId();
   const [showTable, setShowTable] = useState(false);
+  const [big, setBig] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [wrapRef, size] = useSize<HTMLDivElement>();
 
-  const clean = series
-    .map((s) => ({ ...s, points: downsample(s.points.filter((p) => Number.isFinite(p.v)), 80) }))
-    .filter((s) => s.points.length >= 2);
+  const clean = useMemo(
+    () =>
+      series
+        .map((s) => ({ ...s, points: downsample(s.points.filter((p) => Number.isFinite(p.v)), 80) }))
+        .filter((s) => s.points.length >= 2),
+    [series],
+  );
 
   const mine = clean.find((s) => s.label === HIGHLIGHT) ?? clean[0];
-  if (!mine || mine.points.length < 2) return null;
 
-  const all = clean.flatMap((s) => s.points);
-  const [t0, t1] = extent(all.map((p) => p.t));
+  /*
+   * 휠로 보는 구간을 좁힌다.
+   *
+   * 그림 안의 좌표는 viewBox(0~300) 눈금인데 휠은 화면 픽셀로 온다. 둘의 배율(k)로
+   * 옮겨 줘야 커서가 짚은 자리가 확대의 중심이 된다 — 안 그러면 엉뚱한 데가 커진다.
+   */
+  const allT = clean.flatMap((s) => s.points.map((p) => p.t));
+  const [fullT0, fullT1] = extent(allT);
+  const full = useMemo(
+    () => (allT.length >= 2 && fullT1 > fullT0 ? { t0: fullT0, t1: fullT1 } : null),
+    [allT.length, fullT0, fullT1],
+  );
+  const k = size.w > 0 ? size.w / VIEW_W : 0;
+  const vp = useChartViewport({
+    ref: svgRef,
+    full,
+    plotLeft: GUTTER_L * k,
+    plotWidth: (VIEW_W - GUTTER_L - GUTTER_R) * k,
+    enabled: k > 0 && !showTable,
+    mode: 'wheel',
+  });
+  /*
+   * 못 그릴 때도 이 블록의 크기는 그대로 둔다.
+   *
+   * 예전에는 null 을 돌려줘서 블록이 통째로 사라졌다. 값을 못 받은 날 카드가
+   * 517px 에서 377px 로 줄고, 아래 카드가 전부 위로 딸려 올라왔다. 30초마다
+   * 갱신되는 화면에서 그러면 읽던 자리를 잃는다.
+   *
+   * 그림 자리와 아래 '표로 보기' 줄까지 같은 크기로 두고 왜 못 그리는지 적는다.
+   * 빈 칸이 아니라 답이 있는 자리가 된다.
+   */
+  if (!mine || mine.points.length < 2) {
+    return (
+      <div ref={wrapRef} className="max-w-[430px]">
+        {/*
+         * 크기는 진짜 그림과 같은 자로 잰다 — 같은 viewBox 를 가진 빈 svg 를 세운다.
+         * 테두리는 outline 으로 그린다. border 로 그리면 그 2px 만큼 svg 가 좁아져
+         * 높이가 2px 어긋난다 (outline 은 자리를 차지하지 않는다).
+         */}
+        <div
+          className="relative w-full rounded-md outline-1 outline-offset-[-1px] outline-dashed outline-[var(--border)]"
+          role="status"
+        >
+          <svg viewBox={`0 0 ${VIEW_W} ${height}`} className="block h-auto w-full" aria-hidden="true" />
+          <p className="absolute inset-0 flex items-center justify-center px-3 text-center text-[11.5px] leading-relaxed break-keep text-subtle">
+            <span>
+              지나온 값을 받지 못해 선을 그리지 않습니다.
+              <br />
+              빈 값을 임의로 채우지 않습니다.
+            </span>
+          </p>
+        </div>
+        {/* '표로 보기' 줄이 있던 자리. 같은 버튼을 그대로 두고 안 보이게만 한다 —
+            div 로 흉내 내면 버튼과 줄 높이가 6px 달라 그만큼 어긋난다. */}
+        <div className="mt-0.5 text-right">
+          <button type="button" disabled aria-hidden="true" tabIndex={-1} className="invisible text-[11.5px] font-semibold">
+            표로 보기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * 보이는 구간만 남긴다.
+   *
+   * 양 끝 바깥의 점 하나씩은 남겨 둔다 — 그래야 선이 그림 가장자리까지 이어진다.
+   * 그 점들은 눈금 자리(gutter)까지 삐져나오므로 clipPath 로 잘라 낸다.
+   */
+  const { t0, t1 } = vp.view;
+  const windowed = (pts: SeriesPoint[]): SeriesPoint[] => {
+    if (!vp.zoomed) return pts;
+    let lo = 0;
+    let hi = pts.length - 1;
+    while (lo < pts.length - 1 && pts[lo + 1].t <= t0) lo += 1;
+    while (hi > 0 && pts[hi - 1].t >= t1) hi -= 1;
+    if (hi - lo < 1) {
+      lo = Math.max(0, lo - 1);
+      hi = Math.min(pts.length - 1, hi + 1);
+    }
+    return pts.slice(lo, hi + 1);
+  };
+  const view = clean.map((s) => ({ ...s, points: windowed(s.points) }));
+  const mineView = view.find((s) => s.label === mine.label) ?? view[0];
+
+  const all = view.flatMap((s) => s.points);
   const [v0, v1] = extent(all.map((p) => p.v));
   const top = 9;
   const bottom = height - 17;
   const xs = linearScale([t0, t1], [GUTTER_L, VIEW_W - GUTTER_R]);
   const ys = linearScale([v0, v1], [bottom, top]);
 
-  const last = mine.points[mine.points.length - 1];
+  const last = mineView.points[mineView.points.length - 1];
   const fmt = (v: number) => `${formatNumber(v, precision)}${suffix}`;
 
   // 선 끝의 이름표 — 값 순서는 지키되 겹치지 않을 만큼만 벌린다.
   // 눈금선 사이(top~bottom)에 가둬 두어야 아래쪽 연도 글자를 덮지 않는다.
-  const ends = clean.map((s) => {
+  const ends = view.map((s) => {
     const p = s.points[s.points.length - 1];
     return { label: s.label, x: xs(p.t), y: ys(p.v), mine: s.label === mine.label };
   });
   const endY = spread(ends, 11, top, bottom);
 
+  /**
+   * 큰 창에서 쓸 시리즈.
+   *
+   * 작은 그림에서는 비교 나라를 전부 같은 옅은 색으로 두고 이름을 선 끝에 붙여
+   * 구분했다. 큰 창은 범례가 위에 서므로 **나라마다 색이 달라야** 범례가 일을 한다.
+   * 같은 색 셋에 이름만 다르게 적어 두면 범례가 오히려 거짓말이 된다.
+   */
+  const COMPARE = ['var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)'];
+  let ci = 0;
+  const bigSeries: ChartSeries[] = clean.map((s) => ({
+    id: s.label,
+    name: shortLabel(s.label),
+    points: s.points,
+    color: s.label === mine.label ? 'var(--accent)' : COMPARE[ci++ % COMPARE.length],
+    axis: 'left',
+    precision,
+    suffix,
+  }));
+
   return (
-    <div>
+    /*
+     * 그림의 최대 폭을 430px 로 묶는다.
+     * 카드가 두 칸으로 서면서 그림이 카드 폭을 통째로 쓰게 됐는데, 그대로 두면
+     * 넓은 화면에서 viewBox 가 1.6배까지 늘어나 눈금 글씨가 본문보다 커진다.
+     */
+    <div ref={wrapRef} className="max-w-[430px]">
+      <ExpandTrigger label={label} onClick={() => setBig(true)}>
+      {/* h-auto — 높이를 px 로 못박으면 폭이 넓어져도 그림이 가운데에 작게 남는다.
+          touch-action: pan-y — 세로 손가락 스크롤은 브라우저에 그대로 넘긴다 */}
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${VIEW_W} ${height}`}
         width="100%"
         height={height}
+        className="h-auto w-full"
+        style={{ touchAction: 'pan-y' }}
         role="img"
         aria-labelledby={`${id}-t`}
       >
         <title id={`${id}-t`}>
           {label} — {yearOf(t0)}년부터 {yearOf(t1)}년까지, {mine.label} 마지막 값 {fmt(last.v)}
+          {vp.zoomed ? ' (일부 구간만 보는 중)' : ''}
         </title>
+        <defs>
+          {/* 구간 밖의 점까지 이어 그린 선이 눈금 자리로 삐져나오지 않게 잘라 낸다 */}
+          <clipPath id={`${id}-clip`}>
+            <rect x={GUTTER_L} y={0} width={VIEW_W - GUTTER_L - GUTTER_R} height={height} />
+          </clipPath>
+        </defs>
 
         {/* 위아래 눈금선. 선이 어느 높이에 있는지 재는 자다. */}
         {[
@@ -138,7 +283,7 @@ export function BasicTrend({
               stroke="var(--border)"
               strokeWidth="1"
             />
-            <text x={GUTTER_L - 6} y={g.y + 3.2} fontSize="9" fill="var(--subtle-fg)" textAnchor="end">
+            <text x={GUTTER_L - 6} y={g.y + 3.2} fontSize="10" fill="var(--subtle-fg)" textAnchor="end">
               {fmt(g.v)}
             </text>
           </g>
@@ -157,30 +302,32 @@ export function BasicTrend({
           />
         ) : null}
 
-        {/* 비교 나라 — 옅게 */}
-        {clean
-          .filter((s) => s.label !== mine.label)
-          .map((s) => (
-            <path
-              key={s.label}
-              d={linePath(s.points.map((p) => ({ x: xs(p.t), y: ys(p.v) })))}
-              fill="none"
-              stroke="var(--series-2)"
-              strokeWidth="1.2"
-              opacity="0.55"
-            />
-          ))}
+        <g clipPath={`url(#${id}-clip)`}>
+          {/* 비교 나라 — 옅게 */}
+          {view
+            .filter((s) => s.label !== mine.label)
+            .map((s) => (
+              <path
+                key={s.label}
+                d={linePath(s.points.map((p) => ({ x: xs(p.t), y: ys(p.v) })))}
+                fill="none"
+                stroke="var(--series-2)"
+                strokeWidth="1.2"
+                opacity="0.55"
+              />
+            ))}
 
-        {/* 한국 — 굵게 */}
-        <path
-          d={linePath(mine.points.map((p) => ({ x: xs(p.t), y: ys(p.v) })))}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        <circle cx={xs(last.t)} cy={ys(last.v)} r="3" fill="var(--accent)" />
+          {/* 한국 — 굵게 */}
+          <path
+            d={linePath(mineView.points.map((p) => ({ x: xs(p.t), y: ys(p.v) })))}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <circle cx={xs(last.t)} cy={ys(last.v)} r="3" fill="var(--accent)" />
+        </g>
 
         {/* 선 끝의 나라 이름 — 범례 대신 */}
         {ends.map((e, i) => (
@@ -199,7 +346,7 @@ export function BasicTrend({
             <text
               x={VIEW_W - GUTTER_R + 6}
               y={endY[i] + 3.2}
-              fontSize="9.5"
+              fontSize="10.5"
               fontWeight={e.mine ? 700 : 400}
               fill={e.mine ? 'var(--accent)' : 'var(--subtle-fg)'}
             >
@@ -209,19 +356,40 @@ export function BasicTrend({
         ))}
 
         {/* 양 끝 연도 */}
-        <text x={GUTTER_L} y={height - 1} fontSize="9" fill="var(--subtle-fg)">
+        <text x={GUTTER_L} y={height - 1} fontSize="10" fill="var(--subtle-fg)">
           {yearOf(t0)}
         </text>
-        <text x={VIEW_W - GUTTER_R} y={height - 1} fontSize="9" fill="var(--subtle-fg)" textAnchor="end">
+        <text x={VIEW_W - GUTTER_R} y={height - 1} fontSize="10" fill="var(--subtle-fg)" textAnchor="end">
           {yearOf(t1)}
         </text>
       </svg>
+      </ExpandTrigger>
 
-      <div className="mt-0.5 text-right">
+      <ChartModal
+        open={big}
+        onClose={() => setBig(false)}
+        title={label}
+        subtitle="끌어서 이동 · 휠이나 두 손가락으로 확대·축소 · 두 번 누르면 전체로"
+      >
+        <InteractiveChart series={bigSeries} height={340} label={label} expandable={false} />
+      </ChartModal>
+
+      {/* 되돌아갈 길. 확대했을 때만 나타나므로 평소에는 자리를 먹지 않는다 —
+          '표로 보기' 가 이미 서 있는 줄이라 줄 자체가 새로 생기지도 않는다. */}
+      <div className="mt-0.5 flex items-center justify-end gap-3">
+        {vp.zoomed ? (
+          <button
+            type="button"
+            onClick={vp.reset}
+            className="tap text-[11.5px] font-semibold text-accent hover:underline"
+          >
+            전체 구간
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => setShowTable((v) => !v)}
-          className="text-[10px] font-semibold text-muted hover:text-fg"
+          className="tap text-[11.5px] font-semibold text-muted hover:text-fg"
           aria-expanded={showTable}
         >
           {showTable ? '그래프로 보기' : '표로 보기'}
@@ -229,7 +397,7 @@ export function BasicTrend({
       </div>
 
       {showTable ? (
-        <div className="scroll-x mt-1.5 rounded-lg border border-border">
+        <div className="scroll-x mt-2 rounded-lg border border-border">
           <table className="data-table">
             <caption className="sr-only">{label} 연도별 값</caption>
             <thead>

@@ -28,12 +28,12 @@ export function ContributionBars({ items, caption }: { items: ContributionItem[]
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] text-muted">전일 대비 점수 변화 기여도 (점)</p>
+        <p className="text-[12.5px] text-muted">전일 대비 점수 변화 기여도 (점)</p>
         <button
           type="button"
           onClick={() => setShowTable((v) => !v)}
           aria-expanded={showTable}
-          className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted hover:text-fg"
+          className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[12.5px] font-semibold text-muted hover:text-fg"
         >
           {showTable ? '그래프로 보기' : '표로 보기'}
         </button>
@@ -70,9 +70,9 @@ export function ContributionBars({ items, caption }: { items: ContributionItem[]
             return (
               <li key={i.id}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[11px] text-fg">{i.label}</span>
+                  <span className="truncate text-[12.5px] text-fg">{i.label}</span>
                   <span
-                    className="tnum shrink-0 text-[11px] font-semibold"
+                    className="tnum shrink-0 text-[12.5px] font-semibold"
                     style={{ color: c.color(v) }}
                   >
                     {v === null ? '결측' : formatSigned(v, 2)}

@@ -24,6 +24,11 @@ export const COIN_ID: Record<string, string> = {
   xrp: 'ripple',
   sol: 'solana',
   bnb: 'binancecoin',
+  doge: 'dogecoin',
+  ada: 'cardano',
+  trx: 'tron',
+  avax: 'avalanche-2',
+  link: 'chainlink',
 };
 
 export interface CoinGeckoConfig {

@@ -135,6 +135,14 @@ export interface Quote {
   /** 거래량 (없으면 null) */
   volume: number | null;
   volumeUnit?: Unit;
+  /**
+   * 시총 순위. 제공사가 주는 것만 채우고, 모르면 null 이다 — 지어내지 않는다.
+   *
+   * '오늘 불타는 것과 얼어붙은 것' 이 이 값을 본다. 순위가 300위 밖이면 후보에서
+   * 뺀다 (src/lib/heatRank.mjs 의 CAP_RANK_MAX). 작은 종목은 하루 30% 씩도
+   * 움직여서, 그것까지 후보에 넣으면 '오늘 유별났던 것' 이 늘 그 자리가 된다.
+   */
+  capRank?: number | null;
   /** 30포인트 내외의 미니 차트 */
   spark: SeriesPoint[];
   session: SessionPhase;
@@ -362,6 +370,9 @@ export interface FngBandStat {
   avgForward: number | null;
   /** 중앙값(%) */
   medianForward: number | null;
+  /** 사분위수 — 화면의 상자그림이 쓴다 */
+  p25: number | null;
+  p75: number | null;
   /** 플러스로 끝난 비율(%) */
   positiveShare: number | null;
   /** 최악/최선 */
@@ -513,10 +524,21 @@ export interface BasicComparison {
 
 export interface EconomyBasic {
   id: string;
-  /** 한국어 이름 (예: 빅맥지수) */
+  /**
+   * 이 지표의 이름 (예: '1인당 GDP · GDP per capita').
+   *
+   * 카드에서 제목 자리에 크게 선다. 한동안 여기에 이름이 아니라 이름을 풀어 쓴
+   * 말('국민 한 사람 몫의 생산')이 들어 있었는데, 제목 자리에 설명이 서면
+   * 그게 무엇의 이름인지 알 수 없다 — 다른 자료에서 본 말과 이어 볼 수도 없다.
+   */
   name: string;
-  /** 원어 이름 (예: Big Mac Index) */
-  englishName: string;
+  /**
+   * 그 이름을 풀어 쓴 쉬운 말 (예: '국민 한 사람 몫의 생산').
+   *
+   * 이름 아래 작게 붙는다. 이름만으로는 무슨 숫자인지 모르는 사람을 위한 것이지,
+   * 이름을 대신하는 것이 아니다.
+   */
+  plainName: string;
   /** 대표 숫자. 값이 없으면 null — 0 으로 채우지 않는다 */
   value: number | null;
   /** 직전 발표치 */
@@ -638,6 +660,12 @@ export interface RiskIndicator {
   name: string;
   /** 짧은 이름 (타일용) */
   shortName: string;
+  /**
+   * 작게 붙는 원래 이름 (업계 용어 · 영어).
+   * 큰 글씨는 쉬운 우리말로 두고, 원래 이름은 지우지 않고 작게 남긴다 —
+   * 지우면 기사나 다른 자료에서 같은 값을 봤을 때 같은 것인지 알 수 없다.
+   */
+  term?: string;
   /** 어느 시장의 위험을 보는 지표인가 */
   scope: MarketId | 'global';
   value: number | null;
@@ -774,6 +802,52 @@ export interface MarketSummary {
 /* 스냅샷 (API 최상위 응답)                                               */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* 선물 시장                                                            */
+/* ------------------------------------------------------------------ */
+
+/** 인도월 곡선의 한 점 (1 = 근월물) */
+export interface FuturesCurvePoint {
+  n: number;
+  value: number;
+  /** 이 값의 거래일 (곡선의 모든 점은 같은 날이다) */
+  at: string;
+}
+
+export interface FuturesQuote {
+  /** futuresCatalog 의 id */
+  id: string;
+  last: number | null;
+  /** 고른 기간 동안의 변화폭 */
+  change: number | null;
+  /** 고른 기간 동안의 변화율 (%) */
+  changePct: number | null;
+  spark: SeriesPoint[];
+  /**
+   * 선물 계약이 아니라 현물·지표를 대신 쓴 경우 무엇을 썼는지.
+   * 화면에 그대로 나간다 — 안 적으면 선물 가격으로 읽힌다.
+   */
+  proxyNote?: string;
+  /**
+   * 인도월 1~4 가격. 콘탱고·백워데이션을 읽는 재료다.
+   * 받은 항목에만 있다 — 대부분의 선물은 거래소 유료 시세라 곡선을 받을 수 없다.
+   */
+  curve?: FuturesCurvePoint[];
+  /** 값이 없을 때 사유 (거래소 유료 데이터 등) */
+  unavailableReason?: string;
+  meta: Meta;
+}
+
+export interface FuturesBoard {
+  /** 어느 기간의 등락률인가 */
+  range: string;
+  rows: FuturesQuote[];
+  /** 값을 채운 항목 수 / 전체 */
+  availableCount: number;
+  totalCount: number;
+  generatedAt: string;
+}
+
 export interface SnapshotSections {
   sessions: Section<MarketSession[]>;
   fng: Section<FngScore[]>;
@@ -783,8 +857,10 @@ export interface SnapshotSections {
   basics: Section<EconomyBasic[]>;
   prediction: Section<PredictionDigest>;
   risk: Section<RiskDigest>;
+  regime: Section<RegimeDigest>;
   calendar: Section<CalendarEvent[]>;
   news: Section<NewsItem[]>;
+  futures: Section<FuturesBoard>;
   summary: Section<MarketSummary>;
 }
 
@@ -836,6 +912,74 @@ export type RangeKey = '1D' | '1W' | '1M' | '3M' | '1Y' | '3Y';
  */
 export const ASSET_RANGES: RangeKey[] = ['1D', '1W', '1M', '3M', '1Y'];
 
+/* ------------------------------------------------------------------ */
+/* 재무제표 (SEC 공시)                                                   */
+/* ------------------------------------------------------------------ */
+
+/** 재무 항목 한 기간의 값 */
+export interface FinancialPoint {
+  /** 기간 끝 (YYYY-MM-DD) */
+  end: string;
+  /** 기간 시작. 재무상태표 항목은 시점 값이라 없다. */
+  start?: string;
+  value: number;
+  /** 어느 보고서에서 왔는가 (10-K · 10-Q) */
+  form: string;
+  /** 그 보고서가 접수된 날 */
+  filed: string;
+  fy: number | null;
+  fp: string;
+}
+
+export interface FinancialLine {
+  id: string;
+  /** 큰 글씨 — 쉬운 우리말 */
+  label: string;
+  /** 작은 글씨 — 원래 이름 (한국어 용어 · 영어). 지우면 다른 자료와 대조할 길이 없어진다. */
+  term: string;
+  hint: string;
+  unit: 'usd' | 'usd_per_share';
+  /**
+   * 기간 값(손익·현금흐름)인가 시점 값(재무상태표)인가.
+   *
+   * 시점 값은 '3분기 부채' 같은 게 없다 — 그 날짜의 잔액이 있을 뿐이다.
+   * 화면이 분기/연간 토글을 이 줄에 적용하면 안 되므로 성질을 함께 보낸다.
+   */
+  kind: 'duration' | 'instant';
+  /**
+   * 실제로 쓴 XBRL 태그. 회사마다 다른 태그를 쓰기 때문에 밝힌다 —
+   * 회사끼리 견줄 때 같은 것을 보고 있는지가 중요하다.
+   */
+  tag: string | null;
+  quarterly: FinancialPoint[];
+  annual: FinancialPoint[];
+  /** 값이 없으면 왜 없는지 */
+  unavailableReason?: string;
+}
+
+export interface Fundamentals {
+  cik: string;
+  ticker: string;
+  /** SEC 가 돌려준 회사 이름 (원문) */
+  entityName: string | null;
+  lines: FinancialLine[];
+  /** 주가를 이익으로 나눈 값. 어떻게 냈는지를 함께 담는다. */
+  valuation: {
+    basis: 'ttm' | 'annual' | null;
+    eps: number | null;
+    per: number | null;
+    period: string | null;
+    note: string;
+  };
+  /**
+   * 4분기가 분기 표에서 빌 수 있다는 사실.
+   * 10-K 는 한 해 전체를 담고 4분기를 따로 담지 않는 경우가 있는데,
+   * 연간에서 1~3분기를 빼서 채우지 않는다 — 그건 회사가 보고한 값이 아니다.
+   */
+  quarterlyGapNote: string;
+  meta: Meta;
+}
+
 export interface AssetDetail {
   quote: Quote;
   /** ASSET_RANGES 에 있는 구간만 채워진다 */
@@ -850,6 +994,13 @@ export interface AssetDetail {
   unavailable?: Partial<Record<RangeKey, string>>;
   /** 같은 시장의 F&G 점수(겹쳐보기용) */
   fngOverlay: Partial<Record<RangeKey, FngHistoryPoint[]>>;
+  /**
+   * 재무제표. 미국 상장사만 있다 — SEC 공시가 있는 회사에 한한다.
+   * 지수·원자재·환율·코인에는 없다.
+   */
+  fundamentals?: Fundamentals;
+  /** 재무제표가 없는 경우 왜 없는지 */
+  fundamentalsUnavailable?: string;
   mode: DataMode;
 }
 
@@ -864,6 +1015,88 @@ export interface AssetDetail {
 /* 얼마인가" 만 답한다. 그래서 결과에 등급이 없고 개수만 있다.            */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* 국면 전광판                                                          */
+/* ------------------------------------------------------------------ */
+
+export type RegimeAxisId = 'vol' | 'credit' | 'drawdown' | 'trend';
+
+export type RegimeBandId =
+  | 'extreme_fear'
+  | 'fear'
+  | 'caution'
+  | 'middle'
+  | 'calm'
+  | 'hot'
+  | 'extreme_hot';
+
+export interface RegimeAxisDef {
+  id: RegimeAxisId;
+  label: string;
+  /** 좁은 자리(막대 옆 이름표)용 짧은 이름 */
+  short: string;
+  weight: number;
+  invert: boolean;
+  unit: string;
+  precision: number;
+  hint: string;
+}
+
+export interface RegimeAxisResult extends RegimeAxisDef {
+  /** 0~100. 높을수록 과열 쪽. 산출 못 하면 null */
+  percentile: number | null;
+  value: number | null;
+  /** 분포를 만드는 데 쓴 햇수 */
+  years: number;
+  asOf?: number;
+  /** percentile 이 null 인 이유 */
+  reason?: string;
+}
+
+export interface RegimeBand {
+  id: RegimeBandId;
+  max: number;
+  label: string;
+  glyph: string;
+  tone: 'danger' | 'warn' | 'neutral' | 'ok';
+}
+
+export interface RegimeRarity {
+  /** 아래쪽 극단인지 위쪽 극단인지. 가운데면 null */
+  side: 'low' | 'high' | null;
+  band: RegimeBand | null;
+  recordYears?: number;
+  /** 이보다 극단이었던 마지막 시점. 그런 날이 없으면 null */
+  sinceT?: number | null;
+  months?: number | null;
+  text: string | null;
+  headline?: string;
+  /** 1년 이상 만이거나 기록상 최초일 때만 true. 화면·알림은 이때만 크게 쓴다 */
+  notable: boolean;
+}
+
+export interface RegimeBoard {
+  asOf: number | null;
+  /** 0~100. 낮을수록 공포. 못 내면 null */
+  score: number | null;
+  coverage: number;
+  axes: RegimeAxisResult[];
+  band: RegimeBand | null;
+  unavailableReason?: string;
+  rarity: RegimeRarity | null;
+  lookbackYears: number;
+}
+
+/** 전광판 섹션이 실어 나르는 것 — 지금 값 + 20년 곡선 */
+export interface RegimeDigest {
+  board: RegimeBoard;
+  /** 20년 점수 곡선 (주 단위로 솎아냄) */
+  history: { t: number; score: number }[];
+  /** 축별 원자료 출처 */
+  sources: DataSource[];
+  generatedAt: string;
+}
+
 export type CriterionComparator = 'gte' | 'lte';
 
 export type Criterion =
@@ -872,11 +1105,14 @@ export type Criterion =
   /** 위험 신호등에서 특정 단계인 지표의 개수 */
   | { id: string; kind: 'risk_count'; level: RiskLevel; comparator: CriterionComparator; value: number }
   /** 특정 위험 지표의 값 */
-  | { id: string; kind: 'risk_value'; indicatorId: string; comparator: CriterionComparator; value: number };
+  | { id: string; kind: 'risk_value'; indicatorId: string; comparator: CriterionComparator; value: number }
+  /** 국면 점수 (지난 20년 분포 기준) */
+  | { id: string; kind: 'regime'; comparator: CriterionComparator; value: number };
 
 export type AlertRuleType =
   | 'fng_stage_change'
   | 'fng_threshold'
+  | 'regime_rarity'
   | 'price_target'
   | 'price_move'
   | 'risk_spike'

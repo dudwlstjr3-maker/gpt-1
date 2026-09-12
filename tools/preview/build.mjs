@@ -25,6 +25,9 @@ const OUT =
     ? path.resolve(process.argv[outFlag + 1])
     : path.resolve(HERE, '../../dist/market-mood-3-preview.html');
 
+/** 아티팩트로 올릴 벌 — 게시 도구가 머리 태그를 직접 씌우므로 여기엔 없어야 한다 */
+const OUT_BARE = OUT.replace(/\.html$/, '') + '.artifact.html';
+
 /** 자산 상세까지 담고 싶은 종목. 없으면 조용히 건너뛴다. */
 const ASSET_IDS = ['spx', 'kospi', 'btc'];
 
@@ -36,6 +39,71 @@ const ASSET_IDS = ['spx', 'kospi', 'btc'];
  * 읽은 지수는 숫자 자체가 거짓말이 된다 — 원본에서 뽑는다.
  * 모양이 조금이라도 달라지면 조용히 비우지 말고 빌드를 세운다.
  */
+/**
+ * 선물 목록도 원본에서 뽑는다.
+ *
+ * 이름·심볼·묶음·자릿수·사유를 손으로 베끼면 앱과 어긋난다. 특히 '왜 값이
+ * 없는가' 는 어긋나면 안 되는 문장이다 — 미리보기에서만 다른 이유가 적히면
+ * 그걸 보고 판단한 사람이 잘못 안다.
+ */
+function readFuturesCatalog() {
+  const src = fs.readFileSync(path.join(HERE, '../../src/lib/futuresCatalog.ts'), 'utf8');
+
+  const groups = [];
+  const gBlock = src.match(/export const FUTURES_GROUPS[^=]*=\s*\[([\s\S]*?)\n\];/);
+  if (!gBlock) throw new Error('futuresCatalog.ts 에서 FUTURES_GROUPS 를 찾지 못했습니다.');
+  for (const m of gBlock[1].matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']*)',\s*note:\s*'((?:[^'\\]|\\.)*)'\s*\}/g)) {
+    groups.push({ id: m[1], label: m[2], note: m[3].replace(/\\'/g, "'") });
+  }
+  if (groups.length < 5) throw new Error(`FUTURES_GROUPS 를 ${groups.length}개만 읽었습니다.`);
+
+  const iBlock = src.match(/export const FUTURES_ITEMS[^=]*=\s*\[([\s\S]*?)\n\];/);
+  if (!iBlock) throw new Error('futuresCatalog.ts 에서 FUTURES_ITEMS 를 찾지 못했습니다.');
+  const consts = {};
+  for (const m of src.matchAll(/^const (EXCHANGE_PAID|KRX_PAID)\s*=\s*\n?\s*'((?:[^'\\]|\\.)*)';/gm)) {
+    consts[m[1]] = m[2].replace(/\\'/g, "'");
+  }
+  const items = [];
+  for (const line of iBlock[1].split('\n')) {
+    const id = line.match(/\{\s*id:\s*'([^']+)'/);
+    if (!id) continue;
+    const pick = (k) => {
+      const m = line.match(new RegExp('\\b' + k + ":\\s*'((?:[^'\\\\]|\\\\.)*)'"));
+      return m ? m[1].replace(/\\'/g, "'") : null;
+    };
+    const num = (k) => {
+      const m = line.match(new RegExp('\\b' + k + ':\\s*(-?\\d+)'));
+      return m ? Number(m[1]) : 0;
+    };
+    const reasonConst = line.match(/\breason:\s*(EXCHANGE_PAID|KRX_PAID)/);
+    items.push({
+      id: id[1],
+      name: pick('name'),
+      symbol: pick('symbol'),
+      group: pick('group'),
+      precision: num('precision'),
+      suffix: pick('suffix') ?? '',
+      order: num('order'),
+      source: pick('source'),
+      reason: reasonConst ? consts[reasonConst[1]] : pick('reason'),
+      proxy: pick('proxy'),
+      // fallback 은 { source, note } 라 pick 으로는 안 잡힌다. note 만 따로 뽑는다.
+      fallbackNote: (line.match(/\bfallback:\s*\{[^}]*\bnote:\s*'((?:[^'\\]|\\.)*)'/) ?? [])[1] ?? null,
+    });
+  }
+  if (items.length < 30) throw new Error(`FUTURES_ITEMS 를 ${items.length}개만 읽었습니다.`);
+  for (const it of items) {
+    if (!it.name || !it.symbol || !it.group) throw new Error(`선물 항목이 덜 읽혔습니다: ${it.id}`);
+    if (it.source === 'none' && !it.reason) throw new Error(`사유 없는 빈 항목: ${it.id}`);
+    // EIA 로 받는 항목이 fallback 도 reason 도 없이 비면, 화면에 이유 없는 빈 줄이 남는다.
+    // 지금은 어댑터가 "EIA 키가 없어 비웁니다" 를 만들어 주므로 여기서는 표기만 확인한다.
+    if (it.source === 'eia' && it.proxy) {
+      throw new Error(`EIA 로 받는 항목에 proxy 가 남아 있습니다 (대신 쓴 값이 아닙니다): ${it.id}`);
+    }
+  }
+  return { groups, items };
+}
+
 function readIndexCatalog() {
   const src = fs.readFileSync(path.join(HERE, '../../src/lib/catalog.ts'), 'utf8');
 
@@ -103,6 +171,27 @@ async function main() {
     }
   }
 
+  /**
+   * 검증 결과는 손으로 베끼지 않고 원본 모듈에서 그대로 가져온다.
+   * regimeEvidence.mjs 는 의존성이 없는 순수 모듈이라 여기서 바로 읽을 수 있고,
+   * 그래야 미리보기의 숫자가 앱과 어긋날 일이 없다.
+   */
+  const evidence = await import('../../src/lib/regimeEvidence.mjs');
+  const regimeEvidence = {
+    sources: evidence.EVIDENCE_SOURCES,
+    liveVsBacktest: evidence.LIVE_VS_BACKTEST,
+    sample: evidence.EVIDENCE_SAMPLE,
+    buckets: evidence.EVIDENCE_BUCKETS,
+    extremeFear: evidence.EXTREME_FEAR_EPISODES,
+    fear: evidence.FEAR_EPISODES,
+    hot: evidence.HOT_EPISODES,
+    findings: evidence.EVIDENCE_FINDINGS,
+    limits: evidence.EVIDENCE_LIMITS,
+  };
+  if (!regimeEvidence.buckets?.length || !regimeEvidence.findings?.length) {
+    throw new Error('regimeEvidence.mjs 에서 검증 결과를 읽지 못했습니다.');
+  }
+
   const indices = readIndexCatalog();
   // 목록에 있는 지수는 스냅샷에도 있어야 한다. 없으면 미리보기에 빈 줄이 남는다.
   for (const [market, list] of Object.entries(indices)) {
@@ -111,19 +200,79 @@ async function main() {
     if (missing.length) throw new Error(`스냅샷에 ${market} 지수가 없습니다: ${missing.join(', ')}`);
   }
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices };
+  // 전광판이 스냅샷에 없으면 미리보기에 빈 화면이 남는다. 조용히 넘기지 않는다.
+  if (!snapshot.sections.regime) throw new Error('스냅샷에 regime 섹션이 없습니다.');
+
+  const futures = readFuturesCatalog();
+  // 목록에 있는 항목은 스냅샷에도 있어야 한다. 없으면 미리보기에 빈 줄이 남는다.
+  {
+    const have = new Set((snapshot.sections.futures?.data?.rows ?? []).map((r) => r.id));
+    const missing = futures.items.filter((i) => !have.has(i.id)).map((i) => i.id);
+    if (missing.length) throw new Error(`스냅샷에 선물 항목이 없습니다: ${missing.join(', ')}`);
+    // EIA 항목은 인도월 곡선이 함께 와야 한다. 없으면 미리보기에서 곡선 줄이 통째로 빠져
+    // "본 화면과 다른데 눈치채지 못하는" 상태가 된다.
+    const rows = snapshot.sections.futures?.data?.rows ?? [];
+    const noCurve = futures.items
+      .filter((i) => i.source === 'eia')
+      .filter((i) => {
+        const r = rows.find((x) => x.id === i.id);
+        return r && r.last !== null && (r.curve ?? []).length < 2;
+      })
+      .map((i) => i.id);
+    if (noCurve.length) throw new Error(`인도월 곡선이 없는 EIA 항목: ${noCurve.join(', ')}`);
+  }
+
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
+  if (!tpl.includes('__FONT__')) throw new Error('template.html 에 __FONT__ 자리표시자가 없습니다.');
+
+  /*
+   * 글꼴을 파일 안에 심는다.
+   *
+   * 미리보기는 파일 하나로 오간다 — 열어 보는 사람의 컴퓨터에 Pretendard 가
+   * 깔려 있을 리 없고, 바깥 주소를 걸면 인터넷이 없거나 막힌 자리에서 글자가
+   * 딴 글꼴로 떨어진다. 223KB 를 실어 그 일을 없앤다.
+   */
+  const fontPath = 'public/fonts/pretendard-subset.woff2';
+  const fontB64 = fs.readFileSync(path.join(HERE, '../../', fontPath)).toString('base64');
 
   // </script> 가 데이터 안에 있으면 스크립트 태그가 먼저 닫힌다. < 를 이스케이프한다.
-  const html = tpl.replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
+  const html = tpl
+    .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)
+    .replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, html);
 
-  const mb = (html.length / 1024 / 1024).toFixed(2);
+  /*
+   * 두 벌을 낸다. 쓰이는 자리가 다르고, 한 벌로는 둘 다 안 된다.
+   *
+   *   ① 그냥 여는 파일 (OUT)
+   *      브라우저로 바로 열거나 남에게 보내는 파일이다. <!doctype> 과
+   *      **<meta charset="utf-8"> 이 반드시 있어야 한다.** 없으면 로컬 파일을 열 때
+   *      브라우저가 인코딩을 짐작하는데, 한글이 통째로 깨진다. 화면을 아무리 잘
+   *      만들어도 글자가 깨지면 아무것도 아니다.
+   *
+   *   ② 아티팩트용 (OUT_BARE)
+   *      게시 도구가 <!doctype>·html·head·body 를 직접 씌우기 때문에, 그쪽에
+   *      올리는 파일에는 그 태그가 있으면 안 된다. template.html 이 원래 이 모양이다.
+   */
+  fs.writeFileSync(OUT_BARE, html);
+
+  const standalone =
+    '<!doctype html>\n<html lang="ko">\n<head>\n' +
+    '<meta charset="utf-8">\n' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+    '<meta name="color-scheme" content="dark light">\n' +
+    '</head>\n<body style="margin:0">\n' +
+    html +
+    '\n</body>\n</html>\n';
+  fs.writeFileSync(OUT, standalone);
+
+  const mb = (standalone.length / 1024 / 1024).toFixed(2);
   console.log(`미리보기 생성: ${OUT} (${mb}MB, 모드 ${snapshot.mode})`);
+  console.log(`  아티팩트용(머리 태그 없음): ${OUT_BARE}`);
   if (Number(mb) > 15) console.log('  주의: 16MB 에 가깝습니다. 히스토리 길이를 줄이세요.');
 }
 

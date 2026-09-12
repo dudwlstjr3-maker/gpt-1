@@ -199,3 +199,26 @@ test('numOrNull 은 NaN·Infinity·문자열을 null 로 본다', () => {
   assert.equal(numOrNull('3'), null);
   assert.equal(numOrNull(null), null);
 });
+
+/* ------------------------------ 국면 점수 ------------------------------ */
+
+test('국면 점수를 조건으로 쓸 수 있다', () => {
+  const snap = { sections: { regime: { data: { board: { score: 8.5 } } } } };
+  assert.deepEqual(evaluate({ kind: 'regime', comparator: 'lte', value: 10 }, snap), { status: 'met', actual: 8.5 });
+  assert.equal(evaluate({ kind: 'regime', comparator: 'gte', value: 10 }, snap).status, 'unmet');
+});
+
+test('산출 불가인 국면 점수를 0 으로 읽지 않는다', () => {
+  const snap = {
+    sections: { regime: { data: { board: { score: null, unavailableReason: '구성 축의 70% 이상이 있어야 합니다.' } } } },
+  };
+  const r = evaluate({ kind: 'regime', comparator: 'lte', value: 10 }, snap);
+  assert.equal(r.status, 'unknown');
+  assert.match(r.reason, /70%/);
+});
+
+test('국면 조건 설명에도 매매를 권하는 말이 없다', () => {
+  const line = describe({ kind: 'regime', comparator: 'lte', value: 15 });
+  assert.equal(line, '국면 점수가 15 이하');
+  for (const w of ['매수', '매도', '추천', '기회']) assert.ok(!line.includes(w));
+});

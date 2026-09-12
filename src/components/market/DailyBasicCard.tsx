@@ -28,7 +28,7 @@ export function DailyBasicCard() {
         <h2 id="daily-basic-title" className="text-base font-bold text-fg-strong">
           오늘의 경제 이야기
         </h2>
-        <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/basics" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           전체 보기 →
         </Link>
       </div>
@@ -45,12 +45,13 @@ export function DailyBasicCard() {
           const group = groupOfBasic(item.id);
 
           return (
-            <div className="card p-3.5">
+            <div className="card p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
+                  {/* 위가 이름, 아래가 그 이름을 풀어 쓴 말 — 생활 지수 화면과 같은 차례다 */}
                   <p className="text-[14px] font-bold text-fg-strong">{item.name}</p>
-                  <p className="mt-0.5 text-[10px] text-subtle">
-                    {item.englishName}
+                  <p className="mt-0.5 text-[11.5px] break-keep text-subtle">
+                    {item.plainName}
                     {group ? ` · ${group.label}` : ''}
                   </p>
                 </div>
@@ -61,19 +62,19 @@ export function DailyBasicCard() {
               </div>
 
               {guide ? (
-                <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-fg">{guide.headline}</p>
+                <p className="mt-2 text-[13px] leading-relaxed break-keep text-fg">{guide.headline}</p>
               ) : null}
 
-              <div className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-border pt-2.5">
+              <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-border pt-2">
                 <p className="tnum text-[20px] leading-none font-bold text-fg-strong">
                   {item.value === null ? NO_VALUE : `${formatNumber(item.value, item.precision)}${item.suffix}`}
                 </p>
-                <Link href="/basics" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+                <Link href="/basics" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
                   읽는 법 보기 →
                 </Link>
               </div>
 
-              <p className="mt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+              <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
                 하루에 한 가지씩, 날짜에 따라 순서대로 돌아갑니다. 전체 {list.length}가지는 생활 탭에 있습니다.
               </p>
             </div>

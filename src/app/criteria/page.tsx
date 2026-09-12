@@ -8,14 +8,16 @@
  * 한 번 정해 두고 가끔 확인하는 쪽에 가깝다.
  */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { CriteriaBoard } from '@/components/market/CriteriaBoard';
 
 export default function CriteriaPage() {
   return (
     <div className="pt-2 pb-4">
+      <BackBar />
       <header className="px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">내 기준</h1>
-        <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-muted">
+        <p className="mt-1 text-[12.5px] leading-relaxed break-keep text-muted">
           무엇을 볼지 직접 정해 두면, 지금 그 조건이 맞는지 한 자리에서 확인할 수 있습니다.
         </p>
       </header>

@@ -19,9 +19,9 @@ import { CONFIDENCE_LABEL, MARKET_LABEL, type DataMode, type FngScore } from '@/
 function DeltaChip({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
-    <div className="mt-1 flex items-center justify-center gap-1.5 rounded-lg bg-surface-2 py-1.5">
-      <span className="text-[10px] text-muted">{label}</span>
-      <span className="tnum flex items-center gap-0.5 text-[12px] font-semibold" style={{ color: c.color(value) }}>
+    <div className="mt-1 flex items-center justify-center gap-2 rounded-lg bg-surface-2 py-2">
+      <span className="text-[11.5px] text-muted">{label}</span>
+      <span className="tnum flex items-center gap-0.5 text-[13px] font-semibold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
         {value === null ? NO_VALUE : formatSigned(value, 1)}
         <span className="sr-only">{c.label(value)}</span>
@@ -40,15 +40,15 @@ function DriverRow({ kind, label, detail }: { kind: 'up' | 'down'; label: string
   const color = c.color(kind === 'up' ? 1 : -1);
   if (!label) return null;
   return (
-    <div className="flex items-baseline gap-1.5">
-      <span aria-hidden="true" className="text-[10px] font-bold" style={{ color }}>
+    <div className="flex items-baseline gap-2">
+      <span aria-hidden="true" className="text-[11.5px] font-bold" style={{ color }}>
         {kind === 'up' ? '▲' : '▼'}
       </span>
-      <p className="min-w-0 flex-1 text-[11px] leading-tight break-keep text-fg">
+      <p className="min-w-0 flex-1 text-[12.5px] leading-tight break-keep text-fg">
         <span className="text-muted">{kind === 'up' ? '상승 ' : '하락 '}</span>
         {label}
       </p>
-      {detail ? <span className="tnum shrink-0 text-[10px] text-subtle">{detail}</span> : null}
+      {detail ? <span className="tnum shrink-0 text-[11.5px] text-subtle">{detail}</span> : null}
     </div>
   );
 }
@@ -67,14 +67,14 @@ export function FngCard({
 
   return (
     <article
-      className="card flex h-full flex-col p-3.5"
+      className="card flex h-full flex-col p-3"
       aria-labelledby={`fng-${score.market}-title`}
     >
       {/* 제목 줄에는 데이터 모드만 둔다. 국면·신뢰도 배지까지 오른쪽에 쌓으면
           왼쪽 글자 아래로 배지 하나가 혼자 떨어져 머리 부분이 들쭉날쭉해진다. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={`fng-${score.market}-title`} className="flex items-center gap-1.5 text-sm font-bold text-fg-strong">
+          <h3 id={`fng-${score.market}-title`} className="flex items-center gap-2 text-sm font-bold text-fg-strong">
             {/* 시장 색. 캘린더의 점과 같은 색이라 화면을 옮겨도 같은 시장으로 읽힌다.
                 뜻은 옆의 글자가 지고, 색은 훑기를 도울 뿐이다. */}
             <span
@@ -88,22 +88,29 @@ export function FngCard({
             {standalone ? ' 투자심리' : null}
           </h3>
           {standalone ? (
-            <p className="mt-0.5 text-[10px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
+            <p className="mt-0.5 text-[11.5px] text-subtle">자체 산출 지수 · {score.formulaVersion}</p>
           ) : null}
         </div>
         <ModeBadge mode={mode} size="xs" />
       </div>
 
-      {/* 신뢰도는 높을 때 말하지 않는다. 늘 붙어 있으면 배지가 아니라 장식이 된다.
-          문제가 있을 때만 뜨게 해 두면 그때 눈에 걸린다. */}
-      <div className="mt-1.5 mb-2 flex flex-wrap items-center gap-1">
+      {/*
+       * 신뢰도는 **늘** 적는다.
+       *
+       * 예전에는 '높음' 일 때 숨겼다. 배지를 장식으로 만들지 않으려는 뜻이었는데,
+       * 값이 나빠지는 순간 배지가 새로 생기면서 이 줄이 한 줄에서 두 줄이 됐다.
+       * 390px 에서 재 보니 카드가 362px 에서 409px 로 커졌고, 아래 화면 전체가
+       * 47px 밀렸다. 30초마다 갱신되는 화면에서 그건 읽는 사람 손 밑이 흔들리는 것이다.
+       *
+       * 그래서 자리는 고정하고 **말만 바꾼다** — 높음이면 조용한 색, 낮으면 경고 색.
+       * 눈에 걸리게 하는 일은 '있다/없다' 가 아니라 색과 기호가 한다.
+       */}
+      <div className="mt-2 mb-2 flex flex-wrap items-center gap-1">
         <CyclePhaseBadge cycle={score.cycle} />
-        {score.confidence !== 'high' ? (
-          <Badge tone={score.confidence === 'medium' ? 'neutral' : 'warn'} size="xs" title={score.confidenceReason}>
-            <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
-            신뢰도 {CONFIDENCE_LABEL[score.confidence]}
-          </Badge>
-        ) : null}
+        <Badge tone={score.confidence === 'low' ? 'warn' : 'neutral'} size="xs" title={score.confidenceReason}>
+          <span aria-hidden="true">{confidenceGlyph(score.confidence)}</span>
+          신뢰도 {CONFIDENCE_LABEL[score.confidence]}
+        </Badge>
       </div>
 
       <div className="flex flex-col items-center">
@@ -112,7 +119,7 @@ export function FngCard({
 
       {unavailable ? (
         <p
-          className="mt-1 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed break-keep"
+          className="mt-1 rounded-lg px-2 py-2 text-[12.5px] leading-relaxed break-keep"
           style={{ background: 'color-mix(in srgb, var(--warn) 12%, transparent)', color: 'var(--warn)' }}
           role="status"
         >
@@ -124,8 +131,8 @@ export function FngCard({
         <DeltaChip label="어제보다" value={score.deltaDay} />
       )}
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-muted">최근 30일</span>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-[11.5px] text-muted">최근 30일</span>
         <ScoreSparkline
           points={score.spark}
           width={132}
@@ -134,7 +141,7 @@ export function FngCard({
         />
       </div>
 
-      <div className="mt-2.5 space-y-1.5 border-t border-border pt-2.5">
+      <div className="mt-2 mb-2 space-y-2 border-t border-border pt-2">
         <DriverRow
           kind="up"
           label={score.topPositive?.label ?? null}
@@ -147,29 +154,43 @@ export function FngCard({
         />
       </div>
 
-      {/* 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
-          이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다. */}
-      <div className="mt-2.5 flex items-center gap-1.5 border-t border-border pt-2">
+      {/*
+       * 버튼과 산출 시각은 카드 **바닥**에 붙인다 (mt-auto).
+       *
+       * 카드 셋은 가장 키 큰 것에 맞춰 같은 높이로 서는데, 요인 줄은 시장마다
+       * 0~2줄이고 줄바꿈까지 달라서 안쪽 내용의 길이가 제각각이다. 그대로 두면
+       * 짧은 카드는 아래가 통째로 비어 — 미국은 120px 이 비었다 — 같은 크기의
+       * 카드인데도 크기가 다른 것처럼 보였다. 바닥에 붙여 두면 버튼과 시각이
+       * 카드마다 같은 높이에 서고, 남는 자리는 안쪽 여백으로 흩어진다.
+       *
+       * 갈 수 있는 곳을 감추지 않는다. 시장 전체를 보러 가는 길과
+       * 이 점수를 뜯어보는 길은 다른 화면이므로 버튼도 둘로 나눠 둔다.
+       */}
+      <div className="mt-auto flex items-center gap-2 border-t border-border pt-2">
         <Link
           href={`/market/${score.market}`}
-          className="flex-1 rounded-md bg-accent px-2 py-1.5 text-center text-[11px] font-semibold text-accent-fg hover:opacity-90"
+          className="flex-1 rounded-md bg-accent px-2 py-2 text-center text-[12.5px] font-semibold text-accent-fg hover:opacity-90"
         >
           {MARKET_LABEL[score.market]} 시장 →
         </Link>
         <Link
           href={`/fng/${score.market}`}
-          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-center text-[11px] font-semibold text-fg hover:bg-surface-3"
+          className="flex-1 rounded-md border border-border bg-surface-2 px-2 py-2 text-center text-[12.5px] font-semibold text-fg hover:bg-surface-3"
         >
           심리 상세 →
         </Link>
       </div>
-      {/* 갱신 시각은 상태바가 늘 들고 있다. 여기서는 충족률이 온전하지 않을 때만 말한다 —
-          100% 라고 매번 적어 두면 정작 90% 로 떨어진 날을 놓친다. */}
-      {score.coverage < 0.999 ? (
-        <p className="mt-1.5 text-[10px] text-subtle">
-          산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
-        </p>
-      ) : null}
+      {/*
+       * 산출 시각과 충족률도 늘 적는다. 위 배지와 같은 이유다 —
+       * 온전하지 않을 때만 나타나게 두면 그때마다 카드 바닥이 19px 씩 자란다.
+       * 대신 100% 가 아니면 색으로 표시해서, 90% 로 떨어진 날을 놓치지 않게 한다.
+       */}
+      <p
+        className="mt-2 text-[11.5px]"
+        style={{ color: score.coverage < 0.999 ? 'var(--warn)' : 'var(--subtle-fg)' }}
+      >
+        산출 {formatKstTime(score.computedAt)} · 충족률 {Math.round(score.coverage * 100)}%
+      </p>
     </article>
   );
 }

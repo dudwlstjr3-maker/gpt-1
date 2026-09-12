@@ -17,7 +17,7 @@ import { SectionGate, SkeletonCard, EmptyState, Notice } from '@/components/ui/S
 import { Badge, SessionBadge } from '@/components/ui/Badge';
 import { PriceCard } from '@/components/market/PriceCard';
 import { FngCard } from '@/components/market/FngCard';
-import { RiskForMarket } from '@/components/market/RiskSeven';
+import { RiskForMarket } from '@/components/market/RiskGauges';
 import { EventRow } from '@/components/market/CalendarList';
 import { useChangeColor } from '@/components/market/useChangeColor';
 import { useFormatter } from '@/components/market/useFormatter';
@@ -120,19 +120,19 @@ export default function MarketRegionPage() {
           </Link>
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-fg-strong">{MARKET_LABEL[region]} 시장</h1>
-            <p className="mt-0.5 truncate text-[11px] text-subtle">{SUBTITLE[region]}</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug break-keep text-subtle">{SUBTITLE[region]}</p>
           </div>
         </div>
         {session ? (
           <div className="flex shrink-0 flex-col items-end gap-1">
             <SessionBadge phase={session.phase} size="sm" />
-            <span className="text-[10px] text-subtle">{sessionHint(session)}</span>
+            <span className="text-[11.5px] text-subtle">{sessionHint(session)}</span>
           </div>
         ) : null}
       </div>
 
       {/* 시장 전환 */}
-      <div className="mt-2.5 px-3">
+      <div className="mt-2 px-3">
         <SegmentedControl
           label="시장 전환"
           full
@@ -144,9 +144,9 @@ export default function MarketRegionPage() {
         />
       </div>
 
-      <div className="mt-3 px-3 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-4">
+      <div className="mt-3 px-3 @min-[1024px]:grid @min-[1024px]:grid-cols-[340px_minmax(0,1fr)] @min-[1024px]:items-start @min-[1024px]:gap-4">
         {/* 좌측: 심리 · 위험 · 시장 고유 정보 */}
-        <div className="space-y-2.5 lg:sticky lg:top-32">
+        <div className="space-y-2 @min-[1024px]:sticky @min-[1024px]:top-32">
           {fng && snapshot ? <FngCard score={fng} mode={snapshot.mode} /> : <SkeletonCard height={140} lines={2} />}
 
           <RiskForMarket market={region} />
@@ -166,14 +166,14 @@ export default function MarketRegionPage() {
                       ] as const
                     ).map(([label, v]) => (
                       <div key={label} className="rounded-lg bg-surface-2 p-2 text-center">
-                        <p className="text-[10px] text-muted">{label}</p>
+                        <p className="text-[11.5px] text-muted">{label}</p>
                         <p className="tnum mt-0.5 text-[13px] font-bold" style={{ color: flowColor.color(v) }}>
                           {v === null ? NO_VALUE : `${v > 0 ? '+' : '-'}${formatKoreanCompact(Math.abs(v) * 1e8, 1)}원`}
                         </p>
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-[10px] text-subtle">
+                  <p className="mt-2 text-[11.5px] text-subtle">
                     기준 {formatRelative(flows.meta.asOf)} · 외국인 순매수는 원화 강세·지수 방어와 함께 나타나는 경우가 많습니다.
                   </p>
                 </>
@@ -194,13 +194,13 @@ export default function MarketRegionPage() {
                   const dir = f.direction(q);
                   return (
                     <li key={q.id}>
-                      <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-1.5 hover:opacity-80">
-                        <span className="truncate text-[12px] text-fg">{q.name}</span>
+                      <Link href={`/asset/${q.id}`} className="flex items-center justify-between gap-2 py-2 hover:opacity-80">
+                        <span className="min-w-0 text-[13px] whitespace-nowrap text-fg">{q.name}</span>
                         <span className="flex shrink-0 items-center gap-2">
-                          <span className="tnum text-[12px] font-semibold text-fg-strong">
+                          <span className="tnum text-[13px] font-semibold text-fg-strong">
                             {q.price === null ? NO_VALUE : f.price(q)}
                           </span>
-                          <span className="tnum text-[11px]" style={{ color: f.color(dir) }}>
+                          <span className="tnum text-[12.5px]" style={{ color: f.color(dir) }}>
                             {f.glyph(dir)} {f.changePct(q)}
                           </span>
                         </span>
@@ -214,14 +214,14 @@ export default function MarketRegionPage() {
         </div>
 
         {/* 우측: 시세 목록 + 일정 + 뉴스 */}
-        <div className="mt-4 lg:mt-0">
+        <div className="mt-4 @min-[1024px]:mt-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <SegmentedControl label="정렬" size="xs" value={sort} onChange={setSort} options={SORT_OPTIONS} />
             <button
               type="button"
               onClick={() => setOnlyWatched((v) => !v)}
               aria-pressed={onlyWatched}
-              className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold"
+              className="rounded-lg border border-border px-2 py-1 text-[12.5px] font-semibold"
               style={{
                 background: onlyWatched ? 'var(--surface-3)' : 'var(--surface-2)',
                 color: onlyWatched ? 'var(--accent)' : 'var(--muted-fg)',
@@ -236,7 +236,7 @@ export default function MarketRegionPage() {
               section={quotesSection}
               onRetry={refresh}
               loading={
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2">
                   {[0, 1, 2, 3].map((i) => (
                     <SkeletonCard key={i} height={44} lines={1} />
                   ))}
@@ -251,7 +251,7 @@ export default function MarketRegionPage() {
                     description={onlyWatched ? '카드의 ☆ 를 눌러 관심목록에 추가하세요.' : undefined}
                   />
                 ) : (
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 @min-[640px]:grid-cols-2">
                     {list.map((q) => (
                       <PriceCard key={q.id} quote={q} />
                     ))}
@@ -263,12 +263,12 @@ export default function MarketRegionPage() {
 
           {/* 이 시장의 일정 */}
           {events.length > 0 ? (
-            <section className="mt-4" aria-labelledby={`cal-${region}`}>
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <h2 id={`cal-${region}`} className="text-[12px] font-bold text-muted">
+            <section className="mt-5" aria-labelledby={`cal-${region}`}>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h2 id={`cal-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 일정
                 </h2>
-                <Link href="/calendar" className="text-[11px] font-semibold text-accent hover:underline">
+                <Link href="/calendar" className="tap text-[12.5px] font-semibold text-accent hover:underline">
                   전체 캘린더 →
                 </Link>
               </div>
@@ -284,9 +284,9 @@ export default function MarketRegionPage() {
 
           {/* 이 시장의 뉴스 */}
           {news.length > 0 ? (
-            <section className="mt-4" aria-labelledby={`news-${region}`}>
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <h2 id={`news-${region}`} className="text-[12px] font-bold text-muted">
+            <section className="mt-5" aria-labelledby={`news-${region}`}>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h2 id={`news-${region}`} className="text-[13px] font-bold text-muted">
                   {MARKET_LABEL[region]} 관련 뉴스
                 </h2>
                 {snapshot?.mode === 'DEMO' ? (
@@ -295,13 +295,13 @@ export default function MarketRegionPage() {
                   </Badge>
                 ) : null}
               </div>
-              <div className="card p-3.5">
-                <ul className="space-y-2.5">
+              <div className="card p-3">
+                <ul className="space-y-2">
                   {news.map((n) => (
-                    <li key={n.id} className="border-b border-border pb-2.5 last:border-b-0 last:pb-0">
-                      <p className="text-[12px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
-                      <p className="mt-1 truncate text-[10px] text-subtle">{n.titleOriginal}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-subtle">
+                    <li key={n.id} className="border-b border-border pb-2 last:border-b-0 last:pb-0">
+                      <p className="text-[13px] leading-relaxed break-keep text-fg">{n.summaryKo}</p>
+                      <p className="mt-1 truncate text-[11.5px] text-subtle">{n.titleOriginal}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-subtle">
                         <span>{n.outlet}</span>
                         <span>{formatRelative(n.publishedAt)}</span>
                         {n.url ? (
@@ -319,7 +319,7 @@ export default function MarketRegionPage() {
             </section>
           ) : null}
 
-          <p className="mt-4 text-[10px] text-subtle">
+          <p className="mt-4 text-[11.5px] text-subtle">
             표시 종목 {formatNumber(list.length, 0)}개 · 기준 시각과 지연 여부는 각 카드에 표시됩니다.
           </p>
         </div>

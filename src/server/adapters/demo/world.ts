@@ -211,13 +211,29 @@ function generate(todayKey: string): DemoWorld {
     riskRet[i] = r;
   }
 
-  /** 위험요인 + 고유변동으로 가격 시계열 만들기 */
+  /**
+   * 위험요인 + 고유변동으로 가격 시계열 만들기.
+   *
+   * 왜 곱하지 않고 exp 로 쌓나
+   *   예전에는 가격을 (1 + r) 로 곱해 나갔는데 두 가지가 어긋났다.
+   *
+   *   하나. 그렇게 쌓으면 실제로 쌓이는 것은 r 의 평균이 아니라 log(1+r) 의
+   *   평균이고, 이 둘은 흔들림의 크기만큼 벌어진다. 그래서 drift 를 양수로 줘도
+   *   **많이 흔들리는 종목일수록 까닭 없이 가라앉았다** — 10년을 걸으면 시작가의
+   *   4분의 1 밑으로 내려가 0.42달러짜리 미국 주식이 화면에 찍혔다.
+   *
+   *   둘. 변동성이 치솟은 날에는 r 이 -1 보다 작아져 가격이 음수가 되는 것을
+   *   바닥값으로 막아야 했는데, 한 번 그 바닥에 닿은 종목은 다시 올라오지 못했다.
+   *
+   *   r 을 **로그 수익률**로 보고 exp 로 쌓으면 둘 다 사라진다. 값은 0 을 지나지
+   *   않으므로 바닥값이 필요 없고, drift 는 적힌 그대로 "한 걸음에 이만큼씩
+   *   불어난다" 는 뜻이 된다.
+   */
   const build = (start: number, beta: number, idioVol: number, drift = 0): number[] => {
     const out: number[] = new Array(n);
     let p = start;
     for (let i = 0; i < n; i += 1) {
-      const r = drift + beta * riskRet[i] + idioVol * volState[i] * g();
-      p = Math.max(p * (1 + r), 0.01);
+      p *= Math.exp(drift + beta * riskRet[i] + idioVol * volState[i] * g());
       out[i] = p;
     }
     return out;
@@ -231,11 +247,29 @@ function generate(todayKey: string): DemoWorld {
   const cyc = build(1000, 1.25, 0.0035);
   const def = build(1000, 0.62, 0.0026);
 
-  const nvda = build(210, 2.05, 0.0135, 0.0011);
-  const aapl = build(178, 1.06, 0.0072, 0.0003);
-  const msft = build(330, 1.02, 0.0068, 0.0004);
-  const amzn = build(132, 1.28, 0.0092, 0.0003);
-  const tsla = build(245, 1.72, 0.0165, 0.0001);
+  /*
+   * drift 는 "한 걸음에 이만큼씩 불어난다" 는 로그 증가율이다. 10년(거래일 2,680걸음)을
+   * 걸었을 때 값이 지금쯤 있을 법한 자리에 닿도록 잡았다. 오늘의 실제 시세를 맞춘 것이
+   * 아니라 **자릿수**를 맞춘 것이다 — DEMO 는 합성 세계이고 화면마다 그렇게 적혀 있다.
+   */
+  const nvda = build(210, 2.05, 0.0135, 0.0002800);
+  const aapl = build(178, 1.06, 0.0072, -0.0000439);
+  const msft = build(330, 1.02, 0.0068, 0.0000252);
+  const amzn = build(132, 1.28, 0.0092, 0.0003443);
+  const tsla = build(245, 1.72, 0.0165, 0.0003453);
+  // 화제가 몰리는 종목들. 시장을 얼마나 따라가는지(beta)와 혼자 튀는 폭(idioVol)을
+  // 이름마다 다르게 둔다 — 전부 같은 모양으로 움직이면 '불타는 것·얼어붙은 것'
+  // 화면이 아무것도 가려내지 못한다. 실제 회사의 실적이 아니라 성격만 흉내낸 것이다.
+  const meta = build(298, 1.32, 0.0105, 0.0003669);
+  const googl = build(128, 1.12, 0.0082, 0.0001246);
+  const avgo = build(88, 1.42, 0.0098, 0.0007272);
+  const amd = build(112, 1.78, 0.0148, 0.0001467);
+  const nflx = build(430, 1.18, 0.0125, 0.0008366);
+  const pltr = build(15, 2.15, 0.0225, 0.0013609);
+  const coin = build(82, 2.35, 0.0285, 0.0017750);
+  const mstr = build(38, 2.65, 0.0325, 0.0009951);
+  const mu = build(68, 1.55, 0.0135, 0.0016099);
+  const smci = build(24, 2.45, 0.0305, 0.0016150);
 
   // VIX: 평균회귀 + 주가 하락에 강하게 반응
   const vix: number[] = new Array(n);
@@ -262,7 +296,7 @@ function generate(todayKey: string): DemoWorld {
     const out: number[] = new Array(n);
     let p = start;
     for (let i = 0; i < n; i += 1) {
-      p = Math.max(p * (1 + drift + beta * krRisk[i] + idio * volState[i] * g()), 0.01);
+      p *= Math.exp(drift + beta * krRisk[i] + idio * volState[i] * g());
       out[i] = p;
     }
     return out;
@@ -271,11 +305,11 @@ function generate(todayKey: string): DemoWorld {
   const kospi = buildKr(2480, 1.05, 0.0035);
   const kosdaq = buildKr(820, 1.28, 0.0058);
   const kospi200 = kospi.map((x, i) => (x / 2480) * 328 * (1 + 0.00004 * Math.sin(i / 40)));
-  const samsung = buildKr(68000, 1.15, 0.0072);
-  const hynix = buildKr(118000, 1.55, 0.0115, 0.0006);
-  const hyundai = buildKr(185000, 0.92, 0.0082);
-  const naver = buildKr(205000, 1.12, 0.0105, -0.0002);
-  const kakao = buildKr(48000, 1.22, 0.0125, -0.0004);
+  const samsung = buildKr(68000, 1.15, 0.0072, 0.0007700);
+  const hynix = buildKr(118000, 1.55, 0.0115, 0.0002440);
+  const hyundai = buildKr(185000, 0.92, 0.0082, 0.0003748);
+  const naver = buildKr(205000, 1.12, 0.0105, 0.0005650);
+  const kakao = buildKr(48000, 1.22, 0.0125, 0.0002641);
 
   const vkospi: number[] = new Array(n);
   let vk = 17.5;
@@ -317,17 +351,23 @@ function generate(todayKey: string): DemoWorld {
     const out: number[] = new Array(cn);
     let p = start;
     for (let i = 0; i < cn; i += 1) {
-      p = Math.max(p * (1 + drift + beta * cRiskRet[i] + idio * cVol[i] * cg()), 0.0001);
+      p *= Math.exp(drift + beta * cRiskRet[i] + idio * cVol[i] * cg());
       out[i] = p;
     }
     return out;
   };
 
-  const btc = buildC(29500, 1, 0.006, 0.0007);
-  const eth = buildC(1850, 1.12, 0.0095, 0.0003);
-  const xrp = buildC(0.52, 1.18, 0.0165, 0.0002);
-  const sol = buildC(24, 1.45, 0.0195, 0.0016);
-  const bnb = buildC(240, 0.88, 0.0092, 0.0004);
+  const btc = buildC(29500, 1, 0.006, 0.0009629);
+  const eth = buildC(1850, 1.12, 0.0095, 0.0010502);
+  const xrp = buildC(0.52, 1.18, 0.0165, 0.0004351);
+  const sol = buildC(24, 1.45, 0.0195, 0.0016906);
+  const bnb = buildC(240, 0.88, 0.0092, 0.0008694);
+  /* 거래가 몰리는 코인들 */
+  const doge = buildC(0.062, 1.28, 0.0195, 0.0011132);
+  const ada = buildC(0.28, 1.22, 0.017, 0.0010717);
+  const trx = buildC(0.077, 0.72, 0.0115, 0.0007592);
+  const avax = buildC(12.5, 1.52, 0.0205, 0.0016813);
+  const link = buildC(6.2, 1.38, 0.0185, 0.0012270);
 
   const btcDom = ouSeries(cn, cg, { start: 49, mean: 53.5, kappa: 0.006, sigma: 0.28, min: 36, max: 66 }, (i) => -14 * cRiskRet[i]);
   const totalMcap = btc.map((b, i) => (b / btcDom[i]) * 100 * 19_500_000 * (1 + 0.02 * Math.sin(i / 90)));
@@ -504,6 +544,7 @@ function generate(todayKey: string): DemoWorld {
   const s: Record<string, number[]> = {
     spx, ndx, dji, rut, vix, vix3m, ust10, ust2, dxy, gold, wti,
     nvda, aapl, msft, amzn, tsla,
+    meta, googl, avgo, amd, nflx, pltr, coin, mstr, mu, smci,
     kospi, kosdaq, kospi200, vkospi, usdkrw, ktb3, ktb10,
     samsung, hynix, hyundai, naver, kakao,
     hyOas, pcr, marginBalance, investorDeposit, krPcr,
@@ -512,7 +553,8 @@ function generate(todayKey: string): DemoWorld {
   };
 
   const c: Record<string, number[]> = {
-    btc, eth, xrp, sol, bnb, totalMcap, totalVol, btcDom, stableMcap,
+    btc, eth, xrp, sol, bnb, doge, ada, trx, avax, link,
+    totalMcap, totalVol, btcDom, stableMcap,
     funding, openInterest, liquidations, longLiqShare, altBreadth, searchTrend,
   };
 

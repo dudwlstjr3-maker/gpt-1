@@ -30,7 +30,7 @@ export const COMPARATOR_LABEL = {
  * 스냅샷에 실제로 있는 것만 넣는다. 화면에 없는 지표를 조건으로 만들 수 있게 하면
  * 영원히 '판정 불가' 인 줄이 생긴다.
  */
-export const SOURCE_KINDS = ['fng', 'risk_count', 'risk_value'];
+export const SOURCE_KINDS = ['fng', 'risk_count', 'risk_value', 'regime'];
 
 /** 숫자면 그대로, 아니면 null. NaN·Infinity 도 null 이다. */
 export function numOrNull(v) {
@@ -76,6 +76,15 @@ function readValue(criterion, snapshot) {
     const v = numOrNull(hit.score);
     // 산출 불가(구성요소 부족)일 때 score 가 null 로 온다. 0 으로 읽으면 안 된다.
     if (v === null) return { value: null, reason: hit.unavailableReason ?? '심리 점수를 산출하지 못했습니다.' };
+    return { value: v, reason: null };
+  }
+
+  if (criterion.kind === 'regime') {
+    const board = sections.regime?.data?.board ?? null;
+    if (!board) return { value: null, reason: '국면 점수를 받지 못했습니다.' };
+    const v = numOrNull(board.score);
+    // 커버리지가 모자라면 score 가 null 로 온다. 0 으로 읽으면 "0 이하" 가 참이 된다.
+    if (v === null) return { value: null, reason: board.unavailableReason ?? '국면 점수를 산출하지 못했습니다.' };
     return { value: v, reason: null };
   }
 
@@ -130,6 +139,9 @@ export function describe(criterion, labels) {
 
   if (criterion?.kind === 'fng') {
     return `${l.market ?? criterion.market} 심리 점수가 ${shown} ${cmp}`;
+  }
+  if (criterion?.kind === 'regime') {
+    return `국면 점수가 ${shown} ${cmp}`;
   }
   if (criterion?.kind === 'risk_count') {
     return `위험 신호등에서 '${l.level ?? criterion.level}' 인 지표가 ${shown}개 ${cmp}`;

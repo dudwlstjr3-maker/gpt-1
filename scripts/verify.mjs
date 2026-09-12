@@ -6,12 +6,23 @@
  *   npm run verify
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+
+/** 폴더를 훑어 조건에 맞는 파일 경로를 모은다 (글자 크기 검사에 쓴다) */
+async function listFiles(dir, re) {
+  const out = [];
+  for (const e of await readdir(dir, { withFileTypes: true })) {
+    const full = `${dir}/${e.name}`;
+    if (e.isDirectory()) out.push(...(await listFiles(full, re)));
+    else if (re.test(e.name)) out.push(full);
+  }
+  return out;
+}
 
 const BASE = process.env.VERIFY_BASE_URL ?? 'http://localhost:3000';
 
@@ -43,7 +54,9 @@ async function getJson(path) {
  */
 async function unitTests() {
   console.log('[0] 순수 로직 단위 테스트 (node --test)');
-  const files = ['scripts/fred-calendar.test.mjs', 'scripts/criteria.test.mjs'].filter((f) => existsSync(f));
+  // 목록을 손으로 적어 두면 새 테스트를 만들고도 안 돌린 채 지나간다 (실제로 그랬다).
+  // 폴더에서 찾아 전부 태운다.
+  const files = (await listFiles('scripts', /\.test\.mjs$/)).sort();
   if (files.length === 0) {
     check('단위 테스트 파일이 있음', false, '없음');
     return;
@@ -685,12 +698,28 @@ async function main() {
     const html = await (await fetch(`${BASE}/indicators`)).text();
     check('지표 화면에 위험 신호등 보기가 있음', html.includes('위험 신호등'));
     check('지표 화면에 전체 지표 보기가 있음', html.includes('전체 지표'));
-    // 홈에서 각 시장으로 바로 들어간다
-    const home = await (await fetch(`${BASE}/`)).text();
+    /*
+     * 홈에서 각 시장으로 바로 들어간다.
+     *
+     * 홈에서는 서버가 보낸 HTML 이 아니라 원본을 본다. 심리 카드는 스냅샷을
+     * 받아 그리는 client 화면이라 서버 HTML 에는 뼈대만 있고, 링크는 붙은 뒤에
+     * 생긴다. 예전에는 좌측 사이드바가 서버에서 같은 링크를 찍어 줘서 이 검사가
+     * 통과했는데 — 사이드바를 접자 드러났다. 화면에서 길이 사라진 게 아니라
+     * 검사가 엉뚱한 곳을 보고 있었다.
+     */
+    const fngCard = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('홈의 심리 카드에서 그 시장으로 바로 들어감',
+      /href=\{`\/market\/\$\{score\.market\}`\}/.test(fngCard));
+    // 서버가 찍어 주는 화면에도 길이 남아 있어야 한다 (지수 · 더보기)
+    const idxHtml = await (await fetch(`${BASE}/indices`)).text();
+    const moreHtml = await (await fetch(`${BASE}/more`)).text();
     for (const m of ['us', 'crypto']) {
-      check(`홈에 ${m} 시장으로 가는 길이 있음`, home.includes(`/market/${m}`));
+      check(`지수·더보기에 ${m} 시장으로 가는 길이 있음`,
+        idxHtml.includes(`/market/${m}`) && moreHtml.includes(`/market/${m}`));
     }
-    check('홈에 한국 시장으로 가는 길은 없음', !home.includes('/market/kr'));
+    // 한국은 심리 점수를 낼 만큼의 무료 데이터가 없어 시장 화면이 없다 — 없는 곳으로 가는 문을 그리지 않는다
+    check('한국 시장으로 가는 길은 없음',
+      !idxHtml.includes('/market/kr') && !moreHtml.includes('/market/kr'));
   }
 
   /* ---------------- 8-2. 위험 눈금이 상한이 아님을 밝히는가 ---------------- */
@@ -780,7 +809,9 @@ async function main() {
     // 서 있어야 하고(서버가 그린 HTML 에 있어야 하고), 값은 스냅샷에 있어야 한다.
     const quotes = snap.sections?.quotes?.data ?? {};
     const all = [...(quotes.us ?? []), ...(quotes.kr ?? []), ...(quotes.crypto ?? [])];
-    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', 'KOSPI'], ['total_mcap', '전체 시가총액']]) {
+    // 한국에서 실제로 쓰는 말이 있는 지수는 한글 이름으로 세운다.
+    // 원문 기호(SPX·KOSPI 등)는 이름 아래에 그대로 남아 검색이 막히지 않는다.
+    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', '코스피'], ['total_mcap', '전체 시가총액']]) {
       check(`지수 화면에 ${id} 줄이 있음`, idx.includes(`>${name}</p>`));
       check(`${id} 값이 스냅샷에 있음`, all.some((x) => x.id === id && x.price !== null));
     }
@@ -823,10 +854,12 @@ async function main() {
 
     const basics = snap.sections?.basics?.data ?? [];
     check('생활 경제 지수가 아홉 가지', basics.length === 9, `${basics.length}개`);
-    // 이름은 API 가 내려주므로 서버가 그린 HTML 에는 없다. 데이터에서 확인한다.
-    const names = basics.map((b) => b.name);
-    for (const name of ['빅맥지수', '1인당 GDP', '엥겔계수', '지니계수']) {
-      check(`생활 경제 지수에 ${name} 있음`, names.includes(name), names.join(', ').slice(0, 60));
+    // 표시 이름이 아니라 **id** 로 확인한다. 큰 글씨는 쉬운 우리말로 바뀔 수 있고
+    // 실제로 바뀌었다 ('1인당 GDP' → '국민 한 사람 몫의 생산'). 정체는 id 다.
+    const ids9 = basics.map((b) => b.id);
+    for (const [id, was] of [['bigmac', '빅맥지수'], ['per_capita_gdp', '1인당 GDP'],
+      ['engel', '엥겔계수'], ['gini', '지니계수']]) {
+      check(`생활 경제 지수에 ${was} 있음`, ids9.includes(id), ids9.join(', ').slice(0, 60));
     }
     // 아홉 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
     // 있으면 화면에서 "그 밖의 지표" 로 밀려나므로 원본에서 확인한다.
@@ -968,7 +1001,22 @@ async function main() {
     check('알림 상자의 글리프가 눌리지 않음 (미리보기)',
       /\.notice > span:first-child\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
     check('관심목록 별표가 눌리지 않음 (미리보기)', /\.star\s*\{[^}]*flex-shrink:\s*0/.test(tpl));
-    check('종목 이름이 길면 잘림 (미리보기)', /\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
+    /*
+     * 이 검사는 두 번 뒤집혔다. 뒤집힌 자리를 적어 둔다 — 다음 사람이 같은 길을
+     * 되짚지 않도록.
+     *
+     *  ① 처음엔 "이름이 길면 잘려야 한다" 였다. 이름이 옆 칸을 밀고 들어가 글자가
+     *     겹치던 것을 막으려던 것이고, 그때는 자르는 것이 유일한 수단이었다.
+     *  ② 다음엔 "자르지 말고 접어라" 였다. '다우존스 산업평…' 은 무엇인지 알 수 없다.
+     *  ③ 지금은 "접지도 말고 한 줄로" 다. 접으면 카드마다 높이가 달라져 목록이
+     *     들쭉날쭉해진다.
+     *
+     * 자르지도 접지도 않으려면 자리가 있어야 한다. 그래서 '마감'·'15분 지연' 알약을
+     * 이름 줄에서 빼 아래 잔글씨로 내렸다. 자리가 실제로 남는지는 [8-27] 이 잰다.
+     */
+    check('종목 이름을 한 줄로 세움 (미리보기)',
+      /\.pcard-name\s*\{[^}]*white-space:\s*nowrap/.test(tpl) &&
+      !/\.pcard-name\s*\{[^}]*text-overflow:\s*ellipsis/.test(tpl));
     check('요약 문단이 배지를 밀지 않음 (미리보기)', /\.summary li > p\s*\{[^}]*min-width:\s*0/.test(tpl));
   }
 
@@ -1017,6 +1065,1777 @@ async function main() {
       board.includes('사거나 팔라는 신호가 아닙니다') && card.includes('사거나 팔라는 신호가 아닙니다'));
     check('과거 성과 표를 붙이지 않는 이유를 밝힘',
       /지난[\s\S]{0,20}결과가 다음을 보장하지 않고/.test(board));
+  }
+
+
+  /* ---------------- 8-11. 국면 전광판 ---------------- */
+  console.log('\n[8-11] 국면 전광판');
+  {
+    /*
+     * 이 화면은 내 기준보다도 선을 넘기 쉽다. "20년 만의 공포" 라는 큰 문장을
+     * 띄우고 알림까지 나가기 때문이다. 그래서 세 가지를 기계로 막는다.
+     *   ① 매수·매도라는 말이 없을 것
+     *   ② 그 말을 안 쓰는 이유(검증 결과)가 화면에 함께 있을 것
+     *   ③ "N년 만" 을 과장하지 않을 것
+     */
+    const rules = await readFile('src/lib/regimeRules.mjs', 'utf8');
+    const evidence = await readFile('src/lib/regimeEvidence.mjs', 'utf8');
+    const board = await readFile('src/components/market/RegimeBoard.tsx', 'utf8');
+    const detail = await readFile('src/components/market/RegimeDetail.tsx', 'utf8');
+    const page = await (await fetch(`${BASE}/regime`)).text();
+
+    check('전광판 화면이 있음', page.includes('>국면 전광판</h1>'));
+
+    const sec = snap.sections?.regime;
+    check('홈 스냅샷에 전광판 섹션이 있음', !!sec, sec ? `status=${sec.status}` : '없음');
+    const digest = sec?.data;
+    const bd = digest?.board;
+    check('전광판이 점수 또는 산출 불가 사유를 냄',
+      !!bd && (typeof bd.score === 'number' || typeof bd.unavailableReason === 'string'));
+
+    if (bd) {
+      check('점수가 0~100 안에 있음',
+        bd.score === null || (bd.score >= 0 && bd.score <= 100), String(bd.score));
+      check('되돌아보는 기간이 20년', bd.lookbackYears === 20, String(bd.lookbackYears));
+      check('축이 네 개', Array.isArray(bd.axes) && bd.axes.length === 4, String(bd.axes?.length));
+      check('구간에 글리프와 이름이 함께 있음',
+        bd.score === null || (!!bd.band?.glyph && !!bd.band?.label), `${bd.band?.glyph} ${bd.band?.label}`);
+      // 커버리지가 모자라면 점수를 내면 안 된다
+      check('커버리지 70% 미만이면 점수를 내지 않음',
+        bd.coverage >= 0.7 ? bd.score !== null : bd.score === null, `coverage=${Math.round((bd.coverage ?? 0) * 100)}%`);
+      // 빠진 축을 0 으로 세지 않는다 — percentile 이 null 로 와야 한다
+      const zeroed = (bd.axes ?? []).filter((a) => a.percentile === 0 && a.value === null);
+      check('결측 축을 0점으로 채우지 않음', zeroed.length === 0, zeroed.map((a) => a.id).join(', ') || '없음');
+    }
+
+    if (digest?.history?.length) {
+      const h = digest.history;
+      check('20년 곡선이 시간순으로 정렬돼 있음', h.every((p, i) => i === 0 || p.t >= h[i - 1].t));
+      check('곡선 점수도 0~100 안에 있음', h.every((p) => p.score >= 0 && p.score <= 100));
+    }
+
+    // ① 매매를 권하는 말이 없어야 한다
+    const bannedR = ['매수', '매도', '사세요', '파세요', '매매 신호', '추천합니다', '유리합니다', '지금이 기회'];
+    const stripR = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    for (const [name, src] of [['국면 로직', stripR(rules)], ['전광판', stripR(board)], ['상세 화면', stripR(detail)], ['검증 자료', stripR(evidence)]]) {
+      const hit = bannedR.filter((w) => src.includes(w));
+      check(`${name}에 매매를 권하는 말이 없음`, hit.length === 0, hit.join(', ') || '없음');
+    }
+    // 주석에는 "'매수 구간' 같은 이름은 쓰지 않는다" 는 설명이 있다. 걷어내고 본다.
+    check('구간 이름이 행동이 아니라 시장 상태를 가리킴',
+      /'극단적 공포'/.test(rules) && !/매수 구간|매도 구간|진입|청산/.test(stripR(rules)));
+
+    // ② 왜 그 말을 안 쓰는지가 화면에 있어야 한다
+    check('신호가 아니라는 말이 전광판에 있음', board.includes('사거나 팔라는 신호가 아닙니다'));
+    check('그 말을 쓰지 않는 이유가 숫자로 붙어 있음',
+      board.includes('점수가 낮았다고') && detail.includes('성립하지 않습니다'));
+    check('검증 결과로 들어가는 길이 전광판에 있음', board.includes("href=\"/regime\"") || board.includes('검증 결과 보기'));
+    check('상세 화면이 좋았던 경우와 나빴던 경우를 함께 보여 줌',
+      detail.includes('EXTREME_FEAR_EPISODES') && detail.includes('HOT_EPISODES') && detail.includes('EVIDENCE_LIMITS'));
+    check('검증에 쓴 자료의 출처를 밝힘', detail.includes('EVIDENCE_SOURCES') && evidence.includes('finance-vix'));
+    check('검증과 실서비스의 자료가 다르다는 것을 밝힘', /LIVE_VS_BACKTEST/.test(detail) && /FRED 와 Stooq/.test(evidence));
+
+    // ③ 희소성을 과장하지 않는다
+    check('과거에 그런 날이 없으면 "N년 만" 이라고 쓰지 않음',
+      rules.includes('자료가 있는 ${Math.floor(spanYears)}년 중 가장'));
+    check('남은 개월을 올림하지 않음', /Math\.floor\(months \/ 12\)/.test(rules));
+    check('1년 미만은 크게 띄우지 않음(notable)',
+      /notable:\s*months >= 12/.test(rules) && board.includes('rarity?.notable'));
+
+    // 발표가 멈춘 축을 오늘 값처럼 쓰지 않는다
+    check('오래된 값을 오늘 값으로 쓰지 않음', /MAX_STALE_DAYS/.test(rules) && /오늘 값으로 쓰지 않습니다/.test(rules));
+
+    // 알림도 같은 규칙을 따른다
+    const engine = await readFile('src/components/alerts/AlertsEngine.tsx', 'utf8');
+    check('국면 알림이 있음', engine.includes("case 'regime_rarity'"));
+    check('국면 알림은 1년 이상 만일 때만 울림', /rarity\?\.notable/.test(engine));
+    check('알림 문구도 신호가 아니라고 밝힘', engine.includes('매매 신호가 아닙니다'));
+
+    // 세 곳 규칙 — 미리보기 템플릿도 같이 갖고 있어야 한다
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기에도 전광판이 있음', tpl.includes('function regimeBlock()') && tpl.includes('function viewRegime()'));
+    check('미리보기가 검증 숫자를 손으로 베끼지 않음',
+      tpl.includes('DATA.regimeEvidence') && !/fwd12Mean:\s*-?\d/.test(tpl));
+    const buildSrc = await readFile('tools/preview/build.mjs', 'utf8');
+    check('미리보기 빌드가 원본 모듈에서 검증 결과를 읽음', buildSrc.includes("import('../../src/lib/regimeEvidence.mjs')"));
+  }
+
+
+  /* ---------------- 8-12. 그래프 조작 · 구간별 통계 ---------------- */
+  console.log('\n[8-12] 그래프 조작 · 구간별 과거 통계');
+  {
+    const cycle = await readFile('src/server/fng/cycle.ts', 'utf8');
+    const bandView = await readFile('src/components/market/BandStatsView.tsx', 'utf8');
+    const modal = await readFile('src/components/charts/ChartModal.tsx', 'utf8');
+    const inter = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const tpl2 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* 구간별 과거 통계 — 6개월 */
+    check('구간별 통계가 6개월(126거래일) 기준', /BAND_FORWARD_DAYS = 126/.test(cycle));
+    const bs = (await getJson('/api/fng/us')).body?.detail?.bandStats;
+    check('API 가 126거래일로 집계함', bs?.forwardDays === 126, String(bs?.forwardDays));
+    check('화면이 개월로도 말해 줌', bandView.includes('개월(') && bandView.includes('거래일)'));
+
+    /* 상자그림 — 평균만 그리면 구간마다 답이 정해진 것처럼 읽힌다 */
+    check('사분위수를 함께 산출함', /p25:/.test(cycle) && /p75:/.test(cycle));
+    const sample = (bs?.bands ?? []).filter((b) => b.avgForward !== null);
+    check('표본이 있는 구간에 사분위수가 옴',
+      sample.length > 0 && sample.every((b) => typeof b.p25 === 'number' && typeof b.p75 === 'number'),
+      `${sample.length}개 구간`);
+    check('사분위수가 최저~최고 안에 있음',
+      sample.every((b) => b.worst <= b.p25 && b.p25 <= b.medianForward && b.medianForward <= b.p75 && b.p75 <= b.best));
+    check('구간마다 상자그림을 그림', bandView.includes('function BoxRow') && bandView.includes('중앙값'));
+    check('모든 구간이 같은 눈금을 씀', bandView.includes('function domainOf') && bandView.includes('공통 범위'));
+    check('겹친다는 점을 읽는 법으로 적어 둠', bandView.includes('범위가 서로 얼마나 겹치는지'));
+
+    /* 크게 보기 */
+    check('그래프를 크게 보는 창이 있음', modal.includes("role=\"dialog\"") && modal.includes('aria-modal="true"'));
+    check('Esc 로 닫힘', /e\.key === 'Escape'/.test(modal));
+    check('닫으면 초점이 돌아옴', modal.includes('returnTo.current?.focus'));
+    check('열려 있는 동안 뒤 페이지가 안 밀림', modal.includes("document.body.style.overflow = 'hidden'"));
+    check('초점이 창 밖으로 새지 않음', /e\.key !== 'Tab'/.test(modal) && modal.includes('first.focus()'));
+    check('상세 차트에 크게 보기가 있음', inter.includes('expandable') && inter.includes('<ChartModal'));
+    check('큰 창 안에서 또 열리지 않음', inter.includes('expandable={false}'));
+    check('작은 그림도 눌러서 크게 볼 수 있음', trend.includes('<ExpandTrigger') && trend.includes('expandable={false}'));
+    check('큰 창에서는 계열마다 색이 다름', trend.includes('--series-3') && trend.includes('범례가 일을 한다'));
+
+    // 이 화면들은 자료를 클라이언트에서 받아 그리므로 서버가 그린 HTML 에는 뼈대만 있다.
+    // 그래서 화면 자체가 아니라 그 화면이 쓰는 컴포넌트에서 확인한다.
+    const regimeBoard = await readFile('src/components/market/RegimeBoard.tsx', 'utf8');
+    const regimeDetail = await readFile('src/components/market/RegimeDetail.tsx', 'utf8');
+    check('국면 홈 카드의 곡선을 눌러 크게 볼 수 있음', regimeBoard.includes('<ExpandTrigger'));
+    /*
+     * 국면 상세에는 곡선이 하나뿐이어야 한다.
+     *
+     * 예전에는 regimeBody 의 곡선을 감춰 놓고(compact) 바로 아래에 같은 20년
+     * 곡선을 크게 한 번 더 그렸다 — 한 화면에 같은 그림이 두 번이었다.
+     * 이제 감추지 않고 그 하나만 쓴다. 눌러서 크게 보는 길은 그대로다.
+     */
+    check('국면 상세가 곡선을 한 번만 그림',
+      !regimeDetail.includes('<InteractiveChart') && /<RegimeBoardBody digest=\{digest\} \/>/.test(regimeDetail));
+    check('그 곡선도 눌러 크게 볼 수 있음', regimeBoard.includes('<ExpandTrigger'));
+    for (const page of ['/basics', '/regime']) {
+      const res = await fetch(`${BASE}${page}`);
+      check(`${page} 응답 200`, res.status === 200, `status=${res.status}`);
+    }
+
+    /* 지연·실시간 배지는 카드에서 제일 작은 글씨 */
+    const badge = await readFile('src/components/ui/Badge.tsx', 'utf8');
+    check('지연·실시간이 가장 작은 크기', /size = '2xs'/.test(badge) && /text-\[10\.5px\]/.test(badge));
+    check("'오래된 데이터' 는 한 단계 크게 둠", badge.includes("size === '2xs' ? 'xs' : size"));
+
+    /* 지수 이름 — 한국에서 쓰는 말이 있으면 한글로 */
+    const cat = await readFile('src/lib/catalog.ts', 'utf8');
+    for (const [id, ko] of [['kospi', '코스피'], ['kosdaq', '코스닥'], ['ndx', '나스닥 종합'], ['usdkrw', '원/달러 환율']]) {
+      check(`${id} 이름이 한글`, new RegExp(`id: '${id}', name: '${ko}'`).test(cat));
+    }
+    // 고유명사까지 억지로 옮기지는 않는다 — 옮기면 오히려 못 알아본다
+    check('S&P 500 은 그대로 둠', /id: 'spx', name: 'S&P 500'/.test(cat));
+    check('원문 기호가 남아 검색이 막히지 않음', /id: 'kospi',[^\n]*symbol: 'KOSPI'/.test(cat));
+
+    /* 신호등 개수를 문서에 숫자로 박지 않는다 */
+    const risk = await readFile('src/server/risk.ts', 'utf8');
+    const defined = (risk.match(/^    id: '/gm) ?? []).length;
+    const shown = snap.sections?.risk?.data?.indicators?.length ?? 0;
+    check('정의한 위험 지표 수와 화면에 뜬 수가 같음', defined === shown, `정의 ${defined} / 화면 ${shown}`);
+    check('개수를 코드에 숫자로 박아 두지 않음', !/게이지 7개|RISK_SEVEN|일곱 개만/.test(risk));
+    check('왜 여섯 개인지 적어 둠', risk.includes('VKOSPI') && risk.includes('지금은 여섯 개'));
+
+    /* 미리보기도 같은 것을 갖고 있어야 한다 */
+    check('미리보기에 상자그림이 있음', tpl2.includes('function bandBox') && tpl2.includes('function bandAxis'));
+    check('미리보기에 큰 창이 있음', tpl2.includes('function openZoom') && tpl2.includes('cmodal'));
+    check('미리보기 큰 창도 Esc 로 닫힘', /Escape' && document\.querySelector\('\.cmodal-back'\)/.test(tpl2));
+    // 국면 곡선은 regimeBody 안의 하나뿐이다 — 그 아래에 같은 것을 또 그리지 않는다
+    check('미리보기 국면 상세도 곡선을 한 번만 그림',
+      !tpl2.includes("lineChart([{ id: 'regime'") && /\? regimeBody\(digest, false\) \+/.test(tpl2));
+    check('미리보기 배지도 작게', tpl2.includes("size === '2xs'"));
+  }
+
+
+  /* ---------------- 8-13. LIVE 로 켜지는 조건 ---------------- */
+  console.log('\n[8-13] LIVE 로 켜지는 조건');
+  {
+    /*
+     * 여기서 잡으려는 것은 딱 하나다 — **켜지지 않는 이유가 거짓말이 아닐 것.**
+     *
+     * 예전에는 키 네 개(US·KR·CRYPTO·MACRO)를 다 요구했는데 코드가 실제로 읽는 건
+     * MACRO 하나뿐이었다. 그래서 FRED 무료 키를 제대로 넣어도 DEMO 에 머물렀고,
+     * 쓰지도 않는 변수 세 개에 아무 값이나 채워야 켜졌다.
+     * 필수 키 목록과 코드가 읽는 키가 어긋나면 여기서 걸린다.
+     */
+    const cfg = await readFile('src/server/config.ts', 'utf8');
+    const liveSrc = await Promise.all(
+      ['index.ts', 'crypto.ts', 'macro.ts', 'basics.ts', 'equities.ts'].map((f) =>
+        readFile(`src/server/adapters/live/${f}`, 'utf8').catch(() => '')),
+    );
+    const live = liveSrc.join('\n');
+
+    const required = [...(cfg.match(/REQUIRED_KEYS = \[([^\]]*)\]/)?.[1] ?? '').matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+    check('필수 키를 한곳에 모아 둠', required.length > 0, required.join(', ') || '없음');
+
+    // getKeys() 의 어떤 항목을 LIVE 어댑터가 실제로 읽는가
+    const readByCode = new Set();
+    for (const m of live.matchAll(/getKeys\(\)\.(\w+)/g)) readByCode.add(m[1]);
+    const ENV_OF = { usMarket: 'US_MARKET_API_KEY', krMarket: 'KR_MARKET_API_KEY', crypto: 'CRYPTO_API_KEY', macro: 'MACRO_API_KEY' };
+
+    // 코드가 없으면 못 도는 키(= 없으면 에러를 던지는 키)만 필수여야 한다
+    check('필수 키는 코드가 실제로 읽는 것뿐',
+      required.every((k) => [...readByCode].some((r) => ENV_OF[r] === k)),
+      `필수 ${required.join(',')} / 코드가 읽는 것 ${[...readByCode].map((r) => ENV_OF[r]).join(',')}`);
+
+    // 코드가 안 읽는 키를 요구하면 켜지지 않는 이유가 거짓이 된다
+    const unused = Object.values(ENV_OF).filter((e) => ![...readByCode].some((r) => ENV_OF[r] === e));
+    check('코드가 안 읽는 키를 필수로 요구하지 않음',
+      unused.every((e) => !required.includes(e)),
+      `안 읽는 키: ${unused.join(', ') || '없음'}`);
+
+    check('없어도 되는 키는 따로 두고 이유를 적음', /OPTIONAL_KEYS/.test(cfg) && /why:/.test(cfg));
+    check('DEMO 로 떨어질 때 어떻게 켜는지 알려 줌', /fred\.stlouisfed\.org\/docs\/api\/api_key/.test(cfg));
+
+    // 제공사 주소는 전부 갈아 끼울 수 있어야 대역 서버·사내 미러를 붙일 수 있다
+    const eq = await readFile('src/server/adapters/live/equities.ts', 'utf8');
+    check('Cboe 주소도 환경변수로 바꿀 수 있음', /envUrl\('CBOE_CSV_URL'\)/.test(eq));
+    const envExample = await readFile('.env.example', 'utf8');
+    for (const v of ['MACRO_BASE_URL', 'US_MARKET_BASE_URL', 'CRYPTO_BASE_URL', 'CBOE_CSV_URL']) {
+      check(`.env.example 에 ${v} 가 있음`, envExample.includes(v));
+    }
+
+    /* 산출 못 한 것을 정상이라고 말하지 않는가 */
+    const snapSrc = await readFile('src/server/snapshot.ts', 'utf8');
+    check('점수가 하나도 없으면 심리 섹션을 비었다고 표시',
+      /d\.every\(\(f\) => f\.score === null\)/.test(snapSrc));
+    const sumSrc = await readFile('src/server/summary.ts', 'utf8');
+    check('근거 줄만 남으면 요약도 근거 부족으로 표시',
+      /shown\.every\(\(l\) => l\.kind === 'insufficient'\)/.test(sumSrc));
+
+    /* LIVE 파싱을 키 없이 확인할 길이 있는가 */
+    check('LIVE 파싱 점검 스크립트가 있음', existsSync('scripts/check-parse.mjs') && existsSync('scripts/live-stub.mjs'));
+    const stub = await readFile('scripts/live-stub.mjs', 'utf8');
+    check('대역 서버가 제공사가 아니라고 밝힘', /제공사가 아니다/.test(stub) && /전부 가짜/.test(stub));
+    const parse = await readFile('scripts/check-parse.mjs', 'utf8');
+    check('무엇을 확인 못 하는지도 밝힘', /확인하지 못한다/.test(parse) && /check:live/.test(parse));
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    check('npm 스크립트로 돌릴 수 있음', !!pkg.scripts['check:parse'] && !!pkg.scripts['live:stub']);
+
+    /* 무료 소스 커버리지를 실제 값으로 적어 두었는가 */
+    const readme = await readFile('README.md', 'utf8');
+    check('무료 소스 커버리지를 실제 측정값으로 적음',
+      readme.includes('**71%**') && readme.includes('**63%**') && readme.includes('실제로 돌려서 잰 값'));
+    check('크립토가 문턱을 못 넘는다는 사실을 숨기지 않음',
+      /크립토 \| \*\*63%\*\* \| ❌ 산출 불가/.test(readme));
+  }
+
+
+  /* ---------------- 8-14. 화면 이동 ---------------- */
+  console.log('\n[8-14] 화면 이동 — 부드러운가, 길을 잃지 않는가');
+  {
+    /*
+     * 사용자가 실제로 겪은 문제 두 가지를 여기서 막는다.
+     *  ① "눌렀을 때 너무 빨리 넘어가서 가독성이 떨어진다"
+     *     → 전환 효과가 아예 없었다. innerHTML 즉시 교체 + scrollTo instant.
+     *  ② "이쪽 저쪽 페이지를 옮겨다녀서 뭐가 뭔지 모르겠다"
+     *     → 홈 하나에 나가는 링크가 서른 개인데, 상세 화면 여섯 곳에 돌아갈 길이 없었다.
+     */
+    const shell = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const backBar = await readFile('src/components/nav/BackBar.tsx', 'utf8');
+    const tiles = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    const tpl3 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 전환 */
+    check('화면이 바뀔 때 전환 효과가 있음', /view-enter/.test(shell) && /@keyframes view-enter/.test(css));
+    check('경로가 바뀔 때만 재생됨(값 갱신에는 안 돌음)', /key=\{pathname\}/.test(shell));
+    check('축소 모션이면 전환을 생략함', /prefers-reduced-motion/.test(css) && /animation-duration: 0\.001ms/.test(css));
+    // 너무 길면 기다리는 느낌이 든다. 200~320ms 사이로 묶어 둔다.
+    const dur = Number(css.match(/animation: view-enter (\d+)ms/)?.[1] ?? 0);
+    check('전환 길이가 200~320ms', dur >= 200 && dur <= 320, `${dur}ms`);
+
+    /* ② 돌아갈 길 */
+    check('돌아갈 길 컴포넌트가 있음', backBar.includes('export function BackBar'));
+    check('앱 안에서 왔으면 눌렀던 자리로 보냄', /router\.back\(\)/.test(backBar));
+    check('주소를 직접 열었으면 앱 밖으로 안 나감', /router\.push\(fallback\)/.test(backBar));
+    // 주석에는 "history.length 로 짐작하지 않는다" 는 설명이 있다. 걷어내고 본다.
+    const stripB = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    check('history.length 로 짐작하지 않음', !/history\.length/.test(stripB(backBar)));
+    for (const page of ['regime', 'criteria', 'indices', 'basics', 'indicators', 'calendar']) {
+      const src = await readFile(`src/app/${page}/page.tsx`, 'utf8');
+      check(`/${page} 에 돌아갈 길이 있음`, src.includes('<BackBar'));
+    }
+
+    /* ③ 그 자리에서 해결 */
+    check('신호등 타일이 다른 화면으로 나가지 않음',
+      /aria-expanded=\{open\}/.test(tiles) && !/<Link\s+href="\/indicators"\s+className="card/.test(tiles));
+    check('타일이 그 자리에서 해설을 펼침', tiles.includes('guideFor(indicator.id)') && tiles.includes('무슨 뜻인가요'));
+    check('펼친 뒤에도 더 볼 길은 남겨 둠', tiles.includes('구간 기준과 다른 지표 보기'));
+    check('펼침 상태를 스크린리더에 알림', /aria-controls=/.test(tiles) && /aria-expanded/.test(tiles));
+
+    /* 미리보기도 같은 것을 갖고 있어야 한다 */
+    check('미리보기에도 전환 효과가 있음', /@keyframes view-enter/.test(tpl3) && /classList\.add\('view-enter'\)/.test(tpl3));
+    check('미리보기도 같은 화면 안에서는 재생하지 않음', /const moved = state\.view !== lastView/.test(tpl3));
+    check('미리보기에도 돌아갈 길이 있음', /function backBar\(\)/.test(tpl3) && /data-back/.test(tpl3));
+    check('미리보기 홈에는 돌아갈 길을 붙이지 않음', /TAB_VIEWS\.indexOf\(state\.view\) < 0/.test(tpl3));
+    check('미리보기 타일도 그 자리에서 펼침', /data-tile=/.test(tpl3) && /state\.openTile/.test(tpl3));
+  }
+
+  /* ---------------- 8-15. 생활 경제 지수의 폭과 길이 ---------------- */
+  console.log('\n[8-15] 생활 경제 지수 — 쓸데없이 길고 넓지 않은가');
+  {
+    /*
+     * 사용자가 짚은 문제: "경제 생활지수가 저렇게 길게 표시될 필요가 있나?
+     * 폭이 너무 긴 거 같은데 쓸데없이."
+     *
+     * 재 보니 넓은 화면에서 카드 한 장이 952px 을 차지하면서 그 안의 글자는
+     * 350자뿐이었고, 아홉 장이 한 줄로 서서 세로로 4,727px 을 굴러야 했다.
+     * 줄이되 **내용을 지워서 줄이지는 않는다** — 아래 마지막 묶음이 그것을 지킨다.
+     */
+    const board = await readFile('src/components/market/BasicsBoard.tsx', 'utf8');
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const tpl4 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 폭 — 넓은 화면에서는 두 칸 */
+    // 칸이 넓어지면 두 칸. 화면 폭이 아니라 **본문 칸**의 폭을 본다 ([8-28] 참고)
+    check('생활 카드가 칸이 넓어지면 두 칸으로 섬', /grid gap-[\d.]+ @min-\[768px\]:grid-cols-2/.test(board));
+    check('한 줄 세로 나열이 남아 있지 않음', !/<ul className="space-y-2\.5">/.test(board));
+    // 세 칸이면 카드가 310px 밑으로 내려가 이름과 값이 한 줄에 못 선다.
+    check('세 칸까지 쪼개지는 않음', !/grid-cols-3/.test(board));
+
+    /* ② 길이 — 이름과 값이 같은 줄 */
+    check('이름과 값이 같은 줄에 있음', /text-\[22px\] leading-none font-bold/.test(board));
+    check('값만 있는 줄을 따로 두지 않음', !/sm:flex sm:items-start sm:gap-3/.test(board));
+
+    /* ③ 그림 — 카드 폭을 따라가되 무한정 커지지 않음 */
+    check('그림이 카드 폭을 따라 늘어남', /className="h-auto w-full"/.test(trend));
+    check('그림 폭에 상한이 있음', /max-w-\[430px\]/.test(trend));
+
+    /* ④ 미리보기도 같은 모양 */
+    check('미리보기도 두 칸 격자를 씀', /\.bgrid \{ display: grid/.test(tpl4));
+    check('미리보기 두 칸 기준이 앱과 같음(768px)', /@container app \(min-width: 768px\) \{ \.bgrid/.test(tpl4));
+    /*
+     * 옛 좌우 배치(.btrend)가 되살아나지 않았는가.
+     *
+     * 예전에는 글자와 그림을 좌우로 나눠 놓았는데, 넓은 화면에서 카드가 952px 을
+     * 차지하면서 세로로 4,727px 을 굴러야 했다. 그 배치의 클래스 이름이 btrend 였다.
+     *
+     * 검사는 'btrend' 라는 글자가 보이면 실패하게 되어 있었는데, 뒤에 작은 그림의
+     * 휠 확대를 붙이면서 data-btrend 표식이 생겨 애먼 데서 걸렸다. 막으려는 것은
+     * 이름이 아니라 **그 배치**라, 이제 같은 이름의 CSS 규칙이 있는지만 본다.
+     */
+    check('미리보기에서 옛 좌우 배치가 사라짐', !/\.btrend\s*\{/.test(tpl4));
+    check('미리보기 그림도 폭을 따라가고 상한이 있음',
+      /style="width:100%;height:auto"/.test(tpl4) && /max-width:430px/.test(tpl4));
+    check('미리보기도 값을 이름 줄 오른쪽에 둠', /font-size:22px;line-height:1;font-weight:700/.test(tpl4));
+
+    /* ⑤ 줄이면서 내용을 지우지는 않았다 */
+    for (const [what, needle] of [
+      ['해설 문장', 'item.reading'],
+      ['나라별 비교표', '<Comparisons items={item.comparisons}'],
+      ['접힌 설명', '<GuidePanel id={item.id}'],
+      ['출처 줄', 'item.meta.sources[0]?.name'],
+      ['공식/비공식 표시', "item.official ? '공식 통계' : '비공식 개념'"],
+    ]) {
+      check(`줄이면서 ${what}을 지우지 않음`, board.includes(needle));
+    }
+  }
+
+  /* ---------------- 8-16. 홈 아래 탭을 눌러도 화면이 안 움직이는가 ---------------- */
+  console.log('\n[8-16] 홈 아래 탭 — 눌러도 화면이 그대로인가');
+  {
+    /*
+     * 사용자가 짚은 문제: "맨 아래 일정~기준까지 눌렀을 때 화면 변하게 하지 말고
+     * 일정하게 유지되게 만들어."
+     *
+     * 재 보니 탭마다 본문이 192~780px 로 벌어졌다. 짧은 탭으로 옮기면 문서가
+     * 그만큼 짧아지고, 브라우저가 스크롤을 끝으로 당기면서 탭 줄이 화면에서
+     * 최대 247px 미끄러졌다. 방금 누른 자리에 다른 것이 와 있었다.
+     */
+    const lower = await readFile('src/components/market/HomeLower.tsx', 'utf8');
+    const tpl5 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 문서 길이를 지킨다 */
+    check('탭 본문 높이를 재고 있음', /new ResizeObserver/.test(lower) && /bodyRef/.test(lower));
+    check('지금까지 본 것 중 가장 긴 높이를 기억함', /r\.height > prev \? r\.height : prev/.test(lower));
+    check('폭이 바뀌면 최댓값을 다시 잡음', /Math\.abs\(r\.width - widthRef\.current\) > 1/.test(lower));
+
+    /* ② 남는 자리는 본문 밑이 아니라 문서 맨 끝에 — 안 그러면 고지문 위가 한 화면 빈다 */
+    check('남는 자리를 문서 맨 끝에 붙임', /createPortal\(/.test(lower) && /getElementById\('main'\)/.test(lower));
+    check('본문 상자에 min-height 를 걸지 않음(구멍 방지)', !/minHeight/.test(lower));
+    check('탭마다 다른 위 여백이 새지 않게 막음', /className="flow-root"/.test(lower));
+    check('채우는 칸은 스크린리더가 읽지 않음', /aria-hidden="true" style=\{\{ height: gap \}\}/.test(lower));
+
+    /* ③ 미리보기도 같은 규칙 */
+    check('미리보기에도 꼬리 칸이 있음', /id="tailgap"/.test(tpl5));
+    check('미리보기 꼬리 칸이 고지문 뒤에 있음',
+      tpl5.indexOf('</footer>') < tpl5.indexOf('id="tailgap"'));
+    check('미리보기도 가장 긴 본문만큼만 채움', /function holdHomeLower\(\)/.test(tpl5) && /lowerFloor - r\.height/.test(tpl5));
+    check('미리보기는 같은 화면 다시 그릴 때 보던 자리를 지킴',
+      /const keepScroll = moved \? null : window\.scrollY/.test(tpl5));
+  }
+
+  /* ---------------- 8-17. 차트 위에 올렸을 때만 값이 뜨는가 ---------------- */
+  console.log('\n[8-17] 차트 커서 — 그림 위에 올렸을 때만, 표식은 표식대로');
+  {
+    /*
+     * 사용자가 짚은 문제: "점수 추이에 마우스 올리면 어느 곳이든 나오는데
+     * 그래프나 선에 올려뒀을 때만 나오게 해라. 1~7번까지의 선이 있는데
+     * 그걸 무시하고 정보가 나온다."
+     *
+     * 재 보니 x 만 보고 크로스헤어를 세우고 있었다. 왼쪽 축 글씨 위, 오른쪽 축
+     * 글씨 위, 번호 배지가 앉는 위쪽 띠, 아래 연도 글씨 띠 — 찔러 본 자리 여섯 곳이
+     * 전부 값을 띄웠다. 번호 붙은 세로 점선 위에 올려도 그 사건은 말해 주지 않고
+     * 그냥 그날 점수만 떴다.
+     */
+    const chart = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const vpHook = await readFile('src/components/charts/useChartViewport.ts', 'utf8');
+    const tpl6 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 그림 밖에서는 안 뜬다 */
+    check('포인터가 어디 있는지 가려냄', /function hitAt|const hitAt = useCallback/.test(chart));
+    check('가로만이 아니라 세로도 봄', /py < y0 \|\| py > y1/.test(chart));
+    check('마우스가 그 판정을 거침', /moveCursor\(e\.nativeEvent\.offsetX, e\.nativeEvent\.offsetY\)/.test(chart));
+    check('짚기(터치)도 같은 판정을 거침', /tapRef\.current = moveCursor/.test(chart));
+    check('짚기가 세로 위치를 넘겨받음', /onTap\?: \(localX: number, localY: number\) => void/.test(vpHook));
+
+    /* ② 표식은 표식대로 */
+    check('표식 위를 따로 잡음', /MARKER_SNAP/.test(chart));
+    check('번호 배지 띠까지 표식으로 침', /py >= y0 - MARKER_TOP/.test(chart));
+    check('표식 위에서는 그 날짜에 딱 섬', /setCursorT\(hit\.t\)/.test(chart));
+    check('툴팁이 사건 이름부터 알려 줌', /cursorMarker\.label/.test(chart));
+    check('읽어 주는 문장에도 사건이 들어감', /cursorMarker\.index\}번 \$\{cursorMarker\.label/.test(chart));
+    check('올려 둔 표식 선을 굵게 함', /cursorMarker\?\.id === m\.id/.test(chart));
+
+    /* ③ 미리보기도 같은 규칙 */
+    check('미리보기도 포인터 자리를 가려냄', /function chartHit\(c, px, py\)/.test(tpl6));
+    check('미리보기도 세로를 봄', /py < y0 \|\| py > y1/.test(tpl6));
+    check('미리보기 커서가 세로를 받음', /function chartCursor\(id, px, py\)/.test(tpl6));
+    check('미리보기 마우스·터치·짚기가 모두 세로를 넘김',
+      (tpl6.match(/chartCursor\([^)]*,[^,)]*,[^,)]*\)/g) ?? []).length >= 4);
+    check('미리보기 툴팁에도 사건 줄이 있음', /tt-mark/.test(tpl6) && /onMark\.label/.test(tpl6));
+  }
+
+  /* ---------------- 8-18. 읽을 수 있는 크기인가 · 누를 수 있는 크기인가 ---------------- */
+  console.log('\n[8-18] 가독성 — 글자 크기와 누를 자리');
+  {
+    /*
+     * 최종 검토에서 잰 것.
+     *   화면 열한 곳의 글자를 전부 세어 보니 11px 미만이 40.2% 였고, 제일 흔한
+     *   크기가 10px(전체의 30%)였다. 라벨만 작은 게 아니라 134자짜리 설명 문장이
+     *   10px 이었다. 한글은 같은 크기에서 라틴 문자보다 획이 빽빽해 더 안 읽힌다.
+     *   법적 고지문("투자 조언이 아닙니다")조차 화면에서 제일 작은 글씨였다.
+     *
+     * 그래서 아래쪽 눈금만 올렸다 (13.5px 이상 제목은 그대로).
+     *   8·9·9.5 → 10.5   10·10.5 → 11.5   11·11.5 → 12.5   12·12.5·13 → 13
+     *   결과: 11px 미만 40.2% → 2.9% (남은 것은 배지뿐), 최소 10.5px.
+     */
+    const SRC_SIZES = [];
+    for (const f of await listFiles('src', /\.tsx?$/)) {
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) SRC_SIZES.push({ f, v: Number(m[1]) });
+    }
+    const tooSmall = SRC_SIZES.filter((x) => x.v < 10.5);
+    check(
+      '앱에 10.5px 보다 작은 글씨가 없음',
+      tooSmall.length === 0,
+      tooSmall.length ? `${tooSmall.length}곳 (예: ${tooSmall[0].f} ${tooSmall[0].v}px)` : `${SRC_SIZES.length}곳 검사`,
+    );
+    const tpl7 = await readFile('tools/preview/template.html', 'utf8');
+    const tplSmall = [...tpl7.matchAll(/font-size: ?(\d+(?:\.\d+)?)px/g)].map((m) => Number(m[1])).filter((v) => v < 10.5);
+    check('미리보기도 10.5px 아래가 없음', tplSmall.length === 0, tplSmall.length ? `${tplSmall.length}곳` : '');
+    // 본문용 크기가 실제로 쓰이는지 — 눈금만 정의하고 안 쓰면 의미가 없다
+    check('본문이 11.5px 이상에 놓임', SRC_SIZES.filter((x) => x.v >= 11.5).length > SRC_SIZES.length * 0.7);
+
+    /*
+     * 누를 자리는 적어도 24×24 (WCAG 2.2 AA 2.5.8 Target Size).
+     *
+     * 재 보니 네 화면에서 스무 곳 넘게 모자랐다. 글자만 있는 단추·링크는 글자
+     * 높이가 그대로 누를 자리가 되어서다 — 11.5px 글자면 17px, 12.5px 면 19px.
+     * 보이는 크기는 그대로 두고 세로로만 24px 을 보장하는 .tap 을 붙였다.
+     *
+     * 별표(★)는 여기 해당하지 않는다. ::after 로 32×44 를 따로 잡아 두었다.
+     */
+    check('누를 자리를 24px 로 보장하는 길이 있음',
+      /\.tap \{[\s\S]{0,120}min-height: 24px/.test(await readFile('src/app/globals.css', 'utf8')));
+    const tapUsers = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (/className="tap |className="tap"/.test(t)) tapUsers.push(f.split('/').pop());
+    }
+    check('작은 글자 단추들이 그것을 씀', tapUsers.length >= 10, `${tapUsers.length}곳`);
+    check('미리보기도 같은 규칙', /\.linkbtn \{[^}]*min-height: 24px/.test(await readFile('tools/preview/template.html', 'utf8')));
+
+    /* 손가락으로 누를 자리 */
+    const price = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    /*
+     * 별표를 누를 자리는 32×44 여야 한다.
+     *
+     * 숫자를 그대로 맞춰 보지 않고 계산한다. 예전에는 leading-none(16px 상자)에
+     * 위아래 14px 을 넓혀 44px 을 만들었는데, 이름과 위쪽을 맞추려고 줄 높이를
+     * leading-snug(22px 상자)로 바꾸면서 11px 이 됐다. 둘 다 44px 이다 —
+     * 적힌 숫자가 아니라 나오는 크기를 봐야 이런 바꿈에 걸려 넘어지지 않는다.
+     */
+    const LEADING = { 'leading-none': 1, 'leading-tight': 1.25, 'leading-snug': 1.375, 'leading-normal': 1.5 };
+    const starM = price.match(/className="relative shrink-0 text-base (leading-[a-z]+) after:absolute after:-inset-x-(\d+) after:-inset-y-\[(\d+(?:\.\d+)?)px\]/);
+    const starTap = starM
+      ? { w: 16 + 2 * Number(starM[2]) * 4, h: 16 * (LEADING[starM[1]] ?? 1) + 2 * Number(starM[3]) }
+      : { w: 0, h: 0 };
+    check('관심 별표를 손가락으로 누를 수 있음(16px 글리프에 32×44 자리)',
+      starTap.w >= 32 && starTap.h >= 44 && /after:content-\[''\]/.test(price),
+      `${starTap.w}×${Math.round(starTap.h)}`);
+    // 넓힌 가로(8px)가 옆 칸 간격(gap-2 = 8px)과 같아야 이름 링크를 덮지 않는다
+    check('넓힌 자리가 이름 링크를 덮지 않음',
+      /items-start gap-2">/.test(price) && /after:-inset-x-2/.test(price));
+    const tplStar = tpl7.match(/\.star \{[^}]*line-height: ([\d.]+)[^}]*\}[\s\S]{0,120}?\.star::after \{[^}]*inset: -([\d.]+)px -(\d+)px/);
+    const tplTap = tplStar
+      ? { w: 16 + 2 * Number(tplStar[3]), h: 16 * Number(tplStar[1]) + 2 * Number(tplStar[2]) }
+      : { w: 0, h: 0 };
+    check('미리보기 별표도 같은 자리', tplTap.w >= 32 && tplTap.h >= 44, `${tplTap.w}×${Math.round(tplTap.h)}`);
+    for (const f of ['src/app/watchlist/page.tsx', 'src/app/more/page.tsx']) {
+      const t = await readFile(f, 'utf8');
+      check(`${f.split('/')[2]} 의 순서·삭제 버튼이 40px`, !/h-7 w-7/.test(t) && /h-10 w-10/.test(t));
+    }
+
+    /* 첫 숫자까지 가는 길 — 안내를 지우지 않고 접었는가 */
+    const guide = await readFile('src/components/ui/ReadingGuide.tsx', 'utf8');
+    const board = await readFile('src/components/market/RiskBoard.tsx', 'utf8');
+    check('읽는 법을 접어 두는 상자가 있음', /export function ReadingGuide/.test(guide));
+    check('접혀 있어도 한 줄은 남음', /lead/.test(guide) && /aria-expanded=\{open\}/.test(guide));
+    check('지표 화면이 그걸 씀', /<ReadingGuide/.test(board));
+    // 접었다고 문장을 지우면 안 된다 — 셋 다 그대로 있어야 한다
+    for (const [what, needle] of [
+      ['구성요소가 아니라는 설명', '투자심리 점수의 구성요소가 아닙니다'],
+      ['구간 기준 출처', '구간 기준은 이 앱이 정한 값이며 공식 기준이 아닙니다'],
+      ['색 범례', '<SignalLegend'],
+    ]) {
+      check(`접으면서 ${what}을 지우지 않음`, board.includes(needle));
+    }
+    check('미리보기도 접어 두고 같은 문장을 갖고 있음',
+      /data-rguide=/.test(tpl7) && tpl7.includes('구간 기준은 이 앱이 정한 값이며'));
+
+    /*
+     * 320px 에서 페이지가 통째로 옆으로 밀리던 것.
+     * 더보기 화면의 '모드 사유' 줄이 원인이었다 — dt 는 shrink-0 인데 dd 에
+     * min-w-0 이 없어서 flex 자식이 내용보다 좁아지지 못했다. 글자를 키우기 전에도
+     * 25px 밀려 있었고, 키우고 나서 51px 이 됐다. 화면 열두 곳을 320px 로 재서
+     * 지금은 전부 0px 이다. 가로 스크롤은 어떤 화면에서도 생기면 안 된다.
+     */
+    const more = await readFile('src/app/more/page.tsx', 'utf8');
+    check('좁아질 수 있는 칸으로 두어 가로 스크롤을 막음',
+      /min-w-0 text-right break-words/.test(more) && /tnum min-w-0 text-right/.test(more));
+  }
+
+  /* ---------------- 8-19. 값이 나빠져도 틀이 흔들리지 않는가 ---------------- */
+  console.log('\n[8-19] 데이터가 나빠질 때 화면이 흔들리지 않는가');
+  {
+    /*
+     * 사용자가 짚은 문제: "정상 / 부분 실패 사이를 오갈 때 미국 투자심리가
+     * 위아래로 흔들린다. 안 흔들리게 틀을 딱 잡아라."
+     *
+     * 재 보니 화면 열한 곳이 전부 밀리고 있었다. 원인은 하나였다 —
+     * **값이 나빠질 때만 나타나는 요소들**. 나타나는 순간 그 줄이 두 줄이 되거나
+     * 블록이 통째로 생기고 사라져서, 30초마다 갱신되는 화면이 읽는 사람 손 밑에서
+     * 움직였다.
+     *
+     *   상태바 배지가 늘어 줄바꿈       → 모든 화면 +23px (sticky 머리말이라 전부)
+     *   새로고침 단추가 눌려 두 줄      → 머리말 31px → 50px (미리보기)
+     *   세션 칩 뼈대가 진짜보다 5px 작음 → 값이 들어오는 순간 +5px
+     *   신뢰도 배지가 새로 생김         → 심리 카드 362px → 409px
+     *   산출·충족률 줄이 새로 생김      → 카드 바닥 +19px
+     *   결측 사유 줄이 생김             → 구성요소 줄 63px → 84px
+     *   그림 블록이 통째로 사라짐        → 생활 카드 517px → 377px
+     *   시세 값·거래량 줄이 사라짐       → 시세 카드 135px → 106px
+     *
+     * 규칙 하나로 고쳤다 — **자리는 고정하고 말만 바꾼다.**
+     * 지금은 정상 → 부분 실패에서 열한 화면 중 열 곳이 0px, 한 곳이 1px 이다.
+     */
+    const card = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    const bar = await readFile('src/components/market/StatusBar.tsx', 'utf8');
+    const trend2 = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    const price2 = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    const fngPage = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const tpl8 = await readFile('tools/preview/template.html', 'utf8');
+    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+
+    /* ① 심리 카드 — 배지와 바닥 줄을 늘 그린다 */
+    check('신뢰도 배지를 늘 그림', !/confidence !== 'high' \?/.test(strip(card)));
+    check('신뢰도는 색으로만 구분함', /confidence === 'low' \? 'warn' : 'neutral'/.test(card));
+    check('산출·충족률 줄을 늘 그림', !/coverage < 0\.999 \? \(/.test(strip(card)));
+    check('충족률이 모자라면 색으로 표시함', /coverage < 0\.999 \? 'var\(--warn\)'/.test(card));
+
+    /* ② 상태바 — sticky 라서 여기가 자라면 전 화면이 밀린다 */
+    check('상태 줄이 줄바꿈하지 않음', /flex-nowrap/.test(bar) && !/flex-wrap items-center gap-x-2/.test(bar));
+    check('시계가 눌리지 않음', /tnum shrink-0 text-sm/.test(bar));
+    check('시나리오 배지를 가로로 밀리는 줄로 내림',
+      bar.indexOf('scroll-x mt-2') < bar.indexOf('시나리오: {snapshot.scenario}'));
+    check('세션 칩 뼈대가 진짜 칩과 같은 높이', /h-\[29px\] w-24 shrink-0 skeleton/.test(bar));
+    check('미리보기 상태 줄도 한 줄로 못박음', /\.sb-badges \{ display: flex; flex-wrap: nowrap/.test(tpl8));
+    check('미리보기 새로고침 단추가 눌리지 않음', /\.sb-row > \.ghost \{ flex-shrink: 0; white-space: nowrap; \}/.test(tpl8));
+
+    /* ③ 못 그리는 그림도 자리를 지킨다 */
+    check('선을 못 그려도 블록이 사라지지 않음', !/if \(!mine \|\| mine\.points\.length < 2\) return null/.test(trend2));
+    check('빈 자리를 같은 viewBox 로 재서 크기를 맞춤', /viewBox=\{`0 0 \$\{VIEW_W\} \$\{height\}`\} className="block h-auto w-full"/.test(trend2));
+    check("'표로 보기' 줄도 같은 단추로 자리를 지킴", /invisible text-\[11\.5px\] font-semibold/.test(trend2));
+    check('미리보기도 같은 방식으로 빈 자리를 잼', /outline:1px dashed var\(--border\);outline-offset:-1px/.test(tpl8));
+
+    /* ④ 값을 못 받은 시세 카드 */
+    check('값을 못 받아도 시세 카드가 같은 자리를 차지함', /minHeight: 64/.test(price2));
+    check('미리보기 시세 카드도 같음', /min-height:64px;display:flex;align-items:center/.test(tpl8));
+
+    /* ⑤ 결측 사유는 목록 줄이 아니라 펼친 자리에 */
+    check('결측 사유가 목록 줄을 늘리지 않음', !/\{!c\.available && c\.missingReason \? \(\s*<p className="mt-0\.5/.test(fngPage));
+    check('결측 사유는 펼친 자리에 남아 있음', /!c\.available && c\.missingReason/.test(fngPage) && /mb-2 text-\[12\.5px\]/.test(fngPage));
+    check('결측 배지가 사유를 품고 있음', /size="xs" title=\{c\.missingReason/.test(fngPage));
+  }
+
+  /* ---------------- 8-20. 그림이 읽히는가 ---------------- */
+  console.log('\n[8-20] 그래프 — 눈금을 겹치지 않는가, 글자가 읽히는가');
+  {
+    /*
+     * 두 가지를 재서 고쳤다.
+     *
+     * ① 한 그림에 눈금이 둘이었다.
+     *    심리 점수(0~100)를 왼쪽 축에, S&P 500 가격을 오른쪽 축에 놓고 겹쳐 그렸다.
+     *    두 축을 맞추는 기준이 임의라서, 눈금을 어디에 두느냐에 따라 없던 상관관계가
+     *    보이거나 사라진다. 시간축만 공유하고 위아래 두 칸으로 나눴다.
+     *    덤으로 심리 점수 눈금이 -5.9 ~ 103.8 이던 것도 0~100 으로 못박았다.
+     *
+     * ② 차트 안 글자가 화면에서 제일 작았다.
+     *    본문을 11.5~12.5px 로 올린 뒤에도 축 눈금은 raw 7.5~9px 이라 화면에서
+     *    9~10.8px 로 찍혔다. 11px 로 올려 10.6~11.9px 이 됐다.
+     */
+    const chart2 = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    const fngPage2 = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const assetPage = await readFile('src/app/asset/[id]/page.tsx', 'utf8');
+    const tpl9 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 눈금을 겹치지 않는다 */
+    check('한 그림에 두 눈금을 겹치지 않음', /const splitAxes =/.test(chart2) && !/yRight/.test(chart2));
+    check('시간축은 공유하고 칸만 나눔', /bands: \[/.test(chart2) && /plotBottom/.test(chart2));
+    check('나눈 만큼 그림이 높아짐', /SPLIT_EXTRA/.test(chart2) && /height: boxH/.test(chart2));
+    check('오른쪽 축 눈금값이 사라짐', !/innerW \+ 6/.test(chart2));
+    check('어느 칸이 무엇인지 칸 안에 적음', /geometry\.split \? \(\s*<text/.test(chart2));
+    check('나눈 뒤에는 선을 끊어 그리지 않음', /!geometry\.split && s\.dashed/.test(chart2));
+    check('심리 점수 눈금을 0~100 으로 못박음', /fixed0to100: true/.test(fngPage2));
+    check('설명도 좌·우축이 아니라 위·아래 칸으로 고침',
+      !/좌축은/.test(fngPage2) && !/우축은/.test(assetPage) && /아래 칸은/.test(assetPage));
+    check('미리보기도 칸을 나눔', /const splitAxes =/.test(tpl9) && /c\.bands/.test(tpl9));
+    check('미리보기 상자도 그만큼 커짐', /splitNow \? SPLIT_EXTRA : 0/.test(tpl9));
+    check('미리보기도 0~100 으로 못박음', /fixed: true,/.test(tpl9));
+
+    /* ② 그림 안 글자 */
+    const rawSizes = [];
+    for (const f of await listFiles('src/components', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/fontSize=\{?"?(\d+(?:\.\d+)?)"?\}?/g)) rawSizes.push({ f, v: Number(m[1]) });
+    }
+    const tiny = rawSizes.filter((x) => x.v < 9.5);
+    check('그림 안에 9.5px 보다 작은 글자가 없음', tiny.length === 0,
+      tiny.length ? `${tiny.length}곳 (예: ${tiny[0].f} ${tiny[0].v})` : `${rawSizes.length}곳 검사`);
+    check('축 눈금 크기를 한 곳에서 정함', /const TICK_FONT = 11;/.test(chart2));
+    check('미리보기도 같은 크기를 씀', /TICK_FONT = 11/.test(tpl9));
+
+    /* ③ 마크 — 크로스헤어 점은 지름 8px + 바탕 테두리 2px */
+    check('크로스헤어 점이 8px', /r=\{4\}[\s\S]{0,120}strokeWidth=\{2\}/.test(chart2));
+    check('미리보기 점도 같음', /r="4" fill="' \+ s\.color \+ '" stroke="var\(--surface\)" stroke-width="2"/.test(tpl9));
+  }
+
+  /* ---------------- 8-21. 간격이 일정한가 · 숫자로 판단할 수 있는가 ---------------- */
+  console.log('\n[8-21] 간격 한 눈금 · 판단 재료');
+  {
+    /*
+     * ① 간격이 제각각이었다.
+     *    같은 일을 하는 자리가 파일마다 달랐다 — 카드 안쪽 여백이 8·10·12·14·16px,
+     *    카드끼리 간격이 6·8·10·12·16·20px, 섹션 사이가 12·16·20px 이었다.
+     *    반 칸(6·10·14px)을 없애 4px 격자로 스냅하고, 역할별로 값을 하나씩 정했다.
+     *      카드 안쪽 여백 = 화면 좌우 여백 = 12px (카드 글자가 화면 글자와 같은 세로선)
+     *      섹션 사이 = 20px
+     *    2px(0.5)만 남겼다 — 기호와 글자가 붙는 자리.
+     *
+     * ② 숫자는 있는데 판단할 재료가 없었다.
+     *    값·방향·색 띠·구간 목록이 다 있는데, 정작 "다음 단계까지 얼마 남았나" 는
+     *    15 에서 11.55 를 직접 빼야 나왔고, "요즘 값 중 어디인가" 는 스파크라인
+     *    모양으로 짐작해야 했다. 둘 다 있는 데이터로 계산된다.
+     */
+    const HALF = /(?<![\w-])(?:-?(?:m|p)(?:t|b|l|r|x|y)?|gap(?:-x|-y)?|space-(?:x|y))-(?:1\.5|2\.5|3\.5)(?![\d.])/;
+    const offGrid = [];
+    const cardPad = new Set();
+    const sectionTop = new Set();
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (HALF.test(t)) offGrid.push(f);
+      for (const m of t.matchAll(/className="[^"]*\bcard\b[^"]*"/g)) {
+        const p2 = m[0].match(/(?<![\w-])p-(\d+(?:\.\d+)?)/);
+        if (p2) cardPad.add(p2[1]);
+      }
+      for (const m of t.matchAll(/<section[^>]*className="[^"]*?(?<![\w-])mt-(\d+(?:\.\d+)?)/g)) sectionTop.add(m[1]);
+    }
+    check('간격이 4px 격자를 벗어나지 않음 (2px 만 예외)', offGrid.length === 0,
+      offGrid.length ? `${offGrid.length}개 파일 (예: ${offGrid[0]})` : '');
+    check('카드 안쪽 여백이 하나뿐', [...cardPad].filter((v) => v !== '0').length === 1,
+      `쓰인 값: ${[...cardPad].sort().join(', ') || '없음'}`);
+    check('카드 여백이 화면 좌우 여백과 같은 12px', cardPad.has('3'));
+    check('섹션 사이 간격이 하나뿐', sectionTop.size === 1, `쓰인 값: ${[...sectionTop].sort().join(', ')}`);
+    // 미리보기 스타일시트도 4px 격자 위에 있어야 한다 (같은 화면을 손으로 옮겨 그린 것이라 따로 샌다)
+    const tplSp = await readFile('tools/preview/template.html', 'utf8');
+    const offCss = [...tplSp.matchAll(/(?:padding|margin|gap)(?:-\w+)?: ?(\d+)px/g)]
+      .map((m) => Number(m[1]))
+      // 2px 은 기호와 글자가 붙는 자리라 앱과 마찬가지로 남긴다
+      .filter((v) => v > 2 && v % 4 !== 0);
+    check('미리보기 여백도 4px 격자 위에 있음', offCss.length === 0,
+      offCss.length ? `벗어난 값 ${[...new Set(offCss)].sort((a, b) => a - b).join(', ')}px` : '');
+
+    /* ② 판단 재료 */
+    const judge = await readFile('src/lib/riskJudgement.mjs', 'utf8');
+    const gauges = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    const tpl10 = await readFile('tools/preview/template.html', 'utf8');
+    check('다음 경계를 계산하는 규칙이 있음', /export function nextBoundary/.test(judge));
+    check('낮을수록 위험한 지표도 방향을 뒤집어 봄', /direction !== 'lower_is_riskier'/.test(judge));
+    check('제일 위험한 구간에서는 나아지는 경계를 말함', /dir: 'better'/.test(judge));
+    check('최근 구간 안의 자리를 계산함', /export function recentPosition/.test(judge));
+    check('표본이 적으면 범위를 말하지 않음', /vals\.length < 5/.test(judge));
+    check('움직이지 않은 구간은 위치를 말하지 않음', /!\(max > min\)/.test(judge));
+    check('백분위라고 부르지 않음 — 최저~최고 사이의 자리라고 적음', /백분위가 아니라/.test(judge));
+    check('지표 카드가 그 재료를 보여줌', /<JudgeStrip indicator=\{indicator\} \/>/.test(gauges));
+    check('미리보기도 같은 규칙을 씀',
+      /function nextBoundary\(i\)/.test(tpl10) && /function recentPosition\(spark, value\)/.test(tpl10) && /judgeStrip\(i\)/.test(tpl10));
+    // 판단 재료라고 해서 매매를 권하면 안 된다
+    for (const word of ['매수', '매도', '사세요', '파세요', '지금 사', '지금 팔']) {
+      check(`판단 재료에 '${word}' 가 없음`, !judge.includes(word) && !/JudgeStrip[\s\S]{0,2000}/.exec(gauges)?.[0]?.includes(word));
+    }
+  }
+
+  /* ---------------- 8-22. 선물 판 ---------------- */
+  console.log('\n[8-22] 선물 시장 — 규칙을 지키면서 어디까지 담았나');
+  {
+    /*
+     * 요청은 "finviz.com/futures 에 있는 걸 전부 가져와라" 였다.
+     * 긁어 오지 않았다. 두 가지 이유다.
+     *   ① finviz 이용약관이 자동 수집·재배포를 금지한다.
+     *   ② 이 앱이 처음부터 지키기로 한 규칙 — "데이터 제공업체의 이용약관·재배포
+     *      권한·지연 조건 준수" — 을 어긴다. 한국 개별주·VKOSPI 를 뺀 것과 같은 이유다.
+     *
+     * 대신 화면은 그대로 만들고, 값은 합법적으로 받을 수 있는 것만 채운다.
+     * 못 채우는 항목은 지우지 않고 **왜 비었는지**를 적는다 — 조용히 빼면 목록이
+     * 왜 짧은지 알 수 없다.
+     */
+    const cat = await readFile('src/lib/futuresCatalog.ts', 'utf8');
+    const view = await readFile('src/components/market/FuturesBoard.tsx', 'utf8');
+    const demoF = await readFile('src/server/adapters/demo/futures.ts', 'utf8');
+    const liveF = await readFile('src/server/adapters/live/index.ts', 'utf8');
+    const tpl11 = await readFile('tools/preview/template.html', 'utf8');
+    const buildJs = await readFile('tools/preview/build.mjs', 'utf8');
+
+    /* ① 목록과 사유 */
+    const ids = [...cat.matchAll(/\{ id: '([^']+)', name: '/g)].map((m) => m[1]);
+    check('선물 항목이 30개 이상', ids.length >= 30, `${ids.length}개`);
+    check('항목 id 가 겹치지 않음', new Set(ids).size === ids.length);
+    check('값을 못 넣는 항목은 사유를 갖고 있음',
+      !/source: 'none'(?![^}]*reason:)/.test(cat.replace(/\n/g, ' ')));
+    check('거래소 유료 시세라는 사실을 밝힘', /거래소\(CME·ICE\)가 파는 시세/.test(cat));
+    check('선물이 아닌 값을 대신 쓴 경우 그 사실을 적음', /proxy\?: string/.test(cat) && /현물 고시가/.test(cat));
+
+    /* ② 화면 */
+    const boardRes = await fetch(`${BASE}/api/snapshot?scenario=normal`);
+    const boardJson = await boardRes.json();
+    const board = boardJson?.sections?.futures?.data;
+    check('스냅샷에 선물 판이 있음', Boolean(board), board ? `${board.rows.length}개` : '없음');
+    if (board) {
+      check('목록의 모든 항목이 스냅샷에 있음', board.rows.length === ids.length, `${board.rows.length}/${ids.length}`);
+      check('값이 없는 항목도 빠지지 않음', board.rows.some((r) => r.last === null && r.unavailableReason));
+      check('값이 있는 항목은 지나온 선을 갖고 있음',
+        board.rows.filter((r) => r.last !== null).every((r) => r.spark.length > 30));
+      check('빈 값을 0 으로 채우지 않음', board.rows.every((r) => r.last !== null || r.changePct === null));
+    }
+    for (const path of ['/futures']) {
+      const res = await fetch(`${BASE}${path}`);
+      check(`${path} 응답 200`, res.status === 200, `status=${res.status}`);
+    }
+
+    /* ③ 막대 — 묶음 안에서만 견준다 */
+    check('등락 막대가 0 을 가운데 둔 발산형', /const half = BAR_W \/ 2/.test(view) && /pct >= 0 \? half : half - w/.test(view));
+    check('막대 기준이 묶음 안 최댓값', /묶음에서 제일 크게 움직인 값/.test(view));
+    check('기준이 묶음마다 다르다는 사실을 적음', /묶음끼리는 길이를 견주지/.test(view));
+    check('기간을 바꿔도 서버에 다시 묻지 않음', /changeOver\(r\.spark, back\)/.test(view));
+    check('지나온 선이 짧으면 값을 지어내지 않음', /if \(idx < 0\) return null/.test(cat));
+
+    /* ④ 세 곳이 같은 목록을 본다 */
+    check('미리보기가 목록을 원본에서 읽음', /readFuturesCatalog/.test(buildJs) && /futuresCatalog\.ts/.test(buildJs));
+    // 그냥 여는 파일에는 charset 이 반드시 있어야 한다. 없으면 로컬에서 열 때
+    // 브라우저가 인코딩을 짐작하고 한글이 통째로 깨진다 — 화면을 아무리 잘 만들어도 소용없다.
+    check('미리보기 파일에 문자 인코딩이 박혀 있음',
+      /<meta charset="utf-8">/.test(buildJs) && /<!doctype html>/.test(buildJs));
+    check('아티팩트용은 머리 태그 없이 따로 낸다', /OUT_BARE/.test(buildJs));
+
+    // 검토용 묶음 — 남에게 코드를 넘기는 길이라, 비밀이 담길 파일을 거르는지가 제일 중요하다
+    const bundleJs = existsSync('scripts/bundle.mjs') ? await readFile('scripts/bundle.mjs', 'utf8') : '';
+    check('검토용 묶음 스크립트가 있음', bundleJs.length > 0);
+    check('묶음이 .env.local 과 node_modules 를 거름',
+      /\.env\.local/.test(bundleJs) && /node_modules/.test(bundleJs) && /SKIP_DIR/.test(bundleJs));
+    check('묶음이 규칙을 앞에 붙임 (맥락 없이 던지지 않는다)',
+      existsSync('tools/review/01-검토-요청.md') && existsSync('tools/review/02-업그레이드-요청.md'));
+    // 받는 사람이 여러 번 올리게 하지 않는다 — 파일 하나로 낸다
+    check('묶음이 파일 하나(zip)로 나옴', /spawnSync\('zip'/.test(bundleJs) && /검토\.zip/.test(bundleJs));
+    check('묶음이 읽을 수 없는 파일을 뺌', /SKIP_EXT/.test(bundleJs));
+    check('요청서가 일부러 지키는 규칙을 밝힘',
+      /일부러\*\* 지키는 규칙/.test(await readFile('tools/review/01-검토-요청.md', 'utf8')));
+    check('미리보기도 사유 없는 빈 항목을 막음', /사유 없는 빈 항목/.test(buildJs));
+    check('미리보기에 선물 화면이 있음', /function viewFutures\(\)/.test(tpl11) && /futures: viewFutures/.test(tpl11));
+    check('미리보기 막대도 같은 규칙', /function futBar\(pct, max, color\)/.test(tpl11));
+
+    /* ⑤ DEMO 와 LIVE 가 같은 규칙을 지킨다 */
+    check('DEMO 도 거래소 유료 항목을 비워 둠', /item\.source === 'none'/.test(demoF));
+    check('DEMO 값이 실제 시세가 아님을 밝힘', /실제 시세가 아니다/.test(demoF));
+    check('LIVE 는 FRED 로 되는 것만 채움', /FUTURES_FRED/.test(liveF));
+    check('LIVE 도 대신 쓴 값이라는 사실을 함께 내보냄', /note \? \{ proxyNote: note \}/.test(liveF));
+    // 긁어 온 소스가 섞이지 않았는지
+    for (const banned of ['finviz', 'investing.com', 'tradingview']) {
+      check(`${banned} 을(를) 긁어 오지 않음`,
+        !cat.includes(banned) && !liveF.includes(banned) && !demoF.includes(banned));
+    }
+  }
+
+  /* ---------------- 8-23. 인도월 곡선 ---------------- */
+  console.log('\n[8-23] 선물 — 값 하나 말고 판단 재료 (인도월 곡선)');
+  {
+    /*
+     * 여기가 이 앱에서 **진짜 선물 계약 값**이 실리는 유일한 자리다.
+     * 지수·금속·농산물 선물은 거래소가 파는 시세라 못 넣지만, 에너지 넷은 미국
+     * 에너지정보청(EIA)이 NYMEX 인도월 정산가를 공개 통계로 내고 재배포 제한이 없다.
+     *
+     * 인도월 1~4를 함께 받는 이유는 곡선을 읽기 위해서다 — 가격 하나는 비싸다/싸다
+     * 밖에 못 읽지만, 곡선은 "시장이 앞으로를 어떻게 보고 있는가" 를 한 줄 더 준다.
+     * 그게 "숫자만 늘어놓지 말라" 는 요구에 대한 대답이다.
+     */
+    const eiaSrc = existsSync('src/server/adapters/live/providers/eia.ts')
+      ? await readFile('src/server/adapters/live/providers/eia.ts', 'utf8') : '';
+    const curveSrc = existsSync('src/lib/futuresCurve.mjs') ? await readFile('src/lib/futuresCurve.mjs', 'utf8') : '';
+    const cat2 = await readFile('src/lib/futuresCatalog.ts', 'utf8');
+    const view2 = await readFile('src/components/market/FuturesBoard.tsx', 'utf8');
+    const liveF2 = await readFile('src/server/adapters/live/index.ts', 'utf8');
+    const cfgSrc = await readFile('src/server/config.ts', 'utf8');
+    const tpl12 = await readFile('tools/preview/template.html', 'utf8');
+    const stub = await readFile('scripts/live-stub.mjs', 'utf8');
+    const parse = await readFile('scripts/check-parse.mjs', 'utf8');
+    const envEx = await readFile('.env.example', 'utf8');
+
+    /* ① 제공사 */
+    check('EIA 제공사 모듈이 있음', eiaSrc.length > 0);
+    check('인도월 1~4를 한 번에 받음', /facets\[series\]\[\]/.test(eiaSrc) && /RCLC1/.test(eiaSrc) && /RNGC1/.test(eiaSrc));
+    check('난방유·휘발유까지 붙음', /RHOC1/.test(eiaSrc) && /EER_EPMRR_PE1_Y35NY_DPG/.test(eiaSrc));
+    check('결측을 0 으로 바꾸지 않음', /0 으로 바꾸면/.test(eiaSrc));
+    check('응답 모양을 확인하지 못했다는 사실을 적어 둠',
+      /확인하지 못했다/.test(eiaSrc) && /check:live/.test(eiaSrc));
+    check('약관·재배포 조건을 적어 둠', /재배포에 제한이 없다/.test(eiaSrc) && /무료/.test(eiaSrc));
+
+    /* ② 같은 날끼리만 견준다 — 시차를 곡선이라고 부르지 않는다 */
+    check('곡선은 같은 날짜의 값끼리만 만든다', /같은 날짜의 값끼리만/.test(eiaSrc) && /function curveFrom/.test(eiaSrc));
+
+    /* ③ 곡선 읽기 규칙 */
+    check('곡선 읽기가 순수 모듈로 분리됨', /export function curveShape/.test(curveSrc));
+    check('문턱 아래는 평평으로 읽음', /FLAT_PCT = 0\.5/.test(curveSrc));
+    check('색만으로 뜻을 전하지 않음(기호+글자)', /SHAPE_GLYPH/.test(curveSrc) && /SHAPE_LABEL/.test(curveSrc));
+    check('사라/팔아라 를 말하지 않음',
+      !/(매수|매도|사세요|파세요|수익|추천)/.test(curveSrc), '문구 검사');
+    check('계약이 둘 미만이면 모양을 지어내지 않음', /pts\.length < 2\) return null/.test(curveSrc));
+    check('곡선 단위 테스트가 있음', existsSync('scripts/futuresCurve.test.mjs'));
+
+    /* ④ 키가 없을 때의 정직함 */
+    check('EIA 키가 선택 키로 등록됨', /EIA_API_KEY/.test(cfgSrc) && /OPTIONAL_KEYS/.test(cfgSrc));
+    check('키가 없으면 현물로 내려앉고 그 사실을 밝힘', /fallback\?: \{ source: 'fred'; note: string \}/.test(cat2));
+    check('내려앉은 경우에만 대신 쓴 값 문구를 붙임', /const note = usingFallback \? item\.fallback\?\.note : item\.proxy/.test(liveF2));
+    check('대신 쓸 곳이 없으면 왜 비는지 적음', /EIA 무료 키\(EIA_API_KEY\)가 없어 비워 둡니다/.test(liveF2));
+    check('.env.example 에 EIA 항목이 있음', /EIA_API_KEY=/.test(envEx) && /eia\.gov\/opendata/.test(envEx));
+
+    /* ⑤ 화면 */
+    check('화면이 곡선 줄을 그림', /function CurveStrip/.test(view2) && /curveShape\(curve\)/.test(view2));
+    check('곡선 줄이 한 줄 전체를 씀', /col-span-2/.test(view2));
+    check('미리보기도 같은 규칙을 옮겨 둠',
+      /function futCurveShape/.test(tpl12) && /FUT_FLAT_PCT = 0\.5/.test(tpl12) && /futcurve/.test(tpl12));
+
+    /* ⑥ 스냅샷에 실제로 실려 오는가 */
+    const fRes = await fetch(`${BASE}/api/snapshot?scenario=normal`);
+    const fSnap = await fRes.json();
+    const fRows = fSnap?.sections?.futures?.data?.rows ?? [];
+    const eiaIds = [...cat2.matchAll(/\{ id: '([^']+)'[^\n]*source: 'eia'/g)].map((m) => m[1]);
+    check('EIA 로 받는 항목이 네 개', eiaIds.length === 4, eiaIds.join(' '));
+    for (const id of eiaIds) {
+      const r = fRows.find((x) => x.id === id);
+      check(`${id} 에 인도월 곡선이 실려 옴`, (r?.curve ?? []).length >= 2, `${(r?.curve ?? []).length}개`);
+      check(`${id} 곡선의 인도월이 모두 같은 날`,
+        new Set((r?.curve ?? []).map((c) => c.at)).size === 1);
+    }
+    // DEMO 는 콘탱고와 백워데이션을 둘 다 보여줘야 화면을 확인할 수 있다
+    const shapes = eiaIds.map((id) => {
+      const c = fRows.find((x) => x.id === id)?.curve ?? [];
+      if (c.length < 2) return null;
+      const s2 = [...c].sort((a, b) => a.n - b.n);
+      return ((s2[s2.length - 1].value - s2[0].value) / Math.abs(s2[0].value)) * 100;
+    }).filter((v) => v !== null);
+    check('DEMO 에 콘탱고와 백워데이션이 둘 다 있음',
+      shapes.some((v) => v >= 0.5) && shapes.some((v) => v <= -0.5),
+      shapes.map((v) => v.toFixed(1) + '%').join(' '));
+
+    /* ⑦ 파싱 점검이 이 경로를 태우는가 */
+    check('대역 서버에 EIA 경로가 있음', /EIA 선물 정산가/.test(stub) && /RNGC/.test(stub) && /natural-gas/.test(stub));
+    check('대역 서버가 곡선 모양을 흔들림에 잡아먹히지 않게 만듦', /인도월 전체가 함께/.test(stub));
+    check('파싱 점검이 EIA 를 태움', /EIA_BASE_URL/.test(parse) && /인도월/.test(parse));
+    check('선물 판에 쓰는 FRED 계열이 대역 서버에 다 있음',
+      ['DGS5', 'DGS30', 'DCOILWTICO', 'DCOILBRENTEU', 'DHHNGSP', 'DTWEXBGS',
+        'DEXUSEU', 'DEXJPUS', 'DEXUSUK', 'DEXCAUS', 'DEXUSAL', 'DEXSZUS'].every((k) => stub.includes(k)));
+  }
+
+  /* ---------------- 8-24. 재무제표 ---------------- */
+  console.log('\n[8-24] 재무제표 — 가격만 있던 화면에 회사를 붙였는가');
+  {
+    /*
+     * 이 앱은 오랫동안 종목의 가격만 알았다. 가격만으로는 "왜 이 값인가" 를 물을 수
+     * 없다. SEC(미국 증권거래위원회)가 상장사 공시를 기계가 읽는 형태로 전부, 무료로,
+     * 재배포 제한 없이 공개한다 — 유료 벤더가 파는 '재무 데이터' 의 원본이다.
+     *
+     * 여기서 지키는지 보는 것
+     *   · 회사가 안 쓰는 태그는 그 줄만 비고 화면 전체가 죽지 않는다
+     *   · 4분기를 공시하지 않는 회사의 빈 분기를 연간에서 빼서 채우지 않는다
+     *   · 적자면 PER 을 내지 않고 왜 안 내는지 적는다
+     *   · 공시가 없는 대상(지수·코인)은 '없다' 고 말한다
+     */
+    const fundSrc = existsSync('src/lib/fundamentals.mjs') ? await readFile('src/lib/fundamentals.mjs', 'utf8') : '';
+    const secSrc = existsSync('src/server/adapters/live/providers/sec.ts')
+      ? await readFile('src/server/adapters/live/providers/sec.ts', 'utf8') : '';
+    const compSrc = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    const cardSrc = await readFile('src/components/market/FundamentalsCard.tsx', 'utf8');
+    const demoFund = await readFile('src/server/adapters/demo/fundamentals.ts', 'utf8');
+    const stub2 = await readFile('scripts/live-stub.mjs', 'utf8');
+    const parse2 = await readFile('scripts/check-parse.mjs', 'utf8');
+    const envEx2 = await readFile('.env.example', 'utf8');
+
+    /* ① 읽기 규칙 */
+    check('재무제표 읽기가 순수 모듈로 분리됨', /export function quarterly/.test(fundSrc) && /export function valuation/.test(fundSrc));
+    check('수정 공시가 오면 나중 것을 쓴다', /export function dedupe/.test(fundSrc) && /가장 나중에 접수된/.test(fundSrc));
+    check('기간 길이로 분기·연간을 가른다', /QUARTER_MIN = 80/.test(fundSrc) && /YEAR_MIN = 340/.test(fundSrc));
+    check('전년 동기와 견준다 (직전 분기가 아님)', /계절을 탄다/.test(fundSrc) && /export function yoy/.test(fundSrc));
+    check('비율은 같은 기간끼리만 나눈다', /같은 기간끼리만 나눈다/.test(fundSrc));
+    check('TTM 은 연속한 네 분기라야 한다', /연속한 네 분기라야 한다/.test(fundSrc));
+    check('4분기를 연간에서 빼서 채우지 않는다', /빼서 채우지 않는다/.test(fundSrc));
+    check('재무제표 단위 테스트가 있음', existsSync('scripts/fundamentals.test.mjs'));
+
+    /* ② 제공사 */
+    check('SEC 제공사 모듈이 있음', secSrc.length > 0);
+    check('키가 필요 없다는 사실과 재배포 조건을 적어 둠',
+      /무료이고 키가 없다/.test(secSrc) && /재배포 제한도 없다/.test(secSrc));
+    check('SEC 가 요구하는 User-Agent 를 붙임', /'user-agent': cfg\.userAgent/.test(secSrc));
+    check('404 는 오류가 아니라 그 태그를 안 쓴다는 뜻으로 다룸',
+      /noRetryStatus/.test(secSrc) && /e\.status === 404\) return null/.test(secSrc));
+    check('응답 모양을 확인하지 못했다는 사실을 적어 둠', /확인하지\s*\n?\s*\*\s*못했다|확인하지 못했다/.test(secSrc));
+    check('회사마다 다른 태그를 앞에서부터 시도함', /for \(const tag of def\.tags\)/.test(secSrc));
+    check('어느 태그를 썼는지 올려보냄', /tag,\s*\n\s*quarterly/.test(secSrc) || /line: \{ \.\.\.base, tag,/.test(secSrc));
+    check('.env.example 이 User-Agent 를 설명함', /SEC_USER_AGENT=/.test(envEx2) && /403/.test(envEx2));
+
+    /* ③ 목록 */
+    const ciks = [...compSrc.matchAll(/cik: '(\d{10})'/g)].map((m) => m[1]);
+    check('회사 목록에 CIK 가 10자리로 들어 있음', ciks.length >= 5, `${ciks.length}곳`);
+    check('CIK 가 겹치지 않음', new Set(ciks).size === ciks.length);
+    check('항목마다 대체 태그가 여러 개 적혀 있음', /tags: \[\s*\n?\s*'/.test(compSrc));
+    // 설명은 이제 손으로 적지 않고 용어 사전(what)에서 온다
+    check('항목마다 초보자용 설명이 있음', (compSrc.match(/named\('/g) ?? []).length >= 7,
+      `${(compSrc.match(/named\('/g) ?? []).length}개`);
+
+    /* ④ 화면 */
+    check('판단 재료를 숫자보다 먼저 놓음', /판단 재료 세 칸/.test(cardSrc));
+    check('막대를 순서가 아니라 날짜 자리에 놓음', /날짜 자리/.test(cardSrc) && /slotOf/.test(cardSrc));
+    check('빠진 기간을 빈칸이라고 말함', /공시하지 않았다는 뜻입니다/.test(cardSrc));
+    check('방향을 기호와 글자로 말함', /word\.glyph/.test(cardSrc) && /word\.label/.test(cardSrc));
+    check('표로 보기가 있음', /표로 보기/.test(cardSrc));
+    check('출처와 태그를 화면에 밝힘',
+      /TERMS\.xbrl_tag\.plain\} \{line\.tag\}/.test(cardSrc) && /SEC EDGAR/.test(cardSrc));
+    check('앞으로의 실적이 아니라는 사실을 적음', /앞으로의 실적을\s+뜻하지 않습니다/.test(cardSrc));
+
+    /* ⑤ DEMO 도 같은 규칙 */
+    check('DEMO 가 실제 공시가 아님을 밝힘', /실제 공시가 아니다/.test(demoFund));
+    check('DEMO 가 4분기 빈 회사를 재현함', /missingQ4/.test(demoFund));
+    check('DEMO 가 적자 회사를 재현함 (PER 안 나오는 자리)', /적자 회사/.test(demoFund));
+
+    /* ⑥ 실제로 실려 오는가 */
+    const aapl = await getJson('/api/asset/aapl?scenario=normal');
+    const f = aapl.body?.fundamentals;
+    check('종목 상세에 재무제표가 실려 옴', Boolean(f), f ? `${f.lines?.length}줄` : '없음');
+    if (f) {
+      const byId = Object.fromEntries((f.lines ?? []).map((l) => [l.id, l]));
+      check('손익 항목이 분기로 옴', (byId.revenue?.quarterly ?? []).length >= 4, `${byId.revenue?.quarterly?.length}분기`);
+      check('재무상태표 항목은 시점 값(기간 없음)', (byId.liabilities?.annual ?? []).every((p) => !p.start));
+      check('줄마다 성질(기간/시점)이 붙어 있음', (f.lines ?? []).every((l) => l.kind === 'duration' || l.kind === 'instant'));
+      check('4분기가 빈 회사라 TTM 대신 연간을 씀', f.valuation?.basis === 'annual', `basis=${f.valuation?.basis}`);
+      check('어떻게 냈는지 문장으로 밝힘', /연간 값을 썼습니다/.test(String(f.valuation?.note ?? '')));
+      check('4분기를 빼서 채우지 않았음', (byId.revenue?.quarterly ?? []).length < 12, `${byId.revenue?.quarterly?.length}개 (12개가 아님)`);
+    }
+    // 적자 회사는 PER 을 내지 않는다
+    const tsla = (await getJson('/api/asset/tsla?scenario=normal')).body?.fundamentals;
+    check('적자면 PER 을 내지 않고 이유를 적음',
+      tsla?.valuation?.per === null && /적자/.test(String(tsla?.valuation?.note ?? '')),
+      String(tsla?.valuation?.note ?? '').slice(0, 40));
+    // 공시가 없는 대상은 없다고 말한다
+    for (const id of ['spx', 'btc', 'usdkrw']) {
+      const d = (await getJson(`/api/asset/${id}?scenario=normal`)).body;
+      check(`${id} 은 재무제표가 없다고 밝힘`, !d?.fundamentals && /공시/.test(String(d?.fundamentalsUnavailable ?? '')));
+    }
+    // 줄 하나가 비어도 화면이 죽지 않는다
+    const part = (await getJson('/api/asset/aapl?scenario=partial')).body?.fundamentals;
+    check('줄 하나가 비어도 나머지는 그대로 나옴',
+      Boolean(part) && (part.lines ?? []).some((l) => l.unavailableReason) && (part.lines ?? []).some((l) => l.quarterly.length > 0),
+      part ? `${(part.lines ?? []).filter((l) => l.unavailableReason).length}줄 빔` : '없음');
+
+    /* ⑦ 파싱 점검이 이 경로를 태우는가 */
+    check('대역 서버에 SEC 경로가 있음', /companyconcept/.test(stub2));
+    check('대역 서버가 안 쓰는 태그를 404 로 답함', /res\.writeHead\(404/.test(stub2) && /companyconcept/.test(stub2));
+    check('대역 서버가 누적·연간이 섞여 오는 상황을 재현함', /9개월 누적도 같은 태그로/.test(stub2));
+    check('대역 서버가 수정 공시를 재현함', /수정 공시로 한 번 더/.test(stub2));
+    check('대역 서버가 User-Agent 없으면 막음', /User-Agent 헤더가 없습니다/.test(stub2));
+    check('파싱 점검이 재무제표를 태움', /SEC_BASE_URL/.test(parse2) && /재무제표/.test(parse2));
+  }
+
+  /* ---------------- 8-25. 용어 ---------------- */
+  console.log('\n[8-25] 용어 — 큰 글씨는 쉬운 우리말, 원래 이름은 작게');
+  {
+    /*
+     * ROE · PER · EPS · OAS 같은 말은 아는 사람에게만 짧고, 모르는 사람에게는 아무
+     * 뜻이 없다. 그렇다고 원래 이름을 지워 버리면 기사나 다른 자료에서 같은 값을
+     * 봤을 때 같은 것인지 알 수가 없다.
+     *
+     * 그래서 둘 다 적는다 — 큰 글씨는 뜻을 푼 우리말, 그 아래 작은 글씨가 원래 이름.
+     * 이름은 src/lib/terms.ts 한 곳에서만 정한다. 화면마다 손으로 적으면 같은 용어가
+     * 화면마다 다르게 불린다.
+     */
+    const terms = await readFile('src/lib/terms.ts', 'utf8');
+    const label = await readFile('src/components/ui/TermLabel.tsx', 'utf8');
+    const card = await readFile('src/components/market/FundamentalsCard.tsx', 'utf8');
+    const comp = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    const curve = await readFile('src/lib/futuresCurve.mjs', 'utf8');
+    const riskSrc = await readFile('src/server/risk.ts', 'utf8');
+    const basicsView = await readFile('src/components/market/BasicsBoard.tsx', 'utf8');
+    const tpl13 = await readFile('tools/preview/template.html', 'utf8');
+
+    check('용어 사전이 한 곳에 있음', /export const TERMS/.test(terms));
+    check('사전이 쉬운 말과 원래 이름을 함께 담음', /plain: string/.test(terms) && /term: string/.test(terms));
+    check('이름표 컴포넌트가 있음', /export function TermLabel/.test(label) && /export function TermInline/.test(label));
+    check('소리로 읽을 때 둘을 함께 읽어 줌', /aria-label=\{`\$\{t\.plain\} \(\$\{t\.term\}\)`\}/.test(label));
+    check('재무 항목 이름을 사전에서 가져옴', /function named\(/.test(comp) && /TERMS\[id\]/.test(comp));
+
+    // 사전에 담긴 우리말 이름에 영어 약어가 그대로 남아 있으면 안 된다
+    const plains = [...terms.matchAll(/plain: '([^']+)'/g)].map((m) => m[1]);
+    const stillEnglish = plains.filter((v) => /[A-Za-z]{2,}/.test(v));
+    check('쉬운 이름에 영어가 남아 있지 않음', stillEnglish.length === 0, stillEnglish.join(', ') || `${plains.length}개 검사`);
+    // 원래 이름은 반대로 반드시 남아 있어야 한다 — 지우면 대조할 길이 없다
+    const termsList = [...terms.matchAll(/\n    term: '([^']+)'/g)].map((m) => m[1]);
+    check('원래 이름이 지워지지 않았음', termsList.length >= 10, `${termsList.length}개`);
+
+    /* 재무제표 화면 */
+    check('재무 항목이 원래 이름을 작게 달고 있음', /\{line\.term\}/.test(card));
+    check('세 칸 머리말도 사전을 씀', /TermInline id="per"/.test(card) && /TermInline id="operating_margin"/.test(card));
+    check('10-K · 10-Q 를 우리말로 풀어 씀', /function formName/.test(card) && /form_10k/.test(card));
+    check('CIK · XBRL 을 우리말로 풀어 씀', /TERMS\.cik\.plain/.test(card) && /TERMS\.xbrl_tag\.plain/.test(card));
+    check('PER 설명이 화면 문장에 우리말로 있음', /지금 주가를 1주가 번 돈으로 나눈 값/.test(card));
+
+    /* 선물 곡선 */
+    check('콘탱고·백워데이션을 우리말로 먼저 말함',
+      /contango: '먼 달이 더 비쌈'/.test(curve) && /backwardation: '가까운 달이 더 비쌈'/.test(curve));
+    check('원래 이름은 따로 남겨 둠', /export const SHAPE_TERM/.test(curve) && /콘탱고 · Contango/.test(curve));
+    check('미리보기도 같은 이름을 씀', /FUT_SHAPE_TERM/.test(tpl13) && /먼 달이 더 비쌈/.test(tpl13));
+
+    /* 위험 신호등 */
+    check('위험 지표가 원래 이름을 따로 갖고 있음', (riskSrc.match(/^    term: '/gm) ?? []).length >= 5,
+      `${(riskSrc.match(/^    term: '/gm) ?? []).length}개`);
+    check('하이일드 OAS 를 우리말로 바꿈', /위험한 회사가 더 무는 이자/.test(riskSrc) && !/name: '하이일드/.test(riskSrc));
+    check('미리보기도 원래 이름을 그림', /i\.term \?/.test(tpl13));
+
+    /*
+     * 생활 경제 지수 — 위가 이름, 아래가 그 이름을 풀어 쓴 말.
+     *
+     * 한동안 뒤집혀 있었다. '국민 한 사람 몫의 생산' 이 제목 자리에 크게 서고
+     * '1인당 GDP' 가 그 아래 작게 붙었다. 쉬운 말을 앞세우려던 것이었는데,
+     * 제목 자리에 설명이 서면 그게 무엇의 이름인지 알 수 없고 다른 자료에서 본
+     * 말과 이어 볼 수도 없다. 쉬운 말은 이름을 도우라고 있는 것이지 이름을
+     * 대신하라고 있는 것이 아니다.
+     */
+    const nameIdx = basicsView.indexOf('{item.name}');
+    const plainIdx = basicsView.indexOf('{item.plainName}');
+    check('생활 지수는 이름이 위, 풀어 쓴 말이 아래',
+      nameIdx > 0 && plainIdx > nameIdx,
+      `이름 ${nameIdx} · 풀어 쓴 말 ${plainIdx}`);
+    check('제목 자리는 굵은 14px, 풀어 쓴 말은 11.5px',
+      /<h3 className="text-\[14px\] leading-snug font-bold break-keep text-fg-strong">\{item\.name\}<\/h3>/.test(basicsView) &&
+      /text-\[11\.5px\] break-keep text-subtle">\{item\.plainName\}/.test(basicsView));
+    check('풀어 쓴 말을 잘리는 자리에 두지 않음', !/truncate">\{item\.plainName\}/.test(basicsView));
+    const dailyCard = await readFile('src/components/market/DailyBasicCard.tsx', 'utf8');
+    check('홈의 오늘의 생활 카드도 같은 차례',
+      dailyCard.indexOf('{item.name}') > 0 && dailyCard.indexOf('{item.plainName}') > dailyCard.indexOf('{item.name}'));
+
+    /* 실제로 화면에 나오는 이름이 바뀌었는가 */
+    const snapT = (await getJson('/api/snapshot?scenario=normal')).body;
+    const risks = snapT.sections?.risk?.data?.indicators ?? [];
+    check('위험 지표 이름에 영어 약어가 앞장서지 않음',
+      risks.every((i) => !/^[A-Z]{2,}/.test(i.name)), risks.map((i) => i.name).join(' / ').slice(0, 80));
+    check('위험 지표가 원래 이름을 함께 내려보냄', risks.filter((i) => i.term).length >= 5,
+      `${risks.filter((i) => i.term).length}/${risks.length}`);
+    const basicsT = snapT.sections?.basics?.data ?? [];
+    /*
+     * 이름은 우리말이어야 한다.
+     *
+     * 막으려는 것은 'ROE' 처럼 약자 하나만 덩그러니 서 있는 경우다.
+     * 'OECD 경기선행지수' 는 걸리지 않는다 — 발표 기관의 약자가 이름의 일부이고,
+     * 그 뒤에 우리말 이름이 그대로 따라온다. 그래서 앞글자가 아니라
+     * '·' 앞쪽에 우리말이 들어 있는지를 본다.
+     */
+    const headOf = (n) => String(n).split(' · ')[0];
+    const noKorean = basicsT.filter((b) => !/[가-힣]/.test(headOf(b.name)));
+    check('생활 지수 이름이 우리말로 되어 있음', noKorean.length === 0,
+      noKorean.length ? noKorean.map((b) => b.name).join(' / ') : basicsT.map((b) => b.name).join(' / ').slice(0, 80));
+    check('생활 지수가 풀어 쓴 말을 함께 내려보냄',
+      basicsT.every((b) => typeof b.plainName === 'string' && b.plainName.length > 0));
+    /*
+     * 이름 자리에 이름이 들어 있는가.
+     *
+     * 풀어 쓴 말은 문장이라 서술어로 끝난다 — '…생산', '…나뉘는지', '…몇 배'.
+     * 이름은 그렇지 않다. 둘이 다시 뒤바뀌면 이 검사가 먼저 잡는다.
+     */
+    const swapped = basicsT.filter((b) => /(는지|인지|몇 배|얼마|따진|더한)$/.test(b.name));
+    check('이름 자리에 설명이 들어 있지 않음', swapped.length === 0,
+      swapped.map((b) => b.name).join(' / '));
+    check('풀어 쓴 말은 영어로 시작하지 않음',
+      basicsT.every((b) => !/^[A-Za-z]/.test(b.plainName)),
+      basicsT.filter((b) => /^[A-Za-z]/.test(b.plainName)).map((b) => b.plainName).join(' / '));
+    const fundT = (await getJson('/api/asset/aapl?scenario=normal')).body?.fundamentals;
+    check('재무 항목이 우리말 이름과 원래 이름을 둘 다 내려보냄',
+      (fundT?.lines ?? []).every((l) => l.label && l.term && !/[A-Za-z]{2,}/.test(l.label)),
+      (fundT?.lines ?? []).map((l) => l.label).join(' / ').slice(0, 80));
+  }
+
+  /* ---------------- 8-26. 불타는 것 · 얼어붙은 것 ---------------- */
+  console.log('\n[8-26] 오늘 불타는 것과 얼어붙은 것');
+  {
+    /*
+     * 작은 종목은 후보에서 뺀다.
+     *
+     * 작은 종목은 하루 30% 씩도 움직인다. 평소 폭으로 나눠도 배수가 크게 나오는
+     * 날이 잦아서, 그것까지 후보에 넣으면 '오늘 유별났던 것' 자리가 늘 그런 종목
+     * 차지가 되고 정작 큰 시장에서 일어난 일은 밀려난다.
+     *
+     * 문은 순위를 **아는** 것에만 닫힌다. 모르면 그대로 둔다 — 지수처럼 순위
+     * 개념이 없는 것도 있고, 지금 카탈로그는 사람이 골라 담은 것이라 개별주·코인
+     * 열다섯이 전부 각 시장의 대형주·상위 코인이기 때문이다. 그래서 오늘은
+     * 걸러지는 것이 없다. 바깥에서 이름이 쏟아져 들어오는 날(한국 전종목처럼)
+     * 제공사가 순위를 함께 주고, 그때 이 문이 일한다.
+     */
+    const capSrc = await readFile('src/lib/heatRank.mjs', 'utf8');
+    const { withinCap, CAP_RANK_MAX, pickHeat: pick300 } = await import('../src/lib/heatRank.mjs');
+    check('시총 기준이 300위', CAP_RANK_MAX === 300, String(CAP_RANK_MAX));
+    check('순위를 모르면 그대로 둠', withinCap({}) === true && withinCap({ capRank: null }) === true);
+    check('300위 밖은 뺌', withinCap({ capRank: 301 }) === false && withinCap({ capRank: 300 }) === true);
+    check('고르는 자리에서 실제로 걸러짐', /\.filter\(\(q\) => withinCap\(q, maxCapRank\)\)/.test(capSrc));
+    {
+      const mk = (id, pct, rank) => ({
+        id, name: id, price: 100, changePct: pct, capRank: rank,
+        spark: Array.from({ length: 20 }, (_, i) => ({ t: i, v: 100 + (i % 3) })),
+      });
+      const board = pick300([mk('잡주', 40, 4210), mk('큰주', 3, 12), mk('큰하락', -2, 40)]);
+      check('순위 밖 급등주가 자리를 차지하지 못함', board.count === 2 && board.top.quote.id === '큰주',
+        board.top.quote.id);
+    }
+    check('Quote 에 순위 자리가 있고 모르면 null', /capRank\?: number \| null;/.test(await readFile('src/types/index.ts', 'utf8')));
+    check('화면이 그 규칙을 밝힘',
+      /시총 300위 밖은 후보에서 뺍니다/.test(await readFile('src/components/market/HeatBoard.tsx', 'utf8')));
+    const tplHeat = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 같은 문을 씀',
+      /HEAT_CAP_RANK_MAX = 300/.test(tplHeat) && /\.filter\(heatWithinCap\)/.test(tplHeat) &&
+      /시총 300위 밖은 후보에서 뺍니다/.test(tplHeat));
+
+    /*
+     * 몇 % 움직였는지로 줄을 세우면 크립토가 늘 이긴다. 원래 많이 움직이는 것이라
+     * 하루 8% 가 평범할 수 있고, 코스피가 8% 움직이면 사건이다. 그래서 그 종목이
+     * **평소 움직이던 폭에 견줘** 오늘이 얼마나 유별났는지로 고른다.
+     *
+     * 말은 세게 쓰되 '얼마나 크게 움직였는가' 까지만 말한다 — 좋다·나쁘다도,
+     * 사라·팔라도 아니다. 그 선을 코드가 지키는지 여기서 본다.
+     */
+    const heatSrc = existsSync('src/lib/heatRank.mjs') ? await readFile('src/lib/heatRank.mjs', 'utf8') : '';
+    const heatView = existsSync('src/components/market/HeatBoard.tsx')
+      ? await readFile('src/components/market/HeatBoard.tsx', 'utf8') : '';
+    const homeSrc = await readFile('src/app/page.tsx', 'utf8');
+    const cssSrc = await readFile('src/app/globals.css', 'utf8');
+    const tpl14 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 고르는 규칙 */
+    check('고르는 규칙이 순수 모듈로 분리됨', /export function pickHeat/.test(heatSrc) && /export function dailySigma/.test(heatSrc));
+    check('% 가 아니라 평소 폭에 견줘 고름', /평소 움직이던 폭에 견줘/.test(heatSrc) && /changePct \/ sigma/.test(heatSrc));
+    check('표본이 모자라면 배수를 지어내지 않음', /MIN_SAMPLE/.test(heatSrc) && /return null/.test(heatSrc));
+    check('단위 테스트가 있음', existsSync('scripts/heatRank.test.mjs'));
+
+    /* ② 말의 선 — 여기가 이 화면에서 제일 미끄러지기 쉬운 자리다 */
+    const words = [...heatSrc.matchAll(/(?:up|down): '([^']+)'/g)].map((m) => m[1]);
+    check('단계마다 말이 있음 (오름 4 · 내림 4)', words.length === 8, words.join(' / '));
+    check('사라·팔라로 읽히는 낱말이 없음',
+      words.every((w) => !/(매수|매도|사세요|파세요|대박|폭등|기회|추천|수익|손실)/.test(w)),
+      words.filter((w) => /(매수|매도|대박|폭등|기회|추천|수익)/.test(w)).join(', ') || '없음');
+    check('화면이 그 뜻을 밝힘 (움직임이지 좋다·나쁘다가 아니다)',
+      /좋다·나쁘다가 아니고/.test(heatView) && /사라거나 팔라는 뜻은 더더욱 아닙니다/.test(heatView));
+
+    /* ③ 다 오른 날 · 다 내린 날 */
+    check('다 오른 날에는 자리 이름을 바꿈', /가장 덜 오른 것/.test(heatSrc) && /내린 것이 하나도 없습니다/.test(heatSrc));
+    check('다 내린 날도 마찬가지', /가장 덜 내린 것/.test(heatSrc) && /오른 것이 하나도 없습니다/.test(heatSrc));
+
+    /* ④ 화면 */
+    check('홈에 붙어 있음', /<HeatBoard \/>/.test(homeSrc) && /HeatBoard/.test(homeSrc));
+    check('색은 설정에 따라 JS 가 정함 (앱에 --up 토큰이 없다)',
+      /color: f\.color\(dir\)/.test(heatView) && !/var\(--up\)/.test(heatView));
+    check('방향을 기호와 글자로도 말함', /f\.glyph\(dir\)/.test(heatView) && /sr-only/.test(heatView));
+    check('세기에 따라 번지는 빛이 있음', /heat-glow/.test(cssSrc) && /--t/.test(cssSrc));
+    check('움직임을 싫어하면 멈춤', /prefers-reduced-motion[\s\S]{0,160}heat-flame/.test(cssSrc));
+    check('좁은 화면에서도 두 장을 나란히', /grid-cols-2/.test(heatView));
+
+    /* ⑤ 미리보기도 같은 규칙 */
+    check('미리보기에 같은 판이 있음', /function heatSection/.test(tpl14) && /function pickHeat/.test(tpl14));
+    check('미리보기 문구가 앱과 같음',
+      words.every((w) => tpl14.includes(w)),
+      words.filter((w) => !tpl14.includes(w)).join(', ') || '여덟 개 모두 같음');
+    check('미리보기도 두 장을 나란히', /\.heat-pair/.test(tpl14));
+
+    /* ⑥ 실제로 나오는가 */
+    const snapH = (await getJson('/api/snapshot?scenario=normal')).body;
+    const quotes = snapH.sections?.quotes?.data ?? {};
+    const TRADE = new Set(['equity', 'index', 'crypto', 'commodity']);
+    const { pickHeat } = await import('../src/lib/heatRank.mjs');
+    let boards = 0;
+    for (const m of ['us', 'kr', 'crypto']) {
+      const b = pickHeat((quotes[m] ?? []).filter((q) => TRADE.has(q.kind)));
+      if (!b) continue;
+      boards += 1;
+      check(`${m} — 오른 것과 내린 것을 골라 냄`, Boolean(b.top && b.bottom),
+        `${b.top.quote.name} ${b.top.quote.changePct}% / ${b.bottom.quote.name} ${b.bottom.quote.changePct}%`);
+      // 자리 이름이 실제 방향과 어긋나면 안 된다
+      if (b.bottom.quote.changePct >= 0) {
+        check(`${m} — 오른 것을 내렸다고 말하지 않음`, b.bottom.slot === '가장 덜 오른 것' && Boolean(b.bottom.note));
+      }
+      if (b.top.quote.changePct < 0) {
+        check(`${m} — 내린 것을 올랐다고 말하지 않음`, b.top.slot === '가장 덜 내린 것' && Boolean(b.top.note));
+      }
+    }
+    check('세 시장 모두 판이 만들어짐', boards === 3, `${boards}/3`);
+  }
+
+  /* ---------------- 8-27. 이름이 잘리지 않는가 ---------------- */
+  console.log('\n[8-27] 이름과 숫자가 잘리지 않는가');
+  {
+    /*
+     * '다우존스 산업평균' 이 '다우존스 산업평…' 이 되면 그게 무엇인지 알 수 없다.
+     * 이름은 값을 읽기 위한 열쇠라, 잘리면 그 칸 전체가 쓸모없어진다.
+     * 숫자는 더 나쁘다 — '1,335.78원' 이 '1,335.7…' 이 되면 값이 달라져 보인다.
+     *
+     * 그래서 **이름과 숫자 자리에는 truncate 를 쓰지 않는다.** 좁으면 접거나
+     * (이름) 글자 크기를 줄인다(숫자).
+     */
+    const files = [
+      ['src/components/market/MarketIndexBoard.tsx', /\{item\.name\}/],
+      ['src/components/market/PriceCard.tsx', /\{quote\.name\}/],
+      ['src/app/market/[region]/page.tsx', /\{q\.name\}/],
+    ];
+    for (const [f, re] of files) {
+      const t = await readFile(f, 'utf8');
+      const line = t.split('\n').find((l) => re.test(l) || (re.source.includes('quote.name') && /quote\.name/.test(l)));
+      // 이름이 들어가는 줄, 또는 그 바로 앞 줄(여러 줄로 쓴 경우)에 truncate 가 없어야 한다
+      const nameBlocks = t.split('\n').map((l, i) => ({ l, i })).filter((x) => re.test(x.l));
+      const bad = nameBlocks.filter((x) => /truncate/.test(x.l) || /truncate/.test(t.split('\n')[x.i - 1] ?? ''));
+      check(`${f.split('/').pop()} — 이름을 자르지 않음`, bad.length === 0,
+        bad.length ? bad[0].l.trim().slice(0, 60) : (line ? '확인' : '이름 줄 없음'));
+    }
+    const idx = await readFile('src/components/market/MarketIndexBoard.tsx', 'utf8');
+    check('아주 좁은 화면에서는 미니 차트를 접어 이름 자리를 내줌', /min-\[360px\]:block/.test(idx));
+
+    const pc = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    check('가격은 자르지 않고 글자를 줄임', /clamp\(15px/.test(pc) && !/tnum truncate text-lg/.test(pc));
+    const rg = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+    check('위험 지표 값도 자르지 않음', !/tnum truncate text-\[15px\]/.test(rg) && /clamp\(12\.5px/.test(rg));
+
+    const region = await readFile('src/app/market/[region]/page.tsx', 'utf8');
+    check('시장 화면 부제도 자르지 않음', !/truncate text-\[12\.5px\] text-subtle">\{SUBTITLE/.test(region));
+
+    /*
+     * 무엇이 먼저 읽혀야 하는가.
+     *
+     * '마감' · '15분 지연' 은 값을 읽고 난 뒤에 확인하는 곁들임이고, 종목 이름은
+     * 그 칸이 무엇인지 말하는 열쇠다. 둘이 비슷한 크기로 서 있으면 눈이 어디를
+     * 먼저 볼지 헷갈린다. 이름이 배지보다 확실히 커야 한다.
+     */
+    const badgeSrc = await readFile('src/components/ui/Badge.tsx', 'utf8');
+    check('장 상태 배지가 제일 작은 칸을 기본으로 씀', /SessionBadge\(\{ phase, size = '2xs'/.test(badgeSrc));
+    check('지연 배지도 제일 작은 칸', /size = '2xs'/.test(badgeSrc.slice(badgeSrc.indexOf('FreshnessBadge') - 400)));
+    const nameSize = (t, re) => {
+      const m = t.match(re);
+      return m ? Number(m[1]) : 0;
+    };
+    // 사이에 다른 클래스가 끼어도(min-h-[24px] 등) 크기만 본다
+    const pcName = nameSize(pc, /className="block[^"]*text-\[(\d+(?:\.\d+)?)px\][^"]*whitespace-nowrap text-fg-strong/);
+    const ixName = nameSize(idx, /className="text-\[(\d+(?:\.\d+)?)px\] leading-snug font-bold whitespace-nowrap text-fg-strong/);
+    check('가격 카드 이름이 배지(10.5px)보다 확실히 큼', pcName >= 15, `${pcName}px`);
+    check('지수 판 이름도 배지보다 확실히 큼', ixName >= 15, `${ixName}px`);
+
+    const tplSz = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 같은 차례', /\.pcard-name \{ font-size: 16px/.test(tplSz) && /badge\(cls, SESSION_LABEL\[p\], null, '2xs'\)/.test(tplSz));
+
+    /*
+     * 이름은 한 줄이다.
+     *
+     * 접는 것도 자르는 것 못지않게 나쁘다. 목록에서 어떤 카드는 한 줄, 어떤 카드는
+     * 두 줄이면 높이가 제각각이라 눈이 걸리고, 스크롤 중에 값이 어디쯤 있을지
+     * 짐작할 수 없다. 자르지도 접지도 않으려면 자리가 있어야 한다 — 그 자리는
+     * '마감'·'15분 지연' 알약을 이름 줄에서 빼서 만들었다.
+     */
+    const heat = await readFile('src/components/market/HeatBoard.tsx', 'utf8');
+    const oneLine = [
+      ['가격 카드', pc, /className="block[^"]*text-\[16px\][^"]*whitespace-nowrap/],
+      ['지수 판', idx, /className="text-\[15px\] leading-snug font-bold whitespace-nowrap/],
+      ['시장 화면 종목 줄', region, /className="min-w-0 text-\[13px\] whitespace-nowrap/],
+      ['불타는 카드', heat, /font-bold whitespace-nowrap text-fg-strong[\s\S]{0,120}clamp\(13px/],
+    ];
+    for (const [label, src, re] of oneLine) check(`${label} 이름이 한 줄`, re.test(src));
+
+    /*
+     * 이름이 그 한 줄에 정말 들어가는가.
+     *
+     * 한 줄로 세운 이상 넘치면 옆 칸을 밀거나 잘린다. 그래서 자리를 재 둔다.
+     * 아래 칸 너비는 320px 화면에서 브라우저로 잰 값이고(가장 좁은 줄 기준),
+     * 글자 너비는 어림한다 — 한글은 한 글자가 거의 1em, 대문자는 0.68em,
+     * 숫자 0.6em, 나머지 라틴 글자 0.55em, 공백·부호 0.32em.
+     * '다우존스 산업평균' 을 124.5px 로 어림하는데 실측이 125px 이었다.
+     *
+     * 이 검사가 하는 일은 정확한 예측이 아니라 **여유가 남았는지** 보는 것이다.
+     * 카탈로그에 긴 이름이 새로 들어오면 화면에서 깨지기 전에 여기서 걸린다.
+     */
+    const em = (name) => {
+      let w = 0;
+      for (const ch of name) {
+        if (/[\uAC00-\uD7AF\u3130-\u318F\u4E00-\u9FFF\u3040-\u30FF]/.test(ch)) w += 1;
+        else if (/[A-Z]/.test(ch)) w += 0.68;
+        else if (/[0-9]/.test(ch)) w += 0.6;
+        else if (/[a-z]/.test(ch)) w += 0.55;
+        else w += 0.32;
+      }
+      return w;
+    };
+    /**
+     * [자리 이름, 글자 크기(px), 320px 에서 잰 칸 너비(px)]
+     *
+     * 칸 너비는 브라우저로 직접 쟀다 (320×1200, 화면마다 가장 좁은 줄 기준).
+     * 지수 판·시장 줄은 오른쪽 숫자 칸이 넓을수록 이름 칸이 좁아지므로,
+     * 그 화면에서 제일 긴 값이 붙은 줄에서 잰 값이다.
+     */
+    const BOX = [
+      ['가격 카드', 16, 246],
+      ['지수 판', 15, 195],
+      ['불타는 카드', 13, 118],
+      ['시장 화면 종목 줄', 13, 128],
+    ];
+    const catalogSrc = await readFile('src/lib/catalog.ts', 'utf8');
+    const names = [...catalogSrc.matchAll(/name: '([^']+)'/g)].map((m) => m[1]);
+    check('카탈로그에서 이름을 읽어 옴', names.length >= 20, `${names.length}개`);
+    const MARGIN = 6;
+    for (const [label, fs, box] of BOX) {
+      let worst = null;
+      for (const n of names) {
+        const w = em(n) * fs;
+        if (!worst || w > worst.w) worst = { n, w };
+      }
+      const slack = Math.round(box - worst.w);
+      check(`${label} — 가장 긴 이름도 한 줄에 들어감`, slack >= MARGIN,
+        `'${worst.n}' ${Math.round(worst.w)}px / ${box}px · 여유 ${slack}px`);
+    }
+
+    /*
+     * 곁들이는 말은 이름 아래로.
+     *
+     * 알약 하나는 글씨를 10.5px 로 줄여도 테두리와 좌우 여백으로 24px 을 더 먹는다.
+     * 둘이면 60px 이고, 그 60px 이 이름 칸에서 나갔다. 크기를 줄이는 것만으로는
+     * 모자랐다 — 자리를 옮겨야 했다.
+     */
+    const badgeSrc2 = badgeSrc;
+    check('상태 잔글씨가 따로 있음', /export function StatusLine\(/.test(badgeSrc2));
+    check("'마감'·'지연' 은 테두리 없는 잔글씨", /words\.join\(' · '\)/.test(badgeSrc2));
+    check("믿기 전에 봐야 하는 것만 알약으로 남음",
+      /freshness === 'stale' \? '오래된 데이터' : freshness === 'demo' \? 'DEMO' : null/.test(badgeSrc2));
+    check('가격 카드가 이름 줄에서 알약을 뺐음',
+      !/SessionBadge/.test(pc) && !/FreshnessBadge/.test(pc) && /<StatusLine/.test(pc));
+    check('지수 판도 마찬가지', !/FreshnessBadge/.test(idx) && /<StatusLine/.test(idx));
+    check('미리보기도 같은 규칙',
+      /const statusNote = \(phase, fresh, delay\)/.test(tplSz) &&
+      /statusNote\(q\.session, q\.meta\.freshness, delay\)/.test(tplSz) &&
+      /statusNote\(null, q\.meta\.freshness, delay\)/.test(tplSz));
+  }
+
+  /* ---------------- 8-28. 넓은 화면에서도 손안의 화면인가 ---------------- */
+  console.log('\n[8-28] 넓은 화면에서도 손안의 화면');
+  {
+    /*
+     * 사용자가 짚은 것: "윈도우 인터넷으로 볼 때도 핸드폰이랑 비슷하게."
+     *
+     * 창을 넓혔다고 카드를 서너 열로 펼치면 같은 앱이 아니게 된다 — 어제 폰에서
+     * 본 것이 오늘 회사 컴퓨터에서 다른 자리에 있으면 다시 찾아야 한다.
+     * 그래서 480px 부터는 430px 로 고정하고 양옆에 바닥을 깐다.
+     *
+     * 폭이 고정되면 따라오는 것이 있다. 본문 안의 배치 분기가 더는 **화면 폭**을
+     * 봐서는 안 된다는 것이다. 1440px 짜리 창에서 sm:grid-cols-2 는 그대로
+     * 발동해서, 430px 짜리 칸 안에 두 열을 밀어 넣는다. 아래 ③ 이 그것을 막는다.
+     */
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const shell = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    const nav = await readFile('src/components/nav/Navigation.tsx', 'utf8');
+    const tpl8 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 틀 — 넓어져도 430px */
+    check('화면 틀이 있음', /\.app-frame \{[^}]*margin-inline: auto/.test(css));
+    check('틀은 넓은 화면에서만 폭을 묶음',
+      /@media \(min-width: 480px\) \{[\s\S]{0,200}\.app-frame \{[\s\S]{0,120}max-width: var\(--frame-w\)/.test(css));
+    check('틀 폭이 한 곳에 적혀 있음', /--frame-w: 430px/.test(css));
+    check('틀 바깥 바닥색이 두 테마 모두 있음',
+      (css.match(/--desk:/g) ?? []).length >= 2 && /background: var\(--desk\)/.test(css));
+    check('앱 셸이 그 틀을 씀', /className="app-frame"/.test(shell));
+
+    /* ② 길은 하나 — 하단 탭, 사이드바 없음 */
+    check('좌측 사이드바를 두지 않음', !/DesktopSidebar/.test(nav) && !/DesktopSidebar/.test(shell));
+    check('하단 탭이 화면 폭과 무관하게 늘 있음',
+      /className="frame-fixed fixed bottom-0/.test(nav) && !/lg:hidden/.test(nav));
+    /*
+     * frame-fixed 는 좌우 위치를 통째로 쥔다. inset-x-0 같은 유틸리티를 같이
+     * 붙이면 그쪽이 이긴다 — Tailwind 에서 유틸리티가 컴포넌트 레이어보다 세다.
+     * 실제로 그래서 탭 막대가 화면 왼쪽 바깥으로 215px 밀려 나갔었다.
+     */
+    const clash = [...(shell + nav + (await readFile('src/components/alerts/AlertsEngine.tsx', 'utf8')))
+      .matchAll(/className="[^"]*frame-fixed[^"]*"/g)].filter((m) => /inset-x-\d/.test(m[0]));
+    check('틀에 붙는 것에 inset-x 유틸리티를 겹쳐 쓰지 않음', clash.length === 0,
+      clash.length ? clash[0][0].slice(0, 60) : '');
+
+    /* ③ 본문 안의 분기는 화면 폭이 아니라 칸 폭을 본다 */
+    check('본문이 기준 칸이 됨', /\.app-main \{[^}]*container-type: inline-size/.test(css));
+    check('앱 셸이 본문에 그 표시를 붙임', /className="main-pad app-main/.test(shell));
+
+    const CHROME = ['Signal.tsx', 'ChartModal.tsx', 'StatusBar.tsx'];
+    const stray = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      if (CHROME.some((c) => f.endsWith(c))) continue;
+      const t = await readFile(f, 'utf8');
+      for (const m of t.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        const cls = m[1] ?? m[2] ?? '';
+        for (const bp of cls.matchAll(/(?<![\w@[-])(sm|md|lg|xl|min-\[\d+px\]):/g)) {
+          stray.push(`${f.split('/').pop()} ${bp[0]}`);
+        }
+      }
+    }
+    check('본문에 화면 폭 기준 분기가 남아 있지 않음', stray.length === 0,
+      stray.length ? `${stray.length}곳 (예: ${stray[0]})` : '');
+
+    // vw 도 같은 함정이다. 1440px 창에서 85vw 는 1224px 이라 430px 칸을 넘는다.
+    const vw = [];
+    for (const f of await listFiles('src', /\.tsx$/)) {
+      const t = await readFile(f, 'utf8');
+      if (/\d+(?:\.\d+)?vw/.test(t)) vw.push(f.split('/').pop());
+    }
+    check('화면 폭 단위(vw) 대신 칸 폭 단위(cqw)를 씀', vw.length === 0,
+      vw.length ? vw.join(', ') : '');
+
+    /*
+     * 칸(container)이 되면 그 안의 position:fixed 는 화면이 아니라 그 칸을
+     * 기준으로 붙는다. 큰 그림 창을 제자리에서 그리면 뒷배경이 본문 크기만큼만
+     * 덮여 상태바와 하단 탭이 그대로 드러난다.
+     */
+    const modal = await readFile('src/components/charts/ChartModal.tsx', 'utf8');
+    check('큰 그림 창을 문서 맨 위로 옮겨 그림', /createPortal\(/.test(modal) && /document\.body,/.test(modal));
+    check('큰 그림 창도 틀과 같은 폭', /max-w-\[var\(--frame-w\)\]/.test(modal));
+
+    /* ④ 미리보기도 같은 규칙 */
+    check('미리보기에도 틀이 있음',
+      /@media \(min-width: 480px\) \{[\s\S]{0,160}\.app \{[\s\S]{0,120}max-width: var\(--frame-w\)/.test(tpl8));
+    check('미리보기도 본문이 기준 칸', /container-type: inline-size/.test(tpl8));
+    check('미리보기에서도 사이드바를 뺐음',
+      !/class="sidebar"/.test(tpl8) && !/getElementById\('sidenav'\)/.test(tpl8));
+    const tplViewport = [...tpl8.matchAll(/@media \(min-width: (\d+)px\)/g)].map((m) => Number(m[1]));
+    // 남아도 되는 것은 틀 자체를 켜는 480px 하나뿐이다. 나머지 배치는 칸 폭을 봐야 한다.
+    check('미리보기에 남은 화면 폭 분기는 틀을 켜는 것뿐',
+      tplViewport.every((v) => v === 480), tplViewport.filter((v) => v !== 480).join(', '));
+    check('미리보기 배치 분기가 칸 폭을 봄',
+      (tpl8.match(/@container app \(min-width:/g) ?? []).length >= 8);
+  }
+
+  /* ---------------- 8-29. 작은 그림도 휠로 확대되는가 ---------------- */
+  console.log('\n[8-29] 그래프 확대 · 카드 높이');
+  {
+    /*
+     * 사용자가 짚은 것 둘.
+     *  ① "홈 맨 처음 화면에 미국 크립토 화면의 창 크기가 다르잖아"
+     *  ② "각 그래프마다 마우스 휠로 원하는 부분을 확대 축소 할 수 있게"
+     */
+
+    /* ① 심리 카드 — 상자는 같은 높이인데 안이 짧아 아래가 비어 보였다 */
+    const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('심리 카드의 버튼과 산출 시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
+    check('요인 줄이 바닥 줄과 붙지 않게 아래 여백을 둠', /className="mt-2 mb-2 space-y-2 border-t/.test(fngCardSrc));
+    const tpl14 = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 바닥에 붙임', /\.fngfoot \{[^}]*margin-top: auto/.test(tpl14));
+
+    /*
+     * ② 휠 확대.
+     *
+     * 큰 차트는 원래 됐다. 안 되던 것은 카드 안의 작은 그림(생활 경제 지수)이다.
+     * 여기에 끌기까지 붙이면 끌고 손을 뗀 자리에서 큰 창이 열리므로 휠만 받는다.
+     */
+    const hook = await readFile('src/components/charts/useChartViewport.ts', 'utf8');
+    check("휠만 받는 방식이 있음", /mode\?: 'all' \| 'wheel'/.test(hook));
+    check('휠만 받을 때는 끌기·핀치를 붙이지 않음', /if \(!el \|\| !enabled \|\| mode !== 'all'\) return;/.test(hook));
+    check('휠은 커서 자리를 기준으로 확대함', /zoomBy\(zoomOut \? 1\.18 : 1 \/ 1\.18, timeAtPx\(e\.clientX - rect\.left\)\)/.test(hook));
+
+    /*
+     * 페이지를 굴리던 손이 그래프 위를 지나가는 것뿐이면 가로채지 않는다.
+     * 생활 화면은 그림이 아홉 장 쌓여 있어, 이 유예가 없으면 위로 굴려 올라가는
+     * 길목마다 그림이 확대되어 화면을 되돌릴 수가 없다.
+     */
+    check('페이지를 굴리는 중이면 휠을 가로채지 않음',
+      /SCROLL_GRACE_MS/.test(hook) && /Date\.now\(\) - lastPageScroll\.current < SCROLL_GRACE_MS/.test(hook));
+    check('미리보기도 같은 유예를 둠',
+      /const SCROLL_GRACE_MS = 350;/.test(tpl14) && (tpl14.match(/scrolling\(\)\) return;/g) ?? []).length >= 2);
+
+    const trend = await readFile('src/components/charts/BasicTrend.tsx', 'utf8');
+    check('생활 지수의 작은 그림이 휠을 받음', /useChartViewport\(\{[\s\S]{0,320}mode: 'wheel'/.test(trend));
+    check('그림 안 눈금과 화면 픽셀의 배율을 맞춤', /const k = size\.w > 0 \? size\.w \/ VIEW_W : 0/.test(trend));
+    check('구간 밖으로 삐져나온 선을 잘라 냄', /clipPath=\{`url\(#\$\{id\}-clip\)`\}/.test(trend));
+    check('확대했을 때만 되돌아갈 길이 나타남', /vp\.zoomed \? \(/.test(trend) && /전체 구간/.test(trend));
+    /*
+     * 좁힌 구간은 **그림에만** 쓴다. 큰 창과 표에는 원래 값이 그대로 가야 한다 —
+     * 확대해 놓고 표를 열었더니 표까지 잘려 있으면 값을 확인할 길이 없어진다.
+     */
+    check('큰 창에는 원래 구간이 감', /const bigSeries: ChartSeries\[\] = clean\.map/.test(trend));
+    check('표에도 원래 구간이 감', /mine\.points\n?\s*\.slice\(-12\)/.test(trend));
+    check('미리보기도 같은 규칙',
+      /const BTREND_VIEW = \{\};/.test(tpl14) &&
+      /const vclean = clean\.map/.test(tpl14) &&
+      /data-btreset=/.test(tpl14));
+
+    /*
+     * 눈금값이 잘리지 않는가.
+     * '89,514달러' 가 51.2 를 먹는데 자리가 46 뿐이라 앞의 '8' 이 그림 밖으로 나갔다.
+     */
+    const gl = Number(trend.match(/const GUTTER_L = (\d+)/)?.[1] ?? 0);
+    const tplGl = Number(tpl14.match(/const TREND_GL = (\d+)/)?.[1] ?? 0);
+    check('왼쪽 눈금 자리가 가장 긴 값을 담을 만큼 넓음', gl >= 58, `${gl}px`);
+    check('미리보기도 같은 자리', tplGl === gl, `${tplGl} vs ${gl}`);
+  }
+
+  /* ---------------- 8-30. 옷을 갈아입힌 뒤 ---------------- */
+  console.log('\n[8-30] 조용한 단말 — 글꼴 · 재질 · 숫자 · 단추');
+  {
+    const css = await readFile('src/app/globals.css', 'utf8');
+    const tpl15 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* ① 글꼴 — 직접 싣는다 */
+    check('Pretendard 를 직접 실음', /@font-face \{[\s\S]{0,200}Pretendard Variable/.test(css));
+    check('글꼴이 맨 앞에 섬', /--font-sans:\s*\n?\s*'Pretendard Variable'/.test(css));
+    check('기다리는 동안 글자를 감추지 않음', /font-display: swap/.test(css));
+    const font = await stat('public/fonts/pretendard-subset.woff2').catch(() => null);
+    check('자른 글꼴이 실려 있음', font !== null && font.size > 50_000, font ? `${Math.round(font.size / 1024)}KB` : '없음');
+    /*
+     * 원본은 2.0MB 다. 잘라 싣는 이유가 무게라, 무게가 다시 불면 이유가 사라진다.
+     * 400KB 는 첫 화면을 기다리게 하지 않는 선이다.
+     */
+    check('자른 글꼴이 400KB 를 넘지 않음', font !== null && font.size < 400_000,
+      font ? `${Math.round(font.size / 1024)}KB` : '');
+    check('다시 자르는 길이 있음', /"font": "node tools\/font\/subset\.mjs"/.test(await readFile('package.json', 'utf8')));
+    check('글꼴 라이선스를 함께 둠', (await stat('tools/font/LICENSE-Pretendard.txt').catch(() => null)) !== null);
+    check('미리보기도 같은 글꼴을 품고 감', /font-family: 'Pretendard Variable'/.test(tpl15) && /__FONT__/.test(tpl15));
+
+    /* ② 재질 — 테두리 대신 바탕 단차 */
+    check('카드에 테두리를 두르지 않음', /\.card \{\n\s*background: var\(--surface\);\n\s*border-radius/.test(css));
+    check('카드에 그림자를 얹지 않음', !/\.card \{[^}]*box-shadow/.test(css));
+    check('미리보기 카드도 마찬가지', /\.card \{ background: var\(--surface\); border-radius: var\(--box-radius\); \}/.test(tpl15));
+
+    /* ③ 모서리 — 눈금을 둘로 접는다 */
+    check('모서리 값이 한 곳에 적혀 있음', /--box-radius: 10px;/.test(css) && /--box-radius-sm: 6px;/.test(css));
+    check('Tailwind 눈금도 그 둘로 모임',
+      /--radius-lg: var\(--box-radius\);/.test(css) && /--radius-2xl: var\(--box-radius\);/.test(css));
+    const strayRadius = [...tpl15.matchAll(/border-radius:\s*(\d+)px/g)]
+      .map((m) => Number(m[1]))
+      .filter((v) => v > 4 && v < 90);
+    check('미리보기에 떠도는 모서리 값이 없음', strayRadius.length === 0, strayRadius.join(', '));
+
+    /* ④ 숫자 — 소수점 이하는 한 단 연하게 */
+    const fig = await readFile('src/components/ui/Figure.tsx', 'utf8');
+    check('숫자 자리가 따로 있음', /export function Figure\(/.test(fig));
+    check('소수점 이하를 연하게', /\.figure-dec \{[^}]*opacity/.test(css));
+    check('붙는 단위를 한 호 작게', /\.figure-unit \{[^}]*font-size: 0\.78em/.test(css));
+    /*
+     * 0 부터 세어 올리는 연출은 넣지 않는다. 이 앱은 값이 없을 때 0 으로 채우지
+     * 않기로 되어 있는데, 0 에서 시작하는 애니메이션은 짧게나마 그 약속을 어긴다.
+     */
+    check('숫자를 0 부터 세어 올리지 않음', !/countUp|CountUp|from 0/.test(fig));
+    check('값이 바뀐 자리를 잠깐 물들임', /@keyframes figure-flash/.test(css));
+    check('축소 모션을 켠 사람에게는 물들이지 않음',
+      /prefers-reduced-motion[\s\S]{0,160}\.figure-flash[\s\S]{0,80}animation: none/.test(css));
+    const pc2 = await readFile('src/components/market/PriceCard.tsx', 'utf8');
+    check('가격이 그 자리를 씀', /<Figure text=\{f\.price\(quote\)\} flashColor=\{color\} \/>/.test(pc2));
+    check('미리보기도 같은 모양', /\.figure-dec \{ opacity: 0\.55; \}/.test(tpl15));
+
+    /* ⑤ 단추 — 무게를 셋으로 */
+    check('단추 무게가 셋으로 나뉨',
+      /\.btn-primary \{/.test(css) && /\.btn \{/.test(css) && /\.btn-quiet \{/.test(css));
+    const chart2 = await readFile('src/components/charts/InteractiveChart.tsx', 'utf8');
+    check('차트 위 알약 여섯 개가 정리됨',
+      /className="btn-group"/.test(chart2) && /className="btn-quiet"/.test(chart2) &&
+      !/rounded-md border border-border bg-surface-2 px-2 py-1/.test(chart2));
+    check('미리보기도 셋으로 나눔', /\.ghost-primary \{/.test(tpl15) && /\.ghost-quiet \{/.test(tpl15));
+
+    /* ⑥ 눈금값이 잘리지 않는가 — 글꼴을 바꾸면 글자 폭이 달라진다 */
+    const marginLeft = Number(chart2.match(/const MARGIN = \{ top: \d+, right: \d+, bottom: \d+, left: (\d+) \}/)?.[1] ?? 0);
+    const tplLeft = Number(tpl15.match(/const M = \{ top: \d+, right: \d+, bottom: \d+, left: (\d+) \}/)?.[1] ?? 0);
+    check('차트 눈금값 자리가 넉넉함', marginLeft >= 58, `${marginLeft}px`);
+    check('미리보기도 같은 자리', tplLeft === marginLeft, `${tplLeft} vs ${marginLeft}`);
+  }
+
+  /* ---------------- 8-31. 오늘의 한 줄 · 찾기 ---------------- */
+  console.log('\n[8-31] 오늘의 한 줄 · 찾기');
+  {
+    const tpl16 = await readFile('tools/preview/template.html', 'utf8');
+
+    /* 오늘의 한 줄 — 새 데이터 없이, 이미 있는 것에서 뽑는다 */
+    const line = await readFile('src/lib/todayLine.mjs', 'utf8');
+    const view = await readFile('src/components/market/TodayLine.tsx', 'utf8');
+    check('문장 짓는 규칙이 따로 있음', /export function todayLine\(/.test(line));
+    /*
+     * 금지어를 원본에서 찾으면 주석에 적어 둔 "이런 말은 쓰지 않는다" 까지 걸린다.
+     * 나오는 문장을 직접 지어서 본다 — 검사해야 할 것은 규칙이 아니라 결과다.
+     */
+    const { todayLine: makeLine } = await import('../src/lib/todayLine.mjs');
+    const sentences = [
+      makeLine({ scores: [{ market: 'us', score: 12, deltaDay: -9 }] }),
+      makeLine({
+        scores: [{ market: 'crypto', score: 88, deltaDay: 11 }],
+        picks: [{ quote: { name: '비트코인', changePct: -9 }, heat: { times: 4 } }],
+      }),
+      makeLine({ indicators: [{ level: 'alert', name: 'VIX' }, { level: 'alert', name: '하이일드' }] }),
+    ].filter(Boolean);
+    const banned = sentences.filter((t) => /매수|매도|사세요|파세요|기회|추천|전망|예상|오를|내릴|수익/.test(t));
+    check('지어낸 문장에 사라·팔라·전망 같은 말이 없음', banned.length === 0, banned.join(' / '));
+    check('세 갈래 모두 문장이 나옴', sentences.length === 3, `${sentences.length}/3`);
+    check('할 말이 없으면 줄을 그리지 않음', /return null;/.test(line) && /if \(!line\) return null;/.test(view));
+    check('세 마디를 한꺼번에 늘어놓지 않음', /if \(mood && heat\)[\s\S]{0,120}if \(mood && risk\)/.test(line));
+    const homeSrc = await readFile('src/app/page.tsx', 'utf8');
+    check('홈 맨 위에 섬', /<TodayLine \/>[\s\S]{0,200}<FngSection \/>/.test(homeSrc) &&
+      homeSrc.indexOf('<TodayLine />') < homeSrc.indexOf('<FngSection />'));
+
+    /*
+     * 시장 위험 신호등 여섯 장을 홈에서 뺐다.
+     *
+     * 그 블록은 "빨간불은 '위험하니 팔아라' 가 아니라 '이 지표가 평소보다 크게
+     * 벗어나 있다' 는 뜻" 이라는 설명 문단을 함께 읽어야 제대로 읽힌다.
+     * 설명을 읽어야 읽히는 것은 10초 안에 훑는 화면에 맞지 않는다.
+     *
+     * 여섯 중 둘(공포지수 · 위험한 회사 이자)은 이미 심리 점수의 구성요소라
+     * 홈에서 점수로 한 번, 신호등으로 또 한 번 본 셈이기도 했다.
+     * 나머지 넷은 '경제지표' 탭이 맡는다 — 거기서는 설명과 함께 읽힌다.
+     */
+    /*
+     * 카드 폭은 한 화면 안에서 같아야 한다.
+     *
+     * 심리 카드만 85cqw(최대 340px)라 다른 카드보다 66px 좁았다. 홈을 위에서
+     * 아래로 훑으면 왼쪽 선은 맞는데 오른쪽 선만 혼자 들어가 있었고, 두 번째
+     * 카드는 틀 끝에서 잘려 조각으로 보였다 — 같은 크기의 카드 둘이 다른 크기로
+     * 보인 것이다. 이제 한 장이 칸을 꽉 채우고, "옆에 더 있다" 는 점이 말한다.
+     */
+    const fngSec = await readFile('src/components/market/FngSection.tsx', 'utf8');
+    check('심리 카드가 칸을 꽉 채움',
+      /className="snap-item w-\[calc\(100cqw-24px\)\]"/.test(fngSec) && !/max-w-\[340px\]/.test(fngSec));
+    check('옆에 더 있다는 것을 점이 알림', /function Carousel\(/.test(fngSec) && /count > 1 \?/.test(fngSec));
+    check('미리보기도 같은 폭', /\.fng-scroll > \* \{[^}]*width: calc\(100cqw - 24px\)/.test(tpl16) && /\.fng-dots/.test(tpl16));
+
+    /*
+     * 폭만 맞춰서는 모자랐다 — 높이도 같아야 한다.
+     *
+     * 요인 줄은 시장마다 0~2줄이라 카드 안쪽 내용의 길이가 제각각이다. 카드가
+     * 제 내용만큼만 자라면 옆으로 밀 때마다 카드 아래 빈 자리가 늘었다 줄었다
+     * 한다. 미리보기에서 실제로 그랬다 — 크립토 446px, 미국 403px, 아래 빈 자리
+     * 49px 차이. 카드 셋이 가장 키 큰 것에 맞춰 서고, 남는 자리는 안쪽으로
+     * 흩어져야 한다 (바닥의 단추와 시각은 margin-top:auto 로 붙인다).
+     */
+    const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    check('앱 카드가 칸 높이를 꽉 채움', /className="card flex h-full flex-col p-3"/.test(fngCardSrc));
+    check('앱 카드의 단추·시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
+
+    /*
+     * height:100% 가 오히려 높이를 어긋나게 했다.
+     *
+     * 높이가 정해지지 않은 칸 안에서 100% 는 auto 로 풀리고, 그러면서 늘어나는
+     * 동작(align-self:stretch)까지 꺼버린다. 앱은 카드를 감싼 칸이 따로 있어
+     * 안 걸렸고, 감싼 칸이 없는 미리보기에서만 터졌다.
+     */
+    const fngCardCss = tpl16.match(/\.fngcard \{[^}]*\}/)?.[0] ?? '';
+    check('미리보기 카드에 height:100% 가 없음', fngCardCss !== '' && !/height:\s*100%/.test(fngCardCss), fngCardCss);
+    check('미리보기 카드가 늘어나 같은 높이로 섬', /align-self:\s*stretch/.test(fngCardCss), fngCardCss);
+    check('미리보기도 단추·시각을 바닥에 붙임', /\.fngfoot \{[^}]*margin-top:\s*auto/.test(tpl16));
+
+    /*
+     * 바닥 모양도 앱과 같아야 한다. 미리보기는 시각과 단추를 한 줄에 몰아 넣어
+     * 단추가 글자만 했다. 앱은 단추 둘이 한 줄을 나눠 갖고(하나는 강조색),
+     * 산출 시각은 그 아래 줄이다.
+     */
+    check('미리보기 단추가 한 줄을 나눠 가짐', /\.fngfoot > button \{[^}]*flex:\s*1 1 0/.test(tpl16));
+    check('미리보기도 강조 단추가 하나', /class="ghost ghost-primary" data-go-region=/.test(tpl16));
+    check('미리보기도 산출 시각이 아랫줄', /<p class="fngstamp"/.test(tpl16) && /\.fngstamp \{/.test(tpl16));
+
+    /*
+     * 요약 카드가 맨 위 한 줄과 같은 말을 하고 있었다.
+     *   한 줄 : 크립토 투자심리가 어제보다 10점 탐욕 쪽으로 갔고 …
+     *   요약  : 오늘 가장 크게 움직인 것 — 크립토 심리 78.3점 탐욕 (어제보다 +10.0) …
+     * 요약의 첫 줄에서 심리 부분을 뺐다. 심리 이야기는 다음 줄이 '왜' 로 이어받는다.
+     */
+    const summarySrc = await readFile('src/server/summary.ts', 'utf8');
+    check('요약 첫 줄이 심리 점수를 되풀이하지 않음',
+      !/심리 \$\{formatScore/.test(summarySrc) && /대표 시세 중 가장 크게 움직인 것/.test(summarySrc));
+    const sumT = (await getJson('/api/snapshot?scenario=normal')).body?.sections?.summary?.data;
+    const first = (sumT?.lines ?? [])[0]?.text ?? '';
+    check('내려온 요약도 심리 점수로 시작하지 않음', !/심리 \d/.test(first), first.slice(0, 60));
+
+    check('홈에서 위험 신호등 여섯 장을 뺌',
+      !/<RiskGaugesSection \/>/.test(homeSrc) && /<RiskAlertLine \/>/.test(homeSrc));
+    const alertLine = await readFile('src/components/market/RiskAlertLine.tsx', 'utf8');
+    check('빨간불이 켜진 날에만 한 줄이 뜸', /digest\.alertCount === 0\) return null;/.test(alertLine));
+    check('그 줄이 경제지표로 데려감', /href="\/indicators"/.test(alertLine));
+    check('경제지표 탭에는 그대로 있음',
+      /RiskGaugesSection|RiskBoard/.test(await readFile('src/app/indicators/page.tsx', 'utf8')));
+    check('미리보기도 같은 줄을 씀', /빨간불 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
+
+    /*
+     * 조사는 앞말의 받침이 정한다.
+     * '수수료이 평소 범위를 벗어났습니다' 가 나오고 있었고, 다른 한 곳은 지표
+     * **개수**로 조사를 고르고 있었다 — 이름과 아무 상관이 없었다.
+     */
+    const { subject } = await import('../src/lib/particle.mjs');
+    const particleCases = [['수수료', '가'], ['금리차', '가'], ['국면', '이'], ['VIX', '가'], ['S&P 500', '이']];
+    const wrong = particleCases.filter(([w, want]) => subject(w) !== want);
+    check('조사를 받침으로 고름', wrong.length === 0, wrong.map(([w]) => w).join(', '));
+    check('두 곳 모두 그 규칙을 씀',
+      /import \{ subject \} from '\.\/particle\.mjs'/.test(line) && /from '@\/lib\/particle\.mjs'/.test(alertLine));
+    check('미리보기도 같은 문장을 지음',
+      /function todayLineText\(\)/.test(tpl16) && /TODAY_MOVE_MIN = 1\.5/.test(tpl16) && /TODAY_HEAT_MIN = 1\.6/.test(tpl16));
+
+    /* 찾기 */
+    const search = await readFile('src/lib/search.mjs', 'utf8');
+    const dialog = await readFile('src/components/ui/SearchDialog.tsx', 'utf8');
+    check('찾는 규칙이 따로 있음', /export function searchEntries\(/.test(search));
+    check('초성으로도 찾음', /export function initials\(/.test(search) && /isInitialQuery/.test(search));
+    check('앞에서 맞은 것이 먼저 옴', /at === 0 \? 0 : 100/.test(search));
+    check('바깥에 물어보지 않음 (앱 안의 것만)',
+      /CATALOG/.test(dialog) && /TERMS/.test(dialog) && !/fetch\(/.test(dialog));
+    const shellSrc = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    check('어느 화면에서든 Ctrl+K 로 열림',
+      /if \(!e\.metaKey && !e\.ctrlKey\) return;/.test(shellSrc) &&
+      /window\.addEventListener\('keydown'/.test(shellSrc));
+    check('글자를 치는 중에는 가로채지 않음',
+      /HTMLInputElement \|\| el instanceof HTMLTextAreaElement/.test(shellSrc));
+    check('상단에도 여는 자리가 있음',
+      /aria-label="찾기 \(Ctrl\+K\)"/.test(await readFile('src/components/market/StatusBar.tsx', 'utf8')));
+    /* 기준 칸 안의 fixed 는 화면이 아니라 그 칸에 붙는다 — 큰 그림 창과 같은 이유 */
+    check('찾기 창도 문서 맨 위로 옮겨 그림', /createPortal\(/.test(dialog) && /document\.body,/.test(dialog));
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */
@@ -1223,6 +3042,127 @@ async function main() {
       check(`${what} 은 아직 연결 전이라 오류를 던짐`,
         new RegExp(`${what}[\\s\\S]{0,300}NotWiredError`).test(live));
     }
+  }
+
+  /* ---------------- 8-32. 핫한 종목 늘리기 ---------------- */
+  console.log('\n[8-32] 핫한 종목 — 목록 · 값 · 합성 세계');
+  {
+    const cat = await readFile('src/lib/catalog.ts', 'utf8');
+    const stooq = await readFile('src/server/adapters/live/providers/stooq.ts', 'utf8');
+    const gecko = await readFile('src/server/adapters/live/providers/coingecko.ts', 'utf8');
+
+    /* 늘린 이름들이 목록에 있는가 */
+    const HOT_US = ['meta', 'googl', 'avgo', 'amd', 'nflx', 'pltr', 'coin', 'mstr', 'mu', 'smci'];
+    const HOT_COIN = ['doge', 'ada', 'trx', 'avax', 'link'];
+    const missingCat = [...HOT_US, ...HOT_COIN].filter((id) => !new RegExp(`\\{\\s*id:\\s*'${id}'`).test(cat));
+    check('핫한 종목이 카탈로그에 들어옴 — 미국 10 · 코인 5',
+      missingCat.length === 0, missingCat.join(', '));
+
+    /*
+     * 목록에만 있고 받아올 길이 없으면 LIVE 에서 빈 줄만 늘어난다.
+     * 늘린 종목은 전부 제공사 심볼을 함께 적었는지 본다.
+     */
+    const noSymbol = HOT_US.filter((id) => !new RegExp(`^\\s*${id}: '${id}\\.us',`, 'm').test(stooq));
+    check('늘린 미국 종목마다 Stooq 심볼이 있음', noSymbol.length === 0, noSymbol.join(', '));
+    const noCoin = HOT_COIN.filter((id) => !new RegExp(`^\\s*${id}: '[a-z0-9-]+',`, 'm').test(gecko));
+    check('늘린 코인마다 CoinGecko id 가 있음', noCoin.length === 0, noCoin.join(', '));
+
+    /*
+     * 한국 개별 종목은 늘리지 않았다 — 무료로 닿는 시세 제공처가 없다.
+     * 그 사정을 코드에 적어 둔다. 안 적으면 다음 사람이 같은 길을 다시 판다.
+     */
+    check('한국 종목을 왜 안 늘렸는지 적어 둠',
+      /무료로 닿는 시세 제공처가 없다/.test(cat) && /빈 줄만 늘어난다/.test(cat));
+    check('손으로 고른 목록임을 밝힘', /손으로 고른 목록이다/.test(cat) && /다시\n\s*\*\s*들여다봐야/.test(cat));
+
+    /* 화면까지 실제로 값이 오는가 */
+    const quotes = (await getJson('/api/snapshot?scenario=normal')).body?.sections?.quotes?.data ?? {};
+    const byId = new Map();
+    for (const rows of Object.values(quotes)) for (const q of rows ?? []) byId.set(q.id, q);
+    const blank = [...HOT_US, ...HOT_COIN].filter((id) => {
+      const q = byId.get(id);
+      return !q || q.price === null || q.price === undefined || !Number.isFinite(q.changePct);
+    });
+    check('늘린 종목 전부에 값과 등락이 옴 — 15개', blank.length === 0, blank.join(', '));
+
+    /*
+     * 값이 오기만 하면 안 된다. 자릿수가 말이 돼야 한다.
+     * 0.42달러짜리 미국 주식이 찍히던 것을 여기서 잡는다.
+     */
+    const odd = HOT_US.filter((id) => {
+      const v = byId.get(id)?.price;
+      return !(v > 1 && v < 20000);
+    });
+    check('미국 종목 값이 주식다운 자릿수임', odd.length === 0, odd.join(', '));
+
+    /* 큰 그림도 그려지는가 — 구간마다 점이 와야 한다 */
+    for (const id of ['smci', 'avax']) {
+      const ranges = (await getJson(`/api/asset/${id}`)).body?.ranges ?? {};
+      const empty = Object.entries(ranges).filter(([, v]) => !(v?.length > 1)).map(([k]) => k);
+      check(`${id} 의 모든 구간에 그림이 있음`, Object.keys(ranges).length === 5 && empty.length === 0,
+        empty.join(', '));
+    }
+
+    /*
+     * 합성 세계가 가라앉던 것.
+     *
+     * 가격을 (1 + r) 로 곱해 나가면 쌓이는 것은 r 의 평균이 아니라 log(1+r) 의
+     * 평균이라, 많이 흔들리는 종목일수록 까닭 없이 값이 내려갔다. 게다가 변동성이
+     * 치솟은 날에는 r 이 -1 을 넘어 가격이 음수가 되는 걸 바닥값으로 막아야 했고,
+     * 한 번 바닥에 닿은 종목은 다시 올라오지 못했다. exp 로 쌓으면 둘 다 없다.
+     */
+    const world = await readFile('src/server/adapters/demo/world.ts', 'utf8');
+    check('가격을 로그 공간에서 쌓음 (exp)',
+      (world.match(/p \*= Math\.exp\(/g) ?? []).length === 3);
+    check('음수를 막는 바닥값이 더는 필요 없음',
+      !/Math\.max\(p \* \(1 \+/.test(world));
+    check('왜 곱하지 않고 exp 인지 적어 둠',
+      /로그 수익률/.test(world) && /바닥에 닿은 종목은 다시 올라오지 못했다/.test(world));
+
+    /* 10년을 걸어도 한쪽으로 기울지 않는가 — 오르는 종목과 내리는 종목이 섞여야 한다 */
+    const usRows = (quotes.us ?? []).filter((q) => q.kind === 'equity' && Number.isFinite(q.changePct));
+    const up = usRows.filter((q) => q.changePct > 0).length;
+    check('오르는 종목과 내리는 종목이 함께 있음',
+      usRows.length >= 15 && up > 0 && up < usRows.length, `${up}/${usRows.length} 상승`);
+
+    /*
+     * 늘린 종목은 새 case 를 적지 않아도 이어진다.
+     * 한 줄 적는 것을 잊어 빈 카드가 나오는 일을 구조로 막는다.
+     */
+    const demoIdx = await readFile('src/server/adapters/demo/index.ts', 'utf8');
+    check('이름이 같은 시계열을 자동으로 이음',
+      /if \(s\[item\.id\]\) return \{ values: s\[item\.id\], dates: d \};/.test(demoIdx) &&
+      /if \(c\[item\.id\]\) return \{ values: c\[item\.id\], dates: cd \};/.test(demoIdx));
+
+    /*
+     * 재무제표가 없는 이유를 두 가지로 갈랐다.
+     * 한 문장으로 뭉치면 메타 앞에서 "SEC 공시가 있는 미국 상장사만 보여줍니다"
+     * 라고 말하게 된다 — 메타는 미국 상장사이고 공시도 있다. 틀린 말이 된다.
+     */
+    const cc = await readFile('src/lib/companyCatalog.ts', 'utf8');
+    check('재무제표 없는 이유를 한 곳에서 정함',
+      /export function fundamentalsUnavailableReason\(/.test(cc));
+    check('공시가 없는 것과 아직 안 이은 것을 갈라 말함',
+      /market === 'us' && item\.kind === 'equity'/.test(cc) && /회사 번호\(CIK\)를 확인하지 못해/.test(cc));
+    check('CIK 를 짐작으로 적지 않는다고 밝힘', /짐작으로 적으면 엉뚱한 회사의 재무제표가 나오므로/.test(cc));
+    check('조사를 이름의 받침이 정함', /\$\{topic\(item\.name\)\}/.test(cc));
+    const reasons = {};
+    for (const id of ['meta', 'mu', 'doge']) {
+      reasons[id] = (await getJson(`/api/asset/${id}`)).body?.fundamentalsUnavailable ?? '';
+    }
+    check('미국 종목에는 아직 안 이었다고 말함',
+      /미국 상장사지만/.test(reasons.meta) && /미국 상장사지만/.test(reasons.mu));
+    check('받침 있는 이름에 은, 없는 이름에 는',
+      reasons.mu.startsWith('마이크론은') && reasons.meta.startsWith('메타는'),
+      `${reasons.mu.slice(0, 6)} / ${reasons.meta.slice(0, 5)}`);
+    check('코인에는 공시가 없다고 말함', /공시가 없습니다/.test(reasons.doge) && !/미국 상장사지만/.test(reasons.doge));
+
+    /*
+     * 시총 300위 문턱은 그대로다 — 늘린 종목도 그 문을 지난다.
+     * 제공사가 순위를 주지 않는 동안에는 문이 열려 있고, 주기 시작하면 걸러진다.
+     */
+    const heat = await readFile('src/lib/heatRank.mjs', 'utf8');
+    check('시총 문턱이 그대로 있음', /CAP_RANK_MAX = 300/.test(heat) && /export function withinCap\(/.test(heat));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

@@ -72,8 +72,10 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
   /** 네 나라 비교값을 만든다. 한국이 대표값이 된다. */
   const build = (
     id: string,
+    /** 이름을 풀어 쓴 쉬운 말 — 이름 아래 작게 붙는다 */
+    plainName: string,
+    /** 이 지표의 이름 — 카드 제목 자리에 크게 선다 */
     name: string,
-    englishName: string,
     data: Map<string, SeriesPoint[]> | null,
     opts: {
       precision: number;
@@ -125,7 +127,7 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
     return {
       id,
       name,
-      englishName,
+      plainName,
       value: tf(last.v),
       previous: prev ? tf(prev.v) : null,
       precision: opts.precision,
@@ -146,14 +148,14 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
     } satisfies EconomyBasic;
   };
 
-  const gdpItem = build('per_capita_gdp', '1인당 GDP', 'GDP per capita', gdp, {
+  const gdpItem = build('per_capita_gdp', '국민 한 사람 몫의 생산', '1인당 GDP · GDP per capita', gdp, {
     precision: 0,
     suffix: '달러',
     reading: (v, y) => `${y} 한국은 1인당 약 ${Math.round(v).toLocaleString('ko-KR')}달러입니다. 나라가 만든 가치를 인구로 나눈 값이라 내 통장에 들어오는 돈은 아닙니다.`,
   });
   if (gdpItem) out.push(gdpItem);
 
-  const giniItem = build('gini', '지니계수', 'Gini coefficient', gini, {
+  const giniItem = build('gini', '소득이 얼마나 고르게 나뉘는지', '지니계수 · Gini coefficient', gini, {
     precision: 3,
     suffix: '',
     transform: (v) => v / 100, // 세계은행은 0~100 으로 준다
@@ -180,7 +182,7 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
     if (krLast) {
       const krInfl = (infl.get('KR') ?? []).find((p) => p.t === krLast.t)?.v ?? null;
       const krUn = (unemp.get('KR') ?? []).find((p) => p.t === krLast.t)?.v ?? null;
-      const item = build('misery', '미저리 지수', 'Misery index', sumByCountry, {
+      const item = build('misery', '물가와 실업을 더한 살림 고통 지수', '미저리 지수 · Misery Index', sumByCountry, {
         precision: 1,
         suffix: '',
         reading: (v, y) =>
@@ -207,7 +209,7 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
       merged.sort((x, y) => x.t - y.t);
       gapByCountry.set(c.code, merged);
     }
-    const item = build('ppp_gap', '구매력평가(PPP) 환율 괴리', 'PPP exchange rate gap', gapByCountry, {
+    const item = build('ppp_gap', '물가로 따진 환율과 실제 환율의 차이', '구매력평가(PPP) 환율 괴리 · PPP exchange rate gap', gapByCountry, {
       precision: 1,
       suffix: '%',
       reading: (v, y) =>
@@ -229,8 +231,8 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
       const asOf = Date.parse(`${kr.date}T00:00:00Z`);
       out.push({
         id: 'bigmac',
-        name: '빅맥지수',
-        englishName: 'Big Mac Index',
+        name: '빅맥지수 · Big Mac Index',
+        plainName: '햄버거 값으로 따져 본 원화의 값어치',
         value: kr.vsUsdPct,
         previous: krHist.length > 1 ? krHist[krHist.length - 2].v : null,
         precision: 1,

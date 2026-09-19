@@ -246,6 +246,14 @@
   --color-muted: var(--muted-fg);
   --color-subtle: var(--subtle-fg);
   --color-accent: var(--accent);
+  /*
+   * 강조색 위에 얹는 글자색.
+   *
+   * 이게 없어서 text-accent-fg 가 아무 색도 만들어 내지 못했고, 글자가 본문색
+   * (--fg, 거의 흰색)으로 떨어졌다. 파란 단추에 흰 글자 — 대비가 2.08:1 로
+   * 기준(4.5:1)의 절반도 안 됐다. 홈의 '미국 시장 →' 같은 주 단추가 전부 그랬다.
+   */
+  --color-accent-fg: var(--accent-fg);
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
@@ -259,8 +267,25 @@
 
 /* ------------------------------ 기본 ------------------------------ */
 
-* {
-  min-width: 0;
+/*
+ * 칸이 좁아지면 내용도 같이 줄어들게 하는 리셋.
+ *
+ * flex·grid 의 자식은 기본값이 min-width:auto 라 내용보다 작아지지 않는다. 그래서
+ * 긴 글자 하나가 옆 칸을 밀어내고 가로 스크롤을 만든다. 그걸 막는 흔한 리셋이다.
+ *
+ * ★ 반드시 @layer base 안에 있어야 한다.
+ *   레이어 밖에 두었더니 Tailwind 의 유틸리티(@layer utilities)와 이 파일의
+ *   컴포넌트 클래스(@layer components)를 **전부 이겨서**, 앱 안의 min-width 지정이
+ *   하나도 듣지 않았다. 아래 312행의 경고와 같은 종류의 사고다.
+ *
+ *   눈에 보이던 증상: 뒤로가기 '←' 가 min-w-[24px] 을 줬는데도 폭 14px 로 그려져
+ *   손가락으로 누르기 어려웠고(기준 24px), 그래프 확대·축소 단추도 min-width:28px
+ *   이 죽어 16px 로 쪼그라들어 있었다. 코드에 적힌 min-w-* 77곳이 전부 죽은 글자였다.
+ */
+@layer base {
+  * {
+    min-width: 0;
+  }
 }
 
 html {

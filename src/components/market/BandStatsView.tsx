@@ -129,16 +129,29 @@ function BoxRow({ b, d }: { b: FngBandStat; d: Domain }) {
 function Axis({ d }: { d: Domain }) {
   const x = (v: number) => ((v - d.lo) / (d.hi - d.lo)) * ROW_W;
   return (
-    <svg viewBox={`0 0 ${ROW_W} 14`} className="h-[14px] w-full" aria-hidden="true">
+    /*
+     * 높이를 viewBox 와 같은 값으로 못박아 둔다 (16 ↔ h-[16px]).
+     *
+     * SVG 는 preserveAspectRatio 기본값이 'meet' 이라 가로·세로 배율 중 **작은 쪽**을
+     * 따른다. 여기는 높이가 CSS 로 고정돼 있어 세로 배율이 늘 1 이고, 그래서 글자는
+     * 적어 둔 크기 그대로 그려진다 — 가로가 아무리 넓어져도 커지지 않는다.
+     * (같은 이유로 BasicTrend 의 fontSize 10 은 높이가 auto 라 1.1~1.3배로 커져
+     *  실제로는 11~13px 로 보인다. 여기서는 그 여유가 없다.)
+     *
+     * 그래서 이 글자는 적힌 값이 곧 보이는 값이다. 9.5px 로 두었더니 화면에서도
+     * 9.5px 이라 이 앱의 최소 글씨 기준(10.5px)을 밑돌았다. 10.5px 로 올리면서
+     * 눈금선(y=1~4)과 겹치지 않게 칸 높이와 기준선을 함께 내렸다.
+     */
+    <svg viewBox={`0 0 ${ROW_W} 16`} className="h-[16px] w-full" aria-hidden="true">
       <line x1="0" x2={ROW_W} y1="1" y2="1" stroke="var(--border)" strokeWidth="1" />
       {ticksOf(d).map((v) => (
         <g key={v}>
           <line x1={x(v)} x2={x(v)} y1="1" y2="4" stroke={v === 0 ? 'var(--border-strong)' : 'var(--border)'} strokeWidth="1" />
           <text
             x={Math.min(ROW_W - 10, Math.max(10, x(v)))}
-            y="12"
+            y="13"
             textAnchor="middle"
-            fontSize="9.5"
+            fontSize="10.5"
             fill={v === 0 ? 'var(--muted-fg)' : 'var(--subtle-fg)'}
           >
             {v > 0 ? `+${v}` : v}

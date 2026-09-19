@@ -3165,6 +3165,142 @@ async function main() {
     check('시총 문턱이 그대로 있음', /CAP_RANK_MAX = 300/.test(heat) && /export function withinCap\(/.test(heat));
   }
 
+  /* ---------------- 8-33. 그림 속 글씨 크기 ---------------- */
+  console.log('\n[8-33] 그림 속 글씨도 10.5px 아래로 내려가지 않는가');
+  {
+    /*
+     * 글씨 크기 검사에 구멍이 있었다.
+     *
+     * 지금까지는 Tailwind 로 적은 글씨(text-[11.5px] 같은 것)만 봤다. 그런데 그림
+     * 안의 글자는 SVG 의 fontSize 로 적히므로 그 그물에 걸리지 않았고, 구간별 통계의
+     * 가로 눈금이 9.5px 로 남아 있었다.
+     *
+     * SVG 는 까다롭다. viewBox 가 늘어나면 글자도 같이 커지기 때문에, **적어 둔 값이
+     * 곧 보이는 값은 아니다.** 실제로 BasicTrend 의 fontSize 10 은 높이가 auto 라
+     * 1.1~1.3배로 커져 화면에서는 11~13px 로 보인다 — 규칙 위반이 아니다.
+     *
+     * 갈리는 지점은 **높이를 CSS 로 못박았는가** 이다. 못박으면 세로 배율이 1 로
+     * 고정되고(preserveAspectRatio 기본값이 작은 쪽을 따르므로) 적은 값이 그대로
+     * 보인다. 그런 그림만 10.5px 문턱을 적용한다.
+     */
+    /*
+     * 파일 전체를 훑으면 안 된다.
+     *
+     * 한 번 그렇게 짰다가 미리보기의 font-size 9 · 10 이 무더기로 걸렸는데, 재 보니
+     * 전부 높이가 auto 라 1.1~1.3배로 커져 화면에서는 11~13px 였다. 위반이 아닌 것을
+     * 위반이라 부르는 검사는 고쳐야 할 것을 가려 버린다. 그래서 **높이를 못박은 칸**
+     * 하나만 도려내어 본다.
+     */
+    const blocks = [
+      ['src/components/market/BandStatsView.tsx',
+       /viewBox=\{`0 0 \$\{ROW_W\} (\d+)`\}\s+className="h-\[(\d+)px\][\s\S]{0,700}?<\/svg>/],
+      ['tools/preview/template.html',
+       /viewBox="0 0 ' \+ BAND_ROW_W \+ ' (\d+)"[^']*height:(\d+)px[\s\S]{0,900}?<\/svg>/],
+    ];
+    for (const [path, re] of blocks) {
+      const src = await readFile(path, 'utf8');
+      const m = src.match(re);
+      check(`${path} — 눈금 칸의 viewBox 높이와 CSS 높이가 같음`, Boolean(m) && m[1] === m[2],
+        m ? `viewBox ${m[1]} vs CSS ${m[2]}` : '블록을 못 찾음');
+
+      const small = [...(m?.[0] ?? '').matchAll(/font-?[Ss]ize="(\d+(?:\.\d+)?)"/g)]
+        .map((x) => parseFloat(x[1])).filter((v) => v < 10.5);
+      check(`${path} — 그 칸 안에 10.5px 미만 글씨가 없음`, Boolean(m) && small.length === 0,
+        small.join(', '));
+    }
+
+    /*
+     * 실제로 화면에 몇 px 로 보이는지는 브라우저만 안다. 여기서는 소스만 보므로,
+     * 눈금 글씨가 기준값 그대로 적혔는지까지만 확인한다.
+     */
+    const band = await readFile('src/components/market/BandStatsView.tsx', 'utf8');
+    check('구간 눈금 글씨가 10.5px', /fontSize="10\.5"/.test(band));
+    check('눈금선(y=1~4)과 글자 기준선이 겹치지 않음', /y="13"/.test(band));
+    const tplBand = await readFile('tools/preview/template.html', 'utf8');
+    check('미리보기도 같은 값', /font-size="10\.5"/.test(tplBand) && /y="13" text-anchor="middle"/.test(tplBand));
+
+    /*
+     * 늘어나는 그림(BasicTrend)은 이 문턱을 적용하지 않는다. 다만 왜 예외인지는
+     * 코드에 적혀 있어야 한다 — 안 적으면 다음 사람이 "여기도 10.5로 올려야겠다"
+     * 하고 고쳐서 y축 글자가 잘린다.
+     */
+    check('늘어나는 그림이 예외인 이유를 적어 둠',
+      /높이가 auto 라 1\.1~1\.3배로 커져/.test(band));
+  }
+
+  /* ---------------- 8-34. 조용히 죽어 있던 스타일 ---------------- */
+  console.log('\n[8-34] 적어 두었는데 듣지 않던 것들');
+  {
+    const css = await readFile('src/app/globals.css', 'utf8');
+
+    /*
+     * ① 레이어 밖의 * 규칙이 모든 min-width 를 죽이고 있었다.
+     *
+     * Tailwind v4 에서 레이어 없는 CSS 는 @layer utilities · @layer components 를
+     * **전부 이긴다.** 그래서 레이어 밖에 둔 `* { min-width: 0 }` 이 코드에 적힌
+     * min-width 를 하나도 남김없이 0 으로 덮었다 — 앱 안의 min-w-* 77곳이 전부
+     * 죽은 글자였다.
+     *
+     * 눈에 보이던 증상: 뒤로가기 '←' 가 min-w-[24px] 을 주고도 폭 14px, 그래프
+     * 확대·축소 단추가 min-width:28px 을 주고도 16px. 손가락으로 누르기 어려웠다.
+     */
+    const starBlocks = [...css.matchAll(/(^|\n)([^\S\n]*)\*\s*\{[^}]*\}/g)];
+    for (const m of starBlocks) {
+      const before = css.slice(0, m.index);
+      // 이 * 규칙이 @layer 블록 안에 있는가 — 앞선 중괄호 짝으로 센다
+      const depth = (before.match(/\{/g) ?? []).length - (before.match(/\}/g) ?? []).length;
+      check('전역 * 규칙이 @layer 안에 있음', depth > 0,
+        depth > 0 ? '' : `레이어 밖에 있음: ${m[0].trim().replace(/\s+/g, ' ').slice(0, 60)}`);
+    }
+    check('min-width 리셋이 @layer base 안에 있음',
+      /@layer base \{\s*\*\s*\{\s*min-width:\s*0;\s*\}\s*\}/.test(css));
+    check('왜 레이어 안이어야 하는지 적어 둠',
+      /반드시 @layer base 안에 있어야 한다/.test(css) && /min-w-\* 77곳이 전부 죽은 글자였다/.test(css));
+
+    /*
+     * ② @theme 에 없는 색 이름은 유틸리티가 만들어지지 않는다.
+     *
+     * text-accent-fg 를 썼는데 --color-accent-fg 를 @theme 에 안 적어 두어서,
+     * 아무 색도 안 나오고 글자가 본문색(거의 흰색)으로 떨어졌다. 파란 단추에 흰
+     * 글자 — 대비 2.08:1 로 기준(4.5:1)의 절반도 안 됐다.
+     *
+     * 한 곳을 고치는 데서 끝내지 않고, :root 의 색 이름을 유틸리티로 쓰면서
+     * @theme 에 안 올린 것이 또 있는지 통째로 본다.
+     */
+    const themeBlock = css.match(/@theme inline \{[\s\S]*?\n\}/)?.[0] ?? '';
+    const themed = new Set([...themeBlock.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]));
+    const rootVars = new Set([...css.matchAll(/^\s{2}--([a-z][a-z0-9-]*):/gm)].map((m) => m[1]));
+
+    const tsx = [];
+    for (const dir of ['src/components', 'src/app']) {
+      for (const f of await listFiles(dir, /\.tsx$/)) tsx.push(await readFile(f, 'utf8'));
+    }
+    const used = new Set();
+    for (const src of tsx) {
+      for (const m of src.matchAll(/\b(?:text|bg|border|fill|stroke|ring|divide)-([a-z][a-z0-9-]*)\b/g)) {
+        if (rootVars.has(m[1])) used.add(m[1]);
+      }
+    }
+    const dead = [...used].filter((n) => !themed.has(n)).sort();
+    check('색 유틸리티로 쓰는 이름이 모두 @theme 에 올라 있음', dead.length === 0,
+      dead.length ? `@theme 에 --color-${dead.join(', --color-')} 가 없어 유틸리티가 만들어지지 않습니다` : '');
+    check('강조 단추 글자색이 @theme 에 있음', themed.has('accent-fg'));
+
+    /*
+     * ③ 홀로 선 길은 손가락이 닿을 자리를 24px 로 넓힌다 (WCAG 2.2 AA 2.5.8).
+     *    문장 속 링크는 예외라 건드리지 않는다.
+     */
+    const backs = [
+      ['src/app/asset/[id]/page.tsx', /aria-label="뒤로"[\s\S]{0,140}?className="tap[^"]*min-w-\[24px\]/],
+      ['src/app/fng/[market]/page.tsx', /aria-label="[^"]*"[\s\S]{0,160}?className="tap[^"]*min-w-\[24px\]/],
+      ['src/app/market/[region]/page.tsx', /aria-label="지수 목록으로"[\s\S]{0,200}?className="tap[^"]*min-w-\[24px\]/],
+      ['src/app/indices/page.tsx', /href="\/futures"[\s\S]{0,140}?className="tap/],
+    ];
+    for (const [path, re] of backs) {
+      check(`${path} — 홀로 선 길의 누를 자리가 24px`, re.test(await readFile(path, 'utf8')));
+    }
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

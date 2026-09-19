@@ -115,7 +115,14 @@ export default function MarketRegionPage() {
         <div className="flex min-w-0 items-start gap-2">
           {/* /market 은 없앤 화면이라 지수 탭으로 돌려보낸다 */}
           {/* shrink-0 이 없으면 320px 에서 옆의 제목에 밀려 화살표가 제 상자를 넘는다 */}
-          <Link href="/indices" aria-label="지수 목록으로" className="mt-0.5 shrink-0 text-muted">
+          {/* .tap · min-w-[24px] 은 손가락이 닿을 자리를 24px 로 넓힌다 (WCAG 2.2 AA 2.5.8).
+              화살표 글자 자체는 14px 뿐이라 이것이 없으면 누르기 어렵다 —
+              자산·심리 상세의 뒤로가기와 같은 모양으로 맞춘다. */}
+          <Link
+            href="/indices"
+            aria-label="지수 목록으로"
+            className="tap mt-0.5 min-w-[24px] shrink-0 justify-center text-muted"
+          >
             ←
           </Link>
           <div className="min-w-0">

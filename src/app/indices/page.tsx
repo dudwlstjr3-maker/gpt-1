@@ -19,7 +19,10 @@ export default function IndicesPage() {
       <BackBar />
       <header className="flex items-start justify-between gap-2 px-3 pt-1">
         <h1 className="text-lg font-bold text-fg-strong">시장 지수</h1>
-        <Link href="/futures" className="mt-1 shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+        <Link
+          href="/futures"
+          className="tap mt-1 shrink-0 text-[12.5px] font-semibold text-accent hover:underline"
+        >
           선물 시장 →
         </Link>
       </header>

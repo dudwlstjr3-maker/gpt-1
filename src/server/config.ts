@@ -172,10 +172,19 @@ export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
  * 응답이 30ms 여도 뒤쪽 요청이 줄줄이 시간 초과로 떨어졌다 — LIVE 를 처음 돌렸을 때
  * 시세 26개가 전부 빈 채로 나온 것이 이 때문이었다. 12초로 늘리면 그 줄이 풀린다.
  *
- * 무한정 기다리지는 않는다. 화면은 30초마다 갱신되므로, 한 곳이 죽었을 때
- * 그 자리만 비우고 나머지를 보여주려면 갱신 주기보다는 짧아야 한다.
+ * 12초도 모자랐다. 서버에 올려 보니 FRED 가 5개 중 1개만 들어오고 나머지가
+ * "요청 시간 초과 (12000ms)" 로 떨어졌다. 두 가지가 겹친 탓이다.
+ *
+ *   ① 서버리스는 요청이 끝나면 사라진다. 우리 캐시(SWR)가 메모리에 있어서
+ *      **매 요청이 늘 찬 서랍에서 시작한다.** 개발 서버에서는 한 번 데워지면
+ *      그만인 것이 여기서는 매번 처음부터다.
+ *   ② 국면 전광판이 20년치를 달라고 한다. 관측치 5,000개짜리 응답이라
+ *      그것 하나가 십수 초를 먹는다.
+ *
+ * 25초로 올린다. 위의 maxDuration(60초)보다 넉넉히 짧아, 한 곳이 끝내 죽어도
+ * 함수가 잘리기 전에 그 자리만 비우고 나머지를 돌려줄 수 있다.
  */
-export const HTTP_TIMEOUT_MS = Number(env('UPSTREAM_TIMEOUT_MS') ?? 12_000);
+export const HTTP_TIMEOUT_MS = Number(env('UPSTREAM_TIMEOUT_MS') ?? 25_000);
 export const HTTP_MAX_RETRIES = Number(env('UPSTREAM_MAX_RETRIES') ?? 2);
 /** 업스트림 호스트당 초당 최대 요청 수 */
 export const RATE_LIMIT_PER_SEC = Number(env('UPSTREAM_RATE_LIMIT_PER_SEC') ?? 5);

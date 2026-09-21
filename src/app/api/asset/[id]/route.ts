@@ -21,6 +21,20 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+/*
+ * 서버리스에서 이 함수가 살아 있을 수 있는 시간.
+ *
+ * 적지 않으면 Vercel 기본값 10초가 걸린다. 그런데 LIVE 모드의 한 번 응답은
+ * 제공사 여러 곳에 수십 건을 묻고, 호스트당 초당 5건으로 속도를 지키며 기다린다.
+ * 10초로는 모자라 함수가 통째로 잘려 죽고, 화면에는 "데이터 없음" 만 남는다 —
+ * 제공사는 멀쩡한데 우리 쪽에서 끊은 것이라 원인을 짚기도 어렵다.
+ *
+ * 60초는 Hobby 요금제가 허용하는 최대값이다. 바깥 한 곳을 기다리는 시간
+ * (HTTP_TIMEOUT_MS, 12초)보다 넉넉해야 한 곳이 느릴 때 그 자리만 비우고
+ * 나머지를 돌려줄 수 있다.
+ */
+export const maxDuration = 60;
+
 
 // 화면이 내주는 구간과 같아야 한다. 한 곳(@/types)에서 정한다.
 const RANGES = ASSET_RANGES;

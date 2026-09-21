@@ -254,8 +254,31 @@ button { font: inherit; cursor: pointer; }
 .preview {
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
-  padding: 16px 16px;
+  padding: 8px 12px;
 }
+.preview-head { min-width: 0; flex: 1 1 260px; }
+.preview-lead {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--subtle);
+  word-break: keep-all;
+  max-width: 62ch;
+}
+/* '자세히' 는 문장 끝에 붙는 작은 글자 단추다. 줄을 새로 만들지 않는다. */
+.preview-toggle {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  margin-left: 2px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.preview-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
+.preview-more { margin-top: 4px; }
 .preview-inner {
   margin: 0 auto;
   /* 아래 앱이 430px 짜리 칸이라, 이 머리말만 1240px 로 펼쳐 두면 둘이 따로 논다 */
@@ -266,7 +289,7 @@ button { font: inherit; cursor: pointer; }
   gap: 12px 20px;
 }
 .preview-title {
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -282,7 +305,8 @@ button { font: inherit; cursor: pointer; }
   max-width: 62ch;
   line-height: 1.6;
 }
-.preview-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+/* 좁은 화면에서는 네 묶음이 두 줄로 접힌다. 줄 사이를 좁혀 머리말이 덜 먹게 한다. */
+.preview-controls { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
 
 /* ---------------------------------- 앱 셸 ---------------------------------- */
 /*
@@ -840,14 +864,27 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
 <div class="preview">
   <div class="preview-inner">
-    <div>
+    <div class="preview-head">
       <p class="preview-title">구현물 미리보기</p>
-      <p class="preview-note">
-        <strong style="color:var(--fg)">Market Mood 3</strong> — 브랜치 <code>claude/market-mood-3-dashboard-h3j8qf</code> 에 푸시된
-        Next.js 앱의 실제 화면입니다. 아래 수치는 실행 중인 서버의 <strong style="color:var(--warn)">DEMO 스냅샷</strong>을 그대로 담았고,
-        점수는 하드코딩이 아니라 실제 산출 엔진이 계산한 값입니다. 탭·통화·색상·테마 전환과 차트 툴팁이 모두 동작합니다.
+      <!--
+        보이는 줄은 한 줄만 둔다.
+        예전에는 설명이 통째로 펼쳐져 있어서 폰에서 머리말이 312px — 첫 화면의
+        37% 를 먹었다. 앱을 보러 온 사람이 앱을 보려면 스크롤부터 해야 했다.
+        남길 것은 딱 하나, "이 수치는 진짜가 아니다" 이다. 이건 접으면 안 된다.
+        브랜치 이름이나 엔진 이야기는 만든 사람에게나 쓸모 있는 것이라 접어 둔다.
+      -->
+      <p class="preview-lead">
+        <strong style="color:var(--fg)">Market Mood 3</strong> — 화면과 조작은 실제 앱 그대로이고,
+        수치는 <strong style="color:var(--warn)">DEMO(합성) 데이터</strong>라 실제 시세가 아닙니다.
+        <button type="button" class="preview-toggle" data-more aria-expanded="false" aria-controls="preview-more">자세히</button>
       </p>
-      <p class="preview-note" style="margin-top:8px" id="captured"></p>
+      <div class="preview-more" id="preview-more" hidden>
+        <p class="preview-note">
+          브랜치 <code>claude/market-mood-3-dashboard-h3j8qf</code> 의 Next.js 앱을 한 장으로 내보낸 것입니다.
+          점수는 하드코딩이 아니라 실제 산출 엔진이 계산한 값이고, 탭·통화·색상·테마 전환과 차트 툴팁이 모두 동작합니다.
+        </p>
+        <p class="preview-note" style="margin-top:4px" id="captured"></p>
+      </div>
     </div>
     <div class="preview-controls">
       <div class="seg" role="group" aria-label="DEMO 시나리오">
@@ -4867,6 +4904,17 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const box = e.target.closest && e.target.closest('[data-chart]');
     if (!box) return;
     setView(box.dataset.chart, CHARTS[box.dataset.chart].full);
+  });
+
+  /* 머리말의 '자세히' — 접힌 설명을 펴고 접는다 */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-more]');
+    if (!btn) return;
+    const box = document.getElementById('preview-more');
+    const open = box.hidden;
+    box.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.textContent = open ? '접기' : '자세히';
   });
 
   document.addEventListener('click', (e) => {

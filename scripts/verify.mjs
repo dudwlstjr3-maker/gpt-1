@@ -3301,6 +3301,33 @@ async function main() {
     }
   }
 
+  /* ---------------- 8-35. 미리보기 머리말 ---------------- */
+  console.log('\n[8-35] 미리보기 머리말이 앱을 가리지 않는가');
+  {
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+
+    /*
+     * 머리말이 첫 화면의 37% 를 먹고 있었다 (폰에서 312px). 앱을 보러 온 사람이
+     * 앱을 보려면 스크롤부터 해야 했다. 설명을 접어 두고 한 줄만 남겼다.
+     *
+     * 다만 **접으면 안 되는 것이 하나** 있다 — 이 수치가 진짜가 아니라는 말이다.
+     * DEMO 와 실데이터를 헷갈리게 두지 않는 것이 이 앱의 첫째 규칙이라, 그 말은
+     * 펼치지 않아도 보이는 자리에 있어야 한다.
+     */
+    const lead = tpl.match(/<p class="preview-lead">[\s\S]*?<\/p>/)?.[0] ?? '';
+    check('접기 전에도 보이는 한 줄이 있음', lead !== '');
+    check('그 한 줄이 DEMO 임을 밝힘', /DEMO/.test(lead) && /실제 시세가 아닙니다/.test(lead));
+
+    const more = tpl.match(/<div class="preview-more"[\s\S]*?<\/div>/)?.[0] ?? '';
+    check('접히는 쪽에는 만든 사람용 설명만 둠',
+      more !== '' && !/실제 시세가 아닙니다/.test(more) && /브랜치/.test(more));
+    check('접힌 채로 시작함', /<div class="preview-more" id="preview-more" hidden>/.test(tpl));
+    check('펴고 접는 단추가 있음',
+      /data-more aria-expanded="false" aria-controls="preview-more"/.test(tpl) &&
+      /btn\.textContent = open \? '접기' : '자세히'/.test(tpl));
+    check('왜 줄였는지 적어 둠', /첫 화면의\n\s*37% 를 먹었다|37% 를 먹었다/.test(tpl));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

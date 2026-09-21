@@ -33,7 +33,14 @@ import {
 } from './providers/coingecko';
 import { FRED_SOURCE, fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
 import { fetchFredCalendar, fredCalendarConfig } from './providers/fredCalendar';
-import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig, type StooqQuote } from './providers/stooq';
+import {
+  YAHOO_SOURCE,
+  YAHOO_SYMBOL,
+  yahooConfig,
+  fetchDailySeries,
+  fetchQuotes as fetchYahooQuotes,
+  type YahooQuote,
+} from './providers/yahoo';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
 import { FUTURES_ITEMS } from '@/lib/futuresCatalog';
@@ -178,9 +185,17 @@ export class LiveAdapter implements MarketAdapter {
 
   /** Stooq 로 지수·종목 시세를 채운다. 심볼이 없는 항목은 사유를 적고 비운다. */
   private async stooqQuotes(market: MarketId): Promise<Quote[]> {
-    const cfg = stooqConfig(envUrl(this.baseUrlEnvFor(market)));
+    /*
+     * 이름은 stooqQuotes 로 남아 있지만 속은 Yahoo 다.
+     *
+     * Stooq 가 문을 닫아(2026-09) 시세를 통째로 옮겼다. 부르는 쪽 이름을 같이
+     * 바꾸면 이 커밋의 diff 가 제공사 교체가 아니라 대규모 이름 변경처럼 보여서,
+     * **무엇이 왜 바뀌었는지**가 묻힌다. 다음에 또 제공사를 갈 때 이 자리를
+     * 찾기 쉽도록 이름은 두고 속만 바꿨다.
+     */
+    const cfg = yahooConfig(envUrl(this.baseUrlEnvFor(market)));
     const items = catalogFor(market);
-    const ids = items.filter((i) => STOOQ_SYMBOL[i.id]).map((i) => i.id);
+    const ids = items.filter((i) => YAHOO_SYMBOL[i.id]).map((i) => i.id);
     /*
      * 실패한 까닭을 버리지 않는다.
      *
@@ -191,13 +206,13 @@ export class LiveAdapter implements MarketAdapter {
      * 운영에서는 그 한참이 그대로 장애 시간이 된다.
      */
     let fetchError: string | null = null;
-    const quotes = await fetchQuotes(cfg, ids).catch((e: unknown) => {
+    const quotes = await fetchYahooQuotes(cfg, ids).catch((e: unknown) => {
       fetchError = e instanceof Error ? e.message : String(e);
-      return new Map<string, StooqQuote>();
+      return new Map<string, YahooQuote>();
     });
 
     const fetchedAt = new Date().toISOString();
-    const source: DataSource = { ...STOOQ_SOURCE };
+    const source: DataSource = { ...YAHOO_SOURCE };
     const session = getSession(market, new Date()).phase;
 
     return items.map((item) => {
@@ -215,7 +230,7 @@ export class LiveAdapter implements MarketAdapter {
         session,
       };
 
-      if (!STOOQ_SYMBOL[item.id]) {
+      if (!YAHOO_SYMBOL[item.id]) {
         return {
           ...base,
           price: null,
@@ -227,7 +242,7 @@ export class LiveAdapter implements MarketAdapter {
       }
 
       const q = quotes.get(item.id);
-      if (!q || q.close === null) {
+      if (!q || q.price === null) {
         // 닿지 못한 것과 빈 값을 준 것을 갈라 적는다
         const why = fetchError
           ? `제공사에 닿지 못했습니다: ${fetchError}`
@@ -242,19 +257,30 @@ export class LiveAdapter implements MarketAdapter {
         };
       }
 
-      // Stooq 의 한 줄에는 전일 종가가 없다. 시가 대비 변화로 그날의 움직임을 나타낸다.
-      const change = q.open !== null ? q.close - q.open : null;
-      const changePct = q.open !== null && q.open !== 0 ? (q.close / q.open - 1) * 100 : null;
+      /*
+       * 등락은 **전일 종가** 와 견준다.
+       *
+       * Stooq 때는 전일 종가를 주지 않아 그날 시가와 견줬다. 그건 "오늘 장 시작
+       * 뒤로 얼마나" 였지 신문에 나오는 등락률이 아니었다. Yahoo 는 전일 종가를
+       * 주므로 이제 남들이 말하는 것과 같은 값이 된다.
+       */
+      const change = q.previousClose !== null ? q.price - q.previousClose : null;
+      const changePct =
+        q.previousClose !== null && q.previousClose !== 0
+          ? (q.price / q.previousClose - 1) * 100
+          : null;
 
       return {
         ...base,
-        price: q.close,
+        price: q.price,
         change,
         changePct,
         volume: item.hasVolume ? q.volume : null,
         ...(item.hasVolume ? { volumeUnit: 'count' as const } : {}),
+        // 시세와 추이를 한 번에 받으므로 스파크라인도 여기서 채운다
+        spark: q.spark,
         meta: meta(q.asOf ?? fetchedAt, fetchedAt, source,
-          change === null ? ['시가를 받지 못해 등락을 계산하지 않았습니다.'] : undefined),
+          change === null ? ['전일 종가를 받지 못해 등락을 계산하지 않았습니다.'] : undefined),
       };
     });
   }
@@ -370,7 +396,7 @@ export class LiveAdapter implements MarketAdapter {
       );
     }
     const deps = {
-      stooq: stooqConfig(envUrl(this.baseUrlEnvFor(market))),
+      stooq: yahooConfig(envUrl(this.baseUrlEnvFor(market))),
       fred: this.fred(),
       now: ctx.now,
       days: 700,
@@ -389,7 +415,7 @@ export class LiveAdapter implements MarketAdapter {
     }
     const id = market === 'us' ? 'spx' : 'kospi';
     const name = market === 'us' ? 'S&P 500' : 'KOSPI';
-    const series = await fetchDailySeries(stooqConfig(envUrl(this.baseUrlEnvFor(market))), id, 400);
+    const series = await fetchDailySeries(yahooConfig(envUrl(this.baseUrlEnvFor(market))), id, 400);
     return series.length ? { id, name, series, precision: 2 } : null;
   }
 
@@ -421,7 +447,7 @@ export class LiveAdapter implements MarketAdapter {
     const [vix, hy, spx] = await Promise.allSettled([
       fetchSeries(cfg, 'vix', { start }),
       fetchSeries(cfg, 'hy_oas', { start }),
-      fetchDailySeries(stooqConfig(envUrl('US_MARKET_BASE_URL')), 'spx', 21 * 366),
+      fetchDailySeries(yahooConfig(envUrl('US_MARKET_BASE_URL')), 'spx', 21 * 366),
     ]);
 
     if (vix.status === 'fulfilled' && vix.value.length > 0) series.vol = vix.value;
@@ -446,7 +472,7 @@ export class LiveAdapter implements MarketAdapter {
       }
       series.drawdown = drawdown;
       series.trend = trend;
-      sources.push({ ...STOOQ_SOURCE });
+      sources.push({ ...YAHOO_SOURCE });
     }
 
     if (Object.keys(series).length === 0) {
@@ -774,13 +800,13 @@ export class LiveAdapter implements MarketAdapter {
       return fetchOpenInterestHistory(cfg, 'BTCUSDT', spec.period, spec.limit);
     }
 
-    /* 지수 · 개별주 · 원자재 — Stooq. 일봉만 있다. */
-    if (STOOQ_SYMBOL[id]) {
+    /* 지수 · 개별주 · 원자재 — Yahoo. 지금 받는 것은 일봉뿐이다. */
+    if (YAHOO_SYMBOL[id]) {
       if (range === '1D') {
-        throw new SeriesUnavailableError('Stooq 무료 CSV 는 일봉만 있어 하루 안의 움직임을 그릴 수 없습니다.');
+        throw new SeriesUnavailableError('지금 받는 값이 일봉이라 하루 안의 움직임은 그릴 수 없습니다.');
       }
       const days: Partial<Record<RangeKey, number>> = { '1W': 10, '1M': 35, '3M': 100, '1Y': 400, '3Y': 1200 };
-      return fetchDailySeries(stooqConfig(null), id, days[range] ?? 35);
+      return fetchDailySeries(yahooConfig(null), id, days[range] ?? 35);
     }
 
     /* 여기까지 왔으면 무료로 받을 길이 없는 값이다. 사유를 그대로 올려보낸다. */

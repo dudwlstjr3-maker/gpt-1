@@ -153,6 +153,7 @@ const server = createServer((req, res) => {
    * 종료할 때(Ctrl+C) 한 번에 찍는다.
    */
   const who = (req.url || '').startsWith('/fred') ? 'FRED'
+    : (req.url || '').startsWith('/yf') ? 'Yahoo'
     : (req.url || '').startsWith('/cg') ? 'CoinGecko'
     : (req.url || '').startsWith('/bn') ? 'Binance'
     : (req.url || '').startsWith('/wb') ? 'World Bank'
@@ -197,6 +198,42 @@ const server = createServer((req, res) => {
   if (p === '/q/l/') return text(res, stooqQuote((u.searchParams.get('s') ?? '').split(',').filter(Boolean)));
 
   /* ---------------- CoinGecko ---------------- */
+  /* Yahoo v8 chart — 시세와 추이를 한 번에 준다 (providers/yahoo.ts) */
+  if (p.startsWith('/yf/v8/finance/chart/')) {
+    const sym = decodeURIComponent(p.slice('/yf/v8/finance/chart/'.length));
+    const seed = [...sym].reduce((a, c) => a + c.charCodeAt(0), 0);
+    /*
+     * range 를 그대로 존중한다.
+     *
+     * 처음에는 무엇을 묻든 80일치만 돌려줬는데, 그러면 125일 이동평균을 쓰는
+     * 지표가 늘 '값 없음' 이 되어 **우리 코드가 틀린 것처럼 보인다.** 대역 서버가
+     * 진짜보다 적게 주면, 고칠 것이 없는데 고치러 들어가게 된다.
+     */
+    const RANGE_DAYS = { '1mo': 30, '3mo': 92, '6mo': 183, '1y': 365, '2y': 730,
+                         '5y': 1826, '10y': 3652, max: 9000 };
+    const want = RANGE_DAYS[u.searchParams.get('range') ?? '2mo'] ?? 60;
+    const pts = daily(want, seed, 100 + (seed % 400), 0.0004, 0.02, 0.01);
+    const ts = pts.map((x) => Math.floor(x.t / 1000));
+    const close = pts.map((x) => Number(x.v.toFixed(4)));
+    const last = close[close.length - 1];
+    const prev = close[close.length - 2];
+    return json(res, {
+      chart: {
+        result: [{
+          meta: {
+            regularMarketPrice: last,
+            previousClose: prev,
+            regularMarketVolume: 1000000 + (seed % 900000),
+            regularMarketTime: ts[ts.length - 1],
+          },
+          timestamp: ts,
+          indicators: { quote: [{ close }] },
+        }],
+        error: null,
+      },
+    });
+  }
+
   if (p === '/cg/simple/price') {
     const ids = (u.searchParams.get('ids') ?? '').split(',').filter(Boolean);
     const out = {};

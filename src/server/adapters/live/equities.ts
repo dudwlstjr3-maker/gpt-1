@@ -10,10 +10,11 @@ import { envUrl } from '@/server/config';
 import type { EngineInput, RawSeries } from '@/server/fng/engine';
 import type { DataSource, MarketId, SeriesPoint } from '@/types';
 import { FRED_SOURCE, fetchSeries, type FredConfig } from './providers/fred';
-import { STOOQ_SOURCE, fetchDailySeries, type StooqConfig } from './providers/stooq';
+// Stooq 가 문을 닫아 시세·시계열을 Yahoo 로 옮겼다 (providers/stooq.ts 의 머리말 참고)
+import { YAHOO_SOURCE, fetchDailySeries, type YahooConfig } from './providers/yahoo';
 import { CBOE_SOURCE, cboeConfig, fetchEquityPutCall } from './providers/cboe';
 
-const ST: DataSource = { ...STOOQ_SOURCE };
+const ST: DataSource = { ...YAHOO_SOURCE };
 const FR: DataSource = { ...FRED_SOURCE };
 const CB: DataSource = { ...CBOE_SOURCE };
 
@@ -83,7 +84,7 @@ function vol(s: RawSeries, window: number): RawSeries {
 }
 
 export interface EquityDeps {
-  stooq: StooqConfig;
+  stooq: YahooConfig;
   fred: FredConfig | null;
   now: Date;
   days: number;

@@ -2,6 +2,7 @@
 
 /** 경제 캘린더 — 미국·한국·크립토 시장별 + 중요도·카테고리 필터, 날짜별 그룹. */
 
+import { BackBar } from '@/components/nav/BackBar';
 import { useMemo, useState } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, EmptyState } from '@/components/ui/States';
@@ -86,8 +87,9 @@ export default function CalendarPage() {
 
   return (
     <div className="pt-2">
+      <BackBar />
       <h1 className="px-3 pt-1 text-lg font-bold text-fg-strong">경제 캘린더</h1>
-      <p className="mt-0.5 px-3 text-[11px] break-keep text-muted">
+      <p className="mt-0.5 px-3 text-[12.5px] break-keep text-muted">
         모든 시각은 KST 기준입니다. 전체를 고르면 세 시장을 한 번에, 시장을 고르면 그 시장과 글로벌 일정을 봅니다.
         어느 시장 일정인지는 색과 배지로 표시합니다.
       </p>
@@ -123,7 +125,7 @@ export default function CalendarPage() {
             ]}
           />
         </div>
-        <div className="scroll-x flex gap-1.5 pb-1">
+        <div className="scroll-x flex gap-2 pb-1">
           {categories.map((c) => {
             const active = category === c;
             return (
@@ -132,7 +134,7 @@ export default function CalendarPage() {
                 type="button"
                 onClick={() => setCategory(c)}
                 aria-pressed={active}
-                className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                className="shrink-0 rounded-full border px-2 py-1 text-[12.5px] font-semibold"
                 style={{
                   borderColor: active ? 'var(--accent)' : 'var(--border)',
                   background: active ? 'color-mix(in srgb, var(--accent) 16%, transparent)' : 'var(--surface-2)',
@@ -168,10 +170,10 @@ export default function CalendarPage() {
 
                 {/* 고른 날의 일정. 달력에서 누른 날이 여기로 이어진다. */}
                 <section aria-label="고른 날의 일정" aria-live="polite">
-                  <h2 className="mb-1.5 text-[12px] font-bold text-muted">
+                  <h2 className="mb-2 text-[13px] font-bold text-muted">
                     {selected ? formatKstDate(`${selected}T00:00:00+09:00`) : '날짜를 고르세요'}
                     {selected ? (
-                      <span className="ml-1.5 font-normal text-subtle">
+                      <span className="ml-2 font-normal text-subtle">
                         {selectedEvents.length ? `${selectedEvents.length}건` : '일정 없음'}
                       </span>
                     ) : null}
@@ -198,7 +200,7 @@ export default function CalendarPage() {
               <>
                 {grouped.map(([date, events]) => (
                   <section key={date} aria-label={`${date} 일정`}>
-                    <h2 className="mb-1.5 text-[12px] font-bold text-muted">{date}</h2>
+                    <h2 className="mb-2 text-[13px] font-bold text-muted">{date}</h2>
                     <div className="card overflow-hidden">
                       <ul>
                         {events.map((e) => (

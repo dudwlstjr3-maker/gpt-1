@@ -68,10 +68,10 @@ function Comparisons({
   const bars = sameScale && sameUnit && oneSided && magMax > 0 && spread <= 0.7;
 
   return (
-    <dl className="mt-2 space-y-1.5">
+    <dl className="mt-2 space-y-2">
       {items.map((c) => (
         <div key={c.label} className="grid grid-cols-[68px_1fr_auto] items-center gap-2">
-          <dt className={`truncate text-[11px] ${c.primary ? 'font-semibold text-fg' : 'text-muted'}`}>{c.label}</dt>
+          <dt className={`truncate text-[12.5px] ${c.primary ? 'font-semibold text-fg' : 'text-muted'}`}>{c.label}</dt>
           <dd className="min-w-0">
             {bars ? (
               <span className="block h-2 rounded-full bg-surface-3" aria-hidden="true">
@@ -86,7 +86,7 @@ function Comparisons({
             ) : null}
           </dd>
           <dd
-            className={`tnum shrink-0 text-right text-[12px] ${c.primary ? 'font-bold text-fg-strong' : 'text-muted'}`}
+            className={`tnum shrink-0 text-right text-[13px] ${c.primary ? 'font-bold text-fg-strong' : 'text-muted'}`}
           >
             {show(c.value, c.precision, c.suffix)}
           </dd>
@@ -95,7 +95,7 @@ function Comparisons({
       {/* 나라끼리 그대로 견주면 안 되는 지표는 그 이유를 표 바로 밑에 적는다.
           숫자를 나란히 놓는 순간 사람은 비교부터 하기 때문에, 경고가 표 아래에 있어야 한다. */}
       {note ? (
-        <p className="mt-1.5 border-t border-border pt-1.5 text-[10px] leading-relaxed break-keep text-subtle">
+        <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
           <span aria-hidden="true">※ </span>
           {note}
         </p>
@@ -134,28 +134,28 @@ function GuidePanel({
   ];
 
   return (
-    <div className="mt-2.5 border-t border-border pt-2.5">
+    <div className="mt-2 border-t border-border pt-2">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="text-[11px] font-semibold text-accent hover:underline"
+        className="tap text-[12.5px] font-semibold text-accent hover:underline"
       >
         {open ? '설명 접기 ▴' : '이게 무슨 숫자인가요? ▾'}
       </button>
 
       {open ? (
-        <div className="mt-2 rounded-lg bg-surface-2 px-2.5 py-2">
-          <p className="text-[11.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
-          <dl className="mt-2 space-y-1.5 border-t border-border pt-2">
+        <div className="mt-2 rounded-lg bg-surface-2 px-2 py-2">
+          <p className="text-[12.5px] leading-relaxed break-keep text-fg">{g.plain}</p>
+          <dl className="mt-2 space-y-2 border-t border-border pt-2">
             {rows.map((r) => (
-              <div key={r.label} className="flex items-start gap-1.5">
+              <div key={r.label} className="flex items-start gap-2">
                 {/* 화살표는 값의 방향일 뿐이라 등락 색을 쓰지 않는다 */}
-                <span aria-hidden="true" className="mt-px w-3 shrink-0 text-center text-[10px] text-muted">
+                <span aria-hidden="true" className="mt-px w-3 shrink-0 text-center text-[11.5px] text-muted">
                   {r.glyph}
                 </span>
                 <dt className="sr-only">{r.label}</dt>
-                <dd className="min-w-0 text-[11px] leading-relaxed break-keep text-muted">
+                <dd className="min-w-0 text-[12.5px] leading-relaxed break-keep text-muted">
                   <span className="font-semibold text-fg">{r.label} · </span>
                   {r.text}
                 </dd>
@@ -183,29 +183,41 @@ function BasicCard({ item }: { item: EconomyBasic }) {
         : [];
 
   return (
-    <li className="card p-3.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-[14px] font-bold text-fg-strong">{item.name}</h3>
-          <p className="mt-0.5 text-[10px] text-subtle">{item.englishName}</p>
-        </div>
-        <Badge tone={item.official ? 'neutral' : 'warn'} size="xs">
-          <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
-          {item.official ? '공식 통계' : '비공식 개념'}
-        </Badge>
-      </div>
-
+    <li className="card flex flex-col p-3">
       {/*
-       * 큰 숫자와 지나온 선을 나란히 둔다.
-       * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
-       * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다.
+       * 이름과 값을 같은 줄에 둔다.
+       *
+       * 예전에는 이름 줄 밑에 큰 숫자를 한 줄 더 뒀는데, 숫자 오른쪽이 통째로 비어
+       * 카드 한 장이 550px 을 넘겼다. 아홉 장이면 세로로 화면 여섯 개 분량이라
+       * 훑을 수가 없다. 이름과 값은 어차피 같이 읽는 짝이라 한 줄에 둬도 무리가 없다.
        */}
-      <div className="mt-2.5 border-t border-border pt-2.5 sm:flex sm:items-start sm:gap-3">
-        <div className="shrink-0">
-          <p className="tnum text-[26px] leading-none font-bold text-fg-strong">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {/*
+           * 위가 이름, 아래가 그 이름을 풀어 쓴 말이다.
+           *
+           * 한동안 뒤집혀 있었다 — '국민 한 사람 몫의 생산' 이 제목 자리에 크게
+           * 서고 '1인당 GDP' 가 그 아래 작게 붙었다. 쉬운 말을 앞에 두려던 것이었는데,
+           * 제목 자리에 설명이 서면 그게 무엇의 이름인지 알 수 없고 다른 자료에서
+           * 본 말과 이어 볼 수도 없다. 쉬운 말은 이름을 도우라고 있는 것이지
+           * 이름을 대신하라고 있는 것이 아니다.
+           */}
+          <h3 className="text-[14px] leading-snug font-bold break-keep text-fg-strong">{item.name}</h3>
+          {item.plainName ? (
+            <p className="mt-0.5 text-[11.5px] break-keep text-subtle">{item.plainName}</p>
+          ) : null}
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-subtle">
+            <Badge tone={item.official ? 'neutral' : 'warn'} size="2xs">
+              <span aria-hidden="true">{item.official ? '◎' : '△'}</span>
+              {item.official ? '공식 통계' : '비공식 개념'}
+            </Badge>
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="tnum text-[22px] leading-none font-bold text-fg-strong">
             {show(item.value, item.precision, item.suffix)}
           </p>
-          <p className="tnum mt-1 text-[10.5px] text-muted">
+          <p className="tnum mt-1 text-[11.5px] text-muted">
             {t ? (
               <>
                 <span aria-hidden="true">{TREND_GLYPH[t]}</span>
@@ -215,14 +227,22 @@ function BasicCard({ item }: { item: EconomyBasic }) {
             직전 {show(item.previous, item.precision, item.suffix)}
           </p>
         </div>
-        {trend.length > 0 ? (
-          <div className="mt-2 min-w-0 flex-1 sm:mt-0">
-            <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
-          </div>
-        ) : null}
       </div>
 
-      <p className="mt-2 text-[11.5px] leading-relaxed break-keep text-fg">{item.reading}</p>
+      {/*
+       * 지나온 선은 카드 폭을 그대로 쓴다.
+       * 이 화면의 값은 1년에 한두 번만 바뀌어서, 숫자 하나만 보면 그게 높은 건지
+       * 낮은 건지 알 수가 없다. 선이 그 물음을 대신 답한다. 숫자 옆에 끼워 두었을
+       * 때는 230px 밖에 안 되어 눈금 글씨가 뭉갰는데, 이제 두 배 가까이 넓다.
+       *
+       * 값을 못 받아 선을 못 그리는 날에도 블록은 같은 크기로 남는다 —
+       * 그 처리는 BasicTrend 가 한다.
+       */}
+      <div className="mt-2 border-t border-border pt-2">
+        <BasicTrend series={trend} precision={item.precision} suffix={item.suffix} label={item.name} />
+      </div>
+
+      <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-fg">{item.reading}</p>
 
       <Comparisons items={item.comparisons} note={item.comparisonNote} sameScale={item.sameScale} />
 
@@ -233,7 +253,7 @@ function BasicCard({ item }: { item: EconomyBasic }) {
        */}
       <GuidePanel id={item.id} open={open} onToggle={() => setOpen((v) => !v)} caution={item.officialNote} />
 
-      <p className="mt-2 border-t border-border pt-2 text-[10px] text-subtle">
+      <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
         {item.asOfLabel} · 출처 {item.meta.sources[0]?.name ?? '알 수 없음'}
       </p>
     </li>
@@ -290,7 +310,7 @@ export function BasicsBoard() {
           section={section}
           onRetry={refresh}
           loading={
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {[0, 1, 2].map((i) => (
                 <SkeletonCard key={i} height={60} lines={3} />
               ))}
@@ -302,19 +322,26 @@ export function BasicsBoard() {
             list.length === 0 ? (
               <EmptyState title="표시할 지표가 없습니다" />
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {groupList(list).map((g) => (
                   <section key={g.id} aria-labelledby={`basics-${g.id}`}>
-                    <div className="mb-1.5">
-                      <h2 id={`basics-${g.id}`} className="text-[12px] font-bold text-muted">
+                    <div className="mb-2">
+                      <h2 id={`basics-${g.id}`} className="text-[13px] font-bold text-muted">
                         {g.label}
-                        <span className="tnum ml-1.5 font-normal text-subtle">{g.items.length}</span>
+                        <span className="tnum ml-2 font-normal text-subtle">{g.items.length}</span>
                       </h2>
                       {g.note ? (
-                        <p className="mt-0.5 text-[10.5px] leading-relaxed break-keep text-subtle">{g.note}</p>
+                        <p className="mt-0.5 text-[11.5px] leading-relaxed break-keep text-subtle">{g.note}</p>
                       ) : null}
                     </div>
-                    <ul className="space-y-2.5">
+                    {/*
+                     * 넓은 화면에서는 두 칸으로 세운다.
+                     * 한 줄로만 세우면 카드 하나가 950px 을 차지하면서 그 안에 글자는
+                     * 350자뿐이라, 폭은 남아돌고 세로로는 4,700px 을 굴러야 했다.
+                     * 세 칸은 넣지 않는다 — 카드가 310px 밑으로 내려가면 이름과 값이
+                     * 한 줄에 못 서고 그래프 눈금이 뭉갠다.
+                     */}
+                    <ul className="grid gap-2 @min-[768px]:grid-cols-2">
                       {g.items.map((item) => (
                         <BasicCard key={item.id} item={item} />
                       ))}
@@ -327,7 +354,7 @@ export function BasicsBoard() {
         </SectionGate>
       </div>
 
-      <p className="mt-4 px-3 text-[10.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-4 px-3 text-[11.5px] leading-relaxed break-keep text-subtle">
         네 나라 값은 발표 기관과 기준 연도가 서로 다를 수 있습니다. 같은 지표라도 어떤 환율(시장 환율 / 구매력평가
         환율)로 환산했는지에 따라 순위가 뒤집히므로, 숫자 하나로 우열을 단정하지 마세요. 그대로 견주면 안 되는
         지표에는 비교표 아래에 <span aria-hidden="true">※</span> 로 이유를 적어 두었습니다.

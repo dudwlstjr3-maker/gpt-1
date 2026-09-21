@@ -14,6 +14,7 @@ import { computeFng } from './fng/engine';
 import { FORMULA_VERSION } from './fng/definitions';
 import { buildSummary } from './summary';
 import { buildRiskDigest } from './risk';
+import { buildRegimeDigest, regimeMeta } from './regime';
 import { getAllSessions } from '@/lib/marketHours';
 import { kstDateKey } from '@/lib/format';
 import { ValidationCollector, sanitizeSeries, score100 } from '@/lib/validate';
@@ -109,12 +110,14 @@ async function section<T>(
 export interface SnapshotOptions {
   scenario: DemoScenario;
   now?: Date;
+  /** 선물 판에서 고른 기간. 기간마다 캐시가 따로 잡힌다. */
+  futuresRange?: string;
 }
 
-export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOptions): Promise<Snapshot> {
+export async function buildSnapshot({ scenario, now = new Date(), futuresRange }: SnapshotOptions): Promise<Snapshot> {
   const { adapter, reason } = getAdapter();
   const mode = adapter.mode;
-  const ctx: AdapterContext = { now, scenario };
+  const ctx: AdapterContext = { now, scenario, ...(futuresRange ? { futuresRange } : {}) };
   const dayKey = kstDateKey(now);
   const ns = `${mode}:${scenario}:${dayKey}`;
 
@@ -228,7 +231,13 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
       return { data: scores, meta, notes: c.messages() };
     },
     now,
-    (d) => d.length === 0,
+    /*
+     * 카드가 서 있어도 **점수가 하나도 없으면 빈 섹션**이다.
+     * 예전에는 배열 길이만 봤더니, 제공사가 전부 막혀 두 카드가 다 '산출 불가' 인데도
+     * 섹션 배지는 초록불(ok)이었다. 카드가 산출 불가라고 말하는 위에서 배지가
+     * 정상이라고 말하면 둘 중 하나는 거짓말이다.
+     */
+    (d) => d.length === 0 || d.every((f) => f.score === null),
   );
 
   /* -------- 투자자 수급 -------- */
@@ -292,6 +301,33 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     (d) => d.length === 0,
   );
 
+  /* -------- 국면 전광판 -------- */
+  /* 20년 분포를 다시 만드는 계산이라 TTL 이 길다. 실패해도 다른 섹션은 그대로 나온다. */
+  const regime = await section(
+    'regime',
+    `${ns}:regime`,
+    async () => {
+      const { series, sources } = await adapter.getRegimeSeries(ctx);
+      const digest = buildRegimeDigest(series, sources, now);
+      return { data: digest, meta: regimeMeta(digest, now) };
+    },
+    now,
+    (d) => d.board.score === null && d.history.length === 0,
+  );
+
+  /* -------- 선물 시장 -------- */
+  /* 기간은 화면에서 고른다. 캐시 키에 기간을 넣어야 1일과 3개월이 섞이지 않는다. */
+  const futures = await section(
+    'futures',
+    `${ns}:futures:${futuresRange ?? '1D'}`,
+    async () => {
+      const board = await adapter.getFutures(ctx, futuresRange ?? '1D');
+      return { data: board, meta: nowMeta(now) };
+    },
+    now,
+    (d) => d.rows.length === 0 || d.availableCount === 0,
+  );
+
   /* -------- 뉴스 -------- */
   const news = await section(
     'news',
@@ -328,7 +364,7 @@ export async function buildSnapshot({ scenario, now = new Date() }: SnapshotOpti
     meta: nowMeta(now),
   };
 
-  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, calendar, news, summary };
+  const sections: SnapshotSections = { sessions, fng, quotes, flows, macro, basics, prediction, risk, regime, calendar, news, futures, summary };
 
   const fetchedTimes = Object.values(sections)
     .map((s) => Date.parse((s as Section<unknown>).meta.fetchedAt))
@@ -416,8 +452,10 @@ function errorSections(now: Date, message: string): SnapshotSections {
     basics: blankSection(now, 'error', message),
     prediction: blankSection(now, 'error', message),
     risk: blankSection(now, 'error', message),
+    regime: blankSection(now, 'error', message),
     calendar: blankSection(now, 'error', message),
     news: blankSection(now, 'error', message),
+    futures: blankSection(now, 'error', message),
     summary: blankSection(now, 'error', message),
   };
 }
@@ -432,8 +470,10 @@ function loadingSections(now: Date): SnapshotSections {
     basics: blankSection(now, 'loading'),
     prediction: blankSection(now, 'loading'),
     risk: blankSection(now, 'loading'),
+    regime: blankSection(now, 'loading'),
     calendar: blankSection(now, 'loading'),
     news: blankSection(now, 'loading'),
+    futures: blankSection(now, 'loading'),
     summary: blankSection(now, 'loading'),
   };
 }

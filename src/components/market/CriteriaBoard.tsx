@@ -60,22 +60,24 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
     const id = `c${Date.now().toString(36)}`;
     const base = { id, comparator, value: num };
     if (kind === 'fng') onAdd({ ...base, kind: 'fng', market });
+    else if (kind === 'regime') onAdd({ ...base, kind: 'regime' });
     else if (kind === 'risk_count') onAdd({ ...base, kind: 'risk_count', level });
     else onAdd({ ...base, kind: 'risk_value', indicatorId });
     setValue('30');
   };
 
-  const sel = 'w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-[12px] text-fg';
+  const sel = 'w-full rounded-lg border border-border bg-surface-2 px-2 py-2 text-[13px] text-fg';
 
   return (
-    <div className="card p-3.5">
+    <div className="card p-3">
       <h3 className="text-[13px] font-bold text-fg-strong">조건 추가</h3>
 
-      <div className="mt-2.5 space-y-2">
+      <div className="mt-2 space-y-2">
         <label className="block">
-          <span className="mb-1 block text-[11px] text-muted">무엇을 볼까요</span>
+          <span className="mb-1 block text-[12.5px] text-muted">무엇을 볼까요</span>
           <select className={sel} value={kind} onChange={(e) => setKind(e.target.value as Criterion['kind'])}>
             <option value="fng">시장 심리 점수</option>
+            <option value="regime">국면 점수 (20년 기준)</option>
             <option value="risk_count">위험 신호등 개수</option>
             <option value="risk_value">개별 위험 지표 값</option>
           </select>
@@ -83,7 +85,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
 
         {kind === 'fng' ? (
           <label className="block">
-            <span className="mb-1 block text-[11px] text-muted">어느 시장</span>
+            <span className="mb-1 block text-[12.5px] text-muted">어느 시장</span>
             <select className={sel} value={market} onChange={(e) => setMarket(e.target.value as MarketId)}>
               {MARKET_IDS.map((m) => (
                 <option key={m} value={m}>
@@ -94,9 +96,15 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
           </label>
         ) : null}
 
+        {kind === 'regime' ? (
+          <p className="text-[11.5px] leading-relaxed break-keep text-subtle">
+            변동성·신용 스프레드·낙폭·추세를 지난 20년 분포와 견준 0~100 점수입니다. 낮을수록 공포 쪽입니다.
+          </p>
+        ) : null}
+
         {kind === 'risk_count' ? (
           <label className="block">
-            <span className="mb-1 block text-[11px] text-muted">어느 단계를 셀까요</span>
+            <span className="mb-1 block text-[12.5px] text-muted">어느 단계를 셀까요</span>
             <select className={sel} value={level} onChange={(e) => setLevel(e.target.value as RiskLevel)}>
               {(['alert', 'watch', 'normal', 'calm'] as RiskLevel[]).map((l) => (
                 <option key={l} value={l}>
@@ -109,7 +117,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
 
         {kind === 'risk_value' ? (
           <label className="block">
-            <span className="mb-1 block text-[11px] text-muted">어느 지표</span>
+            <span className="mb-1 block text-[12.5px] text-muted">어느 지표</span>
             <select className={sel} value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)}>
               {indicators.map((i) => (
                 <option key={i.id} value={i.id}>
@@ -122,7 +130,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
 
         <div className="flex gap-2">
           <label className="min-w-0 flex-1">
-            <span className="mb-1 block text-[11px] text-muted">값</span>
+            <span className="mb-1 block text-[12.5px] text-muted">값</span>
             <input
               className={`${sel} tnum`}
               inputMode="decimal"
@@ -132,7 +140,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
             />
           </label>
           <label className="w-24 shrink-0">
-            <span className="mb-1 block text-[11px] text-muted">비교</span>
+            <span className="mb-1 block text-[12.5px] text-muted">비교</span>
             <select
               className={sel}
               value={comparator}
@@ -145,7 +153,7 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
         </div>
       </div>
 
-      {!valid ? <p className="mt-1.5 text-[11px] text-warn">숫자를 넣어 주세요.</p> : null}
+      {!valid ? <p className="mt-2 text-[12.5px] text-warn">숫자를 넣어 주세요.</p> : null}
 
       <button
         type="button"
@@ -205,7 +213,7 @@ export function CriteriaBoard() {
         </Notice>
       </div>
 
-      <div className="mt-2.5 px-3">
+      <div className="mt-2 px-3">
         <SegmentedControl
           label="내 기준 보기"
           full
@@ -228,26 +236,26 @@ export function CriteriaBoard() {
           ) : (
             <>
               {/* 요약은 개수다. 등급이나 판정을 만들지 않는다. */}
-              <div className="card p-3.5">
-                <p className="text-[12px] text-muted">내가 정한 조건</p>
+              <div className="card p-3">
+                <p className="text-[13px] text-muted">내가 정한 조건</p>
                 <p className="tnum mt-1 text-[26px] leading-none font-bold text-fg-strong">
                   {sum.total}개 중 {sum.met}개 맞음
                 </p>
-                <p className="mt-1.5 text-[11.5px] leading-relaxed break-keep text-muted">
+                <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">
                   아님 {sum.unmet}개
                   {sum.unknown > 0 ? ` · 판정 불가 ${sum.unknown}개` : ''}
                   {sum.unknown > 0 ? ' — 값을 받지 못한 조건은 맞음으로 세지 않습니다.' : ''}
                 </p>
               </div>
 
-              <ul className="mt-2.5 space-y-2">
+              <ul className="mt-2 space-y-2">
                 {sum.results.map((r, i) => {
                   const c = r.criterion as Criterion;
                   const st = STATUS[r.status];
                   return (
                     <li key={c.id ?? i} className="card p-3">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0 text-[12.5px] leading-relaxed break-keep text-fg">
+                        <p className="min-w-0 text-[13px] leading-relaxed break-keep text-fg">
                           {describe(c, labelOf(c))}
                         </p>
                         <Badge tone={st.tone} size="xs">
@@ -255,7 +263,7 @@ export function CriteriaBoard() {
                           {st.label}
                         </Badge>
                       </div>
-                      <p className="tnum mt-1 text-[11px] text-muted">
+                      <p className="tnum mt-1 text-[12.5px] text-muted">
                         지금 값{' '}
                         {r.actual === null ? (
                           <span className="text-warn">{r.reason ?? '받지 못했습니다.'}</span>
@@ -271,20 +279,20 @@ export function CriteriaBoard() {
           )}
         </div>
       ) : (
-        <div className="mt-3 space-y-2.5 px-3">
+        <div className="mt-3 space-y-2 px-3">
           <CriterionForm onAdd={addCriterion} indicators={indicators} />
 
           {settings.criteria.length > 0 ? (
             <ul className="space-y-2">
               {settings.criteria.map((c) => (
                 <li key={c.id} className="card flex items-center justify-between gap-2 p-3">
-                  <p className="min-w-0 text-[12.5px] leading-relaxed break-keep text-fg">
+                  <p className="min-w-0 text-[13px] leading-relaxed break-keep text-fg">
                     {describe(c, labelOf(c))}
                   </p>
                   <button
                     type="button"
                     onClick={() => removeCriterion(c.id)}
-                    className="shrink-0 rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-muted hover:text-fg"
+                    className="shrink-0 rounded-md border border-border px-2 py-1 text-[12.5px] font-semibold text-muted hover:text-fg"
                     aria-label="이 조건 삭제"
                   >
                     삭제
@@ -293,7 +301,7 @@ export function CriteriaBoard() {
               ))}
             </ul>
           ) : (
-            <p className="text-[11.5px] leading-relaxed break-keep text-subtle">
+            <p className="text-[12.5px] leading-relaxed break-keep text-subtle">
               예를 들면 이런 것들을 만들 수 있습니다 — &ldquo;미국 심리 점수가 25 {COMPARATOR_LABEL.lte}&rdquo;,
               &ldquo;위험 신호등에서 &lsquo;주의&rsquo; 인 지표가 1개 {COMPARATOR_LABEL.lte}&rdquo;. 어떤 조건을
               둘지는 앱이 정해 주지 않습니다.
@@ -302,7 +310,7 @@ export function CriteriaBoard() {
         </div>
       )}
 
-      <p className="mt-4 px-3 text-[10.5px] leading-relaxed break-keep text-subtle">
+      <p className="mt-4 px-3 text-[11.5px] leading-relaxed break-keep text-subtle">
         조건은 이 기기에만 저장됩니다. 과거에 이 조건이 맞았을 때 어떤 일이 있었는지는 알려주지 않습니다 — 지난
         결과가 다음을 보장하지 않고, 그런 표를 붙이면 이 화면이 매매 판단처럼 읽히기 때문입니다.
       </p>

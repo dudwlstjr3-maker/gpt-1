@@ -29,12 +29,12 @@ export function CriteriaSummaryCard() {
   }
 
   return (
-    <section className="mt-3 px-3" aria-labelledby="home-criteria-title">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
+    <section className="mt-5 px-3" aria-labelledby="home-criteria-title">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h3 id="home-criteria-title" className="text-[13px] font-bold text-fg-strong">
           내 기준
         </h3>
-        <Link href="/criteria" className="shrink-0 text-[11px] font-semibold text-accent hover:underline">
+        <Link href="/criteria" className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
           {sum.total === 0 ? '조건 만들기 →' : '자세히 보기 →'}
         </Link>
       </div>
@@ -45,15 +45,15 @@ export function CriteriaSummaryCard() {
           description="무엇을 볼지 직접 정해 두면 지금 그 조건이 맞는지 여기서 바로 확인할 수 있습니다."
         />
       ) : (
-        <div className="card p-3.5">
+        <div className="card p-3">
           <p className="tnum text-[22px] leading-none font-bold text-fg-strong">
             {sum.total}개 중 {sum.met}개 맞음
           </p>
-          <p className="tnum mt-1.5 text-[11px] text-muted">
+          <p className="tnum mt-2 text-[12.5px] text-muted">
             아님 {sum.unmet}개{sum.unknown > 0 ? ` · 판정 불가 ${sum.unknown}개` : ''}
           </p>
           {/* 조건이 다 맞아도 신호가 아니라는 말은 요약 옆에 둔다. 아래로 밀면 안 읽힌다. */}
-          <p className="mt-2 border-t border-border pt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+          <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
             사용자가 정한 조건이 맞는지만 확인한 것입니다. 사거나 팔라는 신호가 아닙니다.
           </p>
         </div>

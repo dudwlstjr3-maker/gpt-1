@@ -1,7 +1,7 @@
 /**
  * 시장 위험 신호등.
  *
- * 세 시장을 관통하는 핵심 위험 게이지 7개만 골라, 현재 값이 어느 구간에 있는지와
+ * 세 시장을 관통하는 핵심 위험 게이지만 골라, 현재 값이 어느 구간에 있는지와
  * 그것이 무슨 뜻인지를 한 화면에서 읽을 수 있게 만든다.
  *
  * 설계 원칙
@@ -29,8 +29,11 @@ import type {
 
 interface RiskDef {
   id: string;
+  /** 큰 글씨 — 쉬운 우리말 */
   name: string;
   shortName: string;
+  /** 작게 붙는 원래 이름 (업계 용어 · 영어) */
+  term?: string;
   scope: MarketId | 'global';
   /** 값을 어디서 가져올지 */
   source: { kind: 'quote'; id: string } | { kind: 'macro'; id: string };
@@ -70,11 +73,19 @@ const band = (level: RiskLevel, from: number | null, to: number | null, label: s
 /* 신호등 지표 정의                                                             */
 /* ------------------------------------------------------------------ */
 
-export const RISK_SEVEN: RiskDef[] = [
+/**
+ * 신호등에 세우는 지표.
+ *
+ * 처음에는 일곱 개였는데 VKOSPI(한국 공포지수)를 뺐다 — 무료로 받을 길이 없어
+ * 영원히 '값 없음' 인 타일이 하나 남아 있었기 때문이다. 지금은 여섯 개다.
+ * 개수를 코드·문서에 숫자로 적어 두지 않는다. 적어 두면 이렇게 어긋난다.
+ */
+export const RISK_GAUGES: RiskDef[] = [
   {
     id: 'vix',
-    name: '미국 공포지수 VIX',
+    name: '미국 공포지수',
     shortName: 'VIX',
+    term: 'VIX · 변동성지수 · CBOE Volatility Index',
     scope: 'us',
     source: { kind: 'quote', id: 'vix' },
     unit: 'point',
@@ -101,8 +112,9 @@ export const RISK_SEVEN: RiskDef[] = [
   },
   {
     id: 'hy_oas',
-    name: '하이일드 신용스프레드 (정크본드)',
-    shortName: '정크본드 스프레드',
+    name: '위험한 회사가 더 무는 이자',
+    shortName: '위험한 회사 이자',
+    term: '하이일드 신용스프레드 · High Yield OAS',
     scope: 'us',
     source: { kind: 'macro', id: 'hy_oas' },
     unit: 'percent',
@@ -129,8 +141,9 @@ export const RISK_SEVEN: RiskDef[] = [
   },
   {
     id: 'us_spread_10_2',
-    name: '미국 장단기 금리차 (10년-2년)',
+    name: '길게 빌려줄 때와 짧게 빌려줄 때의 금리 차이',
     shortName: '장단기 금리차',
+    term: '미국 장단기 금리차(10년−2년) · Yield curve spread',
     scope: 'us',
     source: { kind: 'quote', id: 'us_spread_10_2' },
     unit: 'bp',
@@ -159,8 +172,9 @@ export const RISK_SEVEN: RiskDef[] = [
   },
   {
     id: 'ust10',
-    name: '미국 국채 10년물 금리',
+    name: '미국 정부가 10년 빌릴 때 무는 이자',
     shortName: '미국 10년물',
+    term: '미국 국채 10년물 금리 · US 10Y Treasury yield',
     scope: 'global',
     source: { kind: 'quote', id: 'ust10' },
     unit: 'percent',
@@ -189,8 +203,9 @@ export const RISK_SEVEN: RiskDef[] = [
     id: 'usdkrw',
     // 한국을 시장에서 뺐지만 원/달러는 그대로 둔다 — 실제 값이 나오고,
     // 통화 전환과 미국 자산의 원화 환산에 계속 쓰인다. 어느 한 시장에 묶이지 않으므로 글로벌로.
-    name: 'USD/KRW 환율',
+    name: '1달러를 사는 데 드는 원화',
     shortName: '원/달러',
+    term: '원/달러 환율 · USD/KRW',
     scope: 'global',
     source: { kind: 'quote', id: 'usdkrw' },
     unit: 'point',
@@ -217,8 +232,9 @@ export const RISK_SEVEN: RiskDef[] = [
   },
   {
     id: 'funding',
-    name: '크립토 선물 펀딩비',
+    name: '오르는 쪽에 선 사람이 무는 수수료',
     shortName: '펀딩비',
+    term: '크립토 무기한선물 펀딩비 · Funding rate',
     scope: 'crypto',
     source: { kind: 'quote', id: 'funding' },
     unit: 'percent',
@@ -281,7 +297,7 @@ export function buildRiskDigest(
   const quoteById = new Map(quotes.map((q) => [q.id, q]));
   const macroById = new Map(macro.map((m) => [m.id, m]));
 
-  const indicators: RiskIndicator[] = RISK_SEVEN.map((def) => {
+  const indicators: RiskIndicator[] = RISK_GAUGES.map((def) => {
     let value: number | null = null;
     let previous: number | null = null;
     let change: number | null = null;
@@ -327,6 +343,7 @@ export function buildRiskDigest(
       id: def.id,
       name: def.name,
       shortName: def.shortName,
+      ...(def.term ? { term: def.term } : {}),
       scope: def.scope,
       value,
       previous,

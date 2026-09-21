@@ -32,6 +32,20 @@ export const FRED_SERIES = {
   hy_oas: 'BAMLH0A0HYM2',       // 하이일드 OAS
   /* 환율 */
   usdkrw: 'DEXKOUS',            // 원/달러 (일별, 뉴욕 기준)
+  /* 선물 판에서 쓰는 계열.
+     전부 선물 계약이 아니라 현물·기준 가격이다 — 화면이 그 사실을 밝힌다. */
+  ust5: 'DGS5',                 // 국채 5년
+  ust30: 'DGS30',               // 국채 30년
+  wti: 'DCOILWTICO',            // WTI 현물 고시가 (EIA)
+  brent: 'DCOILBRENTEU',        // 브렌트 현물 고시가 (EIA)
+  henry_hub: 'DHHNGSP',         // 헨리허브 천연가스 현물
+  dollar_index: 'DTWEXBGS',     // 연준 광의 달러지수
+  fx_eur: 'DEXUSEU',            // 유로/달러
+  fx_jpy: 'DEXJPUS',            // 달러/엔
+  fx_gbp: 'DEXUSUK',            // 파운드/달러
+  fx_cad: 'DEXCAUS',            // 달러/캐나다달러
+  fx_aud: 'DEXUSAL',            // 호주달러/달러
+  fx_chf: 'DEXSZUS',            // 달러/스위스프랑
 } as const;
 
 export type FredSeriesKey = keyof typeof FRED_SERIES;

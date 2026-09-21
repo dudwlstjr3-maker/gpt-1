@@ -38,12 +38,22 @@ export const STOOQ_SYMBOL: Record<string, string> = {
   rut: '^rut',
   vix: '^vix',
   dxy: '^dxy',
-  /* 미국 종목 */
+  /* 미국 종목 — Stooq 는 미국 상장 종목을 '<티커>.us' 로 준다 */
   nvda: 'nvda.us',
   aapl: 'aapl.us',
   msft: 'msft.us',
   amzn: 'amzn.us',
   tsla: 'tsla.us',
+  meta: 'meta.us',
+  googl: 'googl.us',
+  avgo: 'avgo.us',
+  amd: 'amd.us',
+  nflx: 'nflx.us',
+  pltr: 'pltr.us',
+  coin: 'coin.us',
+  mstr: 'mstr.us',
+  mu: 'mu.us',
+  smci: 'smci.us',
   /* 원자재 */
   gold: 'xauusd',
   wti: 'cl.f',

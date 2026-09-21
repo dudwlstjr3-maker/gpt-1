@@ -14,7 +14,7 @@ export function Skeleton({ className = '', style }: { className?: string; style?
 
 export function SkeletonCard({ lines = 3, height = 120 }: { lines?: number; height?: number }) {
   return (
-    <div className="card p-4" aria-busy="true" aria-live="polite">
+    <div className="card p-3" aria-busy="true" aria-live="polite">
       <span className="sr-only">데이터를 불러오는 중입니다.</span>
       <Skeleton className="mb-3 h-4 w-24" />
       <Skeleton className="mb-3 w-full" style={{ height }} />
@@ -76,7 +76,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-surface-3"
+          className="mt-1 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs font-semibold text-fg hover:bg-surface-3"
         >
           다시 시도
         </button>
@@ -95,7 +95,7 @@ export function Notice({
   const color = tone === 'danger' ? 'var(--danger)' : tone === 'warn' ? 'var(--warn)' : 'var(--muted-fg)';
   return (
     <p
-      className="flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[11px] leading-relaxed break-keep"
+      className="flex items-start gap-2 rounded-lg px-2 py-2 text-[12.5px] leading-relaxed break-keep"
       style={{ background: `color-mix(in srgb, ${color} 10%, transparent)`, color }}
     >
       {/* 줄지 않게 못 박는다. 눌리면 글리프가 제 상자를 넘어 옆 글자 위로 올라탄다. */}

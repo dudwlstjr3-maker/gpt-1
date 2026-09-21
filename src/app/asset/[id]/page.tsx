@@ -8,7 +8,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { useFormatter } from '@/components/market/useFormatter';
 import { InteractiveChart, type ChartSeries } from '@/components/charts/InteractiveChart';
+import { FundamentalsCard } from '@/components/market/FundamentalsCard';
 import { FreshnessBadge, ModeBadge, SessionBadge } from '@/components/ui/Badge';
+import { Figure } from '@/components/ui/Figure';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, SkeletonCard } from '@/components/ui/States';
 import { convertCurrency, formatKoreanCompact, formatKstFull, NO_VALUE } from '@/lib/format';
@@ -115,7 +117,7 @@ export default function AssetPage() {
     return (
       <div className="px-3 pt-3">
         <ErrorState title="종목 상세를 불러오지 못했습니다" message={error} onRetry={load} />
-        <Link href="/" className="mt-3 inline-block text-[12px] font-semibold text-accent">
+        <Link href="/" className="mt-3 inline-block text-[13px] font-semibold text-accent">
           ← 시장으로
         </Link>
       </div>
@@ -134,23 +136,23 @@ export default function AssetPage() {
     <div className="pt-2 pb-4">
       <div className="flex items-center justify-between gap-2 px-3 pt-1">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href={`/market/${q.market}`} aria-label="뒤로" className="text-muted">
+          <Link href={`/market/${q.market}`} aria-label="뒤로" className="tap min-w-[24px] justify-center text-muted">
             ←
           </Link>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold text-fg-strong">{q.name}</h1>
-            <p className="truncate text-[11px] text-subtle">
+            <p className="truncate text-[12.5px] text-subtle">
               {q.symbol} · {MARKET_LABEL[q.market]}
             </p>
             {/* 지수는 기준점을 모르면 숫자 자체를 읽을 수 없다 */}
             {CATALOG_BY_ID.get(q.id)?.baseline ? (
-              <p className="mt-0.5 text-[10.5px] break-keep text-muted">
+              <p className="mt-0.5 text-[11.5px] break-keep text-muted">
                 기준 {CATALOG_BY_ID.get(q.id)!.baseline}
               </p>
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           <ModeBadge mode={detail.mode} size="xs" />
           <button
             type="button"
@@ -166,14 +168,14 @@ export default function AssetPage() {
       </div>
 
       {/* 현재가 */}
-      <section className="mt-3 px-3" aria-label="현재 시세">
-        <div className="card p-3.5">
+      <section className="mt-5 px-3" aria-label="현재 시세">
+        <div className="card p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="tnum text-2xl leading-tight font-bold text-fg-strong">
-                {q.price === null ? NO_VALUE : f.price(q)}
+              <p className="text-2xl leading-tight font-bold text-fg-strong">
+                <Figure text={q.price === null ? NO_VALUE : f.price(q)} flashColor={color} />
               </p>
-              <p className="tnum mt-1 flex items-center gap-1.5 text-[13px] font-semibold" style={{ color }}>
+              <p className="tnum mt-1 flex items-center gap-2 text-[13px] font-semibold" style={{ color }}>
                 <span aria-hidden="true">{f.glyph(dir)}</span>
                 {f.change(q)} ({f.changePct(q)})
                 <span className="sr-only">{DIRECTION_LABEL[dir]}</span>
@@ -186,12 +188,12 @@ export default function AssetPage() {
           </div>
 
           {q.unavailableReason ? (
-            <p className="mt-2 text-[11px]" style={{ color: 'var(--warn)' }}>
+            <p className="mt-2 text-[12.5px]" style={{ color: 'var(--warn)' }}>
               {q.unavailableReason}
             </p>
           ) : null}
 
-          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border pt-2.5 text-[11px]">
+          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-2 text-[12.5px]">
             <div className="flex justify-between gap-2">
               <dt className="text-muted">거래량</dt>
               <dd className="tnum text-fg">{q.volume === null ? NO_VALUE : formatKoreanCompact(q.volume, 1)}</dd>
@@ -201,7 +203,7 @@ export default function AssetPage() {
               <dd className="text-right text-fg">
                 {q.currency ?? '지수/비율'}
                 {q.currency && q.currency !== f.currency ? (
-                  <span className="block text-[10px] text-subtle">
+                  <span className="block text-[11.5px] text-subtle">
                     {f.usdKrw === null ? '환율 없음 — 환산 불가' : `${f.currency === 'KRW' ? '원' : '달러'}화 환산 표시`}
                   </span>
                 ) : null}
@@ -223,12 +225,12 @@ export default function AssetPage() {
       </section>
 
       {/* 차트 */}
-      <section className="mt-4 px-3" aria-labelledby="asset-chart-title">
+      <section className="mt-5 px-3" aria-labelledby="asset-chart-title">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 id="asset-chart-title" className="text-base font-bold text-fg-strong">
             가격 추이
           </h2>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <SegmentedControl
               label="기간"
               size="xs"
@@ -245,7 +247,7 @@ export default function AssetPage() {
               type="button"
               onClick={() => setOverlay((v) => !v)}
               aria-pressed={overlay}
-              className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold"
+              className="rounded-md border border-border px-2 py-1 text-[12.5px] font-semibold"
               style={{
                 background: overlay ? 'var(--surface-3)' : 'var(--surface-2)',
                 color: overlay ? 'var(--accent)' : 'var(--muted-fg)',
@@ -261,17 +263,20 @@ export default function AssetPage() {
             emptyMessage={detail.unavailable?.[range] ?? '해당 기간의 시계열 데이터가 없습니다.'}
           />
           {overlay ? (
-            <p className="mt-2 text-[10px] break-keep text-subtle">
-              우축은 0~100 심리 점수입니다. 심리 점수는 일 단위로 산출되므로 1일·1주 구간에서는 표본이 적을 수 있습니다.
+            <p className="mt-2 text-[11.5px] break-keep text-subtle">
+              아래 칸은 0~100 심리 점수입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다. 심리
+              점수는 일 단위로 산출되므로 1일·1주 구간에서는 표본이 적을 수 있습니다.
             </p>
           ) : null}
         </div>
       </section>
 
+      <FundamentalsCard fundamentals={detail.fundamentals} unavailable={detail.fundamentalsUnavailable} />
+
       <div className="mt-4 px-3">
         <Link
           href={`/fng/${q.market}`}
-          className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-3 py-2.5 text-[13px] font-semibold text-fg hover:bg-surface-3"
+          className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-3 py-2 text-[13px] font-semibold text-fg hover:bg-surface-3"
         >
           {MARKET_LABEL[q.market]} 투자심리 상세 보기
           <span aria-hidden="true">→</span>

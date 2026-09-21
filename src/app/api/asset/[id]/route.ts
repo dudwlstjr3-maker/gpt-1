@@ -100,11 +100,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           fngOverlay[r] = slice.length >= 2 ? slice : history.slice(-7);
         }
 
+        /*
+         * 재무제표 — 미국 상장사만.
+         *
+         * 구간 시계열과 같은 원칙이다. 재무제표가 없다고 종목 상세를 내리지 않는다 —
+         * 지수·원자재·코인에는 애초에 공시가 없고, 그건 오류가 아니라 성질이다.
+         * 못 받으면 왜 없는지를 대신 올려보낸다.
+         */
+        let fundamentals: Awaited<ReturnType<typeof adapter.getFundamentals>> | undefined;
+        let fundamentalsUnavailable: string | undefined;
+        try {
+          fundamentals = await adapter.getFundamentals(id, quote.price, ctx);
+        } catch (e) {
+          fundamentalsUnavailable =
+            e instanceof SeriesUnavailableError
+              ? e.reason
+              : `재무제표를 받아오지 못했습니다: ${e instanceof Error ? e.message : String(e)}`;
+        }
+
         return {
           quote,
           ranges,
           ...(Object.keys(unavailable).length > 0 ? { unavailable } : {}),
           fngOverlay,
+          ...(fundamentals ? { fundamentals } : {}),
+          ...(fundamentalsUnavailable ? { fundamentalsUnavailable } : {}),
           mode: adapter.mode,
         };
       },

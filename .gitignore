@@ -15,3 +15,8 @@ next-env.d.ts
 npm-debug.log*
 coverage/
 .vercel
+
+# 글꼴 원본 (2MB). 자른 결과만 싣는다 — public/fonts/pretendard-subset.woff2
+# 다시 자르려면 여기에 원본을 두고 npm run font
+# https://github.com/orioncactus/pretendard
+tools/font/PretendardVariable.woff2

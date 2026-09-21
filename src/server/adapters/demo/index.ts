@@ -9,6 +9,8 @@
  */
 
 import { mulberry32, gaussianFrom, hashSeed } from '@/lib/rng';
+import { buildFutures } from './futures';
+import { buildFundamentals } from './fundamentals';
 import { CATALOG, catalogFor, type CatalogItem } from '@/lib/catalog';
 import { getSession } from '@/lib/marketHours';
 import { clamp, round } from '@/lib/stats';
@@ -28,9 +30,13 @@ import type {
   Quote,
   RangeKey,
   SeriesPoint,
+  FuturesBoard,
+  Fundamentals,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import { COMPONENTS } from '@/server/fng/definitions';
+import type { RegimeSeriesPoint } from '@/lib/regimeRules.d.mts';
+import type { RegimeSeries } from '@/server/regime';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
 import { getWorld, type DemoWorld } from './world';
 
@@ -104,7 +110,21 @@ function seriesFor(world: DemoWorld, item: CatalogItem): SeriesRef | null {
     case 'funding': return { values: c.funding, dates: cd };
     case 'open_interest': return { values: c.openInterest.map((v) => v / 1e9), dates: cd };
     case 'liquidations': return { values: c.liquidations.map((v) => v / 1e9), dates: cd };
-    default: return null;
+
+    /*
+     * 위에 이름이 없는 것은 세계(world.ts)에서 **같은 이름의 시계열**을 그대로 쓴다.
+     *
+     * 위의 case 들은 손이 가야 하는 것들이다 — 단위를 바꾸거나(10억 달러로 나누기),
+     * 호가 단위로 반올림하거나, 두 계열을 빼서 만든다. 그런 손질이 필요 없는
+     * 종목은 id 와 시계열 이름이 같으므로 여기서 한 번에 이어 준다. 종목을 늘릴
+     * 때마다 case 를 한 줄씩 더 적지 않아도 되고, 적는 것을 잊어 빈 카드가
+     * 나오는 일도 없다.
+     */
+    default: {
+      if (s[item.id]) return { values: s[item.id], dates: d };
+      if (c[item.id]) return { values: c[item.id], dates: cd };
+      return null;
+    }
   }
 }
 
@@ -887,8 +907,10 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
   const mk = (
     id: string,
+    /** 이름을 풀어 쓴 쉬운 말 — 이름 아래 작게 붙는다 */
+    plainName: string,
+    /** 이 지표의 이름 — 카드 제목 자리에 크게 선다 */
     name: string,
-    englishName: string,
     value: number | null,
     previous: number | null,
     precision: number,
@@ -936,7 +958,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     return {
       id,
       name,
-      englishName,
+      plainName,
       value: missing ? null : value,
       previous: missing ? null : previous,
       precision,
@@ -996,8 +1018,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
   return [
     mk(
       'per_capita_gdp',
-      '1인당 GDP',
-      'GDP per capita',
+      '국민 한 사람 몫의 생산',
+      '1인당 GDP · GDP per capita',
       round(krGdpNow, 0),
       round(krGdpPrev, 0),
       0,
@@ -1020,8 +1042,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'gini',
-      '지니계수',
-      'Gini coefficient',
+      '소득이 얼마나 고르게 나뉘는지',
+      '지니계수 · Gini coefficient',
       B.giniKr,
       B.giniKrPrev,
       3,
@@ -1034,8 +1056,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'misery',
-      '미저리 지수',
-      'Misery Index',
+      '물가와 실업을 더한 살림 고통 지수',
+      '미저리 지수 · Misery Index',
       round(miseryKr, 1),
       round(miseryKrPrev, 1),
       1,
@@ -1051,8 +1073,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'bigmac',
-      '빅맥지수',
-      'Big Mac Index',
+      '햄버거 값으로 따져 본 원화의 값어치',
+      '빅맥지수 · Big Mac Index',
       round(bigmacNow, 1),
       round(undervaluedKrw(bigmacRate, at(120)), 1),
       1,
@@ -1077,8 +1099,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'ppp_gap',
-      '구매력평가(PPP) 환율 괴리',
-      'PPP exchange rate gap',
+      '물가로 따진 환율과 실제 환율의 차이',
+      '구매력평가(PPP) 환율 괴리 · PPP exchange rate gap',
       round(pppNow, 1),
       round(undervaluedKrw(BASIC_PRICES.pppKrwPerUsd, at(250)), 1),
       1,
@@ -1103,8 +1125,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'engel',
-      '엥겔계수',
-      'Engel coefficient',
+      '쓰는 돈 중 먹는 데 쓰는 몫',
+      '엥겔계수 · Engel coefficient',
       B.engelKr,
       B.engelKrPrev,
       1,
@@ -1119,8 +1141,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'pir',
-      '소득 대비 주택가격 (PIR)',
-      'Price to Income Ratio',
+      '집값이 연 소득의 몇 배',
+      '소득 대비 주택가격(PIR) · Price to Income Ratio',
       B.pirSeoul,
       B.pirSeoulPrev,
       1,
@@ -1142,8 +1164,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'cli',
-      'OECD 경기선행지수',
-      'OECD Composite Leading Indicator',
+      '경기가 앞으로 어디로 갈지 미리 보는 지수',
+      'OECD 경기선행지수 · Composite Leading Indicator',
       round(cliAt(s.kospi, i), 1),
       round(cliAt(s.kospi, at(20)), 1),
       1,
@@ -1171,8 +1193,8 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
 
     mk(
       'ccsi',
-      '소비자심리지수',
-      'CCSI',
+      '가계가 살림살이를 어떻게 느끼는지',
+      '소비자심리지수 · CCSI',
       round(ccsiAt(i), 1),
       round(ccsiAt(at(20)), 1),
       1,
@@ -1396,6 +1418,74 @@ export class DemoAdapter implements MarketAdapter {
     };
   }
 
+  /**
+   * 국면 전광판용 21년치 합성 시계열.
+   *
+   * 주 단위로 만든다. 20년 분포를 만드는 게 목적이라 일별까지 갈 이유가 없고,
+   * 스냅샷이 무거워진다. 과거에 두 번의 급락 국면을 심어 둬서 DEMO 에서도
+   * "N년 만의 공포" 문장이 어떻게 생겼는지 볼 수 있게 했다.
+   *
+   * 당연히 실제 시장 자료가 아니다. LIVE 와 절대 섞이지 않는다.
+   */
+  async getRegimeSeries(ctx: AdapterContext): Promise<{ series: RegimeSeries; sources: DataSource[] }> {
+    const rnd = mulberry32(hashSeed(`regime:${ctx.scenario}`));
+    const gauss = gaussianFrom(rnd);
+    const WEEK = 7 * 86_400_000;
+    const weeks = 52 * 21;
+    const end = ctx.now.getTime();
+
+    /**
+     * 과거에 심어 둔 급락 국면 (지금으로부터 N주 전이 바닥).
+     *
+     * 마지막 하나는 '최근'에 둔다. DEMO 로 앱을 처음 열어 본 사람이
+     * 전광판이 조용할 때 말고 **말을 할 때** 어떻게 생겼는지 봐야 하기 때문이다.
+     */
+    const crashes = [
+      { at: weeks - 8, depth: 0.45 },
+      { at: weeks - 52 * 3, depth: 1.0 },
+      { at: weeks - 52 * 9, depth: 0.75 },
+      { at: weeks - 52 * 17, depth: 0.9 },
+    ];
+    /** 해당 주가 급락 국면에서 얼마나 깊은가 (0~1) */
+    const stress = (i: number) => {
+      let s = 0;
+      for (const c of crashes) {
+        const d = Math.abs(i - c.at);
+        if (d < 30) s = Math.max(s, c.depth * Math.exp(-(d * d) / 200));
+      }
+      return s;
+    };
+
+    const vol: RegimeSeriesPoint[] = [];
+    const credit: RegimeSeriesPoint[] = [];
+    const drawdown: RegimeSeriesPoint[] = [];
+    const trend: RegimeSeriesPoint[] = [];
+
+    let price = 1000;
+    let peak = price;
+    const closes: number[] = [];
+
+    for (let i = 0; i <= weeks; i += 1) {
+      const t = end - (weeks - i) * WEEK;
+      const st = stress(i);
+      // 급락 구간에서는 수익률 평균이 내려가고 변동성이 커진다
+      const drift = 0.0016 - st * 0.03;
+      const shock = (0.016 + st * 0.05) * gauss();
+      price = Math.max(50, price * (1 + drift + shock));
+      closes.push(price);
+      peak = Math.max(peak, price);
+
+      vol.push({ t, v: round(11 + st * 45 + Math.abs(gauss()) * 3.5, 2) });
+      credit.push({ t, v: round(2.9 + st * 12 + Math.abs(gauss()) * 0.35, 2) });
+      drawdown.push({ t, v: round((price / peak - 1) * 100, 2) });
+      const window = closes.slice(Math.max(0, closes.length - 52));
+      const ma = window.reduce((a, b) => a + b, 0) / window.length;
+      trend.push({ t, v: round((price / ma - 1) * 100, 2) });
+    }
+
+    return { series: { vol, credit, drawdown, trend }, sources: [DEMO_SOURCE] };
+  }
+
   async getMacro(ctx: AdapterContext): Promise<MacroIndicator[]> {
     if (ctx.scenario === 'empty') return [];
     return buildMacro(getWorld(ctx.now), ctx);
@@ -1417,6 +1507,13 @@ export class DemoAdapter implements MarketAdapter {
   async getCalendar(ctx: AdapterContext): Promise<CalendarEvent[]> {
     if (ctx.scenario === 'empty') return [];
     return buildCalendar(ctx);
+  }
+
+  async getFutures(ctx: AdapterContext, range: string): Promise<FuturesBoard> {
+    if (ctx.scenario === 'empty') {
+      return { range, rows: [], availableCount: 0, totalCount: 0, generatedAt: ctx.now.toISOString() };
+    }
+    return buildFutures(ctx, range, makeMeta(ctx, 'us'));
   }
 
   async getNews(ctx: AdapterContext): Promise<NewsItem[]> {
@@ -1453,6 +1550,10 @@ export class DemoAdapter implements MarketAdapter {
     const values = ref.values.slice(-take);
     const dates = ref.dates.slice(-take);
     return values.map((v, i) => ({ t: dates[i], v: round(v, 6) }));
+  }
+
+  async getFundamentals(id: string, price: number | null, ctx: AdapterContext): Promise<Fundamentals> {
+    return buildFundamentals(id, price, ctx, makeMeta(ctx, 'us'));
   }
 
   async getUsdKrw(ctx: AdapterContext): Promise<number | null> {

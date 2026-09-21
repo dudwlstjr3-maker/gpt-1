@@ -44,28 +44,47 @@ export class SeriesUnavailableError extends Error {
 
 /* ---------------------- 호스트별 토큰 버킷 ---------------------- */
 
-const buckets = new Map<string, { tokens: number; last: number }>();
+const buckets = new Map<string, { tokens: number; last: number; queue: Promise<void> }>();
 
-async function acquire(host: string): Promise<void> {
+/**
+ * 호스트당 초당 요청 수를 지킨다.
+ *
+ * 예전에는 제 구실을 못 했다. 토큰이 없으면 기다리게 했는데, **기다리는 쪽이
+ * 여럿이면 모두 같은 시간을 자고 한꺼번에 깨어났다.** 각자 텅 빈 같은 통을 보고
+ * 같은 대기 시간을 계산했기 때문이다. 40건이 몰리면 40건이 함께 나갔다 —
+ * 초당 5건을 약속해 놓고 지키지 않은 셈이라, 제공사가 막아도 할 말이 없었다.
+ *
+ * 이제 호스트마다 줄을 하나 두고 그 줄에 이어 붙인다. 앞사람이 통에서 토큰을
+ * 빼고 나야 뒷사람이 통을 본다. 대기 시간은 남은 토큰에서 다시 계산되므로
+ * 줄이 길수록 뒷사람이 더 기다린다 — 그게 제한이 해야 할 일이다.
+ */
+function acquire(host: string): Promise<void> {
   const capacity = Math.max(1, RATE_LIMIT_PER_SEC);
-  const now = Date.now();
   let b = buckets.get(host);
   if (!b) {
-    b = { tokens: capacity, last: now };
+    b = { tokens: capacity, last: Date.now(), queue: Promise.resolve() };
     buckets.set(host, b);
   }
-  const elapsed = (now - b.last) / 1000;
-  b.tokens = Math.min(capacity, b.tokens + elapsed * capacity);
-  b.last = now;
+  const bucket = b;
 
-  if (b.tokens >= 1) {
-    b.tokens -= 1;
-    return;
-  }
-  const waitMs = Math.ceil(((1 - b.tokens) / capacity) * 1000);
-  await new Promise((r) => setTimeout(r, waitMs));
-  b.tokens = 0;
-  b.last = Date.now();
+  const next = bucket.queue.then(async () => {
+    const now = Date.now();
+    bucket.tokens = Math.min(capacity, bucket.tokens + ((now - bucket.last) / 1000) * capacity);
+    bucket.last = now;
+
+    if (bucket.tokens < 1) {
+      const waitMs = Math.ceil(((1 - bucket.tokens) / capacity) * 1000);
+      await new Promise((r) => setTimeout(r, waitMs));
+      const after = Date.now();
+      bucket.tokens = Math.min(capacity, bucket.tokens + ((after - bucket.last) / 1000) * capacity);
+      bucket.last = after;
+    }
+    bucket.tokens -= 1;
+  });
+
+  // 줄은 실패해도 끊기지 않아야 한다 — 한 건이 터지면 뒤가 전부 막힌다
+  bucket.queue = next.catch(() => undefined);
+  return next;
 }
 
 /* ---------------------------- fetch ---------------------------- */

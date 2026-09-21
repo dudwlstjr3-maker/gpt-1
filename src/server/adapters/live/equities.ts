@@ -6,6 +6,7 @@
  * 남은 가중치가 70% 아래면 점수를 숨기고 "산출 불가" 로 표시한다.
  */
 
+import { envUrl } from '@/server/config';
 import type { EngineInput, RawSeries } from '@/server/fng/engine';
 import type { DataSource, MarketId, SeriesPoint } from '@/types';
 import { FRED_SOURCE, fetchSeries, type FredConfig } from './providers/fred';
@@ -146,7 +147,7 @@ export async function buildUsFngInput(deps: EquityDeps): Promise<EngineInput> {
   }
 
   // 풋/콜 비율 — 이 하나가 있어야 미국이 70% 문턱을 넘는다 (57% → 71%)
-  const pc = await soft(() => fetchEquityPutCall(cboeConfig(null)), forcedMissing, ['us_equity_pcr_5d'], '주식 풋/콜 비율');
+  const pc = await soft(() => fetchEquityPutCall(cboeConfig(envUrl('CBOE_CSV_URL'))), forcedMissing, ['us_equity_pcr_5d'], '주식 풋/콜 비율');
   if (pc && pc.length > 0) {
     const s5 = align(pc, dates);
     metrics.us_equity_pcr_5d = s5.map((_, i) => {

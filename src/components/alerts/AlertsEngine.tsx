@@ -54,6 +54,23 @@ function evaluate(rule: AlertRule, snapshot: Snapshot, prevStage: Record<string,
         dedupeKey: `${rule.id}:${above ? 'above' : 'below'}`,
       };
     }
+    /**
+     * 국면이 '1년 이상 만의 극단' 에 들어갔을 때만 울린다.
+     *
+     * 문턱을 사용자에게 받지 않는 이유: 이 알림의 값어치는 숫자가 아니라 **희소성**에 있다.
+     * 그리고 rarity.notable 이 false 인 것(몇 개월 만)까지 울리면 매달 울려서
+     * 알림 자체가 무의미해진다. 울릴 때 하는 말도 사실뿐이다 — 무엇을 하라고 하지 않는다.
+     */
+    case 'regime_rarity': {
+      const board = snapshot.sections.regime.data?.board;
+      if (!board || board.score === null || !board.rarity?.notable || !board.rarity.headline) return null;
+      const bandId = board.band?.id ?? 'unknown';
+      return {
+        title: `국면 전광판 · ${board.rarity.headline}`,
+        body: `국면 점수 ${formatScore(board.score)}점 (${board.band?.label ?? ''}) · ${board.rarity.text ?? ''}. 지금이 20년 중 어디쯤인지 알리는 것이며 매매 신호가 아닙니다.`,
+        dedupeKey: `${rule.id}:${bandId}:${board.rarity.headline}`,
+      };
+    }
     case 'price_target': {
       const q = findQuote(rule.target);
       if (!q || q.price === null || rule.threshold === undefined) return null;
@@ -182,8 +199,16 @@ export function AlertsEngine() {
 
   if (toasts.length === 0) return null;
 
+  /*
+   * 알림도 화면 틀 안에 뜬다. 넓은 화면에서 앱은 가운데 430px 짜리 칸이라,
+   * 창 오른쪽 위 구석에 뜨면 앱과 동떨어진 자리에서 말을 거는 꼴이 된다.
+   */
   return (
-    <div className="fixed inset-x-3 top-3 z-50 flex flex-col gap-2 lg:left-auto lg:right-4 lg:w-80" role="status" aria-live="polite">
+    <div
+      className="frame-fixed fixed top-3 z-50 flex flex-col gap-2 px-3"
+      role="status"
+      aria-live="polite"
+    >
       {toasts.map((t) => (
         <div key={t.id} className="card flex items-start gap-2 p-3" style={{ borderColor: 'var(--accent)' }}>
           <span aria-hidden="true" className="mt-0.5 text-sm">
@@ -191,7 +216,7 @@ export function AlertsEngine() {
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-fg-strong">{t.title}</p>
-            <p className="mt-0.5 text-[11px] break-keep text-muted">{t.body}</p>
+            <p className="mt-0.5 text-[12.5px] break-keep text-muted">{t.body}</p>
           </div>
           <button
             type="button"

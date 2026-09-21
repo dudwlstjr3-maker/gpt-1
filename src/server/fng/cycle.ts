@@ -196,8 +196,15 @@ export function buildCycle(
 /* 구간별 과거 통계                                                       */
 /* ------------------------------------------------------------------ */
 
+/** 6개월 ≈ 126 거래일. 한 달(20일)로는 계절성·잡음에 묻혀 구간 차이가 보이지 않는다. */
+export const BAND_FORWARD_DAYS = 126;
+
 /**
  * 점수 구간별로 "그 뒤 N거래일 동안 대표 지수가 어떻게 움직였는지"를 집계한다.
+ *
+ * 평균·중앙값만 내지 않고 **사분위수까지 낸다.** 화면이 상자그림을 그려야
+ * 구간끼리 범위가 얼마나 겹치는지가 보이기 때문이다. 평균만 막대로 그리면
+ * 구간마다 답이 정해져 있는 것처럼 읽히는데, 실제로는 범위가 거의 포개진다.
  *
  * 주의: 과거 표본의 서술일 뿐이며 미래 수익을 예측하지 않는다.
  * 표본이 겹치는(overlapping) 구간이라 통계적 독립성이 없다는 점도 화면에 표기한다.
@@ -207,7 +214,7 @@ export function buildBandStats(
   benchmark: SeriesPoint[],
   benchmarkName: string,
   caveat: string,
-  forwardDays = 20,
+  forwardDays = BAND_FORWARD_DAYS,
 ): FngBandStats | null {
   if (history.length < forwardDays * 3 || benchmark.length < forwardDays * 3) return null;
 
@@ -257,6 +264,8 @@ export function buildBandStats(
         sampleDays: vals.length,
         avgForward: null,
         medianForward: null,
+        p25: null,
+        p75: null,
         positiveShare: null,
         worst: null,
         best: null,
@@ -264,12 +273,16 @@ export function buildBandStats(
     }
     const m = avg(vals);
     const med = quantile(vals, 0.5);
+    const q1 = quantile(vals, 0.25);
+    const q3 = quantile(vals, 0.75);
     return {
       stageId: s.id,
       stageLabel: s.label,
       sampleDays: vals.length,
       avgForward: m === null ? null : round(m, 2),
       medianForward: med === null ? null : round(med, 2),
+      p25: q1 === null ? null : round(q1, 2),
+      p75: q3 === null ? null : round(q3, 2),
       positiveShare: round((vals.filter((v) => v > 0).length / vals.length) * 100, 1),
       worst: round(Math.min(...vals), 2),
       best: round(Math.max(...vals), 2),

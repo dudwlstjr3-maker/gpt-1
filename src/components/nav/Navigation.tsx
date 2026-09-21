@@ -1,6 +1,15 @@
 'use client';
 
-/** 모바일 하단 탭 / 데스크톱 좌측 사이드바. */
+/**
+ * 하단 탭 — 폰이든 데스크톱이든 하나다.
+ *
+ * 넓은 화면에서는 좌측 사이드바로 갈라졌었다. 접었다 — 같은 앱을 두 벌로
+ * 만들어 두면 탭 하나를 옮길 때마다 두 군데를 맞춰야 하고, 그 사이드바에만
+ * 있던 길(선물 화면)은 '더보기' 와 지수 화면에도 그대로 있다.
+ *
+ * 넓은 화면에서는 화면 틀(430px)과 같은 폭·같은 자리에 선다. globals.css
+ * 의 .frame-fixed 가 그 일을 한다.
+ */
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -57,10 +66,10 @@ export function BottomTabs() {
   return (
     <nav
       aria-label="주요 메뉴"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border pb-safe lg:hidden"
+      className="frame-fixed fixed bottom-0 z-40 border-t border-border pb-safe"
       style={{ background: 'color-mix(in srgb, var(--bg) 92%, transparent)', backdropFilter: 'blur(12px)' }}
     >
-      <ul className="mx-auto flex max-w-lg">
+      <ul className="flex">
         {NAV.map((item) => {
           const active = isActive(pathname, item);
           return (
@@ -68,7 +77,7 @@ export function BottomTabs() {
               <Link
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className="flex min-w-0 flex-col items-center gap-0.5 px-px py-2 text-[9.5px] font-semibold whitespace-nowrap transition-colors"
+                className="flex min-w-0 flex-col items-center gap-0.5 px-px py-2 text-[10.5px] font-semibold whitespace-nowrap transition-colors"
                 style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)' }}
               >
                 {item.icon}
@@ -79,79 +88,5 @@ export function BottomTabs() {
         })}
       </ul>
     </nav>
-  );
-}
-
-export function DesktopSidebar() {
-  const pathname = usePathname();
-  return (
-    <aside className="sticky top-0 hidden h-screen w-56 shrink-0 border-r border-border px-3 py-4 lg:block">
-      <div className="mb-5 px-2">
-        <p className="text-base font-bold text-fg-strong">Market Mood 3</p>
-        <p className="mt-0.5 text-[11px] text-subtle">미국 · 크립토 투자심리와 지수</p>
-      </div>
-      <nav aria-label="주요 메뉴">
-        <ul className="space-y-0.5">
-          {NAV.map((item) => {
-            const active = isActive(pathname, item);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors hover:bg-surface-2"
-                  style={{
-                    color: active ? 'var(--accent)' : 'var(--muted-fg)',
-                    background: active ? 'var(--surface-2)' : undefined,
-                  }}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      {/* 지수 화면에서도 들어갈 수 있지만, 데스크톱에서는 한 번에 가는 길을 남겨 둔다 */}
-      <div className="mt-4 border-t border-border pt-3">
-        <p className="mb-1 px-2.5 text-[10px] font-semibold tracking-wide text-subtle">시장별 화면</p>
-        <ul className="space-y-0.5">
-          {[
-            { href: '/market/us', label: '미국' },
-            { href: '/market/crypto', label: '크립토' },
-          ].map((m) => {
-            const active = pathname === m.href;
-            return (
-              <li key={m.href}>
-                <Link
-                  href={m.href}
-                  aria-current={active ? 'page' : undefined}
-                  className="block rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-surface-2"
-                  style={{ color: active ? 'var(--accent)' : 'var(--muted-fg)', background: active ? 'var(--surface-2)' : undefined }}
-                >
-                  {m.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <div className="mt-4 border-t border-border pt-3">
-        <ul className="space-y-0.5">
-          {[{ href: '/alerts', label: '알림 설정' }].map((s) => (
-            <li key={s.href}>
-              <Link
-                href={s.href}
-                className="block rounded-lg px-2.5 py-1.5 text-[12px] text-muted transition-colors hover:bg-surface-2 hover:text-fg"
-              >
-                {s.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </aside>
   );
 }

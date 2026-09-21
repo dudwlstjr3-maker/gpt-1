@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useData } from '@/components/providers/DataProvider';
 import { Notice, Skeleton } from '@/components/ui/States';
-import { Badge, FreshnessBadge } from '@/components/ui/Badge';
+import { Badge, StatusLine } from '@/components/ui/Badge';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { useFormatter } from '@/components/market/useFormatter';
 import { indicesFor, type CatalogItem } from '@/lib/catalog';
@@ -57,27 +57,35 @@ function IndexRow({
   const inner = (
     <>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-semibold text-fg-strong">{item.name}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-subtle">
-          <span className="tnum">{item.symbol}</span>
-          {quote ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>기준 {formatKstTime(quote.meta.asOf)}</span>
-            </>
-          ) : null}
+        {/* 이름은 한 줄이다. 자르면 '다우존스 산업평…' 이 무엇인지 알 수 없고,
+            접으면 줄마다 높이가 달라져 열네 줄이 들쭉날쭉해진다. 대신 자리를 비웠다 —
+            '15분 지연' 배지를 이 줄에서 빼 아래 잔글씨로 내렸다. */}
+        <p className="text-[15px] leading-snug font-bold whitespace-nowrap text-fg-strong">{item.name}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-subtle">
+          <span className="whitespace-nowrap">
+            <span className="tnum">{item.symbol}</span>
+            {quote ? <span> · 기준 {formatKstTime(quote.meta.asOf)}</span> : null}
+          </span>
+          {/* 장 상태는 적지 않는다 — 이 판은 시장별로 묶여 있어 열네 줄에
+              같은 '마감' 을 되풀이하게 된다. 지연 여부만 밝힌다. */}
+          {quote ? <StatusLine freshness={quote.meta.freshness} delayMinutes={delay} /> : null}
         </p>
       </div>
 
+      {/* 아주 좁은 화면(320px)에서는 미니 차트를 접는다. 56px 을 차지하는 통에 이름 칸이
+          62px 까지 눌려 '다우존스 산업평균' 이 두 줄로 쪼개졌다. 이름이 먼저다 —
+          무엇의 값인지 모르면 옆의 숫자도 읽을 수 없고, 흐름은 눌러 들어가면 크게 볼 수 있다. */}
       {hasValue ? (
-        <Sparkline
-          points={quote.spark}
-          width={56}
-          height={22}
-          fill={false}
-          color={color === 'var(--muted-fg)' ? 'var(--accent)' : color}
-          ariaLabel={`${item.name} 최근 추이`}
-        />
+        <span className="hidden shrink-0 @min-[360px]:block">
+          <Sparkline
+            points={quote.spark}
+            width={56}
+            height={22}
+            fill={false}
+            color={color === 'var(--muted-fg)' ? 'var(--accent)' : color}
+            ariaLabel={`${item.name} 최근 추이`}
+          />
+        </span>
       ) : null}
 
       <div className="shrink-0 text-right">
@@ -85,19 +93,17 @@ function IndexRow({
           <Skeleton className="h-[30px] w-[62px] rounded-md" />
         ) : hasValue ? (
           <>
-            <p className="tnum text-[13.5px] leading-tight font-bold text-fg-strong">{f.price(quote)}</p>
-            <p className="tnum mt-0.5 text-[11px] font-semibold" style={{ color }}>
+            <p className="tnum text-[15px] leading-tight font-bold whitespace-nowrap text-fg-strong">{f.price(quote)}</p>
+            <p className="tnum mt-0.5 text-[12.5px] font-semibold" style={{ color }}>
               <span aria-hidden="true">{f.glyph(dir)}</span> {f.changePct(quote)}
             </p>
           </>
         ) : (
-          <p className="text-[12px] font-semibold" style={{ color: 'var(--warn)' }}>
+          <p className="text-[13px] font-semibold" style={{ color: 'var(--warn)' }}>
             {NO_VALUE}
           </p>
         )}
       </div>
-
-      {quote ? <FreshnessBadge freshness={quote.meta.freshness} delayMinutes={delay} /> : null}
     </>
   );
 
@@ -106,25 +112,25 @@ function IndexRow({
       {quote ? (
         <Link
           href={`/asset/${item.id}`}
-          className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2"
+          className="flex items-center gap-2 px-3 py-2 hover:bg-surface-2"
           aria-label={`${item.name} ${hasValue ? `${f.price(quote)} ${f.srChange(quote)}` : '값 없음'}`}
         >
           {inner}
         </Link>
       ) : (
-        <div className="flex items-center gap-2.5 px-3 py-2.5">{inner}</div>
+        <div className="flex items-center gap-2 px-3 py-2">{inner}</div>
       )}
 
       {/* 기준점 — "3,714" 라는 숫자는 언제를 100 으로 놓았는지 알아야 읽힌다 */}
       {item.baseline ? (
-        <p className="px-3 pb-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+        <p className="px-3 pb-2 text-[11.5px] leading-relaxed break-keep text-subtle">
           <span className="font-semibold text-muted">기준 · </span>
           {item.baseline}
         </p>
       ) : null}
       {/* 값을 못 받은 이유는 그 줄에서 밝힌다. 0 으로 채우거나 줄을 지우지 않는다. */}
       {!loading && !hasValue ? (
-        <p className="px-3 pb-2 text-[10.5px] leading-relaxed break-keep" style={{ color: 'var(--warn)' }}>
+        <p className="px-3 pb-2 text-[11.5px] leading-relaxed break-keep" style={{ color: 'var(--warn)' }}>
           {quote?.unavailableReason ?? '값을 받지 못했습니다.'}
         </p>
       ) : null}
@@ -164,14 +170,14 @@ export function MarketIndexBoard() {
       ) : null}
 
       <div className={failed ? 'mt-3 px-3' : 'px-3'}>
-        <div className="space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-3 lg:space-y-0">
+        <div className="space-y-2 @min-[1024px]:grid @min-[1024px]:grid-cols-3 @min-[1024px]:items-start @min-[1024px]:gap-2 @min-[1024px]:space-y-0">
           {groups.map((g) => (
             <section key={g.market} aria-labelledby={`idx-${g.market}`} className="card overflow-hidden">
               <div
                 className="flex items-center justify-between gap-2 border-b border-border px-3 py-2"
                 style={{ background: `color-mix(in srgb, ${marketColor(g.market)} 8%, transparent)` }}
               >
-                <h2 id={`idx-${g.market}`} className="flex items-center gap-1.5 text-[13px] font-bold">
+                <h2 id={`idx-${g.market}`} className="flex items-center gap-2 text-[13px] font-bold">
                   {/* 색은 훑기용 표식일 뿐이고, 어느 시장인지는 옆의 글자가 말한다 */}
                   <span
                     aria-hidden="true"
@@ -184,14 +190,14 @@ export function MarketIndexBoard() {
                 {MARKET_IDS.includes(g.market) ? (
                   <Link
                     href={`/market/${g.market}`}
-                    className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
+                    className="tap shrink-0 text-[12.5px] font-semibold text-accent hover:underline"
                   >
                     시장 화면 →
                   </Link>
                 ) : null}
               </div>
 
-              <p className="px-3 py-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+              <p className="px-3 py-2 text-[11.5px] leading-relaxed break-keep text-subtle">
                 {GROUP_NOTE[g.market]}
               </p>
 
@@ -205,12 +211,12 @@ export function MarketIndexBoard() {
         </div>
       </div>
 
-      <section aria-labelledby="idx-help" className="mt-4 px-3">
+      <section aria-labelledby="idx-help" className="mt-5 px-3">
         <div className="card p-3">
           <h2 id="idx-help" className="text-[13px] font-bold text-fg-strong">
             지수 숫자를 읽는 법
           </h2>
-          <ul className="mt-2 space-y-2 text-[11.5px] leading-relaxed break-keep text-muted">
+          <ul className="mt-2 space-y-2 text-[12.5px] leading-relaxed break-keep text-muted">
             <li>
               <span className="font-semibold text-fg">기준점부터 봅니다. </span>
               KOSPI 는 1980년 1월 4일의 한국 증시를 100 으로 놓고 잰 값입니다. 지금 3,700 이라면 그때의 37배라는
@@ -225,7 +231,7 @@ export function MarketIndexBoard() {
               시장을 재는 눈금이라서, 실제로 사고파는 것은 그 지수를 따라가도록 만든 상품입니다.
             </li>
           </ul>
-          <p className="mt-2.5 border-t border-border pt-2 text-[10.5px] leading-relaxed break-keep text-subtle">
+          <p className="mt-2 border-t border-border pt-2 text-[11.5px] leading-relaxed break-keep text-subtle">
             지수마다 산출 기관과 방식이 다릅니다. 이 화면은 값을 받아 그대로 보여줄 뿐, 다시 계산하지 않습니다.
           </p>
         </div>

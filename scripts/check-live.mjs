@@ -28,6 +28,7 @@ const FRED_KEY = process.env.MACRO_API_KEY || '';
 
 let ok = 0;
 let bad = 0;
+function bad_count() { bad += 1; }
 
 async function probe(label, url, pick) {
   const t0 = Date.now();
@@ -117,6 +118,139 @@ console.log('\n[미국 풋/콜] Cboe — 키 없이 됩니다 (일별 마감 통
 await probeText('주식 풋/콜 비율',
   'https://cdn.cboe.com/api/global/us_indices/daily_statistics/Cboe_Volume_And_Put_Call_Ratios.csv',
   (b) => `${b.trim().split(/\r?\n/).length - 1}줄`);
+
+/*
+ * EIA 선물 정산가 — **응답 모양을 눈으로 확인하는 자리**.
+ *
+ * 이 앱에서 진짜 선물 계약 값이 실리는 곳은 여기뿐이다(에너지 넷). 그런데
+ * 파서가 기대하는 모양과 계열 코드는 EIA 문서를 따른 것이지 실제 응답으로
+ * 확인한 것이 아니다. 그래서 여기서는 값만 찍지 않고 **첫 줄의 열 이름을 그대로**
+ * 찍는다 — 'series' 와 'period' 와 'value' 가 실제로 오는지 눈으로 보라는 뜻이다.
+ * 다르면 그 자리에서 providers/eia.ts 를 고치면 된다.
+ */
+const EIA = process.env.EIA_BASE_URL || 'https://api.eia.gov/v2';
+const EIA_KEY = process.env.EIA_API_KEY || '';
+
+console.log('\n[선물 정산가] EIA — 무료 키가 있어야 합니다 (없으면 원유·천연가스가 현물로 대체됩니다)');
+if (!EIA_KEY) {
+  console.log('  · EIA_API_KEY 가 비어 있습니다. https://www.eia.gov/opendata/ 에서 이메일만 넣으면 무료 발급');
+  console.log('    없어도 앱은 돕니다 — 원유·천연가스는 FRED 현물로 채워지고(대신 쓴 값 표시),');
+  console.log('    난방유·휘발유는 사유와 함께 빕니다.');
+} else {
+  // 계열 표는 providers/eia.ts 에도 있다. 이 스크립트는 next 없이 도는 .mjs 라
+  // .ts 를 읽을 수 없어 여기에 한 벌 더 적어 둔다. 검증 스크립트가 둘을 대조한다.
+  const CHAINS = {
+    'WTI 원유': { route: 'petroleum/pri/fut', series: ['RCLC1', 'RCLC2', 'RCLC3', 'RCLC4'] },
+    천연가스: { route: 'natural-gas/pri/fut', series: ['RNGC1', 'RNGC2', 'RNGC3', 'RNGC4'] },
+    난방유: { route: 'petroleum/pri/fut', series: ['RHOC1', 'RHOC2', 'RHOC3', 'RHOC4'] },
+    'RBOB 휘발유': {
+      route: 'petroleum/pri/fut',
+      series: ['EER_EPMRR_PE1_Y35NY_DPG', 'EER_EPMRR_PE2_Y35NY_DPG', 'EER_EPMRR_PE3_Y35NY_DPG', 'EER_EPMRR_PE4_Y35NY_DPG'],
+    },
+  };
+  let shapeShown = false;
+  for (const [label, spec] of Object.entries(CHAINS)) {
+    const q = new URLSearchParams({
+      api_key: EIA_KEY,
+      frequency: 'daily',
+      'data[0]': 'value',
+      'sort[0][column]': 'period',
+      'sort[0][direction]': 'desc',
+      offset: '0',
+      length: '8',
+    });
+    for (const c of spec.series) q.append('facets[series][]', c);
+    await probe(`${label} 인도월 1~4`, `${EIA}/${spec.route}/data/?${q.toString()}`, (b) => {
+      const rows = b?.response?.data ?? [];
+      if (!shapeShown && rows[0]) {
+        shapeShown = true;
+        console.log(`      첫 줄의 열 이름: ${Object.keys(rows[0]).join(', ')}`);
+        console.log('      (파서는 period · series · value 를 봅니다. 이름이 다르면 providers/eia.ts 를 고치세요)');
+      }
+      const got = [...new Set(rows.map((r) => r.series))];
+      const missing = spec.series.filter((c) => !got.includes(c));
+      const latest = rows.filter((r) => r.series === spec.series[0])[0];
+      return (
+        `${rows.length}행 · 계열 ${got.length}/${spec.series.length}` +
+        (missing.length > 0 ? ` ⚠ 안 온 계열: ${missing.join(', ')}` : '') +
+        (latest ? ` · 근월 ${latest.period} = ${latest.value} ${latest.units ?? ''}` : '')
+      );
+    });
+  }
+}
+
+/*
+ * SEC EDGAR — **응답 모양과 태그를 눈으로 확인하는 자리**.
+ *
+ * 회사마다 쓰는 XBRL 태그가 다르다. 우리는 태그를 앞에서부터 시도해 값이 오는 첫
+ * 태그를 쓰는데, **어느 태그가 실제로 오는지는 물어봐야 안다.** 그래서 여기서
+ * 회사별로 태그를 하나씩 두드려 보고 어느 것이 걸리는지 그대로 찍는다.
+ * 다 빗나가면 companyCatalog.ts 의 tags 목록에 실제 태그를 추가하면 된다.
+ */
+const SEC = process.env.SEC_BASE_URL || 'https://data.sec.gov';
+const SEC_UA = process.env.SEC_USER_AGENT || 'MarketMood3/1.0 (contact: set SEC_USER_AGENT env var)';
+
+console.log('\n[재무제표] SEC EDGAR — 키가 필요 없습니다 (연락처가 담긴 User-Agent 는 필요합니다)');
+if (!process.env.SEC_USER_AGENT) {
+  console.log('  ⚠ SEC_USER_AGENT 가 비어 있습니다. SEC 는 연락처가 담긴 User-Agent 를 요구하고');
+  console.log('    없으면 403 으로 막습니다. 기본값으로 시도해 보지만 운영에서는 반드시 채우세요.');
+}
+{
+  // companyCatalog.ts 와 같은 표. .ts 를 이 스크립트에서 못 읽어 한 벌 더 적어 둔다.
+  const FIRMS = [['애플', '0000320193'], ['엔비디아', '0001045810'], ['테슬라', '0001318605']];
+  const TAGS = [
+    ['매출', ['RevenueFromContractWithCustomerExcludingAssessedTax', 'Revenues', 'SalesRevenueNet']],
+    ['영업이익', ['OperatingIncomeLoss']],
+    ['순이익', ['NetIncomeLoss', 'ProfitLoss']],
+    ['주당순이익', ['EarningsPerShareDiluted', 'EarningsPerShareBasicAndDiluted']],
+  ];
+  let shapeShown = false;
+  for (const [firm, cik] of FIRMS) {
+    const hits = [];
+    for (const [label, tags] of TAGS) {
+      let found = null;
+      for (const tag of tags) {
+        try {
+          const r = await fetch(`${SEC}/api/xbrl/companyconcept/CIK${cik}/us-gaap/${tag}.json`, {
+            headers: { 'user-agent': SEC_UA, accept: 'application/json' },
+            signal: AbortSignal.timeout(12000),
+          });
+          if (r.status === 404) continue;      // 그 회사가 안 쓰는 태그
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const b = await r.json();
+          const rows = b?.units?.USD ?? b?.units?.['USD/shares'] ?? [];
+          if (!Array.isArray(rows) || rows.length === 0) continue;
+          found = { tag, rows, entityName: b.entityName };
+          if (!shapeShown) {
+            shapeShown = true;
+            console.log(`      첫 줄의 열 이름: ${Object.keys(rows[0]).join(', ')}`);
+            console.log('      (파서는 start · end · val · form · filed 를 봅니다. 다르면 providers/sec.ts 를 고치세요)');
+          }
+          break;
+        } catch (e) {
+          found = { error: e instanceof Error ? e.message : String(e) };
+          break;
+        }
+      }
+      if (found?.rows) {
+        // 3개월짜리가 실제로 있는지 — 없으면 분기 표가 통째로 빈다
+        const q = found.rows.filter((x) => {
+          if (!x.start || !x.end) return false;
+          const d = Math.round((Date.parse(x.end) - Date.parse(x.start)) / 86400000);
+          return d >= 80 && d <= 100;
+        });
+        hits.push(`${label}=${found.tag}(${found.rows.length}행·분기 ${q.length})`);
+      } else if (found?.error) {
+        hits.push(`${label}✗ ${found.error}`);
+      } else {
+        hits.push(`${label}✗ 아는 태그가 다 빗나감 (${tags.join('/')})`);
+      }
+    }
+    const bad = hits.filter((h) => h.includes('✗')).length;
+    if (bad === 0) { ok += 1; console.log(`  ✓ ${firm} — ${hits.join(' · ')}`); }
+    else { bad_count(); console.log(`  ✗ ${firm} — ${hits.join(' · ')}`); }
+  }
+}
 
 /*
  * 경제 캘린더 — FRED 발표 일정.
@@ -230,8 +364,9 @@ if (ok === 0) {
   console.log('위험 신호등(VIX·하이일드·장단기 금리차·국채), 경제지표, 환율.');
   console.log('');
   console.log('심리 점수 확보 가중치(무료 소스 기준) — 문턱은 70%');
-  console.log('  크립토 약 85%  → 산출됩니다');
-  console.log('  미국   약 71%  → 산출됩니다 (Cboe 풋/콜이 있어야 넘습니다)');
+  console.log('  미국   71%  → 산출됩니다 (Cboe 풋/콜 14% 가 있어야 넘습니다)');
+  console.log('  크립토 63%  → 산출 불가 — 50일선 상회(12) · 스테이블코인(8) · 도미넌스(10) · 검색/뉴스(7) 가 빕니다');
+  console.log('             CoinGecko 무료 티어가 과거 값을 안 주는 것들입니다. 유료 티어를 붙이면 살아납니다.');
   console.log('  한국   시장에서 제외 — KOSPI·KOSDAQ 시세는 지수 화면에 남습니다');
   console.log('');
   console.log('생활 경제 지수 — 아홉 중 다섯 (1인당 GDP · 지니계수 · 미저리 · PPP 괴리 · 빅맥지수)');

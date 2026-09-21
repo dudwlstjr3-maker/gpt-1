@@ -33,7 +33,7 @@ import {
 } from './providers/coingecko';
 import { FRED_SOURCE, fetchLatest, fetchSeries, fredConfig, type FredConfig, type FredSeriesKey } from './providers/fred';
 import { fetchFredCalendar, fredCalendarConfig } from './providers/fredCalendar';
-import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig } from './providers/stooq';
+import { STOOQ_SOURCE, STOOQ_SYMBOL, fetchDailySeries, fetchQuotes, stooqConfig, type StooqQuote } from './providers/stooq';
 import { buildKrFngInput, buildUsFngInput } from './equities';
 import { getSession } from '@/lib/marketHours';
 import { FUTURES_ITEMS } from '@/lib/futuresCatalog';
@@ -181,7 +181,20 @@ export class LiveAdapter implements MarketAdapter {
     const cfg = stooqConfig(envUrl(this.baseUrlEnvFor(market)));
     const items = catalogFor(market);
     const ids = items.filter((i) => STOOQ_SYMBOL[i.id]).map((i) => i.id);
-    const quotes = await fetchQuotes(cfg, ids).catch(() => new Map());
+    /*
+     * 실패한 까닭을 버리지 않는다.
+     *
+     * 예전에는 `.catch(() => new Map())` 로 오류를 통째로 삼켰다. 그러면 화면에는
+     * 종목마다 "제공사가 값을 주지 않았습니다" 만 남는데, 그건 **제공사가 빈 값을
+     * 준 경우와 아예 닿지 못한 경우를 같은 말로 덮는다.** 실제로 LIVE 를 처음
+     * 돌려 봤을 때 26개가 전부 그 문장이었고, 원인(타임아웃)을 찾는 데 한참 걸렸다.
+     * 운영에서는 그 한참이 그대로 장애 시간이 된다.
+     */
+    let fetchError: string | null = null;
+    const quotes = await fetchQuotes(cfg, ids).catch((e: unknown) => {
+      fetchError = e instanceof Error ? e.message : String(e);
+      return new Map<string, StooqQuote>();
+    });
 
     const fetchedAt = new Date().toISOString();
     const source: DataSource = { ...STOOQ_SOURCE };
@@ -215,13 +228,17 @@ export class LiveAdapter implements MarketAdapter {
 
       const q = quotes.get(item.id);
       if (!q || q.close === null) {
+        // 닿지 못한 것과 빈 값을 준 것을 갈라 적는다
+        const why = fetchError
+          ? `제공사에 닿지 못했습니다: ${fetchError}`
+          : '제공사가 값을 주지 않았습니다.';
         return {
           ...base,
           price: null,
           change: null,
           changePct: null,
-          meta: meta(fetchedAt, fetchedAt, source, ['제공사가 값을 주지 않았습니다.']),
-          unavailableReason: '제공사가 값을 주지 않았습니다.',
+          meta: meta(fetchedAt, fetchedAt, source, [why]),
+          unavailableReason: why,
         };
       }
 

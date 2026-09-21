@@ -16,6 +16,7 @@
  */
 
 import { createServer } from 'node:http';
+import { writeFileSync } from 'node:fs';
 
 const PORT = Number(process.argv[2] ?? 4599);
 const DAY = 86_400_000;
@@ -33,6 +34,19 @@ function rng(seed) {
 }
 
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
+
+/** 제공사별 요청 수 — 종료할 때 찍는다 */
+const HITS = new Map();
+/* STUB_HITS_FILE 을 주면 요청 수를 그 파일에 계속 적는다. 종료 신호를 못 받는
+   환경(백그라운드 실행)에서도 세어 볼 수 있어야 하기 때문이다. */
+const HITS_FILE = process.env.STUB_HITS_FILE ?? null;
+function dumpHits() {
+  const lines = [...HITS].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k.padEnd(12)} ${v}건`);
+  const text = '제공사별 요청 수\n' + lines.join('\n') + '\n';
+  if (HITS_FILE) writeFileSync(HITS_FILE, text);
+  return text;
+}
+process.on('SIGINT', () => { process.stdout.write('\n' + dumpHits()); process.exit(0); });
 
 /** 21년치 일별 값 — 국면 전광판이 20년을 요구하므로 그보다 길어야 한다 */
 function daily(days, seed, base, drift, vol, floor = null) {
@@ -130,6 +144,25 @@ function text(res, body) {
 }
 
 const server = createServer((req, res) => {
+  /*
+   * 어느 제공사에 몇 번 묻는지 센다.
+   *
+   * 이 앱은 호스트마다 초당 요청 수를 제한한다(UPSTREAM_RATE_LIMIT_PER_SEC).
+   * 대역 서버는 호스트가 하나뿐이라 그 제한에 실제보다 훨씬 쉽게 걸리는데,
+   * 경로 앞머리를 제공사로 바꿔 세어 보면 **진짜 배포에서도 걸릴지**를 가늠할 수 있다.
+   * 종료할 때(Ctrl+C) 한 번에 찍는다.
+   */
+  const who = (req.url || '').startsWith('/fred') ? 'FRED'
+    : (req.url || '').startsWith('/cg') ? 'CoinGecko'
+    : (req.url || '').startsWith('/bn') ? 'Binance'
+    : (req.url || '').startsWith('/wb') ? 'World Bank'
+    : (req.url || '').startsWith('/q/') ? 'Stooq'
+    : (req.url || '').startsWith('/cboe') ? 'Cboe'
+    : (req.url || '').startsWith('/bigmac') ? 'Big Mac'
+    : '기타';
+  HITS.set(who, (HITS.get(who) ?? 0) + 1);
+  if (HITS_FILE) dumpHits();
+
   const u = new URL(req.url, `http://localhost:${PORT}`);
   const p = u.pathname;
 

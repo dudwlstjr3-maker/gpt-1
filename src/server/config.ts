@@ -164,7 +164,18 @@ export const SECTION_STALE_AFTER: Record<SectionKey, number> = {
   summary: 3 * 3600_000,
 };
 
-export const HTTP_TIMEOUT_MS = Number(env('UPSTREAM_TIMEOUT_MS') ?? 6000);
+/*
+ * 바깥 제공사 하나를 기다려 주는 시간.
+ *
+ * 6초였는데 너무 빡빡했다. 한 번의 스냅샷이 제공사 한 곳에 십수 건을 몰아 보내는데,
+ * 연결이 순서를 기다리는 동안에도 이 시계는 돌아간다. 그래서 제공사가 멀쩡하고
+ * 응답이 30ms 여도 뒤쪽 요청이 줄줄이 시간 초과로 떨어졌다 — LIVE 를 처음 돌렸을 때
+ * 시세 26개가 전부 빈 채로 나온 것이 이 때문이었다. 12초로 늘리면 그 줄이 풀린다.
+ *
+ * 무한정 기다리지는 않는다. 화면은 30초마다 갱신되므로, 한 곳이 죽었을 때
+ * 그 자리만 비우고 나머지를 보여주려면 갱신 주기보다는 짧아야 한다.
+ */
+export const HTTP_TIMEOUT_MS = Number(env('UPSTREAM_TIMEOUT_MS') ?? 12_000);
 export const HTTP_MAX_RETRIES = Number(env('UPSTREAM_MAX_RETRIES') ?? 2);
 /** 업스트림 호스트당 초당 최대 요청 수 */
 export const RATE_LIMIT_PER_SEC = Number(env('UPSTREAM_RATE_LIMIT_PER_SEC') ?? 5);

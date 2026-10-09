@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "기록 지우개",
+  "version": "1.0.0",
+  "description": "인터넷 사용 기록을 정해 둔 때에 자동으로 지웁니다.",
+  "permissions": ["history", "browsingData", "alarms", "storage"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "기록 지우개",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  },
+  "options_ui": {
+    "page": "popup.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
+}

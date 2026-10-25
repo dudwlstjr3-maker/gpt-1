@@ -20,7 +20,7 @@ import { BandStatsView } from '@/components/market/BandStatsView';
 import { Badge, ModeBadge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/Controls';
 import { ErrorState, Notice, SkeletonCard } from '@/components/ui/States';
-import { formatKstFull, formatNumber, formatPercentPlain, formatSigned, NO_VALUE } from '@/lib/format';
+import { formatKstFull, formatNumber, formatSigned, NO_VALUE } from '@/lib/format';
 import { confidenceGlyph, scoreColor, scoreFill } from '@/lib/scale';
 import { useChangeColor } from '@/components/market/useChangeColor';
 import {
@@ -57,6 +57,70 @@ function DeltaBox({ label, value }: { label: string; value: number | null }) {
         {value === null ? NO_VALUE : formatSigned(value, 1)}
         <span className="sr-only">{c.label(value)}</span>
       </p>
+    </div>
+  );
+}
+
+/**
+ * 가중치 막대.
+ *
+ * 이 화면의 제목이 '구성요소와 **가중치**' 인데, 정작 가중치가 제일 안 보이는
+ * 값이었다. '가중치 25%' 와 '가중치 10%' 가 똑같이 생긴 작은 배지로 나란히
+ * 놓여 있어서, 무엇이 점수를 많이 끌고 가는지 알려면 여섯 줄을 하나씩 읽고
+ * 머릿속에서 견줘야 했다. 길이로 그리면 한 번에 보인다.
+ *
+ * 색은 심리의 색(빨강·초록)을 쓰지 않는다. 가중치는 좋고 나쁨이 아니라 양이고,
+ * 이 화면에서 빨강·초록은 이미 '공포·탐욕' 이라는 뜻을 갖고 있다. 같은 색에
+ * 두 가지 뜻을 얹으면 둘 다 흐려진다. 길이만으로 뜻이 가지 않게 숫자도 옆에 둔다.
+ *
+ * 채운 길이는 **실제로 적용된** 가중치다. 결측이 생기면 남은 것들의 적용
+ * 가중치가 커지는데, 그때 기준 가중치 자리에 세워 둔 눈금보다 막대가 길어져서
+ * 재조정이 일어났다는 사실이 눈에 들어온다. 결측인 줄은 아예 비어 있다.
+ *
+ * 칸 전체의 길이는 **합계 100%** 다. 제일 큰 가중치에 맞추는 방법도 있는데,
+ * 그러면 미국처럼 가중치가 15·15·14·14·14·14·14 로 고른 시장에서 막대가 전부
+ * 칸을 꽉 채운다 — 14% 짜리가 '거의 전부' 로 보인다. 이 구역의 머리말이
+ * '합계 100%' 라고 적고 있으니, 눈금도 거기에 맞춰야 머리말과 막대가 같은 말을
+ * 한다. 길이가 곧 그 숫자다.
+ */
+function WeightBar({
+  weight,
+  effective,
+  total,
+  available,
+}: {
+  weight: number;
+  effective: number;
+  total: number;
+  available: boolean;
+}) {
+  const pct = (v: number) => `${Math.max(0, Math.min(100, (v / total) * 100))}%`;
+  // 0.05%p 미만 차이는 반올림하면 같은 숫자라 눈금을 세우지 않는다
+  const shifted = available && Math.abs(effective - weight) >= 0.05;
+  return (
+    <div className="mt-1 flex items-center gap-2">
+      {/* 숫자가 막대 **왼쪽**에 있다. 오른쪽에 두면 칸 끝에 붙어 옆 줄의 '전일 +4.8'
+          과 나란히 놓이고, 막대의 채워진 끝에서 숫자까지 눈이 먼 길을 간다.
+          왼쪽에 고정하면 줄마다 막대가 같은 자리에서 시작해 세로로 견주기도 쉽다. */}
+      {/* 오른쪽 맞춤 + 최소 너비 36px. '7%' 와 '20%' 의 글자 폭이 달라서
+          그냥 두면 줄마다 막대가 다른 자리에서 시작한다 — 길이를 견주라고 그린
+          막대가 시작점부터 어긋나면 견줄 수가 없다. */}
+      <span className="tnum min-w-9 shrink-0 text-right text-[11.5px] text-muted">
+        {formatNumber(weight, 0)}%
+        {shifted ? <span className="text-accent"> → {formatNumber(effective, 1)}%</span> : null}
+      </span>
+      <span className="relative h-1 flex-1 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        <span
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: available ? pct(effective) : '0%',
+            background: 'color-mix(in srgb, var(--fg) 42%, transparent)',
+          }}
+        />
+        {shifted ? (
+          <span className="absolute inset-y-0 w-0.5 bg-muted" style={{ left: pct(weight) }} />
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -185,6 +249,8 @@ export default function FngDetailPage() {
   if (!detail || !data) return null;
 
   const unavailable = detail.score === null;
+  /* 가중치 막대의 칸 길이 = 가중치 합계. 머리말의 '합계 100%' 와 같은 눈금이다. */
+  const totalWeight = Math.max(1, detail.components.reduce((a, c) => a + c.weight, 0));
 
   return (
     <div className="pt-2 pb-4">
@@ -226,36 +292,31 @@ export default function FngDetailPage() {
                   <DeltaBox label="1개월 대비" value={detail.deltaMonth} />
                 </div>
               )}
-              <dl className="mt-3 space-y-1 text-[13px]">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted">신뢰도</dt>
-                  <dd className="flex items-center gap-1 font-semibold text-fg">
-                    <span aria-hidden="true">{confidenceGlyph(detail.confidence)}</span>
-                    {CONFIDENCE_LABEL[detail.confidence]}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted">데이터 충족률</dt>
-                  <dd className="tnum text-fg">{formatPercentPlain(detail.coverage * 100, 0)}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted">신선도</dt>
-                  <dd className="tnum text-fg">{formatPercentPlain(detail.freshnessScore * 100, 0)}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted">역사적 분포</dt>
-                  <dd className="tnum text-fg">최근 {detail.lookbackDays}일</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-muted">산식 버전</dt>
-                  <dd className="tnum text-fg">{detail.formulaVersion}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="shrink-0 text-muted">산출 시각</dt>
-                  <dd className="tnum text-right text-fg">{formatKstFull(detail.computedAt)}</dd>
-                </div>
-              </dl>
-              <p className="mt-2 text-[12.5px] break-keep text-subtle">{detail.confidenceReason}</p>
+              {/*
+                * 여섯 줄짜리 표를 두 줄로 접었다.
+                *
+                * 신뢰도 · 충족률 · 신선도 · 분포 · 산식 버전 · 산출 시각이 점수와
+                * 같은 비중으로 깔려 있었는데, 그 바로 아래 문장이 **그중 셋을 그대로
+                * 되풀이**하고 있었다 — "데이터 충족률 100% · 신선도 100% → 신뢰도 높음".
+                * 같은 말을 두 번 읽히면 둘 다 안 읽힌다.
+                *
+                * 남긴 기준은 하나다. **점수를 얼마나 믿을지 판단하는 데 쓰이는가.**
+                *   신뢰도   → 배지로 올렸다. 색만으로 뜻이 가지 않게 기호(●●●)와 글자를 함께 둔다.
+                *   충족률·신선도 → 아래 문장이 이미 말한다. 줄을 지웠다.
+                *   분포·산식·시각 → 지우지는 않는다. 숫자의 출처라 따져 볼 사람에게는
+                *                   필요하다. 다만 작은 글씨 한 줄로 내렸다.
+                */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge tone={detail.confidence === 'low' ? 'warn' : 'neutral'} size="sm">
+                  <span aria-hidden="true">{confidenceGlyph(detail.confidence)}</span>
+                  신뢰도 {CONFIDENCE_LABEL[detail.confidence]}
+                </Badge>
+                <span className="text-[12.5px] break-keep text-subtle">{detail.confidenceReason}</span>
+              </div>
+              <p className="tnum mt-2 text-[11.5px] text-subtle">
+                최근 {detail.lookbackDays}일 분포 기준 · 산식 {detail.formulaVersion} ·{' '}
+                {formatKstFull(detail.computedAt)} 산출
+              </p>
             </div>
           </div>
           <div className="mt-3 border-t border-border pt-2">
@@ -401,47 +462,60 @@ export default function FngDetailPage() {
               const open = expanded === c.id;
               return (
                 <li key={c.id}>
+                  {/*
+                   * 가중치 배지 둘(기준 · 적용)을 막대 한 줄로 바꿨다.
+                   *
+                   * 배지로 두면 20% 와 7% 가 똑같이 생긴 알약이라 크기 차이가 안 보이고,
+                   * 이름 옆에 배지가 둘셋 붙어서 긴 이름이 두 줄로 접히기도 했다.
+                   *
+                   * 막대는 이름 바로 아래, 왼쪽 칸 안에 둔다. 숫자를 막대 오른쪽에
+                   * 두었을 때는 그 숫자가 옆 칸의 '전일 +4.8' 과 8px 간격으로 나란히
+                   * 놓여 '15% 전일 +4.8' 한 덩어리로 읽혔다 — 서로 아무 상관이 없는
+                   * 두 값이다. 줄을 통째로 하나 더 내주는 방법도 써 봤는데 줄마다
+                   * 16px 씩, 일곱 줄이면 112px 이 더 들었다. 숫자를 막대 **왼쪽**으로
+                   * 옮기니 겹침도 사라지고 높이도 그대로다.
+                   */}
                   <button
                     type="button"
                     onClick={() => setExpanded(open ? null : c.id)}
                     aria-expanded={open}
-                    className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-surface-2"
+                    className="block w-full px-3 py-2 text-left hover:bg-surface-2"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[13px] font-semibold break-keep text-fg">{c.label}</span>
-                        <Badge tone="neutral" size="xs">
-                          가중치 {c.weight}%
-                        </Badge>
-                        {c.available && c.effectiveWeight !== c.weight ? (
-                          <Badge tone="accent" size="xs" title="결측 재조정 후 실제 적용된 가중치">
-                            적용 {formatNumber(c.effectiveWeight, 1)}%
-                          </Badge>
-                        ) : null}
-                        {!c.available ? (
-                          <Badge tone="warn" size="xs" title={c.missingReason ?? '값을 받지 못했습니다.'}>
-                            결측
-                          </Badge>
-                        ) : null}
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[13px] font-semibold break-keep text-fg">{c.label}</span>
+                          {!c.available ? (
+                            <Badge tone="warn" size="xs" title={c.missingReason ?? '값을 받지 못했습니다.'}>
+                              결측
+                            </Badge>
+                          ) : null}
+                        </div>
+                        {/*
+                         * 결측 사유는 여기 적지 않고 펼친 자리로 내렸다.
+                         * 여기 적으면 결측이 생기는 순간 이 줄만 63px 에서 84px 로 자라
+                         * 목록 전체가 밀린다. 사유는 눌러서 보는 쪽이 맞고, 무엇이 빠졌는지는
+                         * 옆의 '결측' 배지가 이미 말한다.
+                         */}
+                        <WeightBar
+                          weight={c.weight}
+                          effective={c.effectiveWeight}
+                          total={totalWeight}
+                          available={c.available}
+                        />
                       </div>
-                      {/*
-                       * 결측 사유는 여기 적지 않고 펼친 자리로 내렸다.
-                       * 여기 적으면 결측이 생기는 순간 이 줄만 63px 에서 84px 로 자라
-                       * 목록 전체가 밀린다. 사유는 눌러서 보는 쪽이 맞고, 무엇이 빠졌는지는
-                       * 옆의 '결측' 배지가 이미 말한다.
-                       */}
+                      <div className="shrink-0 text-right">
+                        <p className="tnum text-[15px] font-bold" style={{ color: scoreColor(c.score) }}>
+                          {c.score === null ? NO_VALUE : formatNumber(c.score, 1)}
+                        </p>
+                        <p className="tnum text-[11.5px] text-muted">
+                          전일 {c.deltaDay === null ? NO_VALUE : formatSigned(c.deltaDay, 1)}
+                        </p>
+                      </div>
+                      <span aria-hidden="true" className="ml-1 mt-1 shrink-0 text-muted">
+                        {open ? '▾' : '▸'}
+                      </span>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="tnum text-[15px] font-bold" style={{ color: scoreColor(c.score) }}>
-                        {c.score === null ? NO_VALUE : formatNumber(c.score, 1)}
-                      </p>
-                      <p className="tnum text-[11.5px] text-muted">
-                        전일 {c.deltaDay === null ? NO_VALUE : formatSigned(c.deltaDay, 1)}
-                      </p>
-                    </div>
-                    <span aria-hidden="true" className="ml-1 mt-1 shrink-0 text-muted">
-                      {open ? '▾' : '▸'}
-                    </span>
                   </button>
 
                   {open ? (
@@ -513,10 +587,25 @@ export default function FngDetailPage() {
         </h2>
         <div className="card space-y-2 p-3">
           <p className="text-[13px] leading-relaxed break-keep text-fg">{detail.methodology.summary}</p>
+          {/*
+            * <ol> 인데 번호가 안 보였다.
+            *
+            * Tailwind 가 목록 표식을 지우기 때문에, 순서가 있는 목록이 그냥 문단
+            * 네 개로 보였다. 이 네 줄은 실제로 **차례**다 — 원시값을 모으고,
+            * 역사적 분포에서 백분위를 내고, 가중평균하고, 구간을 붙인다. 한 단계가
+            * 앞 단계의 결과를 받는다. 순서가 뜻을 가지는 목록이라 번호를 되살렸다.
+            * (반대로 순서가 뜻이 없는 곳에는 번호를 붙이지 않는다.)
+            */}
           <ol className="space-y-2">
             {detail.methodology.steps.map((s, i) => (
-              <li key={i} className="text-[12.5px] leading-relaxed break-keep text-muted">
-                {s}
+              <li key={i} className="flex items-start gap-2">
+                <span
+                  aria-hidden="true"
+                  className="tnum mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11.5px] font-bold text-fg"
+                >
+                  {i + 1}
+                </span>
+                <span className="text-[12.5px] leading-relaxed break-keep text-muted">{s}</span>
               </li>
             ))}
           </ol>
@@ -548,9 +637,14 @@ export default function FngDetailPage() {
                   {s.delayMinutes === null ? '지연 정보 없음' : s.delayMinutes === 0 ? '실시간' : `${s.delayMinutes}분 지연`}
                   {s.terms ? ` · ${s.terms}` : ''}
                 </p>
+                {/* 날 URL(https://… 뒤에 슬래시까지)을 그대로 깔면 한 줄이 주소로 꽉 찬다.
+                    읽는 사람에게 필요한 건 '어디' 라서 호스트만 남기고, 새 창으로 열린다는
+                    것은 기호(↗)와 화면 낭독용 글자로 함께 알린다 — 기호 하나만으로 두지 않는다. */}
                 {s.url ? (
                   <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[11.5px] text-accent hover:underline">
-                    {s.url}
+                    {s.url.replace(/^https?:\/\//, '').replace(/\/+$/, '')}
+                    <span aria-hidden="true"> ↗</span>
+                    <span className="sr-only"> (새 창에서 열림)</span>
                   </a>
                 ) : null}
               </li>

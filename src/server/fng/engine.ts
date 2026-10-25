@@ -22,7 +22,6 @@ import type {
   Meta,
   SubMetricResult,
 } from '@/types';
-import { CONFIDENCE_LABEL } from '@/types';
 import { stageOf } from '@/lib/scale';
 import { buildCycle } from './cycle';
 import {
@@ -311,9 +310,19 @@ export function computeFng(input: EngineInput, options: EngineOptions): EngineRe
   else if (coverage >= 0.8 && freshnessScore >= 0.6) confidence = 'medium';
   else confidence = 'low';
 
+  /*
+   * 결론은 여기에 적지 않는다 — **근거만** 담는다.
+   *
+   * 예전에는 '데이터 충족률 100% · 신선도 100% → 신뢰도 높음' 이었다. 그런데 이
+   * 문장이 놓이는 두 자리가 모두 '신뢰도 높음' 배지 바로 옆이다 (홈 카드의 배지
+   * title, 심리 상세의 요약 카드). 같은 말을 두 번 읽히면 둘 다 안 읽힌다.
+   *
+   * 결론은 배지가 말하고, 이 줄은 그 결론이 **어디서 나왔는지**만 말한다.
+   * 둘을 갈라 두면 배지만 봐도 되고, 못 미더우면 옆 숫자를 보면 된다.
+   */
   const confidenceReason = `데이터 충족률 ${Math.round(coverage * 100)}% · 신선도 ${Math.round(
     freshnessScore * 100,
-  )}% → 신뢰도 ${CONFIDENCE_LABEL[confidence]}`;
+  )}%`;
 
   const unavailableReason =
     last.score === null

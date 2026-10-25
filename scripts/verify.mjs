@@ -3328,6 +3328,99 @@ async function main() {
     check('왜 줄였는지 적어 둠', /첫 화면의\n\s*37% 를 먹었다|37% 를 먹었다/.test(tpl));
   }
 
+  /* ---------------- 8-36. 심리 상세를 다시 손본 자리 ---------------- */
+  console.log('\n[8-36] 심리 상세 — 같은 말 두 번 · 가중치 · 차례');
+  {
+    const page = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    const engine = await readFile('src/server/fng/engine.ts', 'utf8');
+    const defs = await readFile('src/server/fng/definitions.ts', 'utf8');
+
+    /*
+     * ① 같은 말이 두 번 있었다.
+     *
+     *    요약 카드에 '신뢰도 / 데이터 충족률 / 신선도 / 역사적 분포 / 산식 버전 /
+     *    산출 시각' 여섯 줄짜리 표가 점수와 같은 비중으로 깔려 있었고, 그 바로
+     *    아래 문장이 그중 셋을 그대로 되풀이했다 —
+     *    "데이터 충족률 100% · 신선도 100% → 신뢰도 높음".
+     *    배지도 옆에서 '신뢰도 높음' 이라고 적고 있었으니 결론은 세 번이었다.
+     *
+     *    결론은 배지가, 근거는 그 옆 문장이, 출처는 작은 글씨 한 줄이 맡는다.
+     *    요약 카드 높이 552px → 422px.
+     */
+    /* 문장 자체만 본다 — 주석에는 '왜 뺐는지' 를 적느라 옛 문장이 그대로 들어 있다.
+       '신뢰도' 라는 말이 이 안에 다시 들어오면 배지와 같은 말을 두 번 하는 것이다. */
+    const reasonExpr = engine.match(/const confidenceReason = `[\s\S]*?`;/)?.[0] ?? '';
+    check('신뢰도 근거 문장이 결론을 되풀이하지 않음', reasonExpr !== '' && !/신뢰도/.test(reasonExpr));
+    check('근거만 담는다고 적어 둠', /결론은 여기에 적지 않는다/.test(engine));
+    check('앱 요약 카드가 배지(결론) 옆에 근거를 둠',
+      /신뢰도 \{CONFIDENCE_LABEL\[detail\.confidence\]\}[\s\S]{0,200}?detail\.confidenceReason/.test(page));
+    check('앱 요약 카드에 여섯 줄짜리 표가 없음', !/<dt className="text-muted">데이터 충족률<\/dt>/.test(page));
+    check('출처(분포·산식·시각)는 지우지 않고 작은 글씨 한 줄로 남김',
+      /분포 기준 · 산식 \{detail\.formulaVersion\}/.test(page));
+    check('미리보기도 같은 모양', /class="conf-line"[\s\S]{0,200}?confBadge\(f\.confidence, null\)/.test(tpl));
+    // 규칙과 쓰임만 본다 — 왜 걷어냈는지 적어 둔 주석에는 이름이 남아 있다
+    check('미리보기에 죽은 dl.kv 스타일이 남아 있지 않음',
+      !/dl\.kv\s*\{/.test(tpl) && !/class="kv"/.test(tpl));
+
+    /*
+     * ② 신뢰도 '높음' 을 초록으로 칠하고 있었다 — 미리보기만.
+     *    이 앱에서 초록은 이미 '탐욕' 이다. 같은 화면에서 한 색이 두 뜻을 가리키면
+     *    둘 다 흐려진다. 앱은 처음부터 낮을 때만 색을 썼는데 손으로 한 벌 더 그린
+     *    미리보기가 어긋나 있었다.
+     */
+    // 주석을 걷어내고 본다 — 왜 바꿨는지 적어 둔 글에 옛 클래스 이름이 들어 있다
+    const stripComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '');
+    const confFn = stripComments(tpl.match(/const confBadge = \(c, reason\) => \{[\s\S]*?\n  \};/)?.[0] ?? '');
+    check('신뢰도 배지가 초록을 쓰지 않음 (초록은 탐욕의 색)', confFn !== '' && !/b-ok/.test(confFn));
+    check('앱과 같은 규칙 — 낮을 때만 색', /c === 'low' \? 'b-warn' : 'b-neutral'/.test(confFn));
+
+    /*
+     * ③ '구성요소와 가중치' 인데 가중치가 제일 안 보였다.
+     *    20% 와 7% 가 똑같이 생긴 작은 알약이라, 무엇이 점수를 끌고 가는지
+     *    여덟 줄을 하나씩 읽고 머릿속에서 견줘야 했다. 길이로 그리면 한 번에 보인다.
+     */
+    check('가중치를 막대로 그림', /function WeightBar\(/.test(page) && /const weightBar = \(c, total\) =>/.test(tpl));
+    check('눈금이 합계 100% — 머리말과 같은 수',
+      /const totalWeight = Math\.max\(1, detail\.components\.reduce/.test(page) &&
+      /const totalWeight = Math\.max\(1, f\.components\.reduce/.test(tpl));
+    /* 매개변수 분해가 `}: {` 로 열 0 의 중괄호를 하나 더 만든다. 거기서 끊으면
+       본문을 못 보니, 다음 선언이 시작되는 자리까지를 함수로 본다. */
+    const wb = page.slice(page.indexOf('function WeightBar('), page.indexOf('export default function FngDetailPage'));
+    check('막대 색에 심리의 색(빨강·초록)을 쓰지 않음',
+      wb !== '' && !/scoreColor|scoreFill|var\(--(?:warn|danger|ok)\)/.test(wb));
+    check('길이만으로 뜻이 가지 않게 숫자를 함께 둠', /formatNumber\(weight, 0\)\}%/.test(wb));
+    check('숫자 칸이 오른쪽 맞춤 · 최소 너비 — 줄마다 막대가 같은 자리에서 시작',
+      /min-w-9 shrink-0 text-right/.test(wb) && /\.wbar-num \{[^}]*min-width: 36px[^}]*text-align: right/.test(tpl));
+    check('결측인 줄은 막대가 비어 있음 (0 으로 채우지 않음)',
+      /available \? pct\(effective\) : '0%'/.test(wb) && /c\.available \? pct\(c\.effectiveWeight\) : '0%'/.test(tpl));
+    check('적용 가중치가 기준과 다르면 눈금이 선다', /wbar-tick/.test(tpl) && /shifted \?/.test(wb));
+    check('가중치 배지는 걷어냄 — 같은 값을 두 모양으로 두지 않음',
+      !/가중치 \{c\.weight\}%/.test(page) && !/'가중치 ' \+ c\.weight/.test(tpl));
+
+    /*
+     * ④ <ol> 인데 번호가 안 보였다. 그래서 번호를 글 안에 박아 두었는데,
+     *    화면이 번호를 붙이기 시작하자 '1  (1) 구성요소별 …' 로 두 번 나왔다.
+     *    순서는 자리에서 나오는 값이니 그리는 쪽이 센다.
+     */
+    check('차례 번호가 데이터에 박혀 있지 않음', !/[①-⑳]/.test(defs.split('METHODOLOGY_STEPS')[1] ?? ''));
+    check('앱이 번호를 셈', /steps\.map\(\(s, i\) =>[\s\S]{0,400}?\{i \+ 1\}/.test(page));
+    check('미리보기도 번호를 셈', /steps\.map\(\(x, i\) =>[\s\S]{0,200}?step-n[\s\S]{0,60}?\(i \+ 1\)/.test(tpl));
+    check('번호는 읽어 주지 않음 — 목록이 이미 순서를 말한다',
+      /className="[^"]*"\s*\n?\s*>\s*\{i \+ 1\}/.test(page.replace(/aria-hidden="true"/g, 'aria-hidden="true"')) &&
+      /<span class="step-n" aria-hidden="true">/.test(tpl));
+
+    /*
+     * ⑤ 출처 링크가 날 URL 이라 한 줄이 주소로 꽉 찼다.
+     *    필요한 건 '어디' 라서 호스트만 남긴다. 새 창으로 열린다는 사실은
+     *    기호 하나로 두지 않고 낭독용 글자와 함께 알린다.
+     */
+    check('출처 링크가 주소만 보여 줌',
+      /s\.url\.replace\(\/\^https\?:\\\/\\\/\/, ''\)/.test(page) && /String\(x\.url\)\.replace/.test(tpl));
+    check('새 창이라는 사실을 기호만으로 두지 않음',
+      /새 창에서 열림/.test(page) && /새 창에서 열림/.test(tpl));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

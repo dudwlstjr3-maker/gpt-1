@@ -20,3 +20,7 @@ coverage/
 # 다시 자르려면 여기에 원본을 두고 npm run font
 # https://github.com/orioncactus/pretendard
 tools/font/PretendardVariable.woff2
+
+# 미리보기를 docs/ 로 바로 빌드하면 아티팩트용 사본이 옆에 같이 떨어진다.
+# 게시 도구가 머리 태그를 직접 씌우는 판본이라 Pages 에는 올릴 것이 아니다.
+docs/*.artifact.html

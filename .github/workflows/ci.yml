@@ -1,0 +1,35 @@
+# PR 과 main 푸시에서 돌리는 검사.
+#
+# 여기서 돌리는 것은 서버 없이 끝나는 것들뿐이다.
+# `npm run verify` (1,227 항목) 는 :3000 에 떠 있는 개발 서버에 실제로 요청을 보내
+# 화면에 박힌 값을 읽는 검사라서 CI 에서 돌리지 않는다.
+# 서버를 띄우면 바깥 API 를 두드리게 되고, 키 없이는 DEMO 로 떨어져
+# 통과해도 의미가 없고 실패해도 원인이 코드인지 바깥인지 가려지지 않는다.
+# verify 는 각자 기계에서 `npm run dev` 를 띄워 둔 채로 돌린다.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # package-lock.json 그대로 받는다. install 과 달리 잠금 파일을 고치지 않는다.
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # 타입과 단위 검사를 지나도 빌드에서 깨지는 일이 있어 마지막에 둔다.
+      - run: npm run build

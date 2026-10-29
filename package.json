@@ -8,6 +8,7 @@
     "build": "npm run icons && next build",
     "start": "next start -p 3000",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-tests.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "verify": "node scripts/verify.mjs",
     "preview": "node tools/preview/build.mjs",

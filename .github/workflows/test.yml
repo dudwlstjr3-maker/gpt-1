@@ -1,0 +1,59 @@
+# PR 마다, 그리고 main 에 들어갈 때마다 돈다.
+# 키를 하나도 쓰지 않는다 — DEMO 모드로만 검사한다.
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  MARKET_MOOD_MODE: demo
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  # 순수 로직 단위 테스트 + 타입 검사
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
+  # 빌드한 DEMO 서버를 띄우고 npm run verify (README 7장)
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: 서버를 띄우고 검증
+        run: |
+          # npm 만 끄면 next-server 가 남는다 — 새 프로세스 그룹으로 띄워 그룹째 끈다
+          setsid npm start > next-start.log 2>&1 &
+          SERVER_PGID=$!
+          trap 'kill -- "-$SERVER_PGID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            curl -fs -o /dev/null http://localhost:3000/api/health && break
+            sleep 1
+          done
+          if ! curl -fs -o /dev/null http://localhost:3000/api/health; then
+            echo "서버가 60초 안에 뜨지 않았습니다."
+            cat next-start.log
+            exit 1
+          fi
+          npm run verify

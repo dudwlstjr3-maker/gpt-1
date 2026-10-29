@@ -53,6 +53,7 @@ API 키가 하나도 없어도 **DEMO 모드로 바로 실행**됩니다. 별도
 
 | 명령 | 설명 |
 | --- | --- |
+| `npm test` | 순수 로직 단위 테스트 (`scripts/*.test.mjs`, 서버 불필요). PR 마다 GitHub Actions 가 이것과 타입 검사 · `verify` 를 DEMO 모드로 돌립니다 |
 | `npm run typecheck` | TypeScript 타입 검사 |
 | `npm run icons` | PWA 아이콘 PNG 재생성 (`public/icons/`) |
 | `npm run verify` | **실행 중인 서버**를 상대로 검증 기준 자동 확인 (아래 7장) |

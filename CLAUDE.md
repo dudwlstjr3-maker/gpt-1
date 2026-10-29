@@ -16,22 +16,39 @@ npm run verify       # 그다음
 ```
 
 `npm run dev` 를 포그라운드로 잡으면 그 자리에서 멈춘 채 다음 명령으로 못 넘어간다.
-백그라운드로 돌리고, 끝나면 그 프로세스를 정리한다.
+백그라운드로 돌리고, `/api/health` 가 200 을 줄 때까지 기다린 뒤 verify 를 돌린다.
+끝나면 그 프로세스를 정리한다.
+
+키가 없으면 DEMO 모드로 뜬다 (`/api/health` 가 그렇게 알려 준다). 그 상태가 정상이고,
+바깥 제공사를 부르지 않으므로 verify 를 돌리기에 오히려 알맞다.
 
 `npm test` 는 서버가 필요 없다. 서버를 띄울 수 없는 상황이면 `typecheck` → `test` → `build`
 까지는 그대로 돌려 두고, `verify` 를 돌리지 못했다는 사실을 보고에 적는다.
-**돌리지 않은 검사를 통과했다고 적지 않는다.**
+**돌리지 않은 검사를 통과했다고 적지 않는다. 세어 보지 않은 숫자를 적지 않는다.**
 
 ## 세 곳 규칙을 잊기 쉽다
 
 화면을 고칠 때 `src/` 만 고치고 끝내는 실수가 가장 흔하다.
 `tools/preview/template.html` 과 `scripts/verify.mjs` 까지 세 곳이다 (AGENTS.md 4절).
-`verify.mjs` 는 22만 자가 넘어 통째로 읽기 어렵다 — 고칠 항목을 grep 으로 찾아 들어간다.
 
-## 파일 크기
+하단 고지 문구를 찾을 때 `src/app/layout.tsx` 로 잘못 가기 쉽다. 그 파일의 것은
+검색엔진용 `metadata.description` 이고 화면에 그려지지 않는다.
+실제 문구는 `src/components/market/constants.ts` 의 `DISCLAIMER_TEXT` 다 (AGENTS.md 1절).
 
-`README.md`(93KB), `scripts/verify.mjs`(224KB), `docs/index.html`(2MB) 은 통째로 읽지 않는다.
-필요한 부분만 grep 이나 범위 읽기로 꺼낸다.
+## 통째로 읽지 않는 파일
+
+큰 파일은 전부 읽지 말고 grep 이나 범위 읽기로 필요한 부분만 꺼낸다.
+(바이트는 2026-10-29 기준)
+
+| 파일 | 크기 |
+|---|---|
+| `docs/index.html` | 2,123,794B (~2.0MiB) — 빌드 산출물, 손으로 고칠 것이 아니다 |
+| `tools/preview/template.html` | 339,299B (~331KiB) — 고쳐야 하는 파일인데 가장 크다 |
+| `scripts/verify.mjs` | 217,310B (~212KiB) |
+| `README.md` | 93,366B (~91KiB) |
+
+`template.html` 과 `verify.mjs` 는 세 곳 규칙 때문에 실제로 **고쳐야** 하는 파일이다.
+읽지 않고 고칠 수는 없으니, 고칠 항목을 grep 으로 찾아 그 줄 주변만 열고 들어간다.
 
 ## 보고
 

@@ -3,6 +3,7 @@ import { homeData } from "@/lib/home";
 import { JobCard, SectionHeader, AdLabel, Empty, Pill } from "@/components/ui";
 import { ImpressionBeacon } from "@/components/client";
 import { Icon } from "@/components/Icon";
+import { Skyline } from "@/components/Brand";
 import { PROPERTY_TYPES, SITE_STATUS, BOARD_CATEGORIES, label } from "@/lib/constants";
 import { ago } from "@/lib/format";
 
@@ -16,7 +17,8 @@ export default async function Home() {
   const adIds = [...d.premium.map((j) => j.campaign_id), ...d.banners.map((b) => b.campaign_id)];
 
   const chatCard = national && (
-    <Link href={`/lounge/chat/${national.id}`} className="block overflow-hidden rounded-[var(--radius-card)] bg-navy-900 p-5 text-white">
+    <Link href={`/lounge/chat/${national.id}`} className="relative block overflow-hidden rounded-[var(--radius-card)] bg-navy-900 p-5 text-white">
+      <Skyline className="pointer-events-none absolute -bottom-1 right-0 h-16 w-56 text-white/[0.07]" />
       <div className="flex items-center gap-2 text-[13px] text-brand-200">
         <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" /></span>
         지금 {national.online}명 접속 중 · 오늘 메시지 {national.today}개
@@ -83,14 +85,15 @@ export default async function Home() {
     <div className="mt-4 grid gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
       <ImpressionBeacon ids={adIds} />
       <div className="space-y-7 min-w-0">
-        <section className="card p-5 lg:p-6">
+        <section className="card relative overflow-hidden p-5 lg:p-6">
+          <Skyline className="pointer-events-none absolute -bottom-1 right-0 hidden h-14 w-60 text-brand-50 sm:block" />
           <h1 className="text-[21px] font-bold leading-snug tracking-tight lg:text-[26px]">다음 현장, <span className="text-brand-600">조건으로</span> 찾으세요</h1>
           <p className="mt-1 text-sm text-muted">지역·직급·RT·일비로 전국 분양현장 구인공고를 비교합니다.</p>
-          <form action="/jobs" className="mt-4 flex gap-2">
+          <form action="/jobs" className="relative mt-4 flex gap-2">
             <input name="q" className="input" placeholder="현장명, 지역, 키워드" aria-label="공고 검색" />
             <button className="btn-navy shrink-0">검색</button>
           </form>
-          <div className="mt-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="relative mt-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {QUICK.map(([k, v]) => <Link key={k} href={`/jobs?region=${k}`} className="chip hover:border-brand-500">{v}</Link>)}
             <Link href="/jobs?rank=director" className="chip hover:border-brand-500">본부장</Link>
             <Link href="/jobs?rank=team_leader" className="chip hover:border-brand-500">팀장</Link>

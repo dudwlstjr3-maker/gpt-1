@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { JsonForm } from "@/components/client";
+import { BrandMark } from "@/components/Brand";
 
 export const metadata = { title: "회원가입" };
 
 export default function Signup() {
   return (
     <div className="mx-auto mt-8 max-w-sm">
+      <BrandMark size={44} className="mb-4" />
       <h1 className="text-2xl font-bold tracking-tight">회원가입</h1>
       <p className="mt-1 text-sm text-muted">닉네임을 비워 두면 &lsquo;익명 고양이123&rsquo; 같은 닉네임이 자동으로 만들어집니다.</p>
       <JsonForm endpoint="/api/auth/signup" submitLabel="가입하기" className="mt-6 space-y-3">

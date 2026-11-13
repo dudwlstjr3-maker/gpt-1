@@ -3,7 +3,7 @@
 /* ───── 분양톡 디자인 토큰
    의미 토큰(bg/surface/ink/muted/line)은 CSS 변수 → 다크 모드는 [data-theme=dark]에서 값만 바꾼다 */
 :root {
-  --bg: #f4f6fa;
+  --bg: #f3f5f9;
   --surface: #ffffff;
   --surface-2: #f8fafc;
   --ink: #0f172a;
@@ -33,16 +33,16 @@
 }
 
 @theme {
-  --color-navy-950: #061229;
-  --color-navy-900: #0b1d45;
-  --color-navy-800: #132a5c;
-  --color-navy-700: #1c3a78;
-  --color-brand-50: #eef3ff;
-  --color-brand-100: #dbe6ff;
-  --color-brand-200: #bcd0ff;
-  --color-brand-500: #3a6cf4;
-  --color-brand-600: #2456e3;
-  --color-brand-700: #1c45b8;
+  --color-navy-950: #07122b;
+  --color-navy-900: #0a1b44;
+  --color-navy-800: #15295e;
+  --color-navy-700: #213b7d;
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #dce4ff;
+  --color-brand-200: #bacaff;
+  --color-brand-500: #4b6bf2;
+  --color-brand-600: #2b4fe0;
+  --color-brand-700: #1f3bb0;
   /* 광고 영역 전용 색 — 일반 콘텐츠(블루)와 확실히 구분 */
   --color-ad-50: #fff8eb;
   --color-ad-100: #feecc7;

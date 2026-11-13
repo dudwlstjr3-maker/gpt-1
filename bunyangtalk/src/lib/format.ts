@@ -51,3 +51,25 @@ export function maskEmail(email: string): string {
   const [id, domain] = email.split("@");
   return `${id.slice(0, 2)}${"*".repeat(Math.max(1, id.length - 2))}@${domain}`;
 }
+
+// 조건 바용 짧은 표기
+export function manShort(n: number | null | undefined): string {
+  if (!n) return "없음";
+  if (n >= 10000) {
+    const m = n / 10000;
+    return `${Number.isInteger(m) ? m.toLocaleString("ko-KR") : m.toFixed(1)}만`;
+  }
+  return `${n.toLocaleString("ko-KR")}원`;
+}
+
+export function rtParts(j: { rt_basis: string; rt_amount: number | null; rt_percent: string | number | null }): { label: string; value: string } {
+  if (j.rt_basis === "negotiable") return { label: "RT", value: "협의" };
+  if (j.rt_basis === "percent") return { label: "RT 분양가", value: `${Number(j.rt_percent ?? 0)}%` };
+  return { label: j.rt_basis === "per_unit" ? "RT 호실당" : "RT 건당", value: manShort(j.rt_amount) };
+}
+
+export function settleShort(s: string | null | undefined): string {
+  if (!s) return "협의";
+  const t = s.replace(/^계약\s*/, "").replace(/\s*(일괄\s*)?정산$/, "").trim();
+  return t.length > 7 ? `${t.slice(0, 6)}…` : t || "협의";
+}

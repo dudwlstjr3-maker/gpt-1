@@ -5,12 +5,14 @@ import "./globals.css";
 import { getViewer } from "@/lib/auth";
 import { DesktopNav, BottomNav } from "@/components/Nav";
 import { Icon } from "@/components/Icon";
+import { Wordmark } from "@/components/Brand";
+import { Avatar } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: { default: "분양톡 — 분양인을 위한 구인구직·익명 라운지", template: "%s | 분양톡" },
   description: "분양상담사·팀장·본부장을 위한 현장 구인공고, 익명 채팅, 업계 커뮤니티",
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0b1d45" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0a1b44" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const v = await getViewer();
@@ -24,10 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         )}
         <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
           <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 lg:h-16">
-            <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="분양톡 홈">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-900 text-[15px] font-black text-white">분</span>
-              <span className="text-[19px] font-extrabold tracking-tight text-navy-900">분양톡</span>
-            </Link>
+            <Link href="/" className="shrink-0" aria-label="분양톡 홈"><Wordmark /></Link>
             <DesktopNav />
             <form action="/jobs" className="ml-auto hidden md:block">
               <label className="relative block">
@@ -43,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {v.isOperator && <Link href="/admin" className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 sm:block">관리자</Link>}
                   {v.companies.length > 0 && <Link href="/recruiter" className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-ink-2 hover:bg-surface-2 sm:block">구인자 관리</Link>}
                   <Link href="/me" className="hidden items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-sm font-semibold lg:flex">
-                    <span className="grid h-7 w-7 place-items-center rounded-full bg-brand-50 text-brand-700"><Icon name="user" size={16} /></span>
+                    <Avatar nickname={v.nickname} size={28} />
                     {v.nickname}
                   </Link>
                 </>

@@ -13,7 +13,7 @@ export const POST = api(async (req, ctx) => {
   await tx(async (c) => {
     const p = await q1("SELECT 1 FROM board_posts WHERE id = $1 AND status = 'visible' FOR UPDATE", [id], c);
     if (!p) fail(404, "글을 찾을 수 없습니다.");
-    await c.query("INSERT INTO board_comments(post_id, author_id, author_nickname, body) VALUES ($1,$2,$3,$4)", [id, v.id, v.nickname, text]);
+    await c.query("INSERT INTO board_comments(post_id, author_id, author_nickname, author_badge, body) VALUES ($1,$2,$3,$4,$5)", [id, v.id, v.nickname, v.badge, text]);
     await c.query("UPDATE board_posts SET comment_count = comment_count + 1 WHERE id = $1", [id]);
   });
   return json({ ok: true }, 201);

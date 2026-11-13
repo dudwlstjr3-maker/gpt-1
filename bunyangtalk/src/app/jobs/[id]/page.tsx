@@ -6,7 +6,7 @@ import { isUuid } from "@/lib/http";
 import { RANKS, PROPERTY_TYPES, CONTRACT_TYPES, JOB_STATUS, REPORT_REASONS, label } from "@/lib/constants";
 import { rtText, won, ymd, dday } from "@/lib/format";
 import { ActionButton, ContactReveal, ReportButton } from "@/components/client";
-import { Pill } from "@/components/ui";
+import { Pill, ConditionBar } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +66,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
           {j.verification_status === "verified" && <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-emerald-700"><Icon name="shield" size={14} />기업 확인</span>}
         </p>
         <p className="mt-1 text-[13px] text-muted">게시 {ymd(j.published_at ?? j.created_at)} · 조회 {j.view_count.toLocaleString()}</p>
+        <div className="mt-4"><ConditionBar j={j} size="lg" /></div>
       </header>
 
       <section className="card mt-3 p-5 lg:p-6">

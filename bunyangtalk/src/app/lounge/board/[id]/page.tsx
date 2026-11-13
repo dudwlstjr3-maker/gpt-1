@@ -7,7 +7,7 @@ import { BOARD_CATEGORIES, REPORT_REASONS, label } from "@/lib/constants";
 import { ago } from "@/lib/format";
 import { blockedIds } from "@/lib/chat";
 import { ActionButton, JsonForm, ReportButton } from "@/components/client";
-import { Pill } from "@/components/ui";
+import { Pill, Avatar, RankBadge } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -17,13 +17,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   if (!isUuid(id)) notFound();
   const v = await getViewer();
   const p = await q1(
-    `SELECT p.id, p.author_id, p.author_nickname, p.category, p.title, p.body, p.like_count, p.comment_count, p.view_count, p.created_at,
+    `SELECT p.id, p.author_id, p.author_nickname, p.author_badge, p.category, p.title, p.body, p.like_count, p.comment_count, p.view_count, p.created_at,
             p.status, p.site_id, s.name AS site_name FROM board_posts p LEFT JOIN sites s ON s.id = p.site_id WHERE p.id = $1`, [id]);
   if (!p || (p.status !== "visible" && !v?.isOperator)) notFound();
   await q("UPDATE board_posts SET view_count = view_count + 1 WHERE id = $1", [id]);
   const blocked = v ? [...(await blockedIds(v.id))] : [];
   const comments = await q(
-    `SELECT id, author_id, author_nickname, body, created_at FROM board_comments
+    `SELECT id, author_id, author_nickname, author_badge, body, created_at FROM board_comments
       WHERE post_id = $1 AND status = 'visible' AND NOT (author_id = ANY($2::uuid[])) ORDER BY created_at`, [id, blocked]);
   const liked = v ? !!(await q1("SELECT 1 FROM board_likes WHERE post_id = $1 AND user_id = $2", [id, v.id])) : false;
   // 화면에는 작성자 ID 대신 '내 글 여부'만 넘긴다
@@ -39,9 +39,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           {p.site_name && <Link href={`/sites/${p.site_id}`} className="text-muted hover:underline">{p.site_name}</Link>}
         </div>
         <h1 className="mt-2 text-xl font-bold leading-snug">{p.title}</h1>
-        <p className="mt-2 flex flex-wrap gap-2 text-[13px] text-muted">
-          <span className="font-semibold text-ink-2">{p.author_nickname}</span><span>{ago(p.created_at)}</span><span>조회 {p.view_count + 1}</span>
-        </p>
+        <div className="mt-3 flex items-center gap-2.5">
+          <Avatar nickname={p.author_nickname} size={36} />
+          <div className="text-[13px]">
+            <p className="flex items-center gap-1.5"><span className="font-semibold text-ink">{p.author_nickname}</span><RankBadge rank={p.author_badge} /></p>
+            <p className="text-muted">{ago(p.created_at)} · 조회 {p.view_count + 1}</p>
+          </div>
+        </div>
         <div className="mt-5 whitespace-pre-wrap text-[15px] leading-7 text-ink">{p.body}</div>
         <div className="mt-6 flex items-center gap-2 border-t border-line pt-4">
           {v ? (
@@ -63,9 +67,12 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         <h2 className="section-title">댓글 {comments.length}</h2>
         <ul className="mt-3 divide-y divide-line">
           {comments.map((c) => (
-            <li key={c.id} className="py-3">
-              <p className="flex items-center gap-2 text-[13px]">
-                <span className={`font-semibold ${c.author_id === p.author_id ? "text-brand-700" : "text-ink-2"}`}>{c.author_nickname}{c.author_id === p.author_id && " (글쓴이)"}</span>
+            <li key={c.id} className="flex gap-2.5 py-3">
+              <Avatar nickname={c.author_nickname} size={30} />
+              <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 text-[13px]">
+                <span className={`font-semibold ${c.author_id === p.author_id ? "text-brand-700" : "text-ink"}`}>{c.author_nickname}{c.author_id === p.author_id && " (글쓴이)"}</span>
+                <RankBadge rank={c.author_badge} />
                 <span className="text-muted">{ago(c.created_at)}</span>
                 <span className="ml-auto flex gap-3">
                   {v?.id === c.author_id && <ActionButton endpoint={`/api/board/comments/${c.id}`} method="DELETE" confirm="댓글을 삭제할까요?" className="text-[12px] text-muted">삭제</ActionButton>}
@@ -73,6 +80,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                 </span>
               </p>
               <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed">{c.body}</p>
+              </div>
             </li>
           ))}
         </ul>

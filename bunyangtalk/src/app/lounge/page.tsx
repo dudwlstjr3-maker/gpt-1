@@ -3,8 +3,9 @@ import { q } from "@/lib/db";
 import { getViewer } from "@/lib/auth";
 import { BOARD_CATEGORIES, label, keys } from "@/lib/constants";
 import { ago } from "@/lib/format";
-import { PageTitle, Empty, Pill } from "@/components/ui";
+import { PageTitle, Empty, Pill, Avatar, RankBadge } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { Skyline } from "@/components/Brand";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "익명 라운지" };
@@ -25,7 +26,7 @@ export default async function Lounge({ searchParams }: { searchParams: Promise<R
     const [hot, posts] = await Promise.all([
       q(`SELECT id, title, like_count, comment_count FROM board_posts WHERE status = 'visible' AND created_at > now() - interval '7 days'
           ORDER BY (like_count * 3 + comment_count * 2) DESC, created_at DESC LIMIT 3`),
-      q(`SELECT p.id, p.title, p.category, p.author_nickname, p.like_count, p.comment_count, p.view_count, p.created_at, s.name AS site_name
+      q(`SELECT p.id, p.title, p.category, p.author_nickname, p.author_badge, p.like_count, p.comment_count, p.view_count, p.created_at, s.name AS site_name
            FROM board_posts p LEFT JOIN sites s ON s.id = p.site_id
           WHERE p.status = 'visible' AND ($1::text IS NULL OR p.category = $1) ORDER BY p.created_at DESC LIMIT 50`, [cat]),
     ]);
@@ -60,7 +61,7 @@ export default async function Lounge({ searchParams }: { searchParams: Promise<R
                   </div>
                   <p className="mt-1 line-clamp-1 text-[15px] font-semibold">{p.title}</p>
                   <p className="mt-1 flex gap-2 text-[12px] text-muted">
-                    <span>{p.author_nickname}</span><span>{ago(p.created_at)}</span><span>공감 {p.like_count}</span><span>댓글 {p.comment_count}</span><span>조회 {p.view_count}</span>
+                    <span className="inline-flex items-center gap-1"><Avatar nickname={p.author_nickname} size={16} />{p.author_nickname}<RankBadge rank={p.author_badge} /></span><span>{ago(p.created_at)}</span><span>공감 {p.like_count}</span><span>댓글 {p.comment_count}</span><span>조회 {p.view_count}</span>
                   </p>
                 </Link>
               </li>
@@ -99,7 +100,8 @@ export default async function Lounge({ searchParams }: { searchParams: Promise<R
       <PageTitle title="익명 라운지" sub="닉네임으로만 대화합니다. 실명·연락처·소속은 공개되지 않습니다." />
       {tabs}
       {national && (
-        <Link href={v ? `/lounge/chat/${national.id}` : `/login?next=/lounge/chat/${national.id}`} className="mb-6 block rounded-[var(--radius-card)] bg-navy-900 p-5 text-white">
+        <Link href={v ? `/lounge/chat/${national.id}` : `/login?next=/lounge/chat/${national.id}`} className="relative mb-6 block overflow-hidden rounded-[var(--radius-card)] bg-navy-900 p-5 text-white">
+          <Skyline className="pointer-events-none absolute -bottom-1 right-0 h-16 w-56 text-white/[0.07]" />
           <p className="text-[13px] text-brand-200">{national.online}명 접속 중 · 오늘 {national.today}개 메시지</p>
           <p className="mt-1 text-xl font-bold">전국 자유채팅</p>
           <p className="mt-1 text-sm text-brand-100/80">처음이라면 여기서 시작하세요. 전국 분양인이 모두 모이는 방입니다.</p>

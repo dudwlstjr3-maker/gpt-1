@@ -142,7 +142,7 @@ test("채팅: 전송·익명성·도배 방지·링크 제한", async () => {
   const a = await as("s5@example.com");
   const r = await a.post(`/api/chat/rooms/${national}/messages`, { body: "테스트 메시지입니다" });
   assert.equal(r.status, 201, r.text);
-  assert.deepEqual(Object.keys(r.data.message).sort(), ["body", "createdAt", "deleted", "id", "mine", "nickname"]);
+  assert.deepEqual(Object.keys(r.data.message).sort(), ["badge", "body", "createdAt", "deleted", "id", "mine", "nickname"]);
   assert.equal(r.data.message.mine, true);
 
   const list = await a.get(`/api/chat/rooms/${national}/messages`);
@@ -309,4 +309,16 @@ test("닉네임 변경 제한·탈퇴 시 비식별화", async () => {
   assert.equal((await c.post("/api/me/withdraw", { password: "abcd1234" })).status, 200);
   assert.ok(!(await one("SELECT 1 FROM users WHERE email = $1", [email])), "이메일 비식별화");
   assert.equal((await new Client().post("/api/auth/login", { email, password: "abcd1234" })).status, 401);
+});
+
+test("직급 배지: 기본 꺼짐, 켠 회원만 표시, 허용 값만", async () => {
+  const c = new Client();
+  await c.post("/api/auth/signup", { email: `bd${Date.now()}@example.com`, password: "abcd1234", agreeTerms: true, agreePrivacy: true });
+  let m = (await c.post(`/api/chat/rooms/${national}/messages`, { body: `배지 없음 ${Date.now()}` })).data.message;
+  assert.equal(m.badge, null, "기본값은 표시 안 함");
+  assert.equal((await c.req("PATCH", "/api/me", { badgeRank: "ceo" })).status, 400, "허용되지 않은 값");
+  assert.equal((await c.req("PATCH", "/api/me", { badgeRank: "team_leader" })).status, 200);
+  m = (await c.post(`/api/chat/rooms/${national}/messages`, { body: `배지 있음 ${Date.now()}` })).data.message;
+  assert.equal(m.badge, "team_leader");
+  assert.equal((await c.req("PATCH", "/api/me", { badgeRank: "" })).status, 200, "다시 끄기");
 });

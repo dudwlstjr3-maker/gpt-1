@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "./Icon";
 import { ReportButton } from "./client";
+import { avatarOf, BADGE_LABEL } from "@/lib/avatar";
 
-type Msg = { id: number; nickname: string; body: string | null; createdAt: string; mine: boolean; deleted: boolean };
+type Msg = { id: number; nickname: string; badge: string | null; body: string | null; createdAt: string; mine: boolean; deleted: boolean };
 
 const time = (iso: string) => {
   const d = new Date(iso);
@@ -134,63 +135,94 @@ export function ChatRoom({ roomId, roomName, isDm, isOperator, reasons, myNickna
           <p className="flex items-center gap-1.5 text-[12px] text-muted">
             <span className={`h-1.5 w-1.5 rounded-full ${status === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
             {status === "live" ? `${online ?? "-"}명 접속 중` : status === "connecting" ? "연결 중…" : "재연결 중…"}
-            <span className="text-line">|</span>내 닉네임 {myNickname}
+            <span className="text-line">|</span>
+            <span className="inline-flex items-center gap-1"><span aria-hidden>{avatarOf(myNickname).emoji}</span>{myNickname}</span>
           </p>
         </div>
         <Link href="/policy/anonymity" className="rounded-lg px-2 py-1 text-[12px] font-semibold text-brand-700 hover:bg-brand-50">익명성 안내</Link>
       </header>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-4" onScroll={(e) => {
+      <div ref={listRef} className="flex-1 overflow-y-auto px-3.5 py-4" onScroll={(e) => {
         const el = e.currentTarget;
         atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       }} onClick={() => setMenu(null)}>
         {hasMore && <button onClick={loadOlder} className="mx-auto mb-3 block rounded-full bg-surface px-4 py-1.5 text-[13px] text-muted shadow-sm">이전 메시지 더 보기</button>}
         {!msgs.length && <p className="mt-10 text-center text-sm text-muted">첫 메시지를 남겨 보세요. 닉네임만 표시됩니다.</p>}
-        <ul className="space-y-2.5">
+        <ul>
           {msgs.map((m, i) => {
             const day = dayKey(m.createdAt);
             const showDay = day !== lastDay;
             lastDay = day;
-            const sameAuthor = i > 0 && msgs[i - 1].nickname === m.nickname && !showDay;
+            const prev = msgs[i - 1];
+            // 같은 사람이 3분 안에 이어서 보낸 메시지는 머리글(아바타·닉네임) 없이 묶는다
+            const grouped = !!prev && !showDay && prev.nickname === m.nickname && prev.mine === m.mine &&
+              new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < 180000;
+            const av = avatarOf(m.nickname);
+            const bubble = (
+              <button type="button" disabled={m.deleted}
+                onClick={(e) => { e.stopPropagation(); setMenu(menu === m.id ? null : m.id); }}
+                className={`whitespace-pre-wrap break-words px-3.5 py-2 text-left text-[15px] leading-relaxed ${
+                  m.deleted ? "rounded-2xl bg-surface-2 italic text-muted"
+                  : m.mine ? "rounded-2xl rounded-br-md bg-navy-900 text-white"
+                  : "rounded-2xl rounded-tl-md bg-surface text-ink shadow-[0_1px_0_var(--line)] ring-1 ring-line"}`}>
+                {m.deleted ? "삭제된 메시지입니다." : m.body}
+              </button>
+            );
+            const menuBox = menu === m.id && !m.deleted && (
+              <div className={`absolute top-full z-10 mt-1 w-40 overflow-hidden rounded-xl border border-line bg-surface text-sm shadow-lg ${m.mine ? "right-0" : "left-0"}`} onClick={(e) => e.stopPropagation()}>
+                {m.mine ? (
+                  <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("delete", m)}>삭제</button>
+                ) : (
+                  <>
+                    {!isDm && <button className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" onClick={() => act("dm", m)}>익명 1:1 대화</button>}
+                    <ReportButton targetType="chat_message" targetId={String(m.id)} reasons={reasons} className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" label="신고" />
+                    <button className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" onClick={() => act("block", m)}>차단</button>
+                    {isOperator && <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("adminDelete", m)}>운영자 삭제</button>}
+                    {isOperator && <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("mute", m)}>채팅 금지 7일</button>}
+                  </>
+                )}
+              </div>
+            );
             return (
-              <li key={m.id}>
-                {showDay && <p className="my-3 text-center text-[12px] text-muted"><span className="rounded-full bg-surface px-3 py-1">{day}</span></p>}
-                <div className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[80%] ${m.mine ? "items-end" : "items-start"} flex flex-col`}>
-                    {!m.mine && !sameAuthor && <span className="mb-1 ml-1 text-[12px] font-semibold text-ink-2">{m.nickname}</span>}
-                    <div className={`relative flex items-end gap-1.5 ${m.mine ? "flex-row-reverse" : ""}`}>
-                      <button type="button" disabled={m.deleted}
-                        onClick={(e) => { e.stopPropagation(); setMenu(menu === m.id ? null : m.id); }}
-                        className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-left text-[15px] leading-relaxed ${
-                          m.deleted ? "bg-surface-2 italic text-muted" : m.mine ? "rounded-tr-md bg-brand-600 text-white" : "rounded-tl-md border border-line bg-surface text-ink"}`}>
-                        {m.deleted ? "삭제된 메시지입니다." : m.body}
-                      </button>
-                      <span className="shrink-0 text-[11px] text-muted">{time(m.createdAt)}</span>
-                      {menu === m.id && !m.deleted && (
-                        <div className={`absolute top-full z-10 mt-1 w-40 overflow-hidden rounded-xl border border-line bg-surface text-sm shadow-lg ${m.mine ? "right-0" : "left-0"}`} onClick={(e) => e.stopPropagation()}>
-                          {m.mine ? (
-                            <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("delete", m)}>삭제</button>
-                          ) : (
-                            <>
-                              {!isDm && <button className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" onClick={() => act("dm", m)}>익명 1:1 대화</button>}
-                              <ReportButton targetType="chat_message" targetId={String(m.id)} reasons={reasons} className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" label="신고" />
-                              <button className="block w-full px-4 py-2.5 text-left hover:bg-surface-2" onClick={() => act("block", m)}>차단</button>
-                              {isOperator && <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("adminDelete", m)}>운영자 삭제</button>}
-                              {isOperator && <button className="block w-full px-4 py-2.5 text-left text-red-600 hover:bg-surface-2" onClick={() => act("mute", m)}>채팅 금지 7일</button>}
-                            </>
-                          )}
-                        </div>
+              <li key={m.id} className={grouped ? "mt-1" : "mt-4 first:mt-0"}>
+                {showDay && (
+                  <div className="my-4 flex items-center gap-3 text-[12px] text-muted">
+                    <span className="h-px flex-1 bg-line" />{day}<span className="h-px flex-1 bg-line" />
+                  </div>
+                )}
+                {m.mine ? (
+                  <div className="flex flex-col items-end pl-12">
+                    <div className="relative max-w-full">{bubble}{menuBox}</div>
+                    {!msgs[i + 1] || msgs[i + 1].nickname !== m.nickname || dayKey(msgs[i + 1].createdAt) !== day ? (
+                      <span className="mt-1 text-[11px] text-muted">{time(m.createdAt)}</span>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="flex gap-2.5 pr-10">
+                    <span className="w-9 shrink-0">
+                      {!grouped && (
+                        <span aria-hidden className="grid h-9 w-9 place-items-center rounded-full text-[19px]" style={{ background: av.bg }}>{av.emoji}</span>
                       )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      {!grouped && (
+                        <p className="mb-1 flex items-center gap-1.5 text-[13px]">
+                          <span className="font-semibold text-ink">{m.nickname}</span>
+                          {m.badge && BADGE_LABEL[m.badge] && <span className="rounded px-1 text-[11px] font-semibold text-navy-800 ring-1 ring-navy-800/20" title="본인이 선택한 직급 (자기 신고)">{BADGE_LABEL[m.badge]}</span>}
+                          <span className="text-[11px] text-muted">{time(m.createdAt)}</span>
+                        </p>
+                      )}
+                      <div className="relative inline-block max-w-full">{bubble}{menuBox}</div>
                     </div>
                   </div>
-                </div>
+                )}
               </li>
             );
           })}
         </ul>
       </div>
 
-      <form onSubmit={submit} className="shrink-0 border-t border-line bg-surface px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      <form onSubmit={submit} method="post" className="shrink-0 border-t border-line bg-surface px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         {error && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-3 py-1.5 text-[13px] text-red-700">{error}</p>}
         <div className="flex items-end gap-2">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={500} aria-label="메시지 입력"

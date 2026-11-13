@@ -5,7 +5,7 @@ import { jobCardsByIds } from "@/lib/jobs";
 import { SEEKING_STATUS, REGIONS, RANKS, label } from "@/lib/constants";
 import { ago, ymd } from "@/lib/format";
 import { ActionButton, JsonForm } from "@/components/client";
-import { JobCard, PageTitle, Pill, Empty } from "@/components/ui";
+import { JobCard, PageTitle, Pill, Empty, Avatar, RankBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "마이페이지" };
@@ -23,7 +23,7 @@ function Card({ id, title, children, sub }: { id?: string; title: string; childr
 export default async function Me() {
   const v = await requirePageUser("/me");
   const [profile, savedIds, savedSites, chats, blocks, notif] = await Promise.all([
-    q1("SELECT nickname, nickname_changed_at, job_seeking_status, preferred_region, preferred_rank FROM profiles WHERE user_id = $1", [v.id]),
+    q1("SELECT nickname, nickname_changed_at, job_seeking_status, preferred_region, preferred_rank, badge_rank FROM profiles WHERE user_id = $1", [v.id]),
     q<{ job_post_id: string }>("SELECT job_post_id FROM saved_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30", [v.id]),
     q("SELECT s.id, s.name, r.name AS region_name FROM saved_sites ss JOIN sites s ON s.id = ss.site_id JOIN regions r ON r.code = s.region_code WHERE ss.user_id = $1 ORDER BY ss.created_at DESC", [v.id]),
     q(`SELECT r.id, r.type, r.name,
@@ -42,9 +42,9 @@ export default async function Me() {
     <div className="mx-auto max-w-3xl">
       <PageTitle title="마이페이지" />
       <section className="card flex items-center gap-4 p-5">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand-50 text-xl font-bold text-brand-700">{v.nickname.slice(-2)}</span>
+        <Avatar nickname={v.nickname} size={56} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold">{v.nickname}</p>
+          <p className="flex items-center gap-1.5 truncate text-lg font-bold">{v.nickname}<RankBadge rank={profile?.badge_rank} /></p>
           <p className="truncate text-[13px] text-muted">{v.email} · 가입 {ymd(v.createdAt)} <span className="text-[11px]">(이메일은 나에게만 보입니다)</span></p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             <Pill tone="blue">{label(SEEKING_STATUS, v.jobSeekingStatus)}</Pill>
@@ -73,6 +73,12 @@ export default async function Me() {
                 <select name="jobSeekingStatus" className="input" defaultValue={profile?.job_seeking_status}>
                   {SEEKING_STATUS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                 </select>
+              </label>
+              <label className="sm:col-span-2"><span className="label">직급 배지 (선택)</span>
+                <select name="badgeRank" className="input" defaultValue={profile?.badge_rank ?? ""}>
+                  <option value="">표시 안 함 (기본)</option>{RANKS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+                <span className="mt-1 block text-xs leading-relaxed text-muted">닉네임 옆에 직급만 표시됩니다(자기 신고, 운영자가 확인하지 않음). 켜면 다른 사람이 나를 추정할 단서가 늘어날 수 있습니다. 바꾼 뒤 새로 쓰는 글·메시지부터 적용됩니다.</span>
               </label>
               <label><span className="label">희망 지역</span>
                 <select name="preferredRegion" className="input" defaultValue={profile?.preferred_region ?? ""}>

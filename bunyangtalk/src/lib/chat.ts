@@ -8,7 +8,7 @@ import { fail } from "./http";
 // 서버 인스턴스마다 LISTEN 연결 1개 → 프로세스 안에서 방별 구독자에게 분배.
 // 여러 인스턴스로 늘려도 NOTIFY가 모든 인스턴스에 전달되므로 그대로 동작한다.
 export type ChatEvent =
-  | { type: "message"; roomId: string; m: { id: number; senderId: string; nickname: string; body: string; createdAt: string } }
+  | { type: "message"; roomId: string; m: { id: number; senderId: string; nickname: string; badge: string | null; body: string; createdAt: string } }
   | { type: "delete"; roomId: string; id: number }
   | { type: "presence"; roomId: string };
 
@@ -80,14 +80,15 @@ export async function blockedIds(userId: string, db?: Db): Promise<Set<string>> 
 }
 
 // 다른 회원에게 내려가는 메시지 형태: sender_id 없음
-export type PublicMessage = { id: number; nickname: string; body: string | null; createdAt: string; mine: boolean; deleted: boolean };
+export type PublicMessage = { id: number; nickname: string; badge: string | null; body: string | null; createdAt: string; mine: boolean; deleted: boolean };
 
-export function toPublic(m: { id: number | string; sender_id?: string; senderId?: string; sender_nickname?: string; nickname?: string; body: string | null; created_at?: Date | string; createdAt?: string; deleted_at?: Date | null }, viewerId: string): PublicMessage {
+export function toPublic(m: { id: number | string; sender_id?: string; senderId?: string; sender_nickname?: string; nickname?: string; sender_badge?: string | null; badge?: string | null; body: string | null; created_at?: Date | string; createdAt?: string; deleted_at?: Date | null }, viewerId: string): PublicMessage {
   const sender = m.sender_id ?? m.senderId;
   const deleted = !!m.deleted_at || m.body === null;
   return {
     id: Number(m.id),
     nickname: (m.sender_nickname ?? m.nickname) as string,
+    badge: m.sender_badge ?? m.badge ?? null,
     body: deleted ? null : m.body,
     createdAt: new Date((m.created_at ?? m.createdAt) as string).toISOString(),
     mine: sender === viewerId,

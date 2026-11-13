@@ -51,6 +51,10 @@ export function JsonForm({ endpoint, method = "POST", extra, children, className
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 스크립트가 붙기 전에는 제출 버튼을 잠근다. 잠그지 않으면 브라우저 기본 GET 전송으로
+  // 비밀번호 같은 입력값이 URL에 실린다. (기본 버튼이 비활성이면 Enter 키 암묵 제출도 일어나지 않음)
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
@@ -85,10 +89,10 @@ export function JsonForm({ endpoint, method = "POST", extra, children, className
     }
   }
   return (
-    <form onSubmit={onSubmit} className={className} noValidate>
+    <form onSubmit={onSubmit} method="post" className={className} noValidate>
       {children}
       {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      {submitLabel && <button type="submit" disabled={busy} className={`${submitClass} mt-4`}>{busy ? "처리 중…" : submitLabel}</button>}
+      {submitLabel && <button type="submit" disabled={busy || !ready} className={`${submitClass} mt-4`}>{busy ? "처리 중…" : submitLabel}</button>}
     </form>
   );
 }

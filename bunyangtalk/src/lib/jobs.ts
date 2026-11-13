@@ -15,7 +15,7 @@ const LIVE_AD = `
 
 export const JOB_CARD_SELECT = `
   j.id, j.title, j.ranks, j.headcount, j.rt_basis, j.rt_amount, j.rt_percent, j.daily_pay, j.deadline,
-  j.published_at, j.status, s.id AS site_id, s.name AS site_name, s.property_type, r.name AS region_name,
+  j.published_at, j.status, j.settlement_schedule, s.id AS site_id, s.name AS site_name, s.property_type, r.name AS region_name,
   c.name AS company_name, ad.product_type AS ad_type, ad.id AS campaign_id`;
 
 export type JobCardRow = Row;

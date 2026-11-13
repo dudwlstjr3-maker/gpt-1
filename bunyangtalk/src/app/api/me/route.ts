@@ -22,6 +22,10 @@ export const PATCH = api(async (req) => {
       const s = oneOf(b, "jobSeekingStatus", keys(SEEKING_STATUS), { name: "구직 상태" });
       await c.query("UPDATE profiles SET job_seeking_status = $2, updated_at = now() WHERE user_id = $1", [v.id, s]);
     }
+    if (b.badgeRank !== undefined) {
+      const badge = oneOf(b, "badgeRank", keys(RANKS), { optional: true, name: "직급 배지" });
+      await c.query("UPDATE profiles SET badge_rank = $2, updated_at = now() WHERE user_id = $1", [v.id, badge]);
+    }
     if (b.preferredRegion !== undefined) {
       const r = oneOf(b, "preferredRegion", keys(REGIONS), { optional: true, name: "희망 지역" });
       const rk = oneOf(b, "preferredRank", keys(RANKS), { optional: true, name: "희망 직급" });

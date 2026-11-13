@@ -13,7 +13,7 @@ export const GET = api(async (req, ctx) => {
   const before = Number(req.nextUrl.searchParams.get("before") || 0);
   const blocked = [...(await blockedIds(v.id))];
   const rows = await q(
-    `SELECT id, sender_id, sender_nickname, body, created_at, deleted_at FROM chat_messages
+    `SELECT id, sender_id, sender_nickname, sender_badge, body, created_at, deleted_at FROM chat_messages
       WHERE room_id = $1 AND ($2::bigint = 0 OR id < $2) AND NOT (sender_id = ANY($3::uuid[]))
       ORDER BY id DESC LIMIT 50`,
     [id, before, blocked],
@@ -66,8 +66,8 @@ export const POST = api(async (req, ctx) => {
 
   const msg = await tx(async (c) => {
     const m = await q1(
-      "INSERT INTO chat_messages(room_id, sender_id, sender_nickname, body) VALUES ($1,$2,$3,$4) RETURNING id, sender_id, sender_nickname, body, created_at",
-      [id, v.id, v.nickname, text],
+      "INSERT INTO chat_messages(room_id, sender_id, sender_nickname, sender_badge, body) VALUES ($1,$2,$3,$4,$5) RETURNING id, sender_id, sender_nickname, sender_badge, body, created_at",
+      [id, v.id, v.nickname, v.badge, text],
       c,
     );
     await c.query(
@@ -77,7 +77,7 @@ export const POST = api(async (req, ctx) => {
     );
     // 실시간 전달용 내부 이벤트 (senderId는 서버 안에서 차단 필터에만 쓰고 클라이언트로 내보내지 않는다)
     await publish(
-      { type: "message", roomId: id, m: { id: Number(m!.id), senderId: v.id, nickname: v.nickname, body: text, createdAt: new Date(m!.created_at).toISOString() } },
+      { type: "message", roomId: id, m: { id: Number(m!.id), senderId: v.id, nickname: v.nickname, badge: v.badge, body: text, createdAt: new Date(m!.created_at).toISOString() } },
       c,
     );
     return m!;

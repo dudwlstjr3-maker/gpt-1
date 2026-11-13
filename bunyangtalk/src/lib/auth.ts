@@ -59,6 +59,7 @@ export type Viewer = {
   status: string;
   createdAt: Date;
   jobSeekingStatus: string;
+  badge: string | null;
   roles: string[];
   isOperator: boolean;
   isSuperAdmin: boolean;
@@ -68,7 +69,7 @@ export type Viewer = {
 
 export async function viewerById(userId: string, db?: Db): Promise<Viewer | null> {
   const u = await q1(
-    `SELECT u.id, u.email, u.status, u.created_at, p.nickname, p.job_seeking_status,
+    `SELECT u.id, u.email, u.status, u.created_at, p.nickname, p.job_seeking_status, p.badge_rank,
             COALESCE((SELECT array_agg(role) FROM user_roles WHERE user_id = u.id), '{}') AS roles
        FROM users u JOIN profiles p ON p.user_id = u.id WHERE u.id = $1`,
     [userId],
@@ -90,6 +91,7 @@ export async function viewerById(userId: string, db?: Db): Promise<Viewer | null
     status: u.status,
     createdAt: u.created_at,
     jobSeekingStatus: u.job_seeking_status,
+    badge: u.badge_rank ?? null,
     roles,
     isSuperAdmin: roles.includes("super_admin"),
     isOperator: roles.includes("operator") || roles.includes("super_admin"),

@@ -14,8 +14,8 @@ export const POST = api(async (req) => {
   const recent = await q1<{ n: number }>("SELECT count(*)::int AS n FROM board_posts WHERE author_id = $1 AND created_at > now() - interval '1 minute'", [v.id]);
   if (!v.isOperator && (recent?.n ?? 0) >= 1) fail(429, "글은 1분에 한 번만 쓸 수 있습니다.");
   const r = await q1<{ id: string }>(
-    "INSERT INTO board_posts(author_id, author_nickname, category, site_id, title, body) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id",
-    [v.id, v.nickname, category, siteId, title, text],
+    "INSERT INTO board_posts(author_id, author_nickname, author_badge, category, site_id, title, body) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id",
+    [v.id, v.nickname, v.badge, category, siteId, title, text],
   );
   return json({ ok: true, id: r!.id, redirect: `/lounge/board/${r!.id}` }, 201);
 });

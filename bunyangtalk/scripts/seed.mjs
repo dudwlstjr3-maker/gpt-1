@@ -45,6 +45,8 @@ try {
   await mk("rec3", "pending@example.com", "새내기대행");
   const seekers = [["s1", "익명 고양이217"], ["s2", "익명 수달508"], ["s3", "익명 판다331"], ["s4", "익명 여우742"], ["s5", "익명 펭귄119"]];
   for (const [k, n] of seekers) await mk(k, `${k}@example.com`, n, { seeking: "seeking" });
+  // 직급 배지는 선택 기능 — 일부만 켠 상태로 시연
+  for (const [k, r] of [["rec2", "team_leader"], ["s2", "counselor"], ["s5", "newbie"]]) await c.query("UPDATE profiles SET badge_rank = $2 WHERE user_id = $1", [users[k], r]);
 
   const co = async (name, bn, rep, owner, status) => {
     const r = await one(
@@ -148,8 +150,8 @@ try {
   ];
   let t = 0;
   for (const [k, body] of chat) {
-    const nick = (await one("SELECT nickname FROM profiles WHERE user_id = $1", [users[k]])).nickname;
-    await c.query("INSERT INTO chat_messages(room_id, sender_id, sender_nickname, body, created_at) VALUES ($1,$2,$3,$4, now() - make_interval(mins => $5))", [national, users[k], nick, body, (chat.length - t++) * 7]);
+    const pr = await one("SELECT nickname, badge_rank FROM profiles WHERE user_id = $1", [users[k]]);
+    await c.query("INSERT INTO chat_messages(room_id, sender_id, sender_nickname, sender_badge, body, created_at) VALUES ($1,$2,$3,$4,$5, now() - make_interval(mins => $6))", [national, users[k], pr.nickname, pr.badge_rank, body, (chat.length - t++) * 7]);
     await c.query("INSERT INTO chat_room_members(room_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [national, users[k]]);
   }
   const seoulRoom = (await one("SELECT id FROM chat_rooms WHERE region_code = 'seoul'")).id;
@@ -166,9 +168,9 @@ try {
     ["s4", "free", "분양 일 하면서 제일 뿌듯했던 순간", "첫 계약 때 고객님이 고맙다고 음료수 사 오셨던 거요. 다들 있으시죠?", null, 17, 5],
   ];
   for (const [k, cat, title, body, si, likes, cmts] of posts) {
-    const nick = (await one("SELECT nickname FROM profiles WHERE user_id = $1", [users[k]])).nickname;
-    const p = await one("INSERT INTO board_posts(author_id, author_nickname, category, site_id, title, body, like_count, view_count, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now() - random() * interval '3 days') RETURNING id",
-      [users[k], nick, cat, si === null ? null : sites[si].id, title, body, likes, likes * 9]);
+    const pr = await one("SELECT nickname, badge_rank FROM profiles WHERE user_id = $1", [users[k]]);
+    const p = await one("INSERT INTO board_posts(author_id, author_nickname, author_badge, category, site_id, title, body, like_count, view_count, created_at) VALUES ($1,$2,$9,$3,$4,$5,$6,$7,$8, now() - random() * interval '3 days') RETURNING id",
+      [users[k], pr.nickname, cat, si === null ? null : sites[si].id, title, body, likes, likes * 9, pr.badge_rank]);
     for (let i = 0; i < cmts; i++) {
       const [ck, cn] = seekers[(i + 1) % seekers.length];
       await c.query("INSERT INTO board_comments(post_id, author_id, author_nickname, body, created_at) VALUES ($1,$2,$3,$4, now() - random() * interval '2 days')",

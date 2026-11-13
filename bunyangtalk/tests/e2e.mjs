@@ -20,6 +20,27 @@ async function login(page, email) {
 
 const browser = await chromium.launch();
 try {
+  // ───── 0) 스크립트 로드 전(=JS 꺼짐) 로그인 제출 시 비밀번호가 URL에 실리지 않아야 한다
+  const noJs = await (await browser.newContext({ javaScriptEnabled: false })).newPage();
+  await noJs.goto(`${BASE}/login`);
+  await noJs.fill('input[name="email"]', "s1@example.com");
+  await noJs.fill('input[name="password"]', PW);
+  ok(await noJs.isDisabled('button[type="submit"]'), "스크립트 로드 전 제출 버튼 잠김");
+  await noJs.press('input[name="password"]', "Enter");
+  await noJs.waitForTimeout(500);
+  ok(!noJs.url().includes(PW) && !noJs.url().includes("password"), "Enter 키로도 비밀번호가 URL에 실리지 않음");
+  await noJs.context().close();
+
+  // ───── 0-1) 조건 바(RT·일비·정산·마감) 값이 가장 좁은 화면(375px)에서도 잘리지 않아야 한다
+  const se = await (await browser.newContext({ ...devices["iPhone SE"] })).newPage();
+  const clipped = [];
+  for (const path of ["/", "/jobs", "/jobs?tab=premium"]) {
+    await se.goto(BASE + path);
+    clipped.push(...await se.evaluate(() => [...document.querySelectorAll("dl dd")].filter((e) => e.scrollWidth > e.clientWidth).map((e) => e.innerText)));
+  }
+  ok(clipped.length === 0, `375px 조건 바 잘림 없음${clipped.length ? ` (${clipped.join(", ")})` : ""}`);
+  await se.context().close();
+
   // ───── 1) 두 계정 실시간 채팅
   const ctxA = await browser.newContext({ ...devices["iPhone 13"] });
   const ctxB = await browser.newContext({ viewport: { width: 1440, height: 900 } });

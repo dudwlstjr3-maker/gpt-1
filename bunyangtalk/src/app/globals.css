@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* ───── 분양톡 디자인 토큰
+   의미 토큰(bg/surface/ink/muted/line)은 CSS 변수 → 다크 모드는 [data-theme=dark]에서 값만 바꾼다 */
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --muted: #64748b;
+  --line: #e5e9f2;
+}
+[data-theme="dark"] {
+  --bg: #0b1120;
+  --surface: #111a2e;
+  --surface-2: #16213a;
+  --ink: #e6ebf5;
+  --ink-2: #c3cbe0;
+  --muted: #8a96b2;
+  --line: #22304d;
+}
+
+@theme inline {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+}
+
+@theme {
+  --color-navy-950: #061229;
+  --color-navy-900: #0b1d45;
+  --color-navy-800: #132a5c;
+  --color-navy-700: #1c3a78;
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dbe6ff;
+  --color-brand-200: #bcd0ff;
+  --color-brand-500: #3a6cf4;
+  --color-brand-600: #2456e3;
+  --color-brand-700: #1c45b8;
+  /* 광고 영역 전용 색 — 일반 콘텐츠(블루)와 확실히 구분 */
+  --color-ad-50: #fff8eb;
+  --color-ad-100: #feecc7;
+  --color-ad-700: #9a5b07;
+  --radius-card: 14px;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { font-feature-settings: "tnum" 0; word-break: keep-all; overflow-wrap: anywhere; }
+
+/* 컴포넌트 클래스 — @utility로 정의해 서로 조합(@apply) 가능 */
+@utility card { @apply rounded-[var(--radius-card)] border border-line bg-surface; }
+@utility btn { @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 h-11 text-[15px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed; }
+@utility btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+@utility btn-navy { @apply btn bg-navy-900 text-white hover:bg-navy-800; }
+@utility btn-ghost { @apply btn border border-line bg-surface text-ink-2 hover:bg-surface-2; }
+@utility btn-sm { @apply h-9 px-3 text-sm rounded-lg; }
+@utility input { @apply w-full h-11 rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink placeholder:text-muted outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100; }
+@utility textarea { @apply input h-auto py-3 leading-relaxed; }
+@utility label { @apply block text-sm font-semibold text-ink-2 mb-1.5; }
+@utility chip { @apply inline-flex items-center rounded-full border border-line bg-surface px-3 h-8 text-sm text-ink-2 whitespace-nowrap; }
+@utility chip-on { @apply chip border-navy-900 bg-navy-900 text-white; }
+@utility tag { @apply inline-flex items-center rounded-md px-1.5 h-5 text-[11px] font-semibold; }
+@utility section-title { @apply text-[17px] font-bold text-ink tracking-tight; }

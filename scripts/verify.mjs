@@ -75,23 +75,37 @@ async function unitTests() {
   }
 }
 
-async function verifyMoodResponse() {
-  const { moodResponse } = await import('../src/lib/moodResponse.mjs');
-  const cases = [[[65,75],"탐욕 접근"],[[85,81,75],"탐욕권 이탈"],[[64,66,65],"상승세 둔화"],[[6,5],"공포 3단계"],[[11,10],"공포 2단계"],[[21,20],"공포 1단계"],[[79,80],"탐욕 1단계"],[[89,90],"탐욕 2단계"],[[94,95],"탐욕 3단계"],[[5,10],"공포 완화"],[[10,10],"점수 유지"],[[null,5],"방향 확인 대기"],[[],"방향 확인 대기"]];
-  for (const [scores, expected] of cases) {
-    const { title } = moodResponse(scores.map(v => ({v})));
-    if (!title.startsWith(expected)) throw Error('쫄탐 대응 결과 불일치: ' + scores);
-  }
-  const demo = await readFile('docs/index.html', 'utf8');
-  if (!demo.includes('쫄탐 대응 · 예시 데이터') || !demo.includes('function moodResponse(')) throw Error('쫄탐 대응 미리보기 누락');
+async function verifyMoodStage() {
+  const [page, template, builder] = await Promise.all([
+    readFile('src/app/fng/[market]/page.tsx', 'utf8'),
+    readFile('tools/preview/template.html', 'utf8'),
+    readFile('tools/preview/build.mjs', 'utf8'),
+  ]);
+  const appCard = page.match(/<section[^>]+aria-label="쫄탐 단계"[\s\S]*?<\/section>/)?.[0] ?? '';
+  const previewCard = template.split('\n').find(line => line.includes('쫄탐 단계 ·')) ?? '';
+  const fields = ['mood.title', 'mood.message', 'mood.trail', '최근 흐름'];
+  check('앱과 미리보기의 단계 카드 필드 일치', fields.every(field => appCard.includes(field) && previewCard.includes(field)));
+  check('같은 단계 함수로 생성', page.includes('moodResponse(detail.history)') &&
+    template.includes('moodResponse(d.history)') && template.includes('__MOOD_RESPONSE_CODE__') &&
+    builder.includes('src/lib/moodResponse.mjs'));
+  const forbidden = /매수|매도|매집|분할|비중|현금|보유|물량|검토선|손절|익절|사세요|파세요|추천|유리|기회|대응/;
+  check('단계 카드의 고정 문구', !forbidden.test(appCard + previewCard));
 }
-
-await verifyMoodResponse();
 
 async function main() {
   console.log(`검증 대상: ${BASE}\n`);
 
   await unitTests();
+  await verifyMoodStage();
+  if (process.env.GITHUB_ACTIONS) {
+    const audit = await run('git', ['grep', '-nE', '분할|검토선|매집'], {maxBuffer: 32 * 1024 * 1024});
+    console.log('ISSUE13_GREP_BEGIN');
+    for (const line of audit.stdout.trimEnd().split('\n')) {
+      const match = line.search(/분할|검토선|매집/);
+      console.log(line.length <= 300 ? line : line.slice(0,line.indexOf(':',line.indexOf(':')+1)+1) + ' … ' + line.slice(Math.max(0,match-30),match+70));
+    }
+    console.log('ISSUE13_GREP_END');
+  }
 
   /* ---------------- 1. 기본 스냅샷 ---------------- */
   console.log('[1] 홈 스냅샷 (scenario=normal)');

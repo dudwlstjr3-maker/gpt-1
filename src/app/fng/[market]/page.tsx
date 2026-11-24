@@ -328,9 +328,9 @@ export default function FngDetailPage() {
       </section>
 
       {mood && (
-        <section className="mt-4 px-3" aria-label="쫄탐 대응">
-          <div className="card p-4">
-            <p className="text-xs text-muted">쫄탐 대응 · {data.mode === 'DEMO' ? '예시 데이터' : '미국 자체 지수'}</p>
+        <section className="mt-5 px-3" aria-label="쫄탐 단계">
+          <div className="card p-3">
+            <p className="text-xs text-muted">쫄탐 단계 · {data.mode === 'DEMO' ? '예시 데이터' : '미국 자체 지수'}</p>
             <h2 className="mt-1 text-xl font-bold">{mood.title}</h2>
             <p className="mt-1">{mood.message}</p>
             <p className="tnum mt-2 text-sm text-muted">최근 흐름　{mood.trail}</p>

@@ -225,6 +225,7 @@ async function main() {
   const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
+  if (!tpl.includes('__MOOD_RESPONSE_CODE__')) throw new Error('미리보기 단계 계산 위치가 없습니다.');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
   if (!tpl.includes('__FONT__')) throw new Error('template.html 에 __FONT__ 자리표시자가 없습니다.');
 

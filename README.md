@@ -53,6 +53,7 @@ API 키가 하나도 없어도 **DEMO 모드로 바로 실행**됩니다. 별도
 
 | 명령 | 설명 |
 | --- | --- |
+| `npm test` | 순수 로직 단위 테스트 (`scripts/*.test.mjs`, 서버 불필요). PR 마다 GitHub Actions 가 이것과 타입 검사 · 빌드 · `verify` 를 키 없이 DEMO 로 돌립니다 |
 | `npm run typecheck` | TypeScript 타입 검사 |
 | `npm run icons` | PWA 아이콘 PNG 재생성 (`public/icons/`) |
 | `npm run verify` | **실행 중인 서버**를 상대로 검증 기준 자동 확인 (아래 7장) |
@@ -914,8 +915,8 @@ npm run build && npm start &
 npm run verify
 ```
 
-`scripts/verify.mjs` 가 요구사항의 검증 기준을 자동 확인합니다 (총 1,254건 — 2026-11-24 DEMO 모드에서 센 값).
-맨 앞에서 `node --test` 로 순수 로직 단위 테스트(149건)를 먼저 태웁니다 — 실데이터
+`scripts/verify.mjs` 가 요구사항의 검증 기준을 자동 확인합니다 (총 1,255건 — 2026-11-24 DEMO 모드에서 센 값).
+맨 앞에서 `node --test` 로 순수 로직 단위 테스트(152건)를 먼저 태웁니다 — 실데이터
 정규화기와 판정 로직은 DEMO 경로를 타지 않아 서버 상대 검사로는 한 줄도 실행되지 않습니다.
 
 - 미국·한국·크립토 카드 정상 표시

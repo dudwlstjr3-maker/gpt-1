@@ -49,6 +49,8 @@
   (`.env.production` 처럼 목록에 없는 이름은 걸러지지 않으니 그런 이름을 쓰지 않는다.)
 - 키가 화면이나 응답에 새어 나오지 않는지 확인한다 — `/api/health` 응답에 키 값이
   섞이지 않는 것을 검증기가 본다.
+- 브라우저는 바깥 API 를 직접 부르지 않는다. 항상 `/api/*` 서버 쪽을 거친다
+  (`README.md` 2장 "브라우저는 외부 API 를 직접 호출하지 않고…").
 
 ## 3. 데이터를 다루는 법
 
@@ -64,6 +66,17 @@
 70% 미만이면 점수를 내지 않고 **"산출 불가"** 로 표시한다.
 이건 버그가 아니라 설계대로 동작하는 모습이다 — 예를 들어 미국은 Cboe 풋/콜(14%)이
 빠지면 57% 로 떨어져 통째로 "산출 불가" 가 된다.
+
+**제공사의 약관 · 재배포 조건 · 지연 조건을 지킨다.** 원문은 `README.md` 의 `src/server/adapters/live/index.ts` 절
+"구현 시 반드시 지킬 것" 과 `.env.example` 의 제공사별 주석이다.
+
+- 약관상 실시간 재배포가 금지되면 지연 데이터를 쓰고, `meta.sources[].delayMinutes` 에
+  지연 시간을 적는다. 화면은 그것을 `15분 지연` 배지로 띄운다. 지연 데이터를 "실시간" 이라 적지 않는다.
+- Yahoo 시세는 문서로 공개된 API 가 아니다. **개인적 · 비상업적 범위**에서만 쓰고 값을 재배포하지
+  않는다 (`.env.example` 의 Yahoo 주석). 상업적으로 쓸 일이 생기면 정식 계약이 있는 곳으로 옮긴다.
+- 뉴스 본문 재배포가 금지되면 헤드라인 · 링크만 쓰고, 한국어 요약은 `summaryOrigin: 'derived'` 로 표시한다.
+- 바깥 호출은 **반드시 `fetchJson()` / `fetchText()`** (`src/server/http.ts`)를 거친다 —
+  제한 시간 · 제한적 재시도 · 호스트별 요청 제한이 거기 있다.
 
 ## 4. 화면을 만드는 법
 
@@ -82,13 +95,22 @@
 검증기가 옛 화면을 기준으로 실패한다. 세 곳 중 하나라도 빠뜨리면 그 변경은 끝난 게 아니다.
 검증기에는 "미리보기도 같은 값" 을 보는 검사가 실제로 들어 있어서, 빠뜨리면 거기서 걸린다.
 
+**새 npm 의존성을 넣지 않는다.** 실행 의존성은 `next` · `react` · `react-dom` 셋뿐이다
+(`tools/review/01-검토-요청.md`). 차트도 의존성 없이 SVG 를 직접 그린다.
+
+**`docs/index.html` 은 내보낼 때만 갱신한다.** GitHub Pages 가 그대로 내보내는 2MB 짜리
+빌드 산출물이라 손으로 고치지 않고, 고칠 때마다가 아니라 내보낼 때만 덮어쓴다 (`README.md` 머리말).
+
+**산식을 바꾸면 `FORMULA_VERSION` 을 올린다** (`src/server/fng/definitions.ts`).
+과거 점수와 구분하기 위해서다 (`README.md` "가중치·구성요소를 바꾸려면").
+
 ## 5. 검증 순서
 
 순서대로 돌린다. 앞이 깨진 채로 뒤로 넘어가지 않는다.
 
 ```bash
 npm run typecheck     # 타입
-npm test              # 단위 검사 149건, 서버 필요 없음
+npm test              # 단위 검사 152건, 서버 필요 없음
 npm run dev           # (다른 창에서 띄워 둔다 — :3000)
 npm run verify        # 검증기, 위 서버를 상대로 돈다
 npm run build         # 마지막
@@ -102,19 +124,28 @@ npm run build         # 마지막
 `scripts/` 의 `*.test.mjs` 를 찾아 `node --test` 로 전부 태운다(`verify.mjs:55-69`).
 `npm test` 가 돌리는 것과 같은 파일, 같은 방식이다. 서로 다른 검사 두 벌이 아니다 —
 `npm test` 는 그 단계만 서버 없이 떼어 돌리는 입구다.
-단위 검사는 149건이고, 검증기는 그걸 파일 단위로 묶어 10건으로 센다.
+`npm test` 는 `scripts/run-tests.mjs` 가 `scripts/` 의 `*.test.mjs` 를 찾아 `node --test` 에 넘긴다
+(Windows 와 Node 20 에서도 같은 명령으로 돌게 하려는 것이다 — 그 파일 머리말).
+단위 검사는 152건이고, 검증기는 그걸 파일 단위로 묶어 12건으로 센다.
 
 세어 본 값 (2026-11-24, DEMO 모드):
 
-- `npm test` — 149건 통과, 0건 실패
-- `npm run verify` — 1,254건 통과, 0건 실패
+- `npm test` — 152건 통과, 0건 실패
+- `npm run verify` — 1,255건 통과, 0건 실패
 
-숫자가 바뀌면 여기와 `README.md`, `CLAUDE.md`, `.github/workflows/ci.yml` 을 같이 고친다.
+숫자가 바뀌면 여기와 `README.md` 를 같이 고친다. `docs/CHANGELOG.md` 는 지난 기록이라 고치지 않고 새 항목에 새 숫자를 적는다.
 **직접 돌려 센 값만 적는다.** 서버를 띄울 수 없어 검증기를 돌리지 못했으면
 그 사실을 적고, 통과했다고 쓰지 않는다.
 
-CI(`.github/workflows/ci.yml`)는 `typecheck` → `test` → `build` 만 돌린다.
-`verify` 는 서버가 필요해서 CI 에서 빠져 있고, 각자 기계에서 돌린다.
+CI(`.github/workflows/ci.yml`)는 작업 두 개를 돌린다.
+
+| 작업 | 하는 일 |
+|---|---|
+| `check` | `typecheck` → `test` → `build` |
+| `verify` | `build` → `npm start` 로 서버를 띄움 → `/api/health` 대기 → `npm run verify` → 서버를 내림 |
+
+CI 의 `verify` 는 개발 서버가 아니라 **빌드 결과**를 상대로 돈다. 키 없이 `MARKET_MOOD_MODE=demo` 로 고정한다.
+CI 가 돌려 준다고 각자 기계에서 안 돌려도 되는 것은 아니다 — 푸시하기 전에 돌린다.
 
 ## 6. 브랜치와 병합
 
@@ -135,6 +166,8 @@ CI(`.github/workflows/ci.yml`)는 `typecheck` → `test` → `build` 만 돌린�
 같은 날 같은 지시를 받은 두 에이전트가 서로를 모른 채 **같은 일을 두 번** 했다 —
 `npm test` · CI · `AGENTS.md` · `CLAUDE.md` 를 각자 만들어 PR 두 개(#7, #8)로 올렸다.
 하나가 병합되자 다른 하나는 통째로 충돌했다. 아래 규칙은 그 일이 다시 없게 하는 것이다.
+(#8 은 병합하지 않고 닫았다. #7 에 없던 것 — 제공사 약관 규칙 몇 줄, CI 에서 `verify` 돌리기,
+Windows 에서도 도는 `npm test` — 만 원문과 맞춰 본 뒤 따로 옮겨 왔다.)
 
 ### 시작하기 전에
 
@@ -189,11 +222,27 @@ PR 본문과 작업 보고는 **결과 → 검증 → 가정 → 남은 문제**
 
 범위 밖 결함을 찾으면 고치지 말고 '남은 문제' 에 적는다.
 
-### 이 파일이 다루는 범위
+### 이 저장소의 범위 — 쫄탐일보 전용
 
-이 규칙은 `main` 의 **쫄탐일보** 에 대한 것이다. 이 저장소에는 다른 프로젝트의 가지도
-있다(포커 EV 도구, 크롬 확장 등). 그 가지들은 이 파일의 투자·데이터 규칙(1~4절)을 따르지
-않아도 된다 — 다만 6·7절(브랜치·병합·협업)은 저장소 전체에 걸린다.
+**이 저장소에서는 쫄탐일보만 작업한다.** 다른 프로젝트는 여기서 브랜치 · PR · 이슈를 만들지 않는다.
+사용자가 2026-11-24 그렇게 정했다.
+
+예전에 이 저장소에 올라온 다른 프로젝트 브랜치가 아직 남아 있다. **`main` 에 병합하지 않고,
+그 위에서 작업하지 않고, 그 브랜치에서 쫄탐일보 쪽으로 무엇을 옮겨 오지도 않는다.**
+
+| 브랜치 | 무엇 |
+|---|---|
+| `claude/holdem-eval-tool-improve-j71kcw` | 포커 EV 도구 (PR #1 — 병합하지 않고 닫았다) |
+| `claude/g-7t9ljj` | 포커 EV 도구, 다른 판 |
+| `claude/adoring-faraday-bqcwis` | 크롬 확장 '기록 지우개' |
+| `claude/adoring-ptolemy-tf88k8` | 분양톡 UI |
+| `claude/amazing-brown-x5d6tv` | 영업 랜딩 페이지 |
+
+이 브랜치들은 **지우지 않았다.** 지우면 되돌리기 어렵고, 지울지 다른 저장소로 옮길지는 사용자가 정한다.
+
+섞이는 것은 CI 가 막는다. `scripts/repoScope.test.mjs` 가 `main` 의 최상위 항목을 허용 목록과 맞춰 보고,
+목록에 없는 것(`extensions/` · `bunyangtalk/` · `sales/` · `LICENSE` · 루트 `index.html` …)이 들어오면
+`npm test` 가 실패한다. 쫄탐일보에 정말 새 최상위 항목이 필요하면 그 목록에 더하고 이유를 PR 에 적는다.
 
 ---
 
@@ -229,8 +278,8 @@ public/         아이콘·글꼴 등 정적 파일
 | `npm run build` | 아이콘 생성 후 `next build` | 아니오 |
 | `npm start` | 빌드 결과 실행 (:3000) | — |
 | `npm run typecheck` | `tsc --noEmit` | 아니오 |
-| `npm test` | `node --test scripts/*.test.mjs` — 149건 | 아니오 |
-| `npm run verify` | 검증기 1,254건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
+| `npm test` | `scripts/*.test.mjs` 를 `node --test` 로 — 152건 | 아니오 |
+| `npm run verify` | 검증기 1,255건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
 | `npm run preview` | 그날 스냅샷을 박은 자립형 HTML | **예 (:3000)** |
 | `npm run icons` | PWA 아이콘 PNG 생성 (`public/icons`) | 아니오 |
 | `npm run check:parse` | 로컬 대역 서버로 LIVE 파싱 점검 — 키·네트워크 없이 | 아니오 |

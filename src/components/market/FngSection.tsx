@@ -20,8 +20,7 @@ import { SectionGate, SkeletonCard, Notice } from '@/components/ui/States';
 import { formatNumber, formatSigned } from '@/lib/format';
 import { scoreColor, stageOf, STAGE_GLYPH } from '@/lib/scale';
 import { MARKET_LABEL, type FngScore } from '@/types';
-import { FngCard } from './FngCard';
-import { SCALE_WARNING_TEXT } from './constants';
+import { HomeMoodCard } from './HomeMoodCard';
 
 /**
  * 1면 카드 밑의 한 줄 — 크립토 쫄탐.
@@ -65,41 +64,27 @@ export function FngSection() {
   const { snapshot, refresh } = useData();
   const section = snapshot?.sections.fng ?? null;
   const mode = snapshot?.mode ?? 'DEMO';
-  const version = section?.data?.[0]?.formulaVersion ?? '';
+
 
   return (
     <section aria-labelledby="fng-section-title" className="mt-5">
-      <div className="mb-2 flex items-baseline justify-between gap-2 px-3">
-        <div className="min-w-0">
-          <h2 id="fng-section-title" className="text-base font-bold text-fg-strong">
-            오늘의 쫄탐
-          </h2>
-          {/* 처음 보는 사람에게 이름부터 풀어 준다 — 쫄은 공포, 탐은 탐욕.
-              한 줄로 이으면 오른쪽 눈금 설명에 밀려 버전 번호만 혼자 다음 줄로 떨어졌다.
-              처음부터 두 줄로 나눈다. */}
-          <p className="mt-0.5 text-[11.5px] text-subtle">쫄=공포 · 탐=탐욕</p>
-          <p className="text-[11.5px] text-subtle">자체 산출 지수 · {version}</p>
-        </div>
-        <span className="shrink-0 text-[12.5px] text-subtle">0=극단적 공포 · 100=극단적 탐욕</span>
-      </div>
-
+      <h2 id="fng-section-title" className="sr-only">오늘의 쫄탐</h2>
       <SectionGate
         section={section}
         onRetry={refresh}
         loading={
           <div className="px-3">
-            <SkeletonCard height={420} lines={2} />
+            <SkeletonCard height={230} lines={2} />
           </div>
         }
       >
         {(scores) => {
-          // 미국이 1면이다. 미국 점수가 오지 않은 날에만 다른 시장이 그 자리에 선다.
-          const lead = scores.find((s) => s.market === 'us') ?? scores[0];
-          const rest = scores.filter((s) => s !== lead);
+          const lead = scores.find((s) => s.market === 'us');
+          const rest = scores.filter((s) => s.market !== 'us');
           return (
             <>
               <div className="px-3">
-                <FngCard score={lead} mode={mode} standalone={false} />
+                {lead ? <HomeMoodCard score={lead} mode={mode} /> : <Notice tone="neutral">미국 쫄탐지수 · 산출 불가</Notice>}
               </div>
               {rest.length > 0 ? (
                 <ul className="mt-2 space-y-2 px-3">
@@ -115,9 +100,6 @@ export function FngSection() {
         }}
       </SectionGate>
 
-      <div className="mt-2 px-3">
-        <Notice tone="neutral">{SCALE_WARNING_TEXT}</Notice>
-      </div>
     </section>
   );
 }

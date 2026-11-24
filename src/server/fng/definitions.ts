@@ -388,7 +388,7 @@ export const METHODOLOGY_STEPS: string[] = [
 ];
 
 export const SCALE_WARNING =
-  '세 시장 모두 0~100 척도를 사용하지만 구성 지표와 가중치가 서로 다릅니다. 같은 숫자라도 의미가 동일하지 않으므로 시장 간 점수를 직접 비교하지 마세요.';
+  '미국과 크립토는 모두 0~100점을 쓰지만 구성 지표와 가중치가 다릅니다. 각 시장의 점수는 그 시장의 과거 흐름과 비교해 보세요.';
 
 export const COVERAGE_RULE_TEXT = `최신 상태인 구성요소의 가중치 합이 전체의 ${Math.round(
   MIN_COVERAGE * 100,

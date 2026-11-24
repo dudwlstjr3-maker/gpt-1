@@ -2720,8 +2720,24 @@ async function main() {
     check('할 말이 없으면 줄을 그리지 않음', /return null;/.test(line) && /if \(!line\) return null;/.test(view));
     check('세 마디를 한꺼번에 늘어놓지 않음', /if \(mood && heat\)[\s\S]{0,120}if \(mood && risk\)/.test(line));
     const homeSrc = await readFile('src/app/page.tsx', 'utf8');
-    check('홈 맨 위에 섬', /<TodayLine \/>[\s\S]{0,200}<FngSection \/>/.test(homeSrc) &&
-      homeSrc.indexOf('<TodayLine />') < homeSrc.indexOf('<FngSection />'));
+    check('미국 심리 카드가 오늘의 한 줄보다 먼저 보임',
+      homeSrc.includes('<FngSection />') && homeSrc.indexOf('<FngSection />') < homeSrc.indexOf('<TodayLine />'));
+    const { homeMood } = await import('../src/lib/homeMood.mjs');
+    const scores = Array.from({ length: 101 }, (_, score) => homeMood(score, 0));
+    check('공포·탐욕 양쪽 끝에서 글자가 커짐', scores.every((m, n) =>
+      m.word === (n < 20 ? '쫄?' : n >= 80 ? '탐?' : null) &&
+      (n >= 19 || m.size > scores[n + 1].size) && (n <= 80 || m.size > scores[n - 1].size)) &&
+      scores[0].size === scores[100].size && homeMood(null, 0) === null);
+    check('계기판 왼쪽·정상·오른쪽과 모든 중간 각도', scores.every((m, n) =>
+      Math.abs(m.angle - (n * 1.8 - 90)) < 0.000001) &&
+      scores[0].angle === -90 && scores[50].angle === 0 && scores[100].angle === 90);
+    const cover = await readFile('src/components/market/HomeMoodCard.tsx', 'utf8');
+    const face = await readFile('public/mood-dial.svg', 'utf8');
+    check('앱과 미리보기가 동일한 반원과 바늘 좌표를 씀', [cover, tpl16].every(source =>
+      source.includes('0 0 320 168') && source.includes('mood.angle') && source.includes('160 144)')) &&
+      face.includes('0 · 공포') && face.includes('100 · 탐욕'));
+    check('시장 흐름과 뉴스는 선택해서 펼침', ['시세와 시장 흐름', '일정과 뉴스'].every(label =>
+      [homeSrc, tpl16].every(source => source.includes('<summary>' + label + '</summary>'))));
 
     /*
      * 시장 위험 신호등 여섯 장을 홈에서 뺐다.
@@ -2763,6 +2779,14 @@ async function main() {
      * 흩어져야 한다 (바닥의 단추와 시각은 margin-top:auto 로 붙인다).
      */
     const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    const detailSrc = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const previewHome = tpl16.slice(tpl16.indexOf('function viewHome()'), tpl16.indexOf('function viewMarketHub()'));
+    check('홈은 경고를 요약보다 먼저 표시', homeSrc.includes('<RiskAlertLine />') &&
+      homeSrc.indexOf('<RiskAlertLine />') < homeSrc.indexOf('<TodayLine />') &&
+      previewHome.includes('시장 경고 · 지표') && previewHome.indexOf('시장 경고 · 지표') < previewHome.indexOf('todayLineText()'));
+    check('시장 간 척도 설명은 심리 상세에서 확인', !fngSec.includes('SCALE_WARNING_TEXT') &&
+      !previewHome.includes('서로 견줄 수 없습니다') && detailSrc.includes('detail.methodology.scaleWarning') &&
+      tpl16.includes('esc(d.methodology.scaleWarning)'));
     check('앱 카드가 칸 높이를 꽉 채움', /className="card flex h-full flex-col p-3"/.test(fngCardSrc));
     check('앱 카드의 단추·시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
 
@@ -2807,7 +2831,7 @@ async function main() {
     check('그 줄이 경제지표로 데려감', /href="\/indicators"/.test(alertLine));
     check('경제지표 탭에는 그대로 있음',
       /RiskGaugesSection|RiskBoard/.test(await readFile('src/app/indicators/page.tsx', 'utf8')));
-    check('미리보기도 같은 줄을 씀', /빨간불 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
+    check('미리보기도 같은 줄을 씀', /시장 경고 · 지표 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
 
     /*
      * 조사는 앞말의 받침이 정한다.

@@ -109,13 +109,7 @@ export function StatusBar() {
                 정상
               </Badge>
             ) : null}
-            {/* 마지막 갱신 시각. 따로 한 줄을 쓰지 않고 상태 배지 옆에 붙인다.
-                좁은 화면(380px 미만)에서는 아예 감춘다 — 한 글자만 남기고 자르면
-                '방' 같은 토막이 되어 오히려 읽는 데 방해가 된다. 이 값은 상태바가
-                아니어도 각 카드의 기준 시각에서 확인할 수 있다. */}
-            <span className="tnum hidden min-w-0 truncate text-[12.5px] text-subtle min-[380px]:inline">
-              {snapshot ? formatRelative(snapshot.lastFullUpdate) : '—'} 갱신
-            </span>
+
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
@@ -153,6 +147,11 @@ export function StatusBar() {
               ['us', 'kr', 'crypto'].map((m) => (
                 <div key={m} className="h-[29px] w-24 shrink-0 skeleton" />
               ))}
+          {snapshot && (
+            <span className="tnum shrink-0 self-center whitespace-nowrap text-[12.5px] text-subtle">
+              {formatRelative(snapshot.lastFullUpdate)} 갱신
+            </span>
+          )}
         </div>
 
         {/*

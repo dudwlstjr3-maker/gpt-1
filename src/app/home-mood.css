@@ -1,0 +1,50 @@
+.mood-home {
+  display: flow-root;
+  background:
+    radial-gradient(ellipse at 2% 0, color-mix(in srgb, var(--accent) 12%, transparent), transparent 26rem),
+    repeating-radial-gradient(ellipse at 108% 2rem, transparent 0 22px, color-mix(in srgb, var(--fg) 4%, transparent) 23px, transparent 24px 36px);
+  background-repeat: no-repeat;
+  background-size: 100% 38rem;
+}
+.card.mood-cover {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ink) 32%, var(--border));
+  background:
+    radial-gradient(ellipse at 78% 0, color-mix(in srgb, var(--ink) 16%, transparent), transparent 60%),
+    linear-gradient(150deg, var(--surface-2), var(--surface) 65%);
+  color: var(--fg-strong);
+}
+.mood-cover::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-radial-gradient(ellipse at 90% -32%, transparent 0 13px, color-mix(in srgb, var(--ink) 10%, transparent) 14px, transparent 15px 22px);
+  mask-image: linear-gradient(to bottom, black, transparent 66%);
+}
+.mood-dial {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
+  margin: 6px auto 0;
+}
+.mood-cover header, .mood-cover footer, .mood-reading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mood-cover header h3 { margin: 0; font-size: 15px; font-weight: 750; }
+.mood-reading { min-height: 76px; align-items: baseline; flex-wrap: wrap; align-content: center; }
+.mood-reading strong { color: var(--ink); font-size: 32px; font-weight: 850; line-height: 1.08; letter-spacing: -.055em; }
+.mood-score { font-size: 34px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.mood-score small { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.mood-change { margin: 0; font-size: 14px; }
+.mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
+.mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
+.mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }
+.home-fold { margin: 12px 0 0; border-top: 1px solid var(--border); }
+.home-fold > summary { padding: 14px 12px; color: var(--fg-strong); font-size: 15px; font-weight: 650; cursor: pointer; }

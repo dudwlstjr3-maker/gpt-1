@@ -240,6 +240,8 @@ async function main() {
 
   // </script> 가 데이터 안에 있으면 스크립트 태그가 먼저 닫힌다. < 를 이스케이프한다.
   const html = tpl
+    .replace('__HOME_DIAL_IMAGE__', () => 'data:image/svg+xml;base64,' +
+      fs.readFileSync(path.join(HERE, '../../public/mood-dial.svg')).toString('base64'))
     .replace('__HOME_MOOD_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/home-mood.css'), 'utf8'))
     .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace('export function', 'function'))
     .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)

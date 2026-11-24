@@ -9,5 +9,6 @@ export function homeMood(value, delta) {
     const magnitude = Math.abs(delta).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
     change = delta === 0 ? '전일과 같음' : `전일 대비 ${delta > 0 ? '↑' : '↓'} ${magnitude}점`;
   }
-  return { score, word, size, change };
+  const angle = (score - 50) * 1.8;
+  return { score, word, size, change, angle };
 }

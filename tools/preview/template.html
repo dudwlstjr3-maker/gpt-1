@@ -1870,11 +1870,14 @@ __HOME_MOOD_CSS__
     return '<article class="card mood-cover" style="padding:12px;--ink:' + scoreColor(mood && mood.score) + '" aria-label="미국 쫄탐지수">' +
       '<header><h3>미국 쫄탐지수</h3>' + modeBadge() + '</header>' +
       (mood && stage
-        ? '<div class="mood-reading"><strong' + (mood.word ? ' style="font-size:' + mood.size + 'px"' : '') + '>' + esc(mood.word || stage.label) +
+        ? '<svg class="mood-dial" viewBox="0 0 320 168" aria-hidden="true">' +
+          '<image href="__HOME_DIAL_IMAGE__" width="320" height="168"/>' +
+          '<g transform="rotate(' + mood.angle + ' 160 144)"><path d="M156 148 L159 40 Q160 36 161 40 L164 148Z" fill="#fff5d6" stroke="#442f28"/>' +
+          '<path d="M160 43 L160 141" stroke="#ff9764" stroke-width="1.5"/></g>' +
+          '<circle cx="160" cy="144" r="8" fill="#202b38" stroke="#d4dedc" stroke-width="2"/></svg>' +
+          '<div class="mood-reading"><strong' + (mood.word ? ' style="font-size:' + mood.size + 'px"' : '') + '>' + esc(mood.word || stage.label) +
           '</strong><span class="mood-score">' + mood.score + '<small> / 100</small></span></div>' +
-          '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + ' · </b>' : '') + esc(mood.change) + '</p>' +
-          '<div class="mood-ruler" aria-hidden="true"><i style="left:' + mood.score + '%"></i></div>' +
-          '<div class="mood-ends"><span>0 공포</span><span>100 탐욕</span></div>'
+          '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + ' · </b>' : '') + esc(mood.change) + '</p>'
         : '<p role="status"><b>산출 불가</b> · ' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
       '<footer><span>자체 산출 · ' + esc(kTime(f.computedAt)) + '</span><button type="button" data-go-fng="us">심리 상세 →</button></footer></article>';
   }
@@ -3221,7 +3224,7 @@ __HOME_MOOD_CSS__
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<h1 class="sr">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
       '<section class="block" style="padding-inline:0">' +
       '<h2 class="sr">오늘의 쫄탐</h2>' +
       (() => {
@@ -3336,7 +3339,7 @@ __HOME_MOOD_CSS__
         '<span>원문 링크 없음</span></div></li>').join('') +
       '</ul></div></div></section>') +
       '</div>' +
-      '</div></details>'
+      '</div></details></div>'
     );
   }
 

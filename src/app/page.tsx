@@ -38,7 +38,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="pt-2">
+    <div className="mood-home pt-2">
       <h1 className="sr-only">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>
       <FngSection />
       <TodayLine />

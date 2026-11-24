@@ -2728,6 +2728,14 @@ async function main() {
       m.word === (n < 20 ? '쫄?' : n >= 80 ? '탐?' : null) &&
       (n >= 19 || m.size > scores[n + 1].size) && (n <= 80 || m.size > scores[n - 1].size)) &&
       scores[0].size === scores[100].size && homeMood(null, 0) === null);
+    check('계기판 왼쪽·정상·오른쪽과 모든 중간 각도', scores.every((m, n) =>
+      Math.abs(m.angle - (n * 1.8 - 90)) < 0.000001) &&
+      scores[0].angle === -90 && scores[50].angle === 0 && scores[100].angle === 90);
+    const cover = await readFile('src/components/market/HomeMoodCard.tsx', 'utf8');
+    const face = await readFile('public/mood-dial.svg', 'utf8');
+    check('앱과 미리보기가 동일한 반원과 바늘 좌표를 씀', [cover, tpl16].every(source =>
+      source.includes('0 0 320 168') && source.includes('mood.angle') && source.includes('160 144)')) &&
+      face.includes('0 · 공포') && face.includes('100 · 탐욕'));
     check('시장 흐름과 뉴스는 선택해서 펼침', ['시세와 시장 흐름', '일정과 뉴스'].every(label =>
       [homeSrc, tpl16].every(source => source.includes('<summary>' + label + '</summary>'))));
 

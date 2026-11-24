@@ -97,15 +97,6 @@ async function main() {
 
   await unitTests();
   await verifyMoodStage();
-  if (process.env.GITHUB_ACTIONS) {
-    const audit = await run('git', ['grep', '-nE', '분할|검토선|매집'], {maxBuffer: 32 * 1024 * 1024});
-    console.log('ISSUE13_GREP_BEGIN');
-    for (const line of audit.stdout.trimEnd().split('\n')) {
-      const match = line.search(/분할|검토선|매집/);
-      console.log(line.length <= 300 ? line : line.slice(0,line.indexOf(':',line.indexOf(':')+1)+1) + ' … ' + line.slice(Math.max(0,match-30),match+70));
-    }
-    console.log('ISSUE13_GREP_END');
-  }
 
   /* ---------------- 1. 기본 스냅샷 ---------------- */
   console.log('[1] 홈 스냅샷 (scenario=normal)');

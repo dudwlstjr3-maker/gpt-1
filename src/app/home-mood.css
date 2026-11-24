@@ -1,0 +1,24 @@
+.mood-cover {
+  background: linear-gradient(125deg, color-mix(in srgb, var(--ink) 9%, var(--surface)), var(--surface) 76%);
+  border-top: 3px solid var(--ink);
+  color: var(--fg-strong);
+}
+.mood-cover header, .mood-cover footer, .mood-reading, .mood-ends {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mood-cover header h3 { margin: 0; font-size: 15px; font-weight: 750; }
+.mood-reading { min-height: 90px; align-items: baseline; flex-wrap: wrap; align-content: center; }
+.mood-reading strong { color: var(--ink); font-size: 32px; font-weight: 850; line-height: 1.08; letter-spacing: -.055em; }
+.mood-score { font-size: 34px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.mood-score small { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.mood-change { margin: 0; font-size: 14px; }
+.mood-ruler { position: relative; height: 5px; margin: 18px 5px 6px; border-radius: 3px; background: repeating-linear-gradient(to right, var(--border-strong) 0 calc(20% - 2px), transparent calc(20% - 2px) 20%); }
+.mood-ruler i { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 11px; height: 11px; border-radius: 50%; background: var(--ink); outline: 2px solid var(--surface); }
+.mood-ends, .mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
+.mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
+.mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }
+.home-fold { margin: 12px 0 0; border-top: 1px solid var(--border); }
+.home-fold > summary { padding: 14px 12px; color: var(--fg-strong); font-size: 15px; font-weight: 650; cursor: pointer; }

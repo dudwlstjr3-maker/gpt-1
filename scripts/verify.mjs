@@ -2720,8 +2720,16 @@ async function main() {
     check('할 말이 없으면 줄을 그리지 않음', /return null;/.test(line) && /if \(!line\) return null;/.test(view));
     check('세 마디를 한꺼번에 늘어놓지 않음', /if \(mood && heat\)[\s\S]{0,120}if \(mood && risk\)/.test(line));
     const homeSrc = await readFile('src/app/page.tsx', 'utf8');
-    check('홈 맨 위에 섬', /<TodayLine \/>[\s\S]{0,200}<FngSection \/>/.test(homeSrc) &&
-      homeSrc.indexOf('<TodayLine />') < homeSrc.indexOf('<FngSection />'));
+    check('미국 심리 카드가 오늘의 한 줄보다 먼저 보임',
+      homeSrc.includes('<FngSection />') && homeSrc.indexOf('<FngSection />') < homeSrc.indexOf('<TodayLine />'));
+    const { homeMood } = await import('../src/lib/homeMood.mjs');
+    const scores = Array.from({ length: 101 }, (_, score) => homeMood(score, 0));
+    check('공포·탐욕 양쪽 끝에서 글자가 커짐', scores.every((m, n) =>
+      m.word === (n < 20 ? '쫄?' : n >= 80 ? '탐?' : null) &&
+      (n >= 19 || m.size > scores[n + 1].size) && (n <= 80 || m.size > scores[n - 1].size)) &&
+      scores[0].size === scores[100].size && homeMood(null, 0) === null);
+    check('시장 흐름과 뉴스는 선택해서 펼침', ['시세와 시장 흐름', '일정과 뉴스'].every(label =>
+      [homeSrc, tpl16].every(source => source.includes('<summary>' + label + '</summary>'))));
 
     /*
      * 시장 위험 신호등 여섯 장을 홈에서 뺐다.

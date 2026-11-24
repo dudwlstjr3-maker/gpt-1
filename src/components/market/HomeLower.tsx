@@ -92,7 +92,7 @@ export function HomeLower() {
   /* 채울 자리는 본문 밑이 아니라 문서 맨 끝에 붙인다 (main 의 마지막 자식). */
   const [tail, setTail] = useState<HTMLElement | null>(null);
   useEffect(() => setTail(document.getElementById('main')), []);
-  const gap = Math.max(0, Math.round(floor - bodyH));
+  const gap = bodyH > 0 ? Math.max(0, Math.round(floor - bodyH)) : 0;
 
   return (
     <section aria-labelledby="home-lower-title" className="mt-5">

@@ -36,20 +36,20 @@ export const CATALOG: CatalogItem[] = [
   /* ------------------------------- 미국 ------------------------------- */
   { id: 'spx', name: 'S&P 500', symbol: 'SPX', market: 'us', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 1, baseline: '1941~1943년 평균 = 10' },
   { id: 'ndx', name: '나스닥 종합', symbol: 'IXIC', market: 'us', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 2, baseline: '1971년 2월 5일 = 100' },
-  { id: 'dji', name: '다우존스 산업평균', symbol: 'DJI', market: 'us', kind: 'index', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 3, baseline: '기준값이 없습니다 — 30개 종목의 주가를 더해 제수로 나눈 값입니다. 1896년 5월 26일 40.94 로 시작했습니다.' },
+  { id: 'dji', name: '다우존스 산업평균', symbol: 'DJI', market: 'us', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 3, baseline: '기준값이 없습니다 — 30개 종목의 주가를 더해 제수로 나눈 값입니다. 1896년 5월 26일 40.94 로 시작했습니다.' },
   { id: 'rut', name: '러셀 2000', symbol: 'RUT', market: 'us', kind: 'index', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 4, baseline: '1986년 12월 31일 = 135' },
   { id: 'vix', name: '변동성지수 VIX', symbol: 'VIX', market: 'us', kind: 'volatility', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 5, note: '변동성지수 — 높을수록 시장 불안', baseline: '기준 시점이 없습니다 — 앞으로 30일 동안 예상되는 변동폭을 연율 % 로 나타낸 값입니다.' },
   { id: 'ust2', name: '미국 국채 2년', symbol: 'US2Y', market: 'us', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: false, hasVolume: false, order: 6 },
   { id: 'ust10', name: '미국 국채 10년', symbol: 'US10Y', market: 'us', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: true, hasVolume: false, order: 7 },
   { id: 'us_spread_10_2', name: '10년-2년 금리차', symbol: '10Y-2Y', market: 'us', kind: 'spread', unit: 'bp', precision: 1, currency: null, home: true, hasVolume: false, order: 8, note: '음수면 장단기 금리 역전' },
-  { id: 'dxy', name: '달러지수 DXY', symbol: 'DXY', market: 'us', kind: 'fx', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 9 , baseline: '1973년 3월 = 100'},
+  { id: 'dxy', name: '달러지수 DXY', symbol: 'DXY', market: 'us', kind: 'fx', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 9 , baseline: '1973년 3월 = 100'},
   { id: 'gold', name: '금', symbol: 'XAU', market: 'us', kind: 'commodity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: false, order: 10 },
   { id: 'wti', name: 'WTI 원유', symbol: 'CL', market: 'us', kind: 'commodity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: false, order: 11 },
   { id: 'nvda', name: '엔비디아', symbol: 'NVDA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: true, hasVolume: true, order: 12 },
-  { id: 'aapl', name: '애플', symbol: 'AAPL', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 13 },
+  { id: 'aapl', name: '애플', symbol: 'AAPL', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: true, hasVolume: true, order: 13 },
   { id: 'msft', name: '마이크로소프트', symbol: 'MSFT', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 14 },
   { id: 'amzn', name: '아마존', symbol: 'AMZN', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 15 },
-  { id: 'tsla', name: '테슬라', symbol: 'TSLA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 16 },
+  { id: 'tsla', name: '테슬라', symbol: 'TSLA', market: 'us', kind: 'equity', unit: 'currency', precision: 2, currency: 'USD', home: true, hasVolume: true, order: 16 },
   /*
    * 아래는 '핫한 종목' — 거래가 몰리고 이야기가 몰리는 이름들이다.
    *
@@ -81,20 +81,20 @@ export const CATALOG: CatalogItem[] = [
   /* ------------------------------- 한국 ------------------------------- */
   { id: 'kospi', name: '코스피', symbol: 'KOSPI', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 1 , baseline: '1980년 1월 4일 = 100'},
   { id: 'kosdaq', name: '코스닥', symbol: 'KOSDAQ', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: true, order: 2 , baseline: '1996년 7월 1일 = 1,000 (처음에는 100 이었고 2004년에 1,000 으로 고쳐 매겼습니다)'},
-  { id: 'kospi200', name: '코스피 200', symbol: 'KOSPI200', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 3 , baseline: '1990년 1월 3일 = 100'},
-  { id: 'vkospi', name: '코스피 변동성지수', symbol: 'VKOSPI', market: 'kr', kind: 'volatility', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 4, note: '한국 변동성지수', baseline: '기준 시점이 없습니다 — KOSPI 200 옵션 가격에서 뽑아낸 예상 변동폭을 연율 % 로 나타낸 값입니다.' },
+  { id: 'kospi200', name: '코스피 200', symbol: 'KOSPI200', market: 'kr', kind: 'index', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 3 , baseline: '1990년 1월 3일 = 100'},
+  { id: 'vkospi', name: '코스피 변동성지수', symbol: 'VKOSPI', market: 'kr', kind: 'volatility', unit: 'point', precision: 2, currency: null, home: false, hasVolume: false, order: 4, note: '한국 변동성지수', baseline: '기준 시점이 없습니다 — KOSPI 200 옵션 가격에서 뽑아낸 예상 변동폭을 연율 % 로 나타낸 값입니다.' },
   { id: 'usdkrw', name: '원/달러 환율', symbol: 'USDKRW', market: 'kr', kind: 'fx', unit: 'point', precision: 2, currency: null, home: true, hasVolume: false, order: 5, note: '상승 = 원화 약세' },
   { id: 'ktb3', name: '국고채 3년', symbol: 'KTB3Y', market: 'kr', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: false, hasVolume: false, order: 6 },
   { id: 'ktb10', name: '국고채 10년', symbol: 'KTB10Y', market: 'kr', kind: 'rate', unit: 'percent', precision: 3, currency: null, home: false, hasVolume: false, order: 7 },
   { id: 'samsung', name: '삼성전자', symbol: '005930', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: true, hasVolume: true, order: 8 },
-  { id: 'hynix', name: 'SK하이닉스', symbol: '000660', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 9 },
+  { id: 'hynix', name: 'SK하이닉스', symbol: '000660', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: true, hasVolume: true, order: 9 },
   { id: 'hyundai', name: '현대차', symbol: '005380', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 10 },
   { id: 'naver', name: '네이버', symbol: '035420', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 11 },
   { id: 'kakao', name: '카카오', symbol: '035720', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 12 },
 
   /* ------------------------------ 크립토 ------------------------------ */
   { id: 'btc', name: '비트코인', symbol: 'BTC', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 0, currency: 'USD', home: true, hasVolume: true, order: 1 },
-  { id: 'eth', name: '이더리움', symbol: 'ETH', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: true, hasVolume: true, order: 2 },
+  { id: 'eth', name: '이더리움', symbol: 'ETH', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 2 },
   { id: 'xrp', name: '리플', symbol: 'XRP', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 3 },
   { id: 'sol', name: '솔라나', symbol: 'SOL', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 4 },
   { id: 'bnb', name: 'BNB', symbol: 'BNB', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 5 },
@@ -104,9 +104,9 @@ export const CATALOG: CatalogItem[] = [
   { id: 'trx', name: '트론', symbol: 'TRX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 8 },
   { id: 'avax', name: '아발란체', symbol: 'AVAX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 9 },
   { id: 'link', name: '체인링크', symbol: 'LINK', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 10 },
-  { id: 'total_mcap', name: '전체 시가총액', symbol: 'TOTAL', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: true, hasVolume: false, order: 11 },
+  { id: 'total_mcap', name: '전체 시가총액', symbol: 'TOTAL', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 11 },
   { id: 'total_vol', name: '24시간 거래량', symbol: 'VOL24', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 12 },
-  { id: 'btc_dom', name: '비트코인 점유율', symbol: 'BTC.D', market: 'crypto', kind: 'stat', unit: 'percent', precision: 2, currency: null, home: true, hasVolume: false, order: 13, note: '전체 크립토 시총에서 비트코인이 차지하는 비중 (도미넌스)' },
+  { id: 'btc_dom', name: '비트코인 점유율', symbol: 'BTC.D', market: 'crypto', kind: 'stat', unit: 'percent', precision: 2, currency: null, home: false, hasVolume: false, order: 13, note: '전체 크립토 시총에서 비트코인이 차지하는 비중 (도미넌스)' },
   { id: 'stable_mcap', name: '스테이블코인 시총', symbol: 'STABLE', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 14 },
   { id: 'funding', name: '선물 펀딩비', symbol: 'FUNDING', market: 'crypto', kind: 'stat', unit: 'percent', precision: 4, currency: null, home: false, hasVolume: false, order: 15, note: '양수 = 롱 포지션이 비용 지불' },
   { id: 'open_interest', name: '미결제약정', symbol: 'OI', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 16 },
@@ -123,9 +123,22 @@ export function defaultHomeIds(): string[] {
   return CATALOG.filter((c) => c.home).map((c) => c.id);
 }
 
+/**
+ * 처음 여는 사람의 관심목록. 쫄탐일보는 미국 신문이라 비트코인 대신 나스닥을 넣었다
+ * (2026-11-24). 예전 기본값을 그대로 쓰던 사람은 SettingsProvider 가 새 기본값으로 옮긴다.
+ */
 export function defaultWatchlist(): string[] {
-  return ['spx', 'kospi', 'btc', 'usdkrw', 'vix'];
+  return ['spx', 'ndx', 'kospi', 'usdkrw', 'vix'];
 }
+
+/**
+ * 바로 앞의 기본값들. 저장된 설정이 이것과 **정확히 같을 때만** 새 기본값으로 옮긴다 —
+ * 같다면 한 번도 손대지 않은 것이고, 다르면 사용자가 직접 고른 것이라 건드리지 않는다.
+ */
+export const PREVIOUS_DEFAULTS = {
+  watchlist: ['spx', 'kospi', 'btc', 'usdkrw', 'vix'],
+  homeItems: ['spx', 'ndx', 'vix', 'ust10', 'us_spread_10_2', 'nvda', 'kospi', 'kosdaq', 'vkospi', 'usdkrw', 'samsung', 'btc', 'eth', 'total_mcap', 'btc_dom'],
+};
 
 /**
  * '지수' 탭에 세우는 항목.

@@ -188,7 +188,7 @@ if (!EIA_KEY) {
  * 다 빗나가면 companyCatalog.ts 의 tags 목록에 실제 태그를 추가하면 된다.
  */
 const SEC = process.env.SEC_BASE_URL || 'https://data.sec.gov';
-const SEC_UA = process.env.SEC_USER_AGENT || 'MarketMood3/1.0 (contact: set SEC_USER_AGENT env var)';
+const SEC_UA = process.env.SEC_USER_AGENT || 'JjoltamIlbo/1.0 (contact: set SEC_USER_AGENT env var)';
 
 console.log('\n[재무제표] SEC EDGAR — 키가 필요 없습니다 (연락처가 담긴 User-Agent 는 필요합니다)');
 if (!process.env.SEC_USER_AGENT) {

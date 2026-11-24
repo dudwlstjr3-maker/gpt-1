@@ -1,18 +1,48 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { todayLine, moodClause, heatClause, riskClause, MOVE_MIN, HEAT_MIN } from '../src/lib/todayLine.mjs';
+import { todayLine, moodClause, heatClause, riskClause, MOVE_MIN, HEAT_MIN, MARKET_PRIORITY } from '../src/lib/todayLine.mjs';
 
 const score = (market, s, d) => ({ market, score: s, deltaDay: d });
 const pick = (name, times, changePct) => ({ quote: { name, changePct }, heat: { times } });
+const pickIn = (market, name, times, changePct) => ({ quote: { name, changePct, market }, heat: { times } });
 
 test('작게 움직인 심리는 문장에 올리지 않는다', () => {
   assert.equal(moodClause([score('us', 50, MOVE_MIN - 0.1)]), null);
 });
 
-test('가장 크게 움직인 시장 하나만 고른다', () => {
+/*
+ * 규칙이 바뀐 자리다. 예전에는 '가장 크게 움직인 시장' 이라 여기서 크립토(6점)가 이겼다.
+ * 쫄탐일보는 미국이 1면이라, 미국에 할 말이 있으면(2점 ≥ MOVE_MIN) 미국을 쓴다.
+ */
+test('1면 순서는 미국 · 한국 · 크립토다', () => {
+  assert.deepEqual([...MARKET_PRIORITY], ['us', 'kr', 'crypto']);
+});
+
+test('미국에 할 말이 있으면 크립토가 더 크게 움직여도 미국을 1면에 올린다', () => {
   const line = moodClause([score('us', 50, 2), score('crypto', 70, -6)]);
-  assert.match(line, /크립토/);
+  assert.match(line, /^미국/);
+  assert.match(line, /2점 탐욕/);
+});
+
+test('미국이 조용한 날에는 크립토가 헤드라인을 가져간다 — 지우는 게 아니라 줄을 세운다', () => {
+  const line = moodClause([score('us', 50, MOVE_MIN - 0.1), score('crypto', 70, -6)]);
+  assert.match(line, /^크립토/);
   assert.match(line, /6점 공포/);
+});
+
+test('종목도 미국이 먼저다 — 크립토가 평소의 5배로 움직여도', () => {
+  const line = heatClause([pickIn('crypto', '도지코인', 5, 9), pickIn('us', '엔비디아', 1.7, -3)]);
+  assert.match(line, /^엔비디아가 평소의 1\.7배로 내려/);
+});
+
+test('미국 종목이 조용하면 한국이 크립토보다 먼저다', () => {
+  const line = heatClause([pickIn('crypto', '도지코인', 5, 9), pickIn('kr', '카카오', 1.8, -2), pickIn('us', '애플', 1.2, 1)]);
+  assert.match(line, /^카카오가/);
+});
+
+test('같은 시장 안에서는 가장 유별난 것을 고른다', () => {
+  const line = heatClause([pickIn('us', '애플', 1.7, 1), pickIn('us', '엔비디아', 2.4, 3)]);
+  assert.match(line, /^엔비디아가 평소의 2\.4배로 올라/);
 });
 
 test('오르면 탐욕 쪽이라고 적는다', () => {

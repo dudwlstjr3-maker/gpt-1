@@ -680,7 +680,7 @@ async function main() {
   for (const path of ['/market/us', '/market/kr', '/market/crypto', '/fng/us', '/basics', '/indicators', '/calendar']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
-    check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);
+    check(`${path} 렌더링`, res.status === 200 && html.includes('쫄탐일보'), `status=${res.status}`);
   }
 
   /* ---------------- 8-1. 화면 정리 (중복 제거) ---------------- */
@@ -2735,18 +2735,23 @@ async function main() {
      * 나머지 넷은 '경제지표' 탭이 맡는다 — 거기서는 설명과 함께 읽힌다.
      */
     /*
-     * 카드 폭은 한 화면 안에서 같아야 한다.
+     * 1면은 미국 한 장이다 (2026-11-24 쫄탐일보 리밸런싱).
      *
-     * 심리 카드만 85cqw(최대 340px)라 다른 카드보다 66px 좁았다. 홈을 위에서
-     * 아래로 훑으면 왼쪽 선은 맞는데 오른쪽 선만 혼자 들어가 있었고, 두 번째
-     * 카드는 틀 끝에서 잘려 조각으로 보였다 — 같은 크기의 카드 둘이 다른 크기로
-     * 보인 것이다. 이제 한 장이 칸을 꽉 채우고, "옆에 더 있다" 는 점이 말한다.
+     * 예전에는 미국·크립토 두 장을 옆으로 미는 줄이었고, 그때 이 자리는 "두 장의 폭이
+     * 다른 카드와 같아야 한다" 를 지켰다(85cqw 라 66px 좁았던 일). 이제 옆으로 미는 줄이
+     * 없다 — 미국 한 장이 칸을 꽉 채우고 크립토는 카드가 아니라 아래 한 줄이다.
+     * 크립토를 지우지는 않는다. 점수·단계·어제 대비가 그 줄에 있다.
      */
     const fngSec = await readFile('src/components/market/FngSection.tsx', 'utf8');
-    check('심리 카드가 칸을 꽉 채움',
-      /className="snap-item w-\[calc\(100cqw-24px\)\]"/.test(fngSec) && !/max-w-\[340px\]/.test(fngSec));
-    check('옆에 더 있다는 것을 점이 알림', /function Carousel\(/.test(fngSec) && /count > 1 \?/.test(fngSec));
-    check('미리보기도 같은 폭', /\.fng-scroll > \* \{[^}]*width: calc\(100cqw - 24px\)/.test(tpl16) && /\.fng-dots/.test(tpl16));
+    check('1면 카드는 미국 한 장 (옆으로 미는 줄 없음)',
+      /s\.market === 'us'/.test(fngSec) && !/function Carousel\(/.test(fngSec) && !/snap-item/.test(fngSec));
+    check('크립토는 지우지 않고 한 줄로 내림', /function MarketLine\(/.test(fngSec) && /rest\.map/.test(fngSec));
+    check('한 줄도 단계를 색만이 아니라 기호와 이름으로 말함',
+      /STAGE_GLYPH\[stage\.id\]/.test(fngSec) && /stage\.label/.test(fngSec));
+    check('미리보기도 같은 구성',
+      /x\.market === 'us'/.test(tpl16) && /function marketLine\(f\)/.test(tpl16) && !/id="fngscroll"/.test(tpl16));
+    check('쓰지 않게 된 캐러셀 스타일을 지움',
+      !/\.snap-row \{/.test(await readFile('src/app/globals.css', 'utf8')) && !/\.fng-scroll \{/.test(tpl16));
 
     /*
      * 폭만 맞춰서는 모자랐다 — 높이도 같아야 한다.
@@ -3419,6 +3424,115 @@ async function main() {
       /s\.url\.replace\(\/\^https\?:\\\/\\\/\/, ''\)/.test(page) && /String\(x\.url\)\.replace/.test(tpl));
     check('새 창이라는 사실을 기호만으로 두지 않음',
       /새 창에서 열림/.test(page) && /새 창에서 열림/.test(tpl));
+  }
+
+  /* ---------------- 8-37. 앱 이름 ---------------- */
+  console.log('\n[8-37] 앱 이름이 한 가지인가 — 쫄탐일보');
+  {
+    const NAME = '쫄탐일보';
+    const layout = await readFile('src/app/layout.tsx', 'utf8');
+    const manifest = JSON.parse(await readFile('public/manifest.webmanifest', 'utf8'));
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    const sw = await readFile('public/sw.js', 'utf8');
+
+    /*
+     * 이름이 사람 눈에 닿는 자리는 다섯 곳이다 — 브라우저 탭 제목, 홈 화면에 추가했을 때의
+     * 이름(manifest), 화면 낭독기가 읽는 첫 제목, 미리보기, 오프라인 화면. 한 곳만 옛 이름이
+     * 남아도 사람은 "앱이 둘인가" 로 읽는다.
+     */
+    check('탭 제목에 이름이 있음', /title:\s*'쫄탐일보 — /.test(layout));
+    check('앱 이름(applicationName)', /applicationName:\s*'쫄탐일보'/.test(layout));
+    check('홈 화면 이름(manifest name · short_name)',
+      manifest.short_name === NAME && String(manifest.name).startsWith(NAME));
+    check('미리보기 탭 제목', tpl.startsWith(`<title>${NAME}</title>`));
+    check('오프라인 화면 제목', sw.includes(`<title>오프라인 — ${NAME}</title>`));
+
+    const visible = {
+      'src/app/layout.tsx': layout,
+      'src/app/page.tsx': await readFile('src/app/page.tsx', 'utf8'),
+      'public/manifest.webmanifest': JSON.stringify(manifest),
+      'tools/preview/template.html': tpl,
+      'public/sw.js': sw,
+    };
+    const stale = Object.entries(visible).filter(([, t]) => /Market Mood/.test(t)).map(([f]) => f);
+    check('옛 이름(Market Mood)이 화면에 닿는 파일에 남지 않음', stale.length === 0, stale.join(', '));
+
+    /*
+     * 저장 키는 이름을 따라 바꾸지 않는다.
+     *
+     * 키의 'mm3' 는 옛 이름(Market Mood 3)의 약자지만, 이것을 'fg' 로 바꾸는 순간 이미 쓰던
+     * 사람의 설정 · 알림 · 관심목록이 전부 사라진다 — 브라우저는 새 키 아래에서 빈 값을 읽는다.
+     * 이름 정리로 보이는 일이 데이터 삭제가 된다. 바꾸려면 옛 키에서 옮겨 담는 코드가 먼저다.
+     */
+    const settings = await readFile('src/components/providers/SettingsProvider.tsx', 'utf8');
+    const alerts = await readFile('src/components/alerts/store.ts', 'utf8');
+    check('설정 저장 키가 그대로 (mm3.settings.v1)',
+      settings.includes("'mm3.settings.v1'") && layout.includes("'mm3.settings.v1'"));
+    check('알림 저장 키가 그대로 (mm3.alerts.v1)', alerts.includes("'mm3.alerts.v1'"));
+  }
+
+  /* ---------------- 8-38. 쫄탐일보 지면 ---------------- */
+  console.log('\n[8-38] 쫄탐일보 지면 — 미국이 1면, 한국이 2면, 크립토는 뒤');
+  {
+    /*
+     * 2026-11-24 리밸런싱. 홈에서 크립토가 무게를 갖던 곳은 가격 칸이 아니라 셋이었다 —
+     * 쫄탐 카드의 절반, 오늘의 한 줄(출렁임이 커서 거의 늘), 오늘의 칸 6개 중 2개.
+     * 한국은 카탈로그에 지수 셋 · 환율 · 종목 다섯이 있는데 8칸 제한에 걸려 2칸만 나왔다.
+     *
+     * 크립토는 지우지 않는다. 줄을 세운다 — 미국이 조용한 날에는 여전히 헤드라인에 서고,
+     * 점수는 1면 카드 밑 한 줄에, 시세는 지면 맨 뒤에 있다.
+     */
+    const tl = await readFile('src/lib/todayLine.mjs', 'utf8');
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    const prices = await readFile('src/components/market/HomePrices.tsx', 'utf8');
+    const heat = await readFile('src/components/market/HeatBoard.tsx', 'utf8');
+    const cat = await readFile('src/lib/catalog.ts', 'utf8');
+    const settings = await readFile('src/components/providers/SettingsProvider.tsx', 'utf8');
+
+    // ① 헤드라인 순서
+    check('헤드라인 순서가 미국 · 한국 · 크립토',
+      /export const MARKET_PRIORITY = \['us', 'kr', 'crypto'\];/.test(tl));
+    check('헤드라인이 순서를 따름 (가장 큰 것 하나가 아니라)',
+      (tl.match(/headline\(usable,/g) ?? []).length === 2);
+    check('미리보기도 같은 순서', /const TODAY_PRIORITY = \['us', 'kr', 'crypto'\];/.test(tpl) &&
+      (tpl.match(/todayHeadline\(ok,/g) ?? []).length === 2);
+
+    // ② 시세 지면
+    const slots = (src, re) => src.match(re)?.[1] ?? '';
+    const appSlots = slots(prices, /HOME_SLOTS: Record<MarketId, number> = (\{[^}]*\})/);
+    const tplSlots = slots(tpl, /const HOME_SLOTS = (\{[^}]*\})/);
+    check('시장별 칸 수: 미국 10 · 한국 6 · 크립토 2', appSlots === '{ us: 10, kr: 6, crypto: 2 }', appSlots);
+    check('미리보기도 같은 칸 수', tplSlots === appSlots, tplSlots);
+    check('시장별 소제목으로 묶어 실음', /MARKET_LABEL\[g\.market\]/.test(prices) && /class="price-group-h"/.test(tpl));
+    check('시장 구분 없이 앞에서 자르던 8칸 제한을 지움', !/MAX_ON_HOME/.test(prices) && !/ordered\.slice\(0, 9\)/.test(tpl));
+
+    // ③ 홈 기본 항목 — 미국이 가장 많고 한국이 그다음, 크립토는 하나
+    const homeOf = (m) => [...cat.matchAll(new RegExp(`id: '([a-z0-9_]+)'[^\\n]*market: '${m}'[^\\n]*home: true`, 'g'))].map((x) => x[1]);
+    const us = homeOf('us'), kr = homeOf('kr'), cr = homeOf('crypto');
+    check('홈 기본 항목: 미국 > 한국 > 크립토', us.length > kr.length && kr.length > cr.length && cr.length <= 1,
+      `미국 ${us.length} · 한국 ${kr.length} · 크립토 ${cr.length}`);
+    // 무료로 받을 길이 없는 것은 홈 기본값에 두지 않는다 — LIVE 에서 늘 빈 칸이 된다
+    check('VKOSPI 를 홈 기본값에서 뺌 (KRX 유료 데이터)', !kr.includes('vkospi'));
+    check('미리보기 홈 목록이 카탈로그와 같음',
+      (() => { const m = tpl.match(/const homeIds = \[([^\]]*)\];/); if (!m) return false;
+        const ids = [...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]);
+        return JSON.stringify(ids) === JSON.stringify([...us, ...kr, ...cr]); })());
+
+    // ④ 오늘의 칸
+    check('오늘의 칸은 미국 · 한국', /export const HEAT_MARKETS: MarketId\[\] = \['us', 'kr'\];/.test(heat) &&
+      /HEAT_MARKETS\.map/.test(heat));
+    check('미리보기도 미국 · 한국', /const boards = \['us', 'kr'\]\n/.test(tpl));
+
+    // ⑤ 써 오던 사람에게도 바뀐 지면이 가야 한다 — 다만 직접 고른 것은 그대로
+    check('예전 기본값을 기록해 둠', /export const PREVIOUS_DEFAULTS = \{/.test(cat));
+    check('저장된 관심목록 · 홈 항목을 그 규칙으로 옮김',
+      (settings.match(/upgradeDefault\(arr\(r\.(watchlist|homeItems)/g) ?? []).length === 2);
+    check('관심목록 기본값에 비트코인 대신 나스닥',
+      /return \['spx', 'ndx', 'kospi', 'usdkrw', 'vix'\];/.test(cat) && /watch: new Set\(\['spx', 'ndx', 'kospi', 'usdkrw', 'vix'\]\)/.test(tpl));
+
+    // ⑥ 한국이 빠진 뒤로 틀린 말이던 것
+    const consts = await readFile('src/components/market/constants.ts', 'utf8');
+    check('"세 점수" 라는 틀린 말이 남지 않음', !/세 점수/.test(consts) && !/세 점수/.test(tpl));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

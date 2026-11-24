@@ -1,4 +1,4 @@
-<title>Market Mood 3</title>
+<title>쫄탐일보</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
@@ -13,7 +13,7 @@
   font-display: swap;
 }
 /* ==========================================================================
-   Market Mood 3 — 구현물 미리보기
+   쫄탐일보 — 구현물 미리보기
    색상 토큰은 실제 앱(src/app/globals.css)의 값을 그대로 가져왔다.
    다크가 기본이며, 라이트는 명시 선택 또는 OS 설정으로 전환된다.
    ========================================================================== */
@@ -529,6 +529,9 @@ section.block { padding: 0 12px; margin-top: 20px; }
 .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .block-head h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--fg-strong); letter-spacing: -0.01em; }
 .block-head .hint { font-size: 12.5px; color: var(--subtle); }
+/* 섹션 머리의 작은 설명 줄. 이 규칙이 없어서 .sub 가 카드(.fngcard) 안에서만 작게 그려지고,
+   섹션 머리에서는 본문 크기로 커져 앱과 달랐다. 앱은 text-[11.5px] text-subtle 이다. */
+.block-head .sub { font-size: 11.5px; color: var(--subtle); }
 /* 누를 자리는 적어도 24×24 (WCAG 2.2 AA 2.5.8). 글자만 있는 단추는 글자 높이가
    그대로 누를 자리가 되어 17~19px 밖에 안 된다. 보이는 크기는 그대로 두고
    세로로만 24px 을 보장한다. 앱의 .tap 과 같다. */
@@ -554,22 +557,24 @@ section.block { padding: 0 12px; margin-top: 20px; }
 
 /* -------------------------------- F&G 카드 -------------------------------- */
 
-.fng-scroll { display: flex; gap: 12px; overflow-x: auto; padding: 0 12px 6px; scroll-snap-type: x mandatory; scrollbar-width: none;
-  /* contain 이 없으면 가로 스크롤 영역이 문서 전체의 스크롤 폭으로 새어 나간다 */
-  contain: paint; }
-.fng-scroll::-webkit-scrollbar { display: none; }
-/* 카드 폭은 이 화면의 다른 카드와 같아야 한다. 예전에는 85cqw(최대 340px)라
-   다음 카드가 살짝 보였는데, 그 대가로 이 카드만 66px 좁아 위아래 카드와
-   테두리 선이 안 맞았고 두 번째 카드는 틀 끝에서 잘렸다. 앱과 같은 값이다. */
-.fng-scroll > * { scroll-snap-align: center; flex: 0 0 auto; width: calc(100cqw - 24px); }
-/* "옆에 더 있다" 는 이 점이 말한다 */
-.fng-dots { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
-.fng-dots span { display: block; width: 6px; height: 6px; border-radius: 999px; background: var(--surface-3); }
-.fng-dots span[data-on='true'] { background: var(--muted); }
-@container app (min-width: 1024px) {
-  .fng-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
-  .fng-scroll > * { width: auto; }
+/* 1면 — 미국 한 장이 칸을 꽉 채운다. 크립토는 카드가 아니라 아래 한 줄(.mkline)이다.
+   앱의 FngSection 과 같다. 예전의 옆으로 미는 줄(.fng-scroll)과 점(.fng-dots)은 지웠다. */
+.fng-lead { padding: 0 12px; }
+.mklines { list-style: none; margin: 8px 0 0; padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.mkline {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 12px;
+  border: 0; border-radius: var(--box-radius-sm); background: var(--surface-2);
+  color: inherit; text-align: left; cursor: pointer; font-family: inherit;
 }
+.mkline:hover { background: var(--surface-3); }
+.mkline .nm { font-size: 13px; font-weight: 600; color: var(--fg); }
+.mkline .sc { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mkline .st { font-size: 12.5px; font-weight: 600; }
+.mkline .dl { font-size: 12.5px; color: var(--subtle); font-variant-numeric: tabular-nums; }
+.mkline .go { margin-left: auto; flex-shrink: 0; font-size: 12.5px; color: var(--subtle); }
+/* 시세 지면의 시장 소제목 — 미국 → 한국 → 크립토. 앱 HomePrices 와 같다. */
+.price-group + .price-group { margin-top: 16px; }
+.price-group-h { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
 /*
  * 카드 셋은 같은 높이로 선다.
@@ -895,7 +900,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
         브랜치 이름이나 엔진 이야기는 만든 사람에게나 쓸모 있는 것이라 접어 둔다.
       -->
       <p class="preview-lead">
-        <strong style="color:var(--fg)">Market Mood 3</strong> — 화면과 조작은 실제 앱 그대로이고,
+        <strong style="color:var(--fg)">쫄탐일보</strong> — 화면과 조작은 실제 앱 그대로이고,
         수치는 <strong style="color:var(--warn)">DEMO(합성) 데이터</strong>라 실제 시세가 아닙니다.
         <button type="button" class="preview-toggle" data-more aria-expanded="false" aria-controls="preview-more">자세히</button>
       </p>
@@ -982,7 +987,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     currency: 'KRW',
     colorMode: 'korean',
     scenario: 'normal',
-    watch: new Set(['spx', 'kospi', 'btc', 'usdkrw', 'vix']),
+    watch: new Set(['spx', 'ndx', 'kospi', 'usdkrw', 'vix']),
     openComp: null,
     openTile: null,
     /* 지표 화면의 '읽는 법' 을 펴 두었는가 */
@@ -1837,6 +1842,23 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     );
   }
 
+  /**
+   * 1면 카드 밑의 한 줄 — 크립토 쫄탐. 앱의 FngSection 안 MarketLine 과 같다.
+   * 단계는 색만이 아니라 기호와 이름으로 말한다. 어제 대비는 부호가 방향을 말하므로
+   * 색을 입히지 않는다 — 한국식·해외식 등락 색 설정에 따라 뜻이 엇갈리지 않게.
+   */
+  function marketLine(f) {
+    const st = stageOf(f.score);
+    const body = f.score === null || !st
+      ? '<span class="dl">산출 불가</span>'
+      : '<span class="sc" style="color:' + scoreColor(f.score) + '">' + esc(fmtNum(f.score, 0)) + '</span>' +
+        '<span class="st" style="color:' + scoreColor(f.score) + '"><span aria-hidden="true">' + st.glyph + '</span> ' + esc(st.label) + '</span>' +
+        (isNum(f.deltaDay) ? '<span class="dl">어제 ' + esc(fmtSigned(f.deltaDay, 1)) + '</span>' : '');
+    return '<li><button type="button" class="mkline" data-go-fng="' + f.market + '">' +
+      '<span class="nm">' + esc(MARKET_LABEL[f.market]) + ' 쫄탐</span>' + body +
+      '<span class="go">상세 <span aria-hidden="true">→</span></span></button></li>';
+  }
+
   function fngCard(f, standalone) {
     const un = f.score === null;
     // 값이 없으면 "판단할 데이터가 부족합니다" 를 적는 대신 줄을 그리지 않는다
@@ -1983,7 +2005,8 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 
   function heatSection() {
     const data = snap().sections.quotes.data || {};
-    const boards = ['us', 'kr', 'crypto']
+    /* 미국 · 한국만 — 앱 HeatBoard 의 HEAT_MARKETS 와 같다. 크립토는 크립토 시장 화면에 있다. */
+    const boards = ['us', 'kr']
       .map((m) => ({ m: m, b: pickHeat((data[m] || []).filter((q) => HEAT_TRADABLE[q.kind])) }))
       .filter((x) => x.b);
     return '<section class="block"><div style="margin-bottom:8px">' +
@@ -1991,7 +2014,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       '<p style="margin:4px 0 0;font-size:11.5px;line-height:1.7;word-break:keep-all;color:var(--subtle)">' +
       '시장마다 가장 많이 오른 것 하나와 가장 많이 내린 것 하나씩입니다. 몇 % 움직였는지가 아니라 ' +
       '<b style="color:var(--muted)">그 종목이 평소 움직이던 폭에 견줘</b> 오늘이 얼마나 유별났는지로 골랐습니다 — ' +
-      '그냥 % 로 줄을 세우면 원래 많이 움직이는 크립토가 늘 이깁니다. '  +
+      '그냥 % 로 줄을 세우면 원래 많이 움직이는 종목이 늘 이깁니다. '  +
       '<b style="color:var(--muted)">시총 300위 밖은 후보에서 뺍니다</b> — 작은 종목은 하루 30% 씩도 '  +
       '움직여서, 그것까지 넣으면 이 자리가 늘 그런 종목 차지가 됩니다.</p></div>' +
       (boards.length === 0
@@ -3075,6 +3098,14 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
      있는 것만 뽑는다. 할 말이 없으면 줄을 그리지 않는다. */
   const TODAY_MOVE_MIN = 1.5;
   const TODAY_HEAT_MIN = 1.6;
+  /* 1면 순서 — src/lib/todayLine.mjs 의 MARKET_PRIORITY 와 같다. 앞 시장에 할 말이 있으면
+     뒤 시장은 아무리 크게 움직여도 헤드라인을 못 가져간다. 크립토가 늘 이기던 것을 막는다. */
+  const TODAY_PRIORITY = ['us', 'kr', 'crypto'];
+  function todayRank(m) { const i = TODAY_PRIORITY.indexOf(m); return i < 0 ? TODAY_PRIORITY.length : i; }
+  function todayHeadline(items, marketOf, sizeOf) {
+    const best = Math.min.apply(null, items.map((x) => todayRank(marketOf(x))));
+    return items.filter((x) => todayRank(marketOf(x)) === best).reduce((a, b2) => (sizeOf(b2) > sizeOf(a) ? b2 : a));
+  }
   const r1 = (v) => Math.round(v * 10) / 10;
 
   /* 조사(이/가)는 개수가 아니라 앞말의 받침이 정한다 — '수수료가', '국면이'.
@@ -3093,7 +3124,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function todayMoodClause(scores) {
     const ok = (scores || []).filter((x) => x && x.score !== null && isNum(x.deltaDay) && Math.abs(x.deltaDay) >= TODAY_MOVE_MIN);
     if (!ok.length) return null;
-    const top = ok.reduce((a, b2) => (Math.abs(b2.deltaDay) > Math.abs(a.deltaDay) ? b2 : a));
+    const top = todayHeadline(ok, (x) => x.market, (x) => Math.abs(x.deltaDay));
     const name = MARKET_LABEL[top.market] || top.market;
     const size = r1(Math.abs(top.deltaDay));
     return top.deltaDay > 0
@@ -3104,7 +3135,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   function todayHeatClause(picks) {
     const ok = (picks || []).filter((x) => x && x.heat && isNum(x.heat.times) && x.heat.times >= TODAY_HEAT_MIN && x.quote);
     if (!ok.length) return null;
-    const top = ok.reduce((a, b2) => (b2.heat.times > a.heat.times ? b2 : a));
+    const top = todayHeadline(ok, (x) => x.quote.market, (x) => x.heat.times);
     return top.quote.name + '가 평소의 ' + r1(top.heat.times) + '배로 ' + ((top.quote.changePct || 0) >= 0 ? '올라' : '내려') + ' 움직였습니다';
   }
 
@@ -3143,11 +3174,20 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const fng = s.sections.fng.data || [];
     const quotes = s.sections.quotes.data || {};
     const all = new Map();
-    INDEX_MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => all.set(q.id, q)));
-    const homeIds = ['spx', 'ndx', 'vix', 'ust10', 'us_spread_10_2', 'nvda', 'kospi', 'kosdaq', 'vkospi', 'usdkrw', 'samsung', 'btc', 'eth', 'total_mcap', 'btc_dom'];
-    const ordered = [];
-    state.watch.forEach((id) => { if (all.has(id)) ordered.push(all.get(id)); });
-    homeIds.forEach((id) => { if (all.has(id) && ordered.indexOf(all.get(id)) < 0) ordered.push(all.get(id)); });
+    const marketOf = new Map();
+    INDEX_MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => { all.set(q.id, q); marketOf.set(q.id, m); }));
+    /* 홈 기본 목록 — src/lib/catalog.ts 의 home:true 와 같다. 미국 10 · 한국 6 · 크립토 1.
+       VKOSPI 는 뺐다 — KRX 유료 데이터라 LIVE 에서는 늘 빈 칸이었다. */
+    const homeIds = ['spx', 'ndx', 'dji', 'vix', 'ust10', 'us_spread_10_2', 'dxy', 'nvda', 'aapl', 'tsla',
+      'kospi', 'kosdaq', 'kospi200', 'usdkrw', 'samsung', 'hynix', 'btc'];
+    const ids = [];
+    state.watch.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
+    homeIds.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
+    /* 시장별로 묶고 칸 수를 지킨다 — 앱 HomePrices 의 HOME_SLOTS 와 같은 값 */
+    const HOME_SLOTS = { us: 10, kr: 6, crypto: 2 };
+    const priceGroups = INDEX_MARKETS
+      .map((m) => ({ market: m, quotes: ids.filter((id) => marketOf.get(id) === m).slice(0, HOME_SLOTS[m]).map((id) => all.get(id)) }))
+      .filter((g) => g.quotes.length > 0);
 
     const macro = s.sections.macro.data || [];
     const byId = new Map(macro.map((m) => [m.id, m]));
@@ -3161,7 +3201,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<h1 class="sr">Market Mood 3 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+      '<h1 class="sr">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
       // 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다.
       (() => {
         const t = todayLineText();
@@ -3191,16 +3231,21 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       })() +
 
       '<section class="block" style="padding-inline:0">' +
-      '<div class="block-head" style="padding-inline:12px"><div style="min-width:0"><h2>시장별 투자심리</h2>' +
-      // 카드마다 되풀이하던 줄. 셋이 같은 값이라 머리에 한 번만 적는다.
-      '<div class="sub" style="margin-top:2px">자체 산출 지수 · ' + esc((fng[0] || {}).formulaVersion || '') + '</div></div>' +
+      '<div class="block-head" style="padding-inline:12px"><div style="min-width:0"><h2>오늘의 쫄탐</h2>' +
+      // 처음 보는 사람에게 이름부터 풀어 준다 — 쫄은 공포, 탐은 탐욕.
+      /* 한 줄로 이으면 버전 번호만 혼자 다음 줄로 떨어져서 처음부터 두 줄로 나눈다 — 앱과 같다. */
+      '<div class="sub" style="margin-top:2px">쫄=공포 · 탐=탐욕</div>' +
+      '<div class="sub">자체 산출 지수 · ' + esc((fng[0] || {}).formulaVersion || '') + '</div></div>' +
       '<span class="hint" style="flex-shrink:0">0=극단적 공포 · 100=극단적 탐욕</span></div>' +
-      '<div class="fng-scroll" id="fngscroll">' + fng.map((x) => fngCard(x, false)).join('') + '</div>' +
-      (fng.length > 1
-        ? '<div class="fng-dots" id="fngdots" aria-hidden="true">' +
-          fng.map((x, i) => '<span data-on="' + (i === 0) + '"></span>').join('') + '</div>'
-        : '') +
-      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>세 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
+      /* 미국이 1면이다. 미국 점수가 오지 않은 날에만 다른 시장이 그 자리에 선다. */
+      (() => {
+        const lead = fng.find((x) => x.market === 'us') || fng[0];
+        if (!lead) return '';
+        const rest = fng.filter((x) => x !== lead);
+        return '<div class="fng-lead">' + fngCard(lead, false) + '</div>' +
+          (rest.length ? '<ul class="mklines">' + rest.map(marketLine).join('') + '</ul>' : '');
+      })() +
+      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>미국과 크립토 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
       '</section>' +
 
       /* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다. */
@@ -3210,7 +3255,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       /* 지수는 '지수' 탭으로 떼어 놨다. 설명 두 줄이던 것을 머리 옆 링크 하나로 줄였다. */
       '<section class="block"><div class="block-head"><h2>관심 가격과 주요 지수</h2>' +
       '<button type="button" class="linkbtn" data-go="indices">지수 전체 →</button></div>' +
-      '<div class="grid-cards">' + ordered.slice(0, 9).map(priceCard).join('') + '</div></section>' +
+      priceGroups.map((g) =>
+        '<div role="group" aria-labelledby="hp-' + g.market + '" class="price-group">' +
+        '<h3 id="hp-' + g.market + '" class="price-group-h">' + esc(MARKET_LABEL[g.market]) + '</h3>' +
+        '<div class="grid-cards">' + g.quotes.map(priceCard).join('') + '</div></div>').join('') + '</section>' +
 
       /* 가격을 훑고 난 다음 자리 — "오늘 무슨 일이 있었나" 를 여섯 칸으로 잡는다 */
       heatSection() +
@@ -4599,23 +4647,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     tail.style.height = Math.max(0, Math.round(lowerFloor - r.height)) + 'px';
   }
 
-  /*
-   * 심리 카드를 옆으로 밀면 아래 점이 따라 움직인다.
-   * 카드가 칸을 꽉 채우게 되면서 "옆에 더 있다" 를 알려 줄 것이 없어졌다 —
-   * 점은 그 일만 한다. 앱의 FngSection 안 Carousel 과 같은 셈법이다.
-   */
-  function bindFngDots() {
-    const row = document.getElementById('fngscroll');
-    const dots = document.getElementById('fngdots');
-    if (!row || !dots) return;
-    const n = dots.children.length;
-    row.addEventListener('scroll', () => {
-      const step = row.scrollWidth / n;
-      const at = Math.max(0, Math.min(n - 1, Math.round(row.scrollLeft / step)));
-      for (let i = 0; i < n; i += 1) dots.children[i].setAttribute('data-on', String(i === at));
-    }, { passive: true });
-  }
-
   function render() {
     closeZoom();
     document.documentElement.setAttribute('data-cm', state.colorMode);
@@ -4658,7 +4689,6 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       viewEl.classList.add('view-enter');
     }
     renderNav();
-    bindFngDots();
     Object.keys(CHARTS).forEach((id) => { if (document.getElementById(id)) drawChart(id); else delete CHARTS[id]; });
     document.querySelectorAll('.preview [data-scenario]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scenario === state.scenario)));
   }

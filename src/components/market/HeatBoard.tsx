@@ -4,8 +4,11 @@
  * 오늘 불타는 것과 얼어붙은 것.
  *
  * 무엇을 보여주나
- *   미국 · 한국 · 크립토에서 **가장 많이 오른 것 하나와 가장 많이 내린 것 하나**씩,
- *   모두 여섯 개. 홈에서 "오늘 무슨 일이 있었나" 를 한눈에 잡는 자리다.
+ *   미국 · 한국에서 **가장 많이 오른 것 하나와 가장 많이 내린 것 하나**씩,
+ *   모두 네 개. 홈에서 "오늘 무슨 일이 있었나" 를 한눈에 잡는 자리다.
+ *
+ *   크립토는 뺐다 (2026-11-24 쫄탐일보 리밸런싱). 여섯 칸 중 두 칸이 코인이라
+ *   미국 신문의 '오늘 무슨 일' 자리 3분의 1을 차지했다. 크립토 시장 화면에는 그대로 있다.
  *
  * 왜 '몇 %' 로 줄을 세우지 않나
  *   그러면 크립토가 늘 이긴다. 원래 많이 움직이는 것이라 하루 8% 가 평범할 수 있고,
@@ -29,7 +32,10 @@ import { useFormatter } from './useFormatter';
 import { formatNumber, NO_VALUE } from '@/lib/format';
 import { pickHeat } from '@/lib/heatRank.mjs';
 import type { HeatPick } from '@/lib/heatRank.d.mts';
-import { MARKET_LABEL, INDEX_MARKET_IDS, type MarketId } from '@/types';
+import { MARKET_LABEL, type MarketId } from '@/types';
+
+/** 이 칸에 싣는 시장. 미리보기(template.html)의 heatSection 과 같다. */
+export const HEAT_MARKETS: MarketId[] = ['us', 'kr'];
 
 /** 값이 있는 것만 고른다. 지표·통계(펀딩비·청산 규모)는 '종목' 이 아니라 뺀다. */
 const TRADABLE = new Set(['equity', 'index', 'crypto', 'commodity']);
@@ -174,7 +180,7 @@ export function HeatBoard() {
   const boards = useMemo(() => {
     const data = section?.data;
     if (!data) return [];
-    return INDEX_MARKET_IDS.map((m: MarketId) => ({
+    return HEAT_MARKETS.map((m: MarketId) => ({
       market: m,
       board: pickHeat((data[m] ?? []).filter((q) => TRADABLE.has(q.kind))),
     })).filter((x) => x.board !== null);
@@ -189,7 +195,7 @@ export function HeatBoard() {
         <p className="mt-1 text-[11.5px] leading-relaxed break-keep text-subtle">
           시장마다 가장 많이 오른 것 하나와 가장 많이 내린 것 하나씩입니다. 몇 % 움직였는지가 아니라{' '}
           <strong className="font-semibold text-muted">그 종목이 평소 움직이던 폭에 견줘</strong> 오늘이 얼마나
-          유별났는지로 골랐습니다 — 그냥 % 로 줄을 세우면 원래 많이 움직이는 크립토가 늘 이깁니다.{' '}
+          유별났는지로 골랐습니다 — 그냥 % 로 줄을 세우면 원래 많이 움직이는 종목이 늘 이깁니다.{' '}
           <strong className="font-semibold text-muted">시총 300위 밖은 후보에서 뺍니다</strong> — 작은 종목은 하루
           30% 씩도 움직여서, 그것까지 넣으면 이 자리가 늘 그런 종목 차지가 됩니다.
         </p>
@@ -220,8 +226,8 @@ export function HeatBoard() {
                       {MARKET_NOTE[market] ?? ''} {board!.count}개 중에서
                     </p>
                   </div>
-                  {/* 좁은 화면에서도 두 장을 나란히 둔다. 세로로 쌓으면 여섯 장이
-                      화면 여섯 개 분량이 되어 홈에서 훑을 수가 없다. */}
+                  {/* 좁은 화면에서도 두 장을 나란히 둔다. 세로로 쌓으면 네 장이
+                      화면 네 개 분량이 되어 홈에서 훑을 수가 없다. */}
                   <div className="grid grid-cols-2 gap-2">
                     <HeatCard pick={board!.top} />
                     <HeatCard pick={board!.bottom} />

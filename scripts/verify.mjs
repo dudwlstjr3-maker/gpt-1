@@ -2779,6 +2779,14 @@ async function main() {
      * 흩어져야 한다 (바닥의 단추와 시각은 margin-top:auto 로 붙인다).
      */
     const fngCardSrc = await readFile('src/components/market/FngCard.tsx', 'utf8');
+    const detailSrc = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const previewHome = tpl16.slice(tpl16.indexOf('function viewHome()'), tpl16.indexOf('function viewMarketHub()'));
+    check('홈은 경고를 요약보다 먼저 표시', homeSrc.includes('<RiskAlertLine />') &&
+      homeSrc.indexOf('<RiskAlertLine />') < homeSrc.indexOf('<TodayLine />') &&
+      previewHome.includes('시장 경고 · 지표') && previewHome.indexOf('시장 경고 · 지표') < previewHome.indexOf('todayLineText()'));
+    check('시장 간 척도 설명은 심리 상세에서 확인', !fngSec.includes('SCALE_WARNING_TEXT') &&
+      !previewHome.includes('서로 견줄 수 없습니다') && detailSrc.includes('detail.methodology.scaleWarning') &&
+      tpl16.includes('esc(d.methodology.scaleWarning)'));
     check('앱 카드가 칸 높이를 꽉 채움', /className="card flex h-full flex-col p-3"/.test(fngCardSrc));
     check('앱 카드의 단추·시각이 바닥에 붙음', /className="mt-auto flex items-center gap-2 border-t/.test(fngCardSrc));
 
@@ -2823,7 +2831,7 @@ async function main() {
     check('그 줄이 경제지표로 데려감', /href="\/indicators"/.test(alertLine));
     check('경제지표 탭에는 그대로 있음',
       /RiskGaugesSection|RiskBoard/.test(await readFile('src/app/indicators/page.tsx', 'utf8')));
-    check('미리보기도 같은 줄을 씀', /빨간불 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
+    check('미리보기도 같은 줄을 씀', /시장 경고 · 지표 ' \+ d\.alertCount \+ '개/.test(tpl16) && !/시장 위험 신호등<\/h2>/.test(tpl16.slice(tpl16.indexOf('function viewHome'), tpl16.indexOf('function viewHome') + 4000)));
 
     /*
      * 조사는 앞말의 받침이 정한다.

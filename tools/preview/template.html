@@ -375,9 +375,7 @@ main {
    '일부 항목 누락 3') 이 단추가 눌려 글자가 두 줄이 되면서 머리말이 31px → 50px 이 됐다.
    sticky 머리말이라 그만큼 모든 화면이 밀린다. */
 .sb-row > .ghost { flex-shrink: 0; white-space: nowrap; }
-.sb-when { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--subtle); }
-/* 380px 아래에서는 아예 감춘다. 한 글자만 남기고 자르면 오히려 읽는 데 방해가 된다. */
-@media (max-width: 379px) { .sb-when { display: none; } }
+.sb-when { flex: none; align-self: center; white-space: nowrap; font-size: 12.5px; color: var(--subtle); }
 .clock { font-size: 14px; font-weight: 700; color: var(--fg-strong); }
 .clock small { font-size: 11.5px; font-weight: 400; color: var(--muted); margin-left: 4px; }
 
@@ -1823,9 +1821,6 @@ __HOME_MOOD_CSS__
       '<span class="clock tnum" id="clock">' + kSec(now) + '<small>KST</small></span>' +
       modeBadge() +
       statusBadge +
-      /* 마지막 갱신 시각. 자리가 모자라면 이것부터 줄어들고, 좁은 화면에서는 감춘다 —
-         한 글자만 남기고 자르면 오히려 읽는 데 방해가 된다. */
-      '<span class="sb-when tnum">' + esc(relative(s.lastFullUpdate)) + ' 갱신</span>' +
       '</div><button type="button" class="ghost" data-noop>↻ 새로고침</button></div>' +
 
       /* 시나리오 배지는 이 줄에 둔다 — 위 줄은 높이가 고정이어야 하고,
@@ -1836,7 +1831,7 @@ __HOME_MOOD_CSS__
         const color = x.phase === 'regular' || x.phase === 'always' ? 'var(--ok)' : x.phase === 'pre' || x.phase === 'post' ? 'var(--accent)' : x.phase === 'holiday' ? 'var(--warn)' : 'var(--muted)';
         return '<span class="chip" title="' + esc(x.hint) + '"><span class="dot" style="background:' + color + '"></span>' +
           '<b>' + MARKET_LABEL[x.m] + '</b><span style="color:' + color + '">' + SESSION_LABEL[x.phase] + '</span></span>';
-      }).join('') + '</div>' +
+      }).join('') + '<span class="sb-when tnum">' + esc(relative(s.lastFullUpdate)) + ' 갱신</span></div>' +
 
       /* 통화·색상 전환은 앱에서 더보기 설정으로 옮겼다. 한 번 정해 두면 며칠씩 그대로 두는
          설정이라 모든 화면 맨 위에 늘 띄워 둘 만한 것이 아니었다.
@@ -3233,17 +3228,8 @@ __HOME_MOOD_CSS__
         return '<div class="fng-lead">' + (lead ? homeMoodCard(lead) : '<p class="notice n-neutral">미국 쫄탐지수 · 산출 불가</p>') + '</div>' +
           (rest.length ? '<ul class="mklines">' + rest.map(marketLine).join('') + '</ul>' : '');
       })() +
-      '<div style="padding:8px 12px 0"><p class="notice n-neutral"><span>ⓘ</span><span>미국과 크립토 점수는 척도만 같고 구성 지표가 달라 서로 견줄 수 없습니다.</span></p></div>' +
       '</section>' +
 
-      // 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다.
-      (() => {
-        const t = todayLineText();
-        return t
-          ? '<p style="margin:16px 0 0;padding:0 12px;font-size:15px;line-height:1.7;word-break:keep-all;color:var(--fg-strong)">' +
-            '<span aria-hidden="true" style="margin-right:4px;color:var(--accent)">—</span>' + esc(t) + '</p>'
-          : '';
-      })() +
       /*
        * 빨간불 한 줄.
        *
@@ -3260,10 +3246,18 @@ __HOME_MOOD_CSS__
         return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:baseline;margin:12px 0 0;padding:0 12px;' +
           'border:0;background:none;text-align:left;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--warn);cursor:pointer">' +
           '<span aria-hidden="true" style="flex-shrink:0">▲</span><span style="min-width:0;flex:1">' +
-          '<b>빨간불 ' + d.alertCount + '개</b> — ' + esc(names.join(' · ')) + tail + ' 평소 범위를 벗어났습니다. ' +
-          '<b style="text-decoration:underline;text-underline-offset:2px">경제지표에서 보기</b></span></button>';
+          '<b>시장 경고 · 지표 ' + d.alertCount + '개</b><span class="sr">' + esc(names.join(' · ')) + tail + ' 평소 범위를 벗어났습니다.</span></span>' +
+          '<span style="margin-left:auto;white-space:nowrap;text-decoration:underline">경제지표 보기 →</span></button>';
       })() +
 
+      // 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다.
+      (() => {
+        const t = todayLineText();
+        return t
+          ? '<p style="margin:16px 0 0;padding:0 12px;font-size:15px;line-height:1.7;word-break:keep-all;color:var(--fg-strong)">' +
+            '<span aria-hidden="true" style="margin-right:4px;color:var(--accent)">—</span>' + esc(t) + '</p>'
+          : '';
+      })() +
       '<details class="home-fold" id="home-prices"' + (state.homePricesOpen ? ' open' : '') + '><summary>시세와 시장 흐름</summary>' +
       /* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다. */
       regimeBlock() +

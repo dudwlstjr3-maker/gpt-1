@@ -41,8 +41,8 @@ export default function HomePage() {
     <div className="mood-home pt-2">
       <h1 className="sr-only">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>
       <FngSection />
-      <TodayLine />
       <RiskAlertLine />
+      <TodayLine />
       <details className="home-fold">
         <summary>시세와 시장 흐름</summary>
         <RegimeBoardCard />

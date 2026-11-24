@@ -21,7 +21,6 @@ import { formatNumber, formatSigned } from '@/lib/format';
 import { scoreColor, stageOf, STAGE_GLYPH } from '@/lib/scale';
 import { MARKET_LABEL, type FngScore } from '@/types';
 import { HomeMoodCard } from './HomeMoodCard';
-import { SCALE_WARNING_TEXT } from './constants';
 
 /**
  * 1면 카드 밑의 한 줄 — 크립토 쫄탐.
@@ -101,9 +100,6 @@ export function FngSection() {
         }}
       </SectionGate>
 
-      <div className="mt-2 px-3">
-        <Notice tone="neutral">{SCALE_WARNING_TEXT}</Notice>
-      </div>
     </section>
   );
 }

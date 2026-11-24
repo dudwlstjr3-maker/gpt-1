@@ -42,11 +42,11 @@ export function RiskAlertLine() {
       <span aria-hidden="true" className="shrink-0">
         ▲
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="font-semibold">빨간불 {digest.alertCount}개</span> — {names.join(' · ')}
-        {digest.alertCount > names.length ? ' 등이' : subject(names.join(' · '))} 평소 범위를 벗어났습니다.{' '}
-        <span className="font-semibold underline underline-offset-2">경제지표에서 보기</span>
+      <span className="font-semibold">시장 경고 · 지표 {digest.alertCount}개</span>
+      <span className="sr-only">
+        {names.join(' · ')}{digest.alertCount > names.length ? ' 등이' : subject(names.join(' · '))} 평소 범위를 벗어났습니다.
       </span>
+      <span className="ml-auto shrink-0 underline underline-offset-2">경제지표 보기 →</span>
     </Link>
   );
 }

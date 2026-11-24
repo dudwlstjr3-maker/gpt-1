@@ -2,7 +2,7 @@
   "name": "market-mood-3",
   "version": "1.0.0",
   "private": true,
-  "description": "FG invest — 미국·한국·크립토 투자심리 대시보드 (모바일 우선 PWA)",
+  "description": "쫄탐일보 — 미국·한국·크립토 투자심리 대시보드 (모바일 우선 PWA)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "npm run icons && next build",

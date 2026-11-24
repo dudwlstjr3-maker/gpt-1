@@ -1,60 +1,63 @@
 'use client';
 
 /**
- * 시장별 투자심리 — 옆으로 미는 카드.
+ * 오늘의 쫄탐 — 1면.
  *
- * 카드 폭은 이 화면의 다른 카드와 **같아야 한다**.
+ * 쫄탐일보는 미국 신문이다 (2026-11-24 리밸런싱).
  *
- * 예전에는 85cqw(최대 340px)였다. 다음 카드가 살짝 보여 "옆에 더 있다" 를
- * 알리려던 것인데, 그 대가로 이 카드만 다른 카드보다 66px 좁았다. 홈을 위에서
- * 아래로 훑으면 카드 왼쪽 선은 맞는데 오른쪽 선만 혼자 들어가 있고, 게다가
- * 두 번째 카드는 틀 끝에서 잘려 조각으로 보였다. 같은 크기의 카드 둘이
- * 다른 크기로 보인 것이다.
+ * 예전에는 미국·크립토 두 장을 옆으로 미는 줄이었다. 두 장이 같은 크기로 섰으니
+ * 크립토가 1면의 절반을 차지했다. 이제 **미국 한 장이 칸을 꽉 채우고**, 크립토는
+ * 카드가 아니라 **한 줄**로 내려왔다. 지우지는 않는다 — 점수·단계·어제 대비가 그
+ * 줄에 다 있고, 누르면 크립토 상세로 간다.
  *
- * 이제 한 장이 칸을 꽉 채운다. "옆에 더 있다" 는 아래 점이 말한다.
+ * 한국은 여기 없다. 심리 점수를 낼 데이터가 없어서다(types/index.ts 의 MARKET_IDS
+ * 주석). 한국의 자리는 아래 가격 지면에서 지수 · 환율 · 종목으로 키웠다.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useData } from '@/components/providers/DataProvider';
 import { SectionGate, SkeletonCard, Notice } from '@/components/ui/States';
+import { formatNumber, formatSigned } from '@/lib/format';
+import { scoreColor, stageOf, STAGE_GLYPH } from '@/lib/scale';
+import { MARKET_LABEL, type FngScore } from '@/types';
 import { FngCard } from './FngCard';
 import { SCALE_WARNING_TEXT } from './constants';
 
 /**
- * 옆으로 미는 줄과, 지금 몇 번째인지 알리는 점.
+ * 1면 카드 밑의 한 줄 — 크립토 쫄탐.
  *
- * 카드가 칸을 꽉 채우게 되면서 "옆에 더 있다" 를 알려 줄 것이 없어졌다.
- * 점은 그 일만 한다 — 누르는 것이 아니라 읽는 표시라, 스크롤 위치에서 얻는다.
+ * 색만으로 단계를 말하지 않는다. 기호(▲▲ ▲ ■ ▼ ▼▼)와 단계 이름을 늘 함께 둔다.
+ * 어제 대비는 부호가 방향을 말하므로 색을 입히지 않는다 — 한국식(상승=빨강)과
+ * 해외식(상승=초록) 설정이 엇갈려도 한 줄이 다른 뜻으로 읽히지 않는다.
  */
-function Carousel({ count, children }: { count: number; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState(0);
-
-  const onScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el || count < 2) return;
-    // 한 칸의 폭 = 전체 스크롤 폭 / 장수. 반올림이 가장 가까운 카드를 고른다.
-    const step = el.scrollWidth / count;
-    setAt(Math.max(0, Math.min(count - 1, Math.round(el.scrollLeft / step))));
-  }, [count]);
-
+function MarketLine({ score }: { score: FngScore }) {
+  const stage = stageOf(score.score);
+  const name = MARKET_LABEL[score.market];
   return (
-    <>
-      <div ref={ref} onScroll={onScroll} className="snap-row px-3">
-        {children}
-      </div>
-      {count > 1 ? (
-        <div className="mt-1 flex justify-center gap-1" aria-hidden="true">
-          {Array.from({ length: count }, (_, i) => (
-            <span
-              key={i}
-              className="block h-1.5 w-1.5 rounded-full transition-colors"
-              style={{ background: i === at ? 'var(--muted-fg)' : 'var(--surface-3)' }}
-            />
-          ))}
-        </div>
-      ) : null}
-    </>
+    <Link
+      href={`/fng/${score.market}`}
+      className="tap flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 hover:bg-surface-3"
+    >
+      <span className="text-[13px] font-semibold text-fg">{name} 쫄탐</span>
+      {score.score === null || !stage ? (
+        <span className="text-[12.5px] text-muted">산출 불가</span>
+      ) : (
+        <>
+          <span className="tnum text-[15px] font-bold" style={{ color: scoreColor(score.score) }}>
+            {formatNumber(score.score, 0)}
+          </span>
+          <span className="text-[12.5px] font-semibold" style={{ color: scoreColor(score.score) }}>
+            <span aria-hidden="true">{STAGE_GLYPH[stage.id]}</span> {stage.label}
+          </span>
+          {score.deltaDay !== null ? (
+            <span className="tnum text-[12.5px] text-subtle">어제 {formatSigned(score.deltaDay, 1)}</span>
+          ) : null}
+        </>
+      )}
+      <span className="ml-auto shrink-0 text-[12.5px] text-subtle">
+        상세 <span aria-hidden="true">→</span>
+      </span>
+    </Link>
   );
 }
 
@@ -69,10 +72,13 @@ export function FngSection() {
       <div className="mb-2 flex items-baseline justify-between gap-2 px-3">
         <div className="min-w-0">
           <h2 id="fng-section-title" className="text-base font-bold text-fg-strong">
-            시장별 투자심리
+            오늘의 쫄탐
           </h2>
-          {/* 카드마다 되풀이하던 줄. 셋이 같은 값이라 머리에 한 번만 적는다. */}
-          <p className="mt-0.5 text-[11.5px] text-subtle">자체 산출 지수 · {version}</p>
+          {/* 처음 보는 사람에게 이름부터 풀어 준다 — 쫄은 공포, 탐은 탐욕.
+              한 줄로 이으면 오른쪽 눈금 설명에 밀려 버전 번호만 혼자 다음 줄로 떨어졌다.
+              처음부터 두 줄로 나눈다. */}
+          <p className="mt-0.5 text-[11.5px] text-subtle">쫄=공포 · 탐=탐욕</p>
+          <p className="text-[11.5px] text-subtle">자체 산출 지수 · {version}</p>
         </div>
         <span className="shrink-0 text-[12.5px] text-subtle">0=극단적 공포 · 100=극단적 탐욕</span>
       </div>
@@ -86,17 +92,27 @@ export function FngSection() {
           </div>
         }
       >
-        {(scores) => (
-          <>
-            <Carousel count={scores.length}>
-              {scores.map((s) => (
-                <div key={s.market} className="snap-item w-[calc(100cqw-24px)]">
-                  <FngCard score={s} mode={mode} standalone={false} />
-                </div>
-              ))}
-            </Carousel>
-          </>
-        )}
+        {(scores) => {
+          // 미국이 1면이다. 미국 점수가 오지 않은 날에만 다른 시장이 그 자리에 선다.
+          const lead = scores.find((s) => s.market === 'us') ?? scores[0];
+          const rest = scores.filter((s) => s !== lead);
+          return (
+            <>
+              <div className="px-3">
+                <FngCard score={lead} mode={mode} standalone={false} />
+              </div>
+              {rest.length > 0 ? (
+                <ul className="mt-2 space-y-2 px-3">
+                  {rest.map((s) => (
+                    <li key={s.market}>
+                      <MarketLine score={s} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          );
+        }}
       </SectionGate>
 
       <div className="mt-2 px-3">

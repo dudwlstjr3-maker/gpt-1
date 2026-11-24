@@ -73,7 +73,7 @@ for (const f of all) {
 const tree = all.map(rel).sort();
 fs.writeFileSync(
   path.join(OUT, '00-담긴-파일.txt'),
-  `FG invest — 검토용 묶음\n만든 날 ${new Date().toISOString().slice(0, 10)}\n` +
+  `쫄탐일보 — 검토용 묶음\n만든 날 ${new Date().toISOString().slice(0, 10)}\n` +
     `파일 ${tree.length}개\n\n` +
     '먼저 읽을 것\n  00-검토-요청.md      규칙과 무엇을 봐 달라\n' +
     '  00-업그레이드-요청.md  다음에 뭘 만들면 좋을지\n' +

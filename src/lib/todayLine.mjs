@@ -25,12 +25,39 @@ export const HEAT_MIN = 1.6;
 
 const MARKET_NAME = { us: '미국', kr: '한국', crypto: '크립토' };
 
+/**
+ * 1면에 올리는 순서 — 쫄탐일보는 미국 신문이고, 한국이 2면, 크립토는 뒤쪽이다.
+ *
+ * 예전 규칙은 "가장 크게 움직인 것" 하나였다. 공정해 보이지만 크립토가 늘 이겼다 —
+ * 원래 출렁임이 커서 하루 6점, 평소의 3배는 크립토에게 평범한 날이다. 그 결과 미국
+ * 신문의 헤드라인이 매일 코인 이야기였다.
+ *
+ * 이제는 **앞 시장에 할 말이 있으면 뒤 시장은 아무리 크게 움직여도 헤드라인을 못 가져간다.**
+ * 할 말이 있느냐의 문턱(MOVE_MIN · HEAT_MIN)은 그대로라, 미국이 조용한 날에는 여전히
+ * 한국이나 크립토가 헤드라인에 선다. 크립토를 지우는 게 아니라 줄을 세우는 것이다.
+ * 시장을 모르는 것은 맨 뒤로 보낸다.
+ */
+export const MARKET_PRIORITY = ['us', 'kr', 'crypto'];
+
+function rankOf(market) {
+  const i = MARKET_PRIORITY.indexOf(market);
+  return i === -1 ? MARKET_PRIORITY.length : i;
+}
+
+/** 가장 앞선 시장만 남기고, 그 안에서 가장 큰 것 하나. */
+function headline(items, marketOf, sizeOf) {
+  const best = Math.min(...items.map((x) => rankOf(marketOf(x))));
+  return items
+    .filter((x) => rankOf(marketOf(x)) === best)
+    .reduce((a, b) => (sizeOf(b) > sizeOf(a) ? b : a));
+}
+
 function round1(v) {
   return Math.round(v * 10) / 10;
 }
 
 /**
- * 심리 점수가 어제와 견줘 가장 크게 움직인 시장.
+ * 심리 점수가 어제와 견줘 눈에 띄게 움직인 시장 — 1면 순서가 앞선 쪽.
  * 오르면 탐욕 쪽, 내리면 공포 쪽이라는 사실만 적는다.
  */
 export function moodClause(scores) {
@@ -38,7 +65,7 @@ export function moodClause(scores) {
     (s) => s && s.score !== null && Number.isFinite(s.deltaDay) && Math.abs(s.deltaDay) >= MOVE_MIN,
   );
   if (usable.length === 0) return null;
-  const top = usable.reduce((a, b) => (Math.abs(b.deltaDay) > Math.abs(a.deltaDay) ? b : a));
+  const top = headline(usable, (x) => x.market, (x) => Math.abs(x.deltaDay));
   const name = MARKET_NAME[top.market] ?? top.market;
   const size = round1(Math.abs(top.deltaDay));
   return top.deltaDay > 0
@@ -47,7 +74,7 @@ export function moodClause(scores) {
 }
 
 /**
- * 평소 움직이던 폭에 견줘 오늘 가장 유별났던 것.
+ * 평소 움직이던 폭에 견줘 오늘 유별났던 것 — 1면 순서가 앞선 시장에서 가장 유별난 것.
  * heatRank 가 고른 것을 그대로 받아 쓴다 — 두 곳이 다른 말을 하면 안 된다.
  */
 export function heatClause(picks) {
@@ -55,7 +82,7 @@ export function heatClause(picks) {
     (p) => p && p.heat && Number.isFinite(p.heat.times) && p.heat.times >= HEAT_MIN && p.quote,
   );
   if (usable.length === 0) return null;
-  const top = usable.reduce((a, b) => (b.heat.times > a.heat.times ? b : a));
+  const top = headline(usable, (x) => x.quote.market, (x) => x.heat.times);
   const dir = (top.quote.changePct ?? 0) >= 0 ? '올라' : '내려';
   return `${top.quote.name}가 평소의 ${round1(top.heat.times)}배로 ${dir} 움직였습니다`;
 }

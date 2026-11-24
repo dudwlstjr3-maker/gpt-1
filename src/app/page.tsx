@@ -56,7 +56,7 @@ export default function HomePage() {
 
   return (
     <div className="pt-2">
-      <h1 className="sr-only">FG invest 홈 — 미국·한국·크립토 투자심리 요약</h1>
+      <h1 className="sr-only">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>
       {/* 아래 카드들에서 오늘 가장 할 말이 있는 것만 뽑은 한 줄. 할 말이 없으면 그리지 않는다. */}
       <TodayLine />
       {/* 빨간불이 켜진 날에만 뜨는 줄. 평소에는 아무것도 그리지 않는다. */}

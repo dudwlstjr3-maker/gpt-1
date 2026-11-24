@@ -6,7 +6,8 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { defaultHomeIds, defaultWatchlist } from '@/lib/catalog';
+import { defaultHomeIds, defaultWatchlist, PREVIOUS_DEFAULTS } from '@/lib/catalog';
+import { upgradeDefault } from '@/lib/defaults.mjs';
 import type { AlertRule, Criterion, DemoScenario } from '@/types';
 import type { ChangeColorMode } from '@/lib/scale';
 import type { DisplayCurrency } from '@/lib/format';
@@ -79,8 +80,9 @@ function sanitize(raw: unknown): Settings {
     )
       ? (r.scenario as DemoScenario)
       : 'normal',
-    watchlist: arr(r.watchlist, DEFAULTS.watchlist),
-    homeItems: arr(r.homeItems, DEFAULTS.homeItems),
+    // 옛 기본값을 손대지 않고 쓰던 사람만 새 기본값으로 옮긴다. 직접 고른 것은 그대로 (lib/defaults.mjs).
+    watchlist: upgradeDefault(arr(r.watchlist, DEFAULTS.watchlist), PREVIOUS_DEFAULTS.watchlist, DEFAULTS.watchlist),
+    homeItems: upgradeDefault(arr(r.homeItems, DEFAULTS.homeItems), PREVIOUS_DEFAULTS.homeItems, DEFAULTS.homeItems),
     autoRefresh: typeof r.autoRefresh === 'boolean' ? r.autoRefresh : true,
     alertsEnabled: typeof r.alertsEnabled === 'boolean' ? r.alertsEnabled : false,
     notificationsGranted: typeof r.notificationsGranted === 'boolean' ? r.notificationsGranted : false,

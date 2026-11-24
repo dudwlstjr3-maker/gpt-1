@@ -46,7 +46,7 @@ const env = {
   EIA_API_KEY: 'stub-key-not-real',
   EIA_BASE_URL: `${BASE}/eia`,
   SEC_BASE_URL: `${BASE}/sec`,
-  SEC_USER_AGENT: 'FGinvest-check-parse (stub)',
+  SEC_USER_AGENT: 'JjoltamIlbo-check-parse (stub)',
   PORT: String(APP_PORT),
 };
 

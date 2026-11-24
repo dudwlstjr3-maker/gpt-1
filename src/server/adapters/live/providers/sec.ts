@@ -48,7 +48,7 @@ const DEFAULT_BASE = 'https://data.sec.gov';
  * SEC 는 연락처가 담긴 User-Agent 를 요구한다. 이 값이 실제로 닿는 주소여야
  * 한다는 것이 SEC 의 요구이므로, 운영에 올릴 때는 SEC_USER_AGENT 로 바꾼다.
  */
-const DEFAULT_UA = 'FGinvest/1.0 (contact: set SEC_USER_AGENT env var)';
+const DEFAULT_UA = 'JjoltamIlbo/1.0 (contact: set SEC_USER_AGENT env var)';
 
 export interface SecConfig {
   base: string;

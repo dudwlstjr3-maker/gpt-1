@@ -3816,11 +3816,13 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
     return out;
   }
 
+__MOOD_RESPONSE_CODE__
   function viewFng() {
     const s = snap();
     const m = state.fngMarket;
     const f = (s.sections.fng.data || []).find((x) => x.market === m);
     const d = DATA.details[m];
+    const mood = m === 'us' && d ? moodResponse(d.history) : null;
     if (!f) return '<p style="padding:20px">데이터가 없습니다.</p>';
 
     const cutoff = Date.now() - RANGE_MS[state.range];
@@ -3876,6 +3878,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
       stageStrip(f.score) +
       '</div></section>' +
 
+      (mood ? '<section class="block"><div class="card" style="padding:12px"><small>쫄탐 단계 · 예시 데이터</small><h2>' + esc(mood.title) + '</h2><p>' + esc(mood.message) + '</p><small>최근 흐름　' + esc(mood.trail) + '</small></div></section>' : '') +
       '<section class="block"><div class="block-head"><h2>점수 추이</h2>' +
       '<div class="seg" role="group" aria-label="기간">' +
       ['1M', '3M', '1Y', '3Y', '10Y'].map((r) => '<button type="button" data-range="' + r + '" aria-pressed="' + (state.range === r) + '">' +

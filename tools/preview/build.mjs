@@ -225,6 +225,7 @@ async function main() {
   const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
+  if (!tpl.includes('__MOOD_RESPONSE_CODE__')) throw new Error('미리보기 단계 계산 위치가 없습니다.');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
   if (!tpl.includes('__FONT__')) throw new Error('template.html 에 __FONT__ 자리표시자가 없습니다.');
 
@@ -240,6 +241,7 @@ async function main() {
 
   // </script> 가 데이터 안에 있으면 스크립트 태그가 먼저 닫힌다. < 를 이스케이프한다.
   const html = tpl
+    .replace('__MOOD_RESPONSE_CODE__', () => fs.readFileSync(path.join(HERE, '../../src/lib/moodResponse.mjs'), 'utf8').replace('export function', 'function'))
     .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)
     .replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
 

@@ -7,6 +7,7 @@
  * 기여도 · 산출 방법 · 출처와 업데이트 시각 · 결측/신뢰도 설명.
  */
 
+import { moodResponse } from '@/lib/moodResponse.mjs';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -248,6 +249,7 @@ export default function FngDetailPage() {
 
   if (!detail || !data) return null;
 
+  const mood = market === 'us' ? moodResponse(detail.history) : null;
   const unavailable = detail.score === null;
   /* 가중치 막대의 칸 길이 = 가중치 합계. 머리말의 '합계 100%' 와 같은 눈금이다. */
   const totalWeight = Math.max(1, detail.components.reduce((a, c) => a + c.weight, 0));
@@ -324,6 +326,17 @@ export default function FngDetailPage() {
           </div>
         </div>
       </section>
+
+      {mood && (
+        <section className="mt-5 px-3" aria-label="쫄탐 단계">
+          <div className="card p-3">
+            <p className="text-xs text-muted">쫄탐 단계 · {data.mode === 'DEMO' ? '예시 데이터' : '미국 자체 지수'}</p>
+            <h2 className="mt-1 text-xl font-bold">{mood.title}</h2>
+            <p className="mt-1">{mood.message}</p>
+            <p className="tnum mt-2 text-sm text-muted">최근 흐름　{mood.trail}</p>
+          </div>
+        </section>
+      )}
 
       {/* 추이 차트 */}
       <section className="mt-5 px-3" aria-labelledby="fng-chart-title">

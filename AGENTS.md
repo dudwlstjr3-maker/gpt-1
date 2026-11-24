@@ -5,7 +5,7 @@
 **6절(브랜치와 병합)과 7절(여러 AI 가 함께 일할 때)은 여기서 새로 적는다** — 그 전에는 저장소 어디에도 글로 적혀 있지 않았다.
 사람이 읽어도 그대로 쓸 수 있게 썼다.
 
-Market Mood 3 — 미국·한국·크립토 투자심리 대시보드. Next.js 15 / React 19 / TypeScript.
+FG invest — 미국·한국·크립토 투자심리 대시보드. Next.js 15 / React 19 / TypeScript.
 
 ---
 
@@ -107,7 +107,7 @@ npm run build         # 마지막
 세어 본 값 (2026-11-24, DEMO 모드):
 
 - `npm test` — 137건 통과, 0건 실패
-- `npm run verify` — 1,227건 통과, 0건 실패
+- `npm run verify` — 1,235건 통과, 0건 실패
 
 숫자가 바뀌면 여기와 `README.md`, `CLAUDE.md`, `.github/workflows/ci.yml` 을 같이 고친다.
 **직접 돌려 센 값만 적는다.** 서버를 띄울 수 없어 검증기를 돌리지 못했으면
@@ -191,7 +191,7 @@ PR 본문과 작업 보고는 **결과 → 검증 → 가정 → 남은 문제**
 
 ### 이 파일이 다루는 범위
 
-이 규칙은 `main` 의 **Market Mood 3** 에 대한 것이다. 이 저장소에는 다른 프로젝트의 가지도
+이 규칙은 `main` 의 **FG invest** 에 대한 것이다. 이 저장소에는 다른 프로젝트의 가지도
 있다(포커 EV 도구, 크롬 확장 등). 그 가지들은 이 파일의 투자·데이터 규칙(1~4절)을 따르지
 않아도 된다 — 다만 6·7절(브랜치·병합·협업)은 저장소 전체에 걸린다.
 
@@ -230,7 +230,7 @@ public/         아이콘·글꼴 등 정적 파일
 | `npm start` | 빌드 결과 실행 (:3000) | — |
 | `npm run typecheck` | `tsc --noEmit` | 아니오 |
 | `npm test` | `node --test scripts/*.test.mjs` — 137건 | 아니오 |
-| `npm run verify` | 검증기 1,227건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
+| `npm run verify` | 검증기 1,235건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
 | `npm run preview` | 그날 스냅샷을 박은 자립형 HTML | **예 (:3000)** |
 | `npm run icons` | PWA 아이콘 PNG 생성 (`public/icons`) | 아니오 |
 | `npm run check:parse` | 로컬 대역 서버로 LIVE 파싱 점검 — 키·네트워크 없이 | 아니오 |

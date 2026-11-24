@@ -1,5 +1,5 @@
 /**
- * Market Mood 3 서비스 워커.
+ * FG invest 서비스 워커.
  *
  * 전략
  *  - 정적 자산(/_next/static, /icons): cache-first
@@ -15,7 +15,7 @@ const PAGE_CACHE = `${VERSION}-pages`;
 const OFFLINE_HTML = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>오프라인 — Market Mood 3</title>
+<title>오프라인 — FG invest</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
        background:#0a0d14;color:#e9eef8;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;}

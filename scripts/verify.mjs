@@ -680,7 +680,7 @@ async function main() {
   for (const path of ['/market/us', '/market/kr', '/market/crypto', '/fng/us', '/basics', '/indicators', '/calendar']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
-    check(`${path} 렌더링`, res.status === 200 && html.includes('Market Mood 3'), `status=${res.status}`);
+    check(`${path} 렌더링`, res.status === 200 && html.includes('FG invest'), `status=${res.status}`);
   }
 
   /* ---------------- 8-1. 화면 정리 (중복 제거) ---------------- */
@@ -3419,6 +3419,51 @@ async function main() {
       /s\.url\.replace\(\/\^https\?:\\\/\\\/\/, ''\)/.test(page) && /String\(x\.url\)\.replace/.test(tpl));
     check('새 창이라는 사실을 기호만으로 두지 않음',
       /새 창에서 열림/.test(page) && /새 창에서 열림/.test(tpl));
+  }
+
+  /* ---------------- 8-37. 앱 이름 ---------------- */
+  console.log('\n[8-37] 앱 이름이 한 가지인가 — FG invest');
+  {
+    const NAME = 'FG invest';
+    const layout = await readFile('src/app/layout.tsx', 'utf8');
+    const manifest = JSON.parse(await readFile('public/manifest.webmanifest', 'utf8'));
+    const tpl = await readFile('tools/preview/template.html', 'utf8');
+    const sw = await readFile('public/sw.js', 'utf8');
+
+    /*
+     * 이름이 사람 눈에 닿는 자리는 다섯 곳이다 — 브라우저 탭 제목, 홈 화면에 추가했을 때의
+     * 이름(manifest), 화면 낭독기가 읽는 첫 제목, 미리보기, 오프라인 화면. 한 곳만 옛 이름이
+     * 남아도 사람은 "앱이 둘인가" 로 읽는다.
+     */
+    check('탭 제목에 이름이 있음', /title:\s*'FG invest — /.test(layout));
+    check('앱 이름(applicationName)', /applicationName:\s*'FG invest'/.test(layout));
+    check('홈 화면 이름(manifest name · short_name)',
+      manifest.short_name === NAME && String(manifest.name).startsWith(NAME));
+    check('미리보기 탭 제목', tpl.startsWith(`<title>${NAME}</title>`));
+    check('오프라인 화면 제목', sw.includes(`<title>오프라인 — ${NAME}</title>`));
+
+    const visible = {
+      'src/app/layout.tsx': layout,
+      'src/app/page.tsx': await readFile('src/app/page.tsx', 'utf8'),
+      'public/manifest.webmanifest': JSON.stringify(manifest),
+      'tools/preview/template.html': tpl,
+      'public/sw.js': sw,
+    };
+    const stale = Object.entries(visible).filter(([, t]) => /Market Mood/.test(t)).map(([f]) => f);
+    check('옛 이름(Market Mood)이 화면에 닿는 파일에 남지 않음', stale.length === 0, stale.join(', '));
+
+    /*
+     * 저장 키는 이름을 따라 바꾸지 않는다.
+     *
+     * 키의 'mm3' 는 옛 이름(Market Mood 3)의 약자지만, 이것을 'fg' 로 바꾸는 순간 이미 쓰던
+     * 사람의 설정 · 알림 · 관심목록이 전부 사라진다 — 브라우저는 새 키 아래에서 빈 값을 읽는다.
+     * 이름 정리로 보이는 일이 데이터 삭제가 된다. 바꾸려면 옛 키에서 옮겨 담는 코드가 먼저다.
+     */
+    const settings = await readFile('src/components/providers/SettingsProvider.tsx', 'utf8');
+    const alerts = await readFile('src/components/alerts/store.ts', 'utf8');
+    check('설정 저장 키가 그대로 (mm3.settings.v1)',
+      settings.includes("'mm3.settings.v1'") && layout.includes("'mm3.settings.v1'"));
+    check('알림 저장 키가 그대로 (mm3.alerts.v1)', alerts.includes("'mm3.alerts.v1'"));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

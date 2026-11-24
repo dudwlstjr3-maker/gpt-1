@@ -5,14 +5,14 @@ import { DataProvider } from '@/components/providers/DataProvider';
 import { AppShell } from '@/components/nav/AppShell';
 
 export const metadata: Metadata = {
-  title: 'Market Mood 3 — 미국·한국·크립토 투자심리 대시보드',
+  title: 'FG invest — 미국·한국·크립토 투자심리 대시보드',
   description:
     '미국·한국·크립토 시장의 투자심리, 주요 가격, 경제지표를 10초 안에 파악하는 모바일 우선 대시보드. 정보 제공 목적이며 투자 조언이 아닙니다.',
-  applicationName: 'Market Mood 3',
+  applicationName: 'FG invest',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
-    title: 'Market Mood 3',
+    title: 'FG invest',
     statusBarStyle: 'black-translucent',
   },
   icons: {

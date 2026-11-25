@@ -2740,6 +2740,55 @@ async function main() {
       [homeSrc, tpl16].every(source => source.includes('<summary>' + label + '</summary>'))));
 
     /*
+     * 전일 변화는 말로 — "극단적 공포 · 전일 대비 ↑ 5.5점" 은 점수가 낮은데 오른 날
+     * '공포가 커졌다' 로도 읽혔다(16점 +5.5 와 16점 −5.5 가 화살표 한 글자만 달랐다).
+     * 점수가 오르면 공포는 풀리고 탐욕은 커진다. 계기판에는 어제 위치를 점선 바늘로 둔다.
+     */
+    check('전일 변화를 말로 — 오르면 풀렸다·커졌다, 내리면 깊어졌다·식었다',
+      homeMood(16, 5.5).change === '어제보다 공포가 5.5점 풀렸어요' && homeMood(16, 5.5).glyph === '▲' &&
+      homeMood(16, -5.5).change === '어제보다 공포가 5.5점 깊어졌어요' && homeMood(16, -5.5).glyph === '▼' &&
+      homeMood(84, 3).change === '어제보다 탐욕이 3점 커졌어요' && homeMood(84, -6).change === '어제보다 탐욕이 6점 식었어요' &&
+      homeMood(50, 0).change === '어제와 같아요' && homeMood(16, null).change === '어제와 비교할 수 없어요');
+    {
+      const said = [];
+      for (let n = 0; n <= 100; n += 1) for (const d of [-12, -5.5, -1, 1, 5.5, 12]) said.push(homeMood(n, d).change);
+      const pushy = said.filter((t) => /매수|매도|매집|분할|비중|현금|보유|물량|검토선|손절|익절|사세요|파세요|추천|유리|기회|대응|전망|예상|수익/.test(t));
+      check('전일 변화 문장에 매매를 권하는 말이 없음', pushy.length === 0, `${said.length}문장 중 ${pushy.length}`);
+    }
+    check('앱과 미리보기가 같은 전일 변화 문장과 기호를 그림',
+      cover.includes('mood.change') && cover.includes('mood.glyph') && cover.includes('mood-delta') &&
+      tpl16.includes('esc(mood.change)') && tpl16.includes('mood.glyph') && tpl16.includes('mood-delta') &&
+      // 원본 글자가 아니라 나오는 문장을 본다 — 주석에 적어 둔 옛 문구까지 걸리지 않게
+      ![[16, 5.5], [16, -5.5], [84, -6], [50, 0], [16, null]].some(([v, d]) => /전일 대비|[↑↓]/.test(homeMood(v, d).change)));
+    check('계기판에 어제 위치 — 점선 바늘을 오늘 바늘 밑에, 같은 좌표로',
+      homeMood(16, 5.5).yesterday?.angle === (11 - 50) * 1.8 && homeMood(16, 5.5).yesterday?.value === 10.5 &&
+      homeMood(50, 0).yesterday === null && homeMood(16, null).yesterday === null &&
+      cover.indexOf('mood.yesterday.angle') > -1 && cover.indexOf('mood.yesterday.angle') < cover.indexOf('rotate(${mood.angle}') &&
+      tpl16.indexOf('mood.yesterday.angle') > -1 && tpl16.indexOf('mood.yesterday.angle') < tpl16.indexOf("rotate(' + mood.angle") &&
+      [cover, tpl16].every((source) => source.includes('class' + (source === cover ? 'Name' : '') + '="mood-ghost"') && source.includes('mood-ghost-key')) &&
+      /\.mood-ghost \{[^}]*stroke-dasharray/.test(await readFile('src/app/home-mood.css', 'utf8')));
+
+    /*
+     * '이유 보기' — 심리 상세의 기여도 절(오늘 무엇이 점수를 움직였나)로 바로 간다.
+     * 예전 '심리 상세 →' 는 맨 위에 내려놓아서, 그 절까지 3,300px 를 손으로 내려야 했다.
+     * 그 절은 데이터를 받은 뒤에 그려지므로 브라우저의 #이름 스크롤이 닿지 않는다 —
+     * HashScroll 이 그 자리가 생길 때까지 기다렸다가 내려 준다.
+     */
+    const reasonDetail = await readFile('src/app/fng/[market]/page.tsx', 'utf8');
+    const shell = await readFile('src/components/nav/AppShell.tsx', 'utf8');
+    const hashScroll = await readFile('src/components/nav/HashScroll.tsx', 'utf8');
+    check('홈의 이유 보기가 기여도 절로 바로 감 (앱)',
+      cover.includes("REASON_ANCHOR = 'fng-contrib-title'") && cover.includes('/fng/us#${REASON_ANCHOR}') &&
+      cover.includes('이유 보기 →') && reasonDetail.includes('id="fng-contrib-title"') &&
+      shell.includes('<HashScroll />') && hashScroll.includes('MutationObserver') && hashScroll.includes('header.sticky'));
+    check('미리보기도 이유 보기가 기여도 절로 바로 감',
+      tpl16.includes('data-go-to="contrib"') && tpl16.includes("d.goTo === 'contrib'") &&
+      tpl16.includes("x.textContent.trim() === '점수 상승·하락 기여도'") && tpl16.includes('<h2>점수 상승·하락 기여도</h2>'));
+    check('점수가 없으면(산출 불가) 이유 보기 대신 심리 상세로',
+      /mood \? \([\s\S]{0,200}이유 보기 →[\s\S]{0,120}\) : \([\s\S]{0,80}심리 상세 →/.test(cover) &&
+      /\(mood\s*\?[\s\S]{0,200}이유 보기 →[\s\S]{0,80}:[\s\S]{0,80}심리 상세 →/.test(tpl16));
+
+    /*
      * 시장 위험 신호등 여섯 장을 홈에서 뺐다.
      *
      * 그 블록은 "빨간불은 '위험하니 팔아라' 가 아니라 '이 지표가 평소보다 크게

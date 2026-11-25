@@ -1867,14 +1867,24 @@ __HOME_MOOD_CSS__
       (mood && stage
         ? '<svg class="mood-dial" viewBox="0 0 320 168" aria-hidden="true">' +
           '<image href="__HOME_DIAL_IMAGE__" width="320" height="168"/>' +
+          /* 어제 위치 — 점선 바늘. 오늘 바늘 밑에 깐다 (앱 HomeMoodCard 와 같은 좌표) */
+          (mood.yesterday ? '<g transform="rotate(' + mood.yesterday.angle + ' 160 144)"><path class="mood-ghost" d="M160 140 L160 46"/></g>' : '') +
           '<g transform="rotate(' + mood.angle + ' 160 144)"><path d="M156 148 L159 40 Q160 36 161 40 L164 148Z" fill="#fff5d6" stroke="#442f28"/>' +
           '<path d="M160 43 L160 141" stroke="#ff9764" stroke-width="1.5"/></g>' +
           '<circle cx="160" cy="144" r="8" fill="#202b38" stroke="#d4dedc" stroke-width="2"/></svg>' +
+          (mood.yesterday ? '<p class="mood-ghost-key"><svg width="18" height="6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3"/></svg>어제 ' +
+            mood.yesterday.value.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '</p>' : '') +
           '<div class="mood-reading"><strong' + (mood.word ? ' style="font-size:' + mood.size + 'px"' : '') + '>' + esc(mood.word || stage.label) +
           '</strong><span class="mood-score">' + mood.score + '<small> / 100</small></span></div>' +
-          '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + ' · </b>' : '') + esc(mood.change) + '</p>'
+          '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + '</b>' : '') +
+          '<span class="mood-delta">' + (mood.glyph ? '<span aria-hidden="true">' + mood.glyph + '</span>' : '') + esc(mood.change) + '</span></p>'
         : '<p role="status"><b>산출 불가</b> · ' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
-      '<footer><span>자체 산출 · ' + esc(kTime(f.computedAt)) + '</span><button type="button" data-go-fng="us">심리 상세 →</button></footer></article>';
+      '<footer><span>자체 산출 · ' + esc(kTime(f.computedAt)) + '</span>' +
+      /* 점수가 있으면 '이유 보기' — 심리 상세의 기여도 절로 바로 간다. 없으면 상세 맨 위로 */
+      (mood
+        ? '<button type="button" data-go-fng="us" data-go-to="contrib" aria-label="미국 쫄탐지수가 움직인 이유 보기">이유 보기 →</button>'
+        : '<button type="button" data-go-fng="us">심리 상세 →</button>') +
+      '</footer></article>';
   }
 
   function fngCard(f, standalone) {
@@ -4745,7 +4755,16 @@ __HOME_MOOD_CSS__
     if (d.go === 'market') { state.view = 'indices'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go === 'risk') { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.go) { state.view = d.go; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
-    if (d.goFng) { state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
+    if (d.goFng) {
+      state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); render();
+      /* 홈의 '이유 보기' — 기여도 절(앱의 #fng-contrib-title)까지 바로 내려 준다. 상태바에 가리지 않게 그 높이만큼 덜 */
+      if (d.goTo === 'contrib') {
+        const h = Array.prototype.find.call(document.querySelectorAll('#view h2'), (x) => x.textContent.trim() === '점수 상승·하락 기여도');
+        const bar = document.getElementById('statusbar');
+        if (h) window.scrollTo({ top: Math.max(0, h.getBoundingClientRect().top + window.scrollY - (bar ? bar.getBoundingClientRect().height : 0) - 8), behavior: 'instant' });
+      }
+      return;
+    }
     if (d.goRegion !== undefined) { state.region = d.goRegion; state.view = 'marketRegion'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.region) { state.region = d.region; return render(); }
     if (d.goRisk !== undefined) { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }

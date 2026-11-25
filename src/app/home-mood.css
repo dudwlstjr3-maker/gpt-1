@@ -42,7 +42,26 @@
 .mood-reading strong { color: var(--ink); font-size: 32px; font-weight: 850; line-height: 1.08; letter-spacing: -.055em; }
 .mood-score { font-size: 34px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
 .mood-score small { font-size: 13px; font-weight: 500; letter-spacing: 0; }
-.mood-change { margin: 0; font-size: 14px; }
+/* 전일 변화 — 기호와 말을 함께. 등락 색 설정(한국식·해외식)과 엇갈리지 않게 색은 입히지 않는다. */
+.mood-change { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14px; }
+.mood-change b { font-weight: 700; }
+.mood-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  color: var(--fg-strong);
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+/* 어제 위치 — 계기판은 늘 어두운 유리라 바늘색을 고정한다. 설명 줄의 점선은 글자색을 따른다. */
+.mood-ghost { fill: none; stroke: #e6eef0; stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 5 5; opacity: .6; }
+.mood-ghost-key { margin: 2px 0 0; display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; }
+.mood-ghost-key line { stroke: currentColor; stroke-width: 2; stroke-dasharray: 3 3; }
 .mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
 .mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
 .mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }

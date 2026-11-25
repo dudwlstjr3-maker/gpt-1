@@ -62,6 +62,17 @@
 .mood-ghost { fill: none; stroke: #e6eef0; stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 5 5; opacity: .6; }
 .mood-ghost-key { margin: 2px 0 0; display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; }
 .mood-ghost-key line { stroke: currentColor; stroke-width: 2; stroke-dasharray: 3 3; }
+
+/* ---- 홈과 심리 상세가 같이 쓰는 계기판 (components/charts/MoodGauge.tsx · 미리보기 moodGauge) ---- */
+.mood-gauge { width: 100%; max-width: 320px; margin-inline: auto; }
+.mood-gauge .mood-dial { width: 100%; }
+/* 다섯 단계 칸 — 지금 점수가 있는 칸만 굵고 밝게. 나머지는 흐리게 두되 색은 남긴다(어디가 어느 쪽인지) */
+.mood-band { fill: none; stroke-width: 7; opacity: .5; }
+.mood-band.on { stroke-width: 11; opacity: 1; }
+/* 바늘 가운데 선은 단계 색 — 공포면 붉게, 탐욕이면 푸르게 */
+.mood-needle-line { stroke: var(--ink); }
+.mood-na { margin: 6px 0 0; text-align: center; font-size: 17px; color: var(--muted-fg, var(--muted)); }
+.mood-na-why { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted-fg, var(--muted)); }
 .mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
 .mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
 .mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }

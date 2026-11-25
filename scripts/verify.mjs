@@ -2731,7 +2731,9 @@ async function main() {
     check('계기판 왼쪽·정상·오른쪽과 모든 중간 각도', scores.every((m, n) =>
       Math.abs(m.angle - (n * 1.8 - 90)) < 0.000001) &&
       scores[0].angle === -90 && scores[50].angle === 0 && scores[100].angle === 90);
-    const cover = await readFile('src/components/market/HomeMoodCard.tsx', 'utf8');
+    // 계기판은 홈 카드와 심리 상세가 같이 쓰는 MoodGauge 로 옮겼다 — 홈 카드의 틀과 계기판을 함께 본다
+    const dialSrc = await readFile('src/components/charts/MoodGauge.tsx', 'utf8');
+    const cover = (await readFile('src/components/market/HomeMoodCard.tsx', 'utf8')) + dialSrc;
     const face = await readFile('public/mood-dial.svg', 'utf8');
     check('앱과 미리보기가 동일한 반원과 바늘 좌표를 씀', [cover, tpl16].every(source =>
       source.includes('0 0 320 168') && source.includes('mood.angle') && source.includes('160 144)')) &&
@@ -2787,6 +2789,39 @@ async function main() {
     check('점수가 없으면(산출 불가) 이유 보기 대신 심리 상세로',
       /mood \? \([\s\S]{0,200}이유 보기 →[\s\S]{0,120}\) : \([\s\S]{0,80}심리 상세 →/.test(cover) &&
       /\(mood\s*\?[\s\S]{0,200}이유 보기 →[\s\S]{0,80}:[\s\S]{0,80}심리 상세 →/.test(tpl16));
+
+    /*
+     * 홈과 심리 상세의 계기판을 똑같이 (2026-11-25 사용자 요청).
+     * 예전 심리 상세는 따로 그린 얇은 무지개 반원이라, 같은 점수가 화면마다 다른 물건으로 보였다.
+     * 이제 둘 다 MoodGauge(미리보기 moodGauge) 하나를 쓴다. 시장 화면의 쫄탐 카드도 Gauge 를 거쳐 같은 것.
+     */
+    const gaugeSrc = await readFile('src/components/charts/Gauge.tsx', 'utf8');
+    const homeCardSrc = await readFile('src/components/market/HomeMoodCard.tsx', 'utf8');
+    check('홈과 심리 상세가 같은 계기판을 씀 (앱)',
+      homeCardSrc.includes('<MoodGauge score={score.score} deltaDay={score.deltaDay} />') &&
+      gaugeSrc.includes('<MoodGauge score={score} deltaDay={deltaDay} />') && !gaugeSrc.includes('linearGradient') &&
+      reasonDetail.includes('<Gauge score={detail.score} deltaDay={detail.deltaDay} />'));
+    check('미리보기도 홈과 심리 상세가 같은 계기판',
+      tpl16.includes('moodGauge(f.score, f.deltaDay)') && tpl16.includes('if (size >= 150) return moodGauge(score, deltaDay);') &&
+      tpl16.includes('gauge(f.score, 200, f.deltaDay)'));
+    {
+      const bandsOf = (src) => [...src.matchAll(/\['(M[0-9. ]+A106 106 0 0 1 [0-9. ]+)', '(#[0-9a-f]{6})'\]/g)].map((m) => m[1] + m[2]).join('|');
+      const appBands = bandsOf(dialSrc);
+      check('지금 단계 칸만 밝힘 — 경계는 기존 단계와 같고, 칸 좌표는 앱과 미리보기가 같음',
+        [[0, 0], [19, 0], [20, 1], [39, 1], [40, 2], [59, 2], [60, 3], [79, 3], [80, 4], [100, 4]].every(([v, b]) => homeMood(v, 0).band === b) &&
+        appBands.split('|').length === 5 && appBands === bandsOf(tpl16) &&
+        dialSrc.includes("i === mood.band ? 'mood-band on' : 'mood-band'") && tpl16.includes("i === mood.band ? 'mood-band on' : 'mood-band'") &&
+        /\.mood-band\.on \{[^}]*stroke-width: 11/.test(await readFile('src/app/home-mood.css', 'utf8')) &&
+        !face.includes('A106 106'), `칸 ${appBands.split('|').length}개`);
+    }
+    check('바늘 가운데 선은 단계 색(--ink)',
+      /\.mood-needle-line \{ stroke: var\(--ink\); \}/.test(await readFile('src/app/home-mood.css', 'utf8')) &&
+      dialSrc.includes('className="mood-needle-line"') && tpl16.includes('class="mood-needle-line"') &&
+      !dialSrc.includes('#ff9764') && !tpl16.includes('#ff9764'));
+    check('점수가 없으면 계기판은 흐린 칸만 — 바늘 없이 산출 불가',
+      homeMood(null, 0) === null && dialSrc.includes('{mood && (\n          <g transform={`rotate(${mood.angle}') &&
+      dialSrc.includes('<p className="mood-na" role="status"><b>산출 불가</b></p>') &&
+      tpl16.includes("(mood ? '<g transform=\"rotate(' + mood.angle") && tpl16.includes('<p class="mood-na" role="status"><b>산출 불가</b></p>'));
 
     /*
      * 시장 위험 신호등 여섯 장을 홈에서 뺐다.

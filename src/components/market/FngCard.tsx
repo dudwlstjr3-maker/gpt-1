@@ -114,7 +114,7 @@ export function FngCard({
       </div>
 
       <div className="flex flex-col items-center">
-        <Gauge score={score.score} size={168} />
+        <Gauge score={score.score} />
       </div>
 
       {unavailable ? (

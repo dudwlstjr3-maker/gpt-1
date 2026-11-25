@@ -1250,9 +1250,51 @@ __HOME_MOOD_CSS__
     return 'M ' + x0.toFixed(2) + ' ' + y0.toFixed(2) + ' A ' + r + ' ' + r + ' 0 0 ' + (a1 < a0 ? 1 : 0) + ' ' + x1.toFixed(2) + ' ' + y1.toFixed(2);
   }
 
+  /*
+   * 쫄탐 계기판 — 홈 카드와 심리 상세가 같은 것을 쓴다 (앱 components/charts/MoodGauge.tsx 이식).
+   * 다섯 단계 칸은 여기서 그리고 지금 칸만 굵고 밝게. 바늘 가운데 선은 단계 색(--ink).
+   * deltaDay 를 주면 어제 바늘(점선)과 전일 변화 문장까지, 안 주면(undefined) 둘 다 없다.
+   * DIAL_BANDS 는 앱 MoodGauge 의 DIAL_BANDS 와 글자까지 같다 (검증기 8-31 이 본다).
+   */
+  const DIAL_BANDS = [
+    ['M54.01 142.50 A106 106 0 0 1 73.37 82.91', '#ff6e74'],
+    ['M75.13 80.49 A106 106 0 0 1 125.82 43.66', '#ffab68'],
+    ['M128.67 42.74 A106 106 0 0 1 191.33 42.74', '#eed177'],
+    ['M194.18 43.66 A106 106 0 0 1 244.87 80.49', '#a6d285'],
+    ['M246.63 82.91 A106 106 0 0 1 265.99 142.50', '#55cdae'],
+  ];
+  function moodGauge(score, deltaDay) {
+    const compare = deltaDay !== undefined;
+    const mood = homeMood(score, compare ? deltaDay : null);
+    const stage = stageOf(mood && mood.score);
+    let h = '<div class="mood-gauge" style="--ink:' + scoreColor(mood && mood.score) + '">' +
+      '<svg class="mood-dial" viewBox="0 0 320 168" aria-hidden="true">' +
+      '<image href="__HOME_DIAL_IMAGE__" width="320" height="168"/>' +
+      DIAL_BANDS.map(function (b, i) {
+        return '<path d="' + b[0] + '" stroke="' + b[1] + '" class="' + (mood && i === mood.band ? 'mood-band on' : 'mood-band') + '"/>';
+      }).join('') +
+      /* 어제 위치 — 점선 바늘. 오늘 바늘 밑에 깐다 */
+      (mood && compare && mood.yesterday ? '<g transform="rotate(' + mood.yesterday.angle + ' 160 144)"><path class="mood-ghost" d="M160 140 L160 46"/></g>' : '') +
+      (mood ? '<g transform="rotate(' + mood.angle + ' 160 144)"><path d="M156 148 L159 40 Q160 36 161 40 L164 148Z" fill="#fff5d6" stroke="#442f28"/>' +
+        '<path class="mood-needle-line" d="M160 43 L160 141" stroke-width="1.5"/></g>' : '') +
+      '<circle cx="160" cy="144" r="8" fill="#202b38" stroke="#d4dedc" stroke-width="2"/></svg>';
+    if (!mood || !stage) return h + '<p class="mood-na" role="status"><b>산출 불가</b></p></div>';
+    h += (compare && mood.yesterday ? '<p class="mood-ghost-key"><svg width="18" height="6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3"/></svg>어제 ' +
+        mood.yesterday.value.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '</p>' : '') +
+      '<div class="mood-reading"><strong' + (mood.word ? ' style="font-size:' + mood.size + 'px" aria-hidden="true"' : '') + '>' + esc(mood.word || stage.label) +
+      '</strong><span class="mood-score">' + mood.score + '<small> / 100</small></span></div>' +
+      (mood.word || compare
+        ? '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + '</b>' : '') +
+          (compare ? '<span class="mood-delta">' + (mood.glyph ? '<span aria-hidden="true">' + mood.glyph + '</span>' : '') + esc(mood.change) + '</span>' : '') + '</p>'
+        : '');
+    return h + '</div>';
+  }
+
   let uid = 0;
-  /** 0~100 반원 게이지 — 실제 앱 Gauge.tsx 이식 */
-  function gauge(score, size) {
+  /** 0~100 반원 게이지 — 앱 Gauge.tsx 처럼 큰 것은 홈과 같은 moodGauge.
+      시장 목록의 작은 계기판(116px)은 유리 계기판의 숫자가 읽히지 않을 만큼 작아 옛 모양을 둔다. */
+  function gauge(score, size, deltaDay) {
+    if (size >= 150) return moodGauge(score, deltaDay);
     const id = 'g' + ++uid;
     const w = size, h = size * 0.7, cx = w / 2, cy = h - 20;
     const r = Math.min(w / 2 - 12, cy - 8), th = Math.max(9, r * 0.19);
@@ -1859,26 +1901,13 @@ __HOME_MOOD_CSS__
 
   __HOME_MOOD_FN__
 
+  /** 홈 1면 카드 — 계기판 · 점수 · 전일 변화는 심리 상세와 같은 moodGauge 가 그린다 (앱 HomeMoodCard 와 같은 구성) */
   function homeMoodCard(f) {
     const mood = homeMood(f.score, f.deltaDay);
-    const stage = stageOf(mood && mood.score);
     return '<article class="card mood-cover" style="padding:12px;--ink:' + scoreColor(mood && mood.score) + '" aria-label="미국 쫄탐지수">' +
       '<header><h3>미국 쫄탐지수</h3>' + modeBadge() + '</header>' +
-      (mood && stage
-        ? '<svg class="mood-dial" viewBox="0 0 320 168" aria-hidden="true">' +
-          '<image href="__HOME_DIAL_IMAGE__" width="320" height="168"/>' +
-          /* 어제 위치 — 점선 바늘. 오늘 바늘 밑에 깐다 (앱 HomeMoodCard 와 같은 좌표) */
-          (mood.yesterday ? '<g transform="rotate(' + mood.yesterday.angle + ' 160 144)"><path class="mood-ghost" d="M160 140 L160 46"/></g>' : '') +
-          '<g transform="rotate(' + mood.angle + ' 160 144)"><path d="M156 148 L159 40 Q160 36 161 40 L164 148Z" fill="#fff5d6" stroke="#442f28"/>' +
-          '<path d="M160 43 L160 141" stroke="#ff9764" stroke-width="1.5"/></g>' +
-          '<circle cx="160" cy="144" r="8" fill="#202b38" stroke="#d4dedc" stroke-width="2"/></svg>' +
-          (mood.yesterday ? '<p class="mood-ghost-key"><svg width="18" height="6" aria-hidden="true"><line x1="1" y1="3" x2="17" y2="3"/></svg>어제 ' +
-            mood.yesterday.value.toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '</p>' : '') +
-          '<div class="mood-reading"><strong' + (mood.word ? ' style="font-size:' + mood.size + 'px"' : '') + '>' + esc(mood.word || stage.label) +
-          '</strong><span class="mood-score">' + mood.score + '<small> / 100</small></span></div>' +
-          '<p class="mood-change">' + (mood.word ? '<b>' + esc(stage.label) + '</b>' : '') +
-          '<span class="mood-delta">' + (mood.glyph ? '<span aria-hidden="true">' + mood.glyph + '</span>' : '') + esc(mood.change) + '</span></p>'
-        : '<p role="status"><b>산출 불가</b> · ' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
+      moodGauge(f.score, f.deltaDay) +
+      (mood ? '' : '<p class="mood-na-why">' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
       '<footer><span>자체 산출 · ' + esc(kTime(f.computedAt)) + '</span>' +
       /* 점수가 있으면 '이유 보기' — 심리 상세의 기여도 절로 바로 간다. 없으면 상세 맨 위로 */
       (mood
@@ -3882,7 +3911,7 @@ __HOME_MOOD_CSS__
       '</div></div>' +
 
       '<section class="block"><div class="card" style="padding:12px">' +
-      '<div class="summary-grid">' + gauge(f.score, 200) +
+      '<div class="summary-grid">' + gauge(f.score, 200, f.deltaDay) +
       '<div class="meta">' +
       (f.score === null
         ? '<p class="notice n-warn">' + esc(f.unavailableReason) + '</p>'

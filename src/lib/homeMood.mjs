@@ -39,5 +39,7 @@ export function homeMood(value, delta) {
       yesterday = { value: Math.round(before * 10) / 10, angle: (Math.round(before) - 50) * 1.8 };
     }
   }
-  return { score, word, size, change, glyph, angle, yesterday };
+  // 계기판에서 밝힐 칸 — 기존 단계(FNG_STAGES) 경계 그대로: 0–19 · 20–39 · 40–59 · 60–79 · 80–100
+  const band = Math.min(4, Math.floor(score / 20));
+  return { score, word, size, change, glyph, angle, yesterday, band };
 }

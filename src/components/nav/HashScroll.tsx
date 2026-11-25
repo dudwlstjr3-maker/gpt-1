@@ -20,6 +20,18 @@ import { usePathname } from 'next/navigation';
 const WAIT_MS = 10_000;
 const SETTLE_MS = [250, 800];
 
+/*
+ * 뒤로/앞으로 가기로 온 화면에서는 내려 주지 않는다 — 사람이 읽던 자리를 빼앗지 않는다.
+ * (검토에서 재현: 기여도 절에 도착 → 위로 올려 400px 을 읽다가 홈에 갔다 돌아오면
+ *  다시 3,486px 의 기여도 절로 끌려갔다.) popstate 는 화면이 바뀌기 전에 오므로 시각만 적어 둔다.
+ */
+let lastHistoryNav = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    lastHistoryNav = Date.now();
+  });
+}
+
 export function HashScroll() {
   const pathname = usePathname();
 
@@ -45,8 +57,18 @@ export function HashScroll() {
     };
 
     const start = () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
-      if (!id) return;
+      // 깨진 퍼센트 인코딩(#%E0%A4%A 같은)은 decodeURIComponent 가 던진다 — 화면 전체가 넘어가지 않게 무시한다
+      let id = '';
+      try {
+        id = decodeURIComponent(window.location.hash.slice(1));
+      } catch {
+        return;
+      }
+      if (!id || Date.now() - lastHistoryNav < 1500) return;
+      // 같은 화면에서 # 이 다시 바뀌면 이전 감시와 타이머를 먼저 끈다 — 옛 자리로 끌고 가지 않게
+      observer?.disconnect();
+      timers.forEach((t) => window.clearTimeout(t));
+      timers.length = 0;
       stopped = false;
       const landed = () => SETTLE_MS.forEach((ms) => timers.push(window.setTimeout(() => land(id), ms)));
       if (land(id)) return landed();

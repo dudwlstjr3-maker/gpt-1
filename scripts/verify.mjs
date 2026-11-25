@@ -2818,6 +2818,19 @@ async function main() {
       /\.mood-needle-line \{ stroke: var\(--ink\); \}/.test(await readFile('src/app/home-mood.css', 'utf8')) &&
       dialSrc.includes('className="mood-needle-line"') && tpl16.includes('class="mood-needle-line"') &&
       !dialSrc.includes('#ff9764') && !tpl16.includes('#ff9764'));
+    /*
+     * 같은 말 두 번 없애기 — 오늘의 한 줄은 미국 쫄탐 카드 바로 아래라, 카드가 이미 한
+     * "어제보다 공포가 5.5점 풀렸어요" 를 "미국 투자심리가 어제보다 5.5점 탐욕 쪽으로 갔고" 로 또 하지 않는다.
+     */
+    const todayView = await readFile('src/components/market/TodayLine.tsx', 'utf8');
+    check('오늘의 한 줄은 카드가 한 전일 변화를 되풀이하지 않음 (앱 · 미리보기)',
+      /todayLine\(\{[\s\S]{0,600}scores: null,/.test(todayView) && !todayView.includes('sections.fng') &&
+      tpl16.includes('    const mood = null;\n') && !tpl16.includes('const mood = todayMoodClause('));
+    /* '이유 보기' 의 자리 찾기는 깨진 주소에 넘어지지 않고, 뒤로 가기로 온 화면은 끌어내리지 않는다 */
+    check('이유 보기 자리 찾기 — 깨진 주소 · 뒤로 가기에 안전',
+      /try \{\s*id = decodeURIComponent\(window\.location\.hash\.slice\(1\)\);\s*\} catch \{\s*return;\s*\}/.test(hashScroll) &&
+      hashScroll.includes("window.addEventListener('popstate'") && hashScroll.includes('Date.now() - lastHistoryNav < 1500') &&
+      hashScroll.includes('observer?.disconnect();\n      timers.forEach'));
     check('점수가 없으면 계기판은 흐린 칸만 — 바늘 없이 산출 불가',
       homeMood(null, 0) === null && dialSrc.includes('{mood && (\n          <g transform={`rotate(${mood.angle}') &&
       dialSrc.includes('<p className="mood-na" role="status"><b>산출 불가</b></p>') &&

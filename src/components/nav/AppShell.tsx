@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation';
 import { markInternalNav } from './BackBar';
 import { BottomTabs } from './Navigation';
+import { HashScroll } from './HashScroll';
 import { StatusBar } from '@/components/market/StatusBar';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { AlertsEngine } from '@/components/alerts/AlertsEngine';
@@ -88,6 +89,8 @@ export function AppShell({ children }: { children: ReactNode }) {
        * 그 안에 position:fixed 를 두면 화면이 아니라 그 칸을 기준으로 붙는다.
        */}
       <BottomTabs />
+      {/* '#이름' 자리가 데이터를 받은 뒤에 그려져도 그 자리까지 내려 준다 (홈의 '이유 보기') */}
+      <HashScroll />
       <AlertsEngine />
       <ServiceWorkerRegistrar />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

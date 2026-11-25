@@ -281,7 +281,7 @@ export default function FngDetailPage() {
       <section className="mt-5 px-3" aria-label="점수 요약">
         <div className="card p-3">
           <div className="flex flex-col items-center gap-2 @min-[1024px]:flex-row @min-[1024px]:items-center @min-[1024px]:gap-6">
-            <Gauge score={detail.score} size={200} />
+            <Gauge score={detail.score} deltaDay={detail.deltaDay} />
             <div className="w-full flex-1">
               {unavailable ? (
                 <Notice tone="warn">{detail.unavailableReason}</Notice>

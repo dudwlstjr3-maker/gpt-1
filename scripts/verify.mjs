@@ -1300,6 +1300,8 @@ async function main() {
     for (const v of ['MACRO_BASE_URL', 'US_MARKET_BASE_URL', 'CRYPTO_BASE_URL', 'CBOE_CSV_URL']) {
       check(`.env.example 에 ${v} 가 있음`, envExample.includes(v));
     }
+    /* 예시 파일이 demo 로 고정돼 있으면, 그대로 배포 환경변수에 옮긴 사람은 키를 넣어도 예시 데이터만 본다 (2026-11-25) */
+    check('.env.example 의 모드는 auto — 키를 넣으면 실제 데이터로', /^MARKET_MOOD_MODE=auto$/m.test(envExample) && !/^MARKET_MOOD_MODE=demo$/m.test(envExample));
 
     /* 산출 못 한 것을 정상이라고 말하지 않는가 */
     const snapSrc = await readFile('src/server/snapshot.ts', 'utf8');

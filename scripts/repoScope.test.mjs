@@ -23,6 +23,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const ALLOWED_TOP_LEVEL = [
   '.env.example',
+  '.gitattributes', // start.bat 을 어느 체크아웃에서나 CRLF 로 (2026-11-25)
   '.github',
   '.gitignore',
   '.gitkeep',
@@ -37,6 +38,7 @@ export const ALLOWED_TOP_LEVEL = [
   'public',
   'scripts',
   'src',
+  'start.bat', // 윈도에서 더블클릭으로 켜기 — 맨 위에 있어야 찾는다 (2026-11-25)
   'tools',
   'tsconfig.json',
 ];

@@ -1,0 +1,4 @@
+# 윈도 배치 파일은 CRLF 여야 한다 — LF 로만 끝나면 cmd 가 라벨·goto 를 잘못 읽는 일이 있다.
+# ZIP 으로 받든 clone 하든 어느 체크아웃에서나 CRLF 로 나오게 못박는다.
+*.bat text eol=crlf
+*.cmd text eol=crlf

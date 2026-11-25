@@ -2,6 +2,19 @@
 
 새 항목을 위에 쌓는다. 날짜는 KST.
 
+## 2026-11-25 — 윈도에서 더블클릭으로 켜기 (start.bat)
+
+- 저장소 맨 위 `start.bat` → `tools/start/launch.mjs`. Node 20 이상만 있으면 된다.
+  처음이면 `npm ci` · `npm run build`, 다음부터는 바뀐 것이 있을 때만 다시 만든다(`package-lock.json` 지문 · 빌드보다 새 파일).
+  `npm start` 로 켜고 `/api/health` 가 답하면 브라우저를 연다. 창에 **지금 모드(DEMO/LIVE)와 이유, `.env.local` 유무**를 찍는다.
+- 이미 켜져 있으면 다시 빌드하지 않고 브라우저만 연다 — 켜진 서버 옆에서 빌드하면 `.next` 가 망가진다(겪은 일).
+  3000 번을 다른 프로그램이 쓰고 있으면 멈추고 알린다.
+- `start.bat` 에는 ASCII 만 쓴다. 한글은 런처가 UTF-8 로 찍고, Node 가 없으면 한글 안내서 `tools/start/HELP-ko.txt` 를 연다.
+  줄 끝은 CRLF — `.gitattributes` 로 어느 체크아웃에서나 CRLF.
+- `scripts/startBat.test.mjs` (6건) — ASCII · CRLF · 런처가 Node 기본 모듈만 쓰는지 · 부르는 npm 명령이 있는지 · 켜져 있으면 빌드보다 먼저 확인하는지.
+  맨 위 허용 목록(`scripts/repoScope.test.mjs`)에 `start.bat` · `.gitattributes` 를 더했다.
+- 다시 센 값: **단위 158건 · 검증기 1,262건** (2026-11-25, DEMO). 윈도 실기기에서는 돌려 보지 못했다 — 런처(`launch.mjs`)는 리눅스에서 네 경우(처음 · 바뀐 것 없음 · 이미 켜짐 · 3000 번 사용 중)를 돌려 봤다.
+
 ## 2026-11-25 — 홈 안내 간소화 및 공개 데모 갱신
 
 - 경고가 있을 때만 홈에 지표 개수와 경제지표 링크를 먼저 표시한다. 시장별 점수의 비교 설명은 심리 상세에서 읽을 수 있다.

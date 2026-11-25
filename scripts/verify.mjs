@@ -2994,6 +2994,41 @@ async function main() {
       /aria-label="찾기 \(Ctrl\+K\)"/.test(await readFile('src/components/market/StatusBar.tsx', 'utf8')));
     /* 기준 칸 안의 fixed 는 화면이 아니라 그 칸에 붙는다 — 큰 그림 창과 같은 이유 */
     check('찾기 창도 문서 맨 위로 옮겨 그림', /createPortal\(/.test(dialog) && /document\.body,/.test(dialog));
+
+    /*
+     * [8-39] 점수표에서 깎인 것 (2026-11-26, 390px 에서 탭마다 잼).
+     *   경제지표 화면이 5.5장 길이 — 다섯 카드가 '무슨 지표인가' 와 '오르면 · 내리면' 을 늘 펼쳐 둠.
+     *   누를 자리 24px 미달 — 홈 '시장 경고' 21px, 심리 상세 '표로 보기' 19px.
+     *   더보기 · 데이터 진단이 문 닫은 Stooq 를 시세 출처라고 말함 (실제는 Yahoo Finance).
+     */
+    console.log('\n[8-39] 점수표 반영 — 지표 설명 접기 · 누를 자리 · 진단 문구');
+    {
+      const gauges = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+      const card = gauges.slice(gauges.indexOf('export function RiskCard'), gauges.indexOf('export function RiskGaugesSection'));
+      const fold = card.slice(card.indexOf('<details'), card.indexOf('</details>'));
+      check('경제지표 카드 — 지금 읽는 법은 펼쳐 두고, 지표 설명은 접음 (앱)',
+        card.indexOf('지금 읽는 법 · ') > 0 && card.indexOf('지금 읽는 법 · ') < card.indexOf('<details') &&
+        fold.includes('이게 무슨 지표인가요? ▾') && fold.includes('무슨 지표인가 · ') && fold.includes('<UpDownExplainer') &&
+        fold.includes('<summary className="tap ') && card.indexOf('</details>') > card.indexOf('<details') &&
+        !card.slice(card.indexOf('</details>')).includes('무슨 지표인가 · '));
+      const tplCard = tpl16.slice(tpl16.indexOf('function riskCard(i)'), tpl16.indexOf("'</article>'", tpl16.indexOf('function riskCard(i)')));
+      const tplFold = tplCard.slice(tplCard.indexOf('<details class="risk-more"'), tplCard.indexOf('</dl></details>'));
+      check('미리보기 경제지표 카드도 같게',
+        tplCard.indexOf('지금 읽는 법 · ') > 0 && tplCard.indexOf('지금 읽는 법 · ') < tplCard.indexOf('<details class="risk-more"') &&
+        tplFold.includes('이게 무슨 지표인가요? ▾') && tplFold.includes('무슨 지표인가 · ') && tplFold.includes('값이 오르면') &&
+        tplFold.includes('<summary class="linkbtn"') && tplCard.indexOf('</dl></details>') > tplCard.indexOf('<details class="risk-more"') &&
+        !tplCard.slice(tplCard.indexOf('</dl></details>')).includes('무슨 지표인가 · '));
+      const alertLine = await readFile('src/components/market/RiskAlertLine.tsx', 'utf8');
+      const tableToggles = await Promise.all(['CrisisMarkers', 'BandStatsView', 'FundamentalsCard'].map((n) => readFile(`src/components/market/${n}.tsx`, 'utf8')));
+      check('누를 자리 24px — 홈 시장 경고 줄 · 표로 보기 (앱 · 미리보기)',
+        alertLine.includes('flex min-h-6 items-center') &&
+        tableToggles.every((t) => t.includes('<summary className="min-h-6 cursor-pointer') && !t.includes('<summary className="cursor-pointer text-[12.5px]')) &&
+        tpl16.includes('data-go="risk" style="display:flex;gap:8px;align-items:center;min-height:24px;') &&
+        tpl16.includes('<summary style="min-height:24px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>'));
+      const cfg = await readFile('src/server/config.ts', 'utf8');
+      check('데이터 진단이 시세 출처를 Yahoo Finance 로 말함 (Stooq 는 문 닫음)',
+        cfg.includes('미국·한국 시세(Yahoo Finance)') && !cfg.includes('시세(Stooq)'));
+    }
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */

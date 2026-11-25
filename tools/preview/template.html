@@ -2411,9 +2411,11 @@ __HOME_MOOD_CSS__
           RISK_LABEL[b.level] + ' ' + esc(b.label) + '</span></li>';
       }).join('') + '</ul>' +
 
-      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">' +
-      '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
+      /* 지금 읽는 법은 늘 펼쳐 두고, 지표 설명은 접는다 (앱 RiskCard 와 같다) */
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:' + RISK_COLOR[i.level] + '"><b>지금 읽는 법 · </b>' + esc(i.reading) + '</p></div>' +
+      '<details class="risk-more" style="margin-top:8px"><summary class="linkbtn" style="cursor:pointer;list-style:none">이게 무슨 지표인가요? ▾</summary>' +
+      '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
 
       /* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */
       '<dl style="margin:8px 0 0;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:8px">' +
@@ -2423,7 +2425,7 @@ __HOME_MOOD_CSS__
         '<dt class="sr">' + lb + '</dt>' +
         '<dd style="margin:0;min-width:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
         '<b style="color:var(--fg)">' + lb + ' · </b>' + esc(tx || '') + '</dd></div>').join('') +
-      '</dl>' +
+      '</dl></details>' +
 
       '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle)">기준 ' + esc(kTime(i.meta.asOf)) + ' · 출처 ' + esc((i.meta.sources[0] || {}).name || '알 수 없음') + '</p>' +
       '</article>'
@@ -2529,7 +2531,7 @@ __HOME_MOOD_CSS__
           (curStage ? ' (' + curStage.label + ')' : '') + ' 입니다.</p>'
         : '') +
       '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' + rows + '</ul>' +
-      '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
+      '<details style="margin-top:12px"><summary style="min-height:24px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
       '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius: var(--box-radius)">' +
       '<table class="data-table"><caption class="sr">과거 위기 시점의 자체 산출 심리 점수</caption>' +
       '<thead><tr><th scope="col">시점</th><th scope="col">사건</th><th scope="col">점수</th><th scope="col">단계</th></tr></thead><tbody>' +
@@ -3283,7 +3285,7 @@ __HOME_MOOD_CSS__
         if (!d || !d.alertCount) return '';
         const names = d.indicators.filter((i) => i.level === 'alert').slice(0, 2).map((i) => i.name);
         const tail = d.alertCount > names.length ? ' 등이' : subjectParticle(names.join(' · '));
-        return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:baseline;margin:12px 0 0;padding:0 12px;' +
+        return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:center;min-height:24px;margin:12px 0 0;padding:0 12px;' +
           'border:0;background:none;text-align:left;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--warn);cursor:pointer">' +
           '<span aria-hidden="true" style="flex-shrink:0">▲</span><span style="min-width:0;flex:1">' +
           '<b>시장 경고 · 지표 ' + d.alertCount + '개</b><span class="sr">' + esc(names.join(' · ')) + tail + ' 평소 범위를 벗어났습니다.</span></span>' +

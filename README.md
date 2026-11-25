@@ -265,7 +265,7 @@ FRED 에는 `Consumer Price Index, Japan` · `Median Consumer Price Index` ·
 
 #### 실제 데이터로 켜기
 
-**필요한 키는 하나뿐입니다 — FRED 무료 키.** 미국·한국 시세(Stooq), 크립토(CoinGecko 무료),
+**필요한 키는 하나뿐입니다 — FRED 무료 키.** 미국·한국 시세(Yahoo Finance), 크립토(CoinGecko 무료),
 풋/콜(Cboe), 생활 경제 지수(세계은행·이코노미스트)는 전부 키가 없어도 됩니다.
 
 ```bash
@@ -915,7 +915,7 @@ npm run build && npm start &
 npm run verify
 ```
 
-`scripts/verify.mjs` 가 요구사항의 검증 기준을 자동 확인합니다 (총 1,282건 — 2026-11-25 DEMO 모드에서 센 값).
+`scripts/verify.mjs` 가 요구사항의 검증 기준을 자동 확인합니다 (총 1,286건 — 2026-11-26 DEMO 모드에서 센 값).
 맨 앞에서 `node --test` 로 순수 로직 단위 테스트(168건)를 먼저 태웁니다 — 실데이터
 정규화기와 판정 로직은 DEMO 경로를 타지 않아 서버 상대 검사로는 한 줄도 실행되지 않습니다.
 

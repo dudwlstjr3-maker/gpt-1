@@ -153,7 +153,7 @@ export function CrisisMarkers({
 
       {/* 표 대안 */}
       <details className="mt-3">
-        <summary className="cursor-pointer text-[12.5px] font-semibold text-muted hover:text-fg">표로 보기</summary>
+        <summary className="min-h-6 cursor-pointer text-[12.5px] font-semibold text-muted hover:text-fg">표로 보기</summary>
         <div className="scroll-x mt-2 rounded-lg border border-border">
           <table className="data-table">
             <caption className="sr-only">과거 위기 시점의 자체 산출 심리 점수</caption>

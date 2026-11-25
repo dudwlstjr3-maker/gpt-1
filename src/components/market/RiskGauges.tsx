@@ -503,19 +503,30 @@ export function RiskCard({ indicator }: { indicator: RiskIndicator }) {
         <RiskZoneList indicator={indicator} />
       </div>
 
-      <div className="mt-3 space-y-2 border-t border-border pt-2">
-        <p className="text-[12.5px] leading-relaxed break-keep text-muted">
-          <span className="font-semibold text-fg">무슨 지표인가 · </span>
-          {indicator.why}
-        </p>
+      {/* 지금 읽는 법 — 오늘 이 숫자가 무슨 뜻인지는 늘 펼쳐 둔다 */}
+      <div className="mt-3 border-t border-border pt-2">
         <p className="text-[12.5px] leading-relaxed break-keep" style={{ color: RISK_COLOR[indicator.level] }}>
           <span className="font-semibold">지금 읽는 법 · </span>
           {indicator.reading}
         </p>
       </div>
 
-      {/* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */}
-      <UpDownExplainer whenUp={indicator.whenUp} whenDown={indicator.whenDown} />
+      {/*
+       * 지표 설명은 접는다 (2026-11-26).
+       * 다섯 장 모두 '무슨 지표인가' 와 '오르면 · 내리면' 을 늘 펼쳐 두어 화면이 5.5장 길이였다.
+       * 한 번 읽으면 매일 다시 읽을 글이 아니다. 지우지 않고 '이게 무슨 지표인가요?' 아래에 둔다.
+       */}
+      <details className="mt-2">
+        <summary className="tap cursor-pointer list-none text-[12.5px] font-semibold text-accent hover:underline">
+          이게 무슨 지표인가요? ▾
+        </summary>
+        <p className="mt-2 text-[12.5px] leading-relaxed break-keep text-muted">
+          <span className="font-semibold text-fg">무슨 지표인가 · </span>
+          {indicator.why}
+        </p>
+        {/* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */}
+        <UpDownExplainer whenUp={indicator.whenUp} whenDown={indicator.whenDown} />
+      </details>
 
       <p className="mt-2 text-[11.5px] text-subtle">
         기준 {formatKstTime(indicator.meta.asOf)} · 출처 {indicator.meta.sources[0]?.name ?? '알 수 없음'}

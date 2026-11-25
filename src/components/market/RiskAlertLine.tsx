@@ -36,7 +36,7 @@ export function RiskAlertLine() {
   return (
     <Link
       href="/indicators"
-      className="mt-3 flex items-baseline gap-2 px-3 text-[13px] leading-relaxed break-keep"
+      className="mt-3 flex min-h-6 items-center gap-2 px-3 text-[13px] leading-relaxed break-keep"
       style={{ color: 'var(--warn)' }}
     >
       <span aria-hidden="true" className="shrink-0">

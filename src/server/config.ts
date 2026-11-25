@@ -110,7 +110,7 @@ export function resolveMode(): { mode: DataMode; reason: string; missing: string
       reason:
         `${missing.join(', ')} 가 없어 DEMO 모드로 동작합니다. ` +
         'FRED 무료 키 하나면 LIVE 로 켜집니다 (https://fred.stlouisfed.org/docs/api/api_key.html). ' +
-        '미국·한국 시세(Stooq)와 크립토(CoinGecko 무료)는 키가 필요 없습니다.',
+        '미국·한국 시세(Yahoo Finance)와 크립토(CoinGecko 무료)는 키가 필요 없습니다.',
       missing: [...missing],
     };
   }

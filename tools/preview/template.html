@@ -3868,6 +3868,21 @@ __HOME_MOOD_CSS__
     return out;
   }
 
+  /* 기여도 몫(%) — 앱 src/lib/contribution.mjs 를 글자 그대로 옮겼다 (검증기가 대조한다) */
+  function contributionShares(values) {
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v);
+    const gross = values.reduce((a, v) => a + (ok(v) ? Math.abs(v) : 0), 0);
+    const net = values.reduce((a, v) => a + (ok(v) ? v : 0), 0);
+    const rows = values.map((v) => {
+      if (!ok(v)) return { share: null, text: '결측', dir: 0 };
+      if (gross === 0 || v === 0) return { share: 0, text: '0%', dir: 0 };
+      const share = (Math.abs(v) / gross) * 100;
+      return { share, text: share < 0.5 ? '<1%' : Math.round(share) + '%', dir: v > 0 ? 1 : -1 };
+    });
+    return { net: Math.round(net * 10) / 10, moved: gross > 0, rows };
+  }
+  const CONTRIB_GLYPH = { 1: '▲', '-1': '▼', 0: '' };
+
   function viewFng() {
     const s = snap();
     const m = state.fngMarket;
@@ -3899,6 +3914,7 @@ __HOME_MOOD_CSS__
 
     const contribs = f.components.map((c) => c.contributionDay).filter((v) => v !== null && v !== 0);
     const maxAbs = Math.max(0.01, ...contribs.map(Math.abs));
+    const contribShares = contributionShares(f.components.map((c) => c.contributionDay));
     /* 가중치 막대의 칸 길이 = 가중치 합계. 머리말의 '합계 100%' 와 같은 눈금이다. */
     const totalWeight = Math.max(1, f.components.reduce((a, c) => a + c.weight, 0));
 
@@ -3911,7 +3927,8 @@ __HOME_MOOD_CSS__
       MARKETS.map((x) => '<button type="button" style="flex:1" data-fngm="' + x + '" aria-pressed="' + (m === x) + '">' + MARKET_LABEL[x] + '</button>').join('') +
       '</div></div>' +
 
-      '<section class="block"><div class="card" style="padding:12px">' +
+      /* 홈 카드와 같은 배경 — 단계 색 조명과 동심원 (앱 상세 요약 카드도 mood-cover) */
+      '<section class="block"><div class="card mood-cover" style="padding:12px;--ink:' + scoreColor(f.score) + '">' +
       '<div class="summary-grid">' + gauge(f.score, 200, f.deltaDay) +
       '<div class="meta">' +
       (f.score === null
@@ -3952,16 +3969,24 @@ __HOME_MOOD_CSS__
 
       '<section class="block"><div class="block-head"><h2>점수 상승·하락 기여도</h2></div>' +
       '<div class="card" style="padding:12px">' +
-      '<p style="margin:0 0 8px;font-size:12.5px;color:var(--muted)">전일 대비 점수 변화 기여도 (점)</p>' +
-      '<ul class="bars">' + f.components.map((c) => {
+      (function () {
+        const n = contribShares.net, nd = n > 0 ? 1 : n < 0 ? -1 : 0;
+        return '<p style="margin:0 0 8px;font-size:13px">' + (contribShares.moved
+          ? '오늘 <b class="tnum" style="color:' + dirColor(n) + '">' + CONTRIB_GLYPH[nd] + ' ' + esc(fmtSigned(n, 1)) + '점</b> — 지표별로 나누면'
+          : '오늘은 움직인 지표가 없어요') + '</p>';
+      })() +
+      '<ul class="bars">' + f.components.map((c, k) => {
         const v = c.contributionDay;
+        const r = contribShares.rows[k];
         const pct = v === null ? 0 : (Math.abs(v) / maxAbs) * 50;
-        return '<li><div class="bar-top"><span>' + esc(c.label) + '</span><b class="tnum" style="color:' + dirColor(v) + '">' +
-          (v === null ? '결측' : esc(fmtSigned(v, 2))) + '</b></div>' +
+        return '<li><div class="bar-top"><span>' + esc(c.label) + '</span><span style="flex-shrink:0"><b class="tnum" style="font-size:14px;color:' + dirColor(v) + '">' +
+          (v === null ? '결측' : (CONTRIB_GLYPH[r.dir] + ' ' + r.text).trim()) + '</b>' +
+          (v === null ? '' : '<small class="tnum" style="margin-left:8px;font-size:11.5px;color:var(--subtle)">' + esc(fmtSigned(v, 1)) + '점</small>') + '</span></div>' +
           '<div class="bar-track"><span class="bar-zero"></span>' +
           (v === null ? '' : '<span class="bar-fill" style="background:' + dirColor(v) + ';left:' + (v > 0 ? 50 : 50 - pct) + '%;width:' + pct + '%"></span>') +
           '</div></li>';
       }).join('') + '</ul>' +
+      '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.6;color:var(--subtle);word-break:keep-all">%는 오늘 움직인 크기 가운데 그 지표가 맡은 몫입니다. 올린 쪽(▲)과 내린 쪽(▼)을 합쳐 100%. 옆의 \'점\'은 100점 만점 점수가 그 지표 때문에 움직인 만큼입니다.</p>' +
       '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:12px" class="drivers-grid">' +
       [['가장 큰 상승 요인', f.topPositive], ['가장 큰 하락 요인', f.topNegative]].map(([l, dr]) =>
         '<div style="background:var(--surface-2);border-radius: var(--box-radius);padding:12px">' +

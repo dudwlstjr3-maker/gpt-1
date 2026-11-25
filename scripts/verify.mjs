@@ -2837,6 +2837,36 @@ async function main() {
       tpl16.includes("(mood ? '<g transform=\"rotate(' + mood.angle") && tpl16.includes('<p class="mood-na" role="status"><b>산출 불가</b></p>'));
 
     /*
+     * 기여도는 몫(%)을 크게, 점수(점)는 작게 (2026-11-25 사용자: "0.## 이라는 숫자를 보고 이해를 못하겠네").
+     * 몫 계산은 lib/contribution.mjs 한 곳 — 미리보기에는 그 함수가 글자 그대로 들어 있어야 한다.
+     */
+    {
+      const contribLib = await readFile('src/lib/contribution.mjs', 'utf8');
+      const contribFn = contribLib.slice(contribLib.indexOf('export function contributionShares')).replace(/^export /, '').trim();
+      const indented = contribFn.split('\n').map((l) => (l ? '  ' + l : l)).join('\n');
+      const { contributionShares } = await import('../src/lib/contribution.mjs');
+      const bars = await readFile('src/components/charts/ContributionBars.tsx', 'utf8');
+      const demoRow = contributionShares([0.72, 0, 0.67, 0.32, 2.06, 0.99, 0.73]);
+      check('기여도는 몫(%)으로 — 오른 쪽과 내린 쪽을 합쳐 100%',
+        demoRow.rows.map((r) => r.text).join(' ') === '13% 0% 12% 6% 38% 18% 13%' && demoRow.net === 5.5 &&
+        contributionShares([3, -1]).rows.map((r) => r.text).join(' ') === '75% 25%' &&
+        contributionShares([1, null]).rows[1].text === '결측',
+        demoRow.rows.map((r) => r.text).join(' '));
+      check('앱 기여도 막대가 몫을 크게, 점수를 작게',
+        bars.includes("import { contributionShares } from '@/lib/contribution.mjs';") &&
+        bars.includes('`${GLYPH[row.dir]} ${row.text}`') && bars.includes('{formatSigned(v, 1)}점') &&
+        bars.includes('지표별로 나누면') && bars.includes('합쳐 100%') && !bars.includes('기여도 (점)'));
+      check('미리보기 기여도 — 같은 함수를 글자 그대로, 같은 몫 · 같은 설명',
+        tpl16.includes('\n  ' + indented.trimStart() + '\n') &&
+        tpl16.includes('const contribShares = contributionShares(f.components.map((c) => c.contributionDay));') &&
+        tpl16.includes("(CONTRIB_GLYPH[r.dir] + ' ' + r.text).trim()") && tpl16.includes('지표별로 나누면') &&
+        tpl16.includes('합쳐 100%') && !tpl16.includes('기여도 (점)'));
+    }
+    check('심리 상세 요약 카드도 홈 카드와 같은 배경 (mood-cover · 단계 색)',
+      reasonDetail.includes('<div className="card mood-cover p-3" style={{ \'--ink\': scoreColor(detail.score) } as React.CSSProperties}>') &&
+      tpl16.includes('<section class="block"><div class="card mood-cover" style="padding:12px;--ink:\' + scoreColor(f.score) + \'">'));
+
+    /*
      * 시장 위험 신호등 여섯 장을 홈에서 뺐다.
      *
      * 그 블록은 "빨간불은 '위험하니 팔아라' 가 아니라 '이 지표가 평소보다 크게

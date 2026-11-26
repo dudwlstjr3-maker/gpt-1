@@ -348,7 +348,8 @@ function Posts({ state, busy, act }: { state: PlazaState; busy: boolean; act: Ac
                     disabled={!state.me || busy}
                     onClick={() => void act({ action: 'like', id: p.id })}
                   >
-                    ♡ 공감 {p.likes}
+                    {/* 누른 상태를 색 · 굵기만으로 두지 않고 기호도 바꾼다 (AGENTS.md 4절) */}
+                    {p.liked ? '♥' : '♡'} 공감 {p.likes}
                   </button>
                   {!p.mine ? (
                     <button

@@ -4033,7 +4033,7 @@ async function main() {
       /const ns = \(ctx: PlazaCtx\) => `zt:\$\{ctx\.mode\.toLowerCase\(\)\}:`/.test(svc) &&
       /if \(ctx\.mode !== 'DEMO' \|\| ctx\.store\.kind !== 'memory'\) return;/.test(svc));
     check('IP 를 저장소에 남기지 않음 (요청 수 제한은 서버 메모리에서만)', !/\bip\b/i.test(svc) && /rateLimit\(`plaza:\$\{clientIp\(req\)\}`/.test(route));
-    check('관리자 삭제는 PLAZA_ADMIN_KEY(16자 이상)일 때만', /k && k\.length >= 16 \? k : null/.test(cfg) && /if \(!admin \|\| req\.headers\.get\('x-plaza-admin'\) !== admin\)/.test(route));
+    check('관리자 삭제는 PLAZA_ADMIN_KEY(16자 이상)일 때만', /k && k\.length >= 16 \? k : null/.test(cfg) && /if \(!isAdmin\(req\.headers\.get\('x-plaza-admin'\), admin\)\)/.test(route) && /timingSafeEqual\(h\(given\), h\(admin\)\)/.test(route));
     const plazaWords = page + home + txt + (tplP.match(/function viewPlaza\(\) \{[\s\S]*?\n  \}\n/)?.[0] ?? '');
     check('사고팔라는 말을 쓰지 않음 (오른다 / 내린다)', !/매수|매도|사세요|파세요|추천/.test(plazaWords) && /plazaPick/.test(page) && /'▲ 오른다'/.test(txt));
     check('상금 없음 · 투자 실력 아님 · 회원 글은 투자 조언 아님을 적음',
@@ -4128,6 +4128,9 @@ async function main() {
     check('탈퇴 — 회원 · 계정 열쇠 · 순위 · 기록 · 내 글 · 마감 전 선택을 지움',
       /\['DEL', K\(ctx, 'u', uid\), K\(ctx, 'h', uid\)/.test(svc) && /\['DEL', K\(ctx, 'acct'/.test(svc) && /\['ZREM', K\(ctx, 'lb'\), uid\]/.test(svc) &&
       /\['HDEL', K\(ctx, 'posts'\), pid\], \['LREM', K\(ctx, 'posts', 'ids'\), 0, pid\]/.test(svc) && /HDEL', K\(ctx, 'r', m, roundsAt/.test(svc));
+    check('탈퇴 — 진행 중 · 채점 끝난 판의 내 선택과 남의 글에 누른 공감 · 신고에서도 나를 뺌',
+      /\['SADD', K\(ctx, 'urd', uid\), `\$\{m\}:\$\{open\}`\]/.test(svc) && /\['SMEMBERS', K\(ctx, 'urd', uid\)\]/.test(svc) &&
+      /\['HDEL', K\(ctx, 'r', m, date\), uid\]/.test(svc) && /\['SREM', K\(ctx, 'lk', pid\), uid\]/.test(svc) && /\['SREM', K\(ctx, 'rp', pid\), uid\]/.test(svc));
     const policy = priv;
     check('개인정보 처리방침 — 받는 것 · 가림 · 탈퇴 · 맡기는 곳(국외) · 쿠키 · 문의를 적음',
       ['받는 정보', '가운데를 가려', '탈퇴', 'Vercel', 'Upstash', '국외', 'zt_session', '문의'].every((w) => policy.includes(w)) &&

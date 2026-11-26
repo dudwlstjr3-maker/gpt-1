@@ -10,6 +10,7 @@
  * 응답은 사람마다 다르므로 캐시하지 않는다.
  */
 
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/server/cache';
 import { CLIENT_RATE_LIMIT_PER_MIN, getPlazaAdminKey } from '@/server/config';
@@ -25,6 +26,13 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 
 function clientIp(req: NextRequest): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.headers.get('x-real-ip') ?? 'local';
+}
+
+/** 관리자 키 비교 — 글자마다 걸리는 시간이 달라 키를 한 글자씩 짐작해 내지 못하게, 해시를 시간 일정하게 견준다 */
+function isAdmin(given: string | null, admin: string | null): boolean {
+  if (!admin || !given) return false;
+  const h = (s: string) => createHash('sha256').update(s).digest();
+  return timingSafeEqual(h(given), h(admin));
 }
 
 function fail(e: unknown) {
@@ -67,7 +75,7 @@ export async function POST(req: NextRequest) {
     const action = String(body.action ?? '');
     if (action === 'delete') {
       const admin = getPlazaAdminKey();
-      if (!admin || req.headers.get('x-plaza-admin') !== admin) {
+      if (!isAdmin(req.headers.get('x-plaza-admin'), admin)) {
         return NextResponse.json({ error: '관리자만 지울 수 있어요.' }, { status: 403, headers: NO_STORE });
       }
       await adminDelete(ctx, body.id);

@@ -83,20 +83,30 @@ export async function loginAccount(
 ): Promise<string> {
   const display = maskName(rawName) || '회원';
   const acct = accountKey(provider, subject, secret);
-  const fresh = randomBytes(8).toString('hex');
-  const [set] = await ctx.store.exec([['SET', K(ctx, 'acct', acct), fresh, 'NX']], { write: true });
-  if (set === 'OK') {
+  const profile = (): Cmd => [
+    'acct', acct, 'via', provider, 'created', ctx.now,
+    'rating', RATING_START, 'played', 0, 'correct', 0, 'streak', 0, 'best', 0, 'ex', 0,
+  ];
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const fresh = randomBytes(8).toString('hex');
+    const [set] = await ctx.store.exec([['SET', K(ctx, 'acct', acct), fresh, 'NX']], { write: true });
+    if (set === 'OK') {
+      await ctx.store.exec([['HSET', K(ctx, 'u', fresh), 'nick', display, 'real', real ? 1 : 0, ...profile()]], { write: true });
+      return fresh;
+    }
+    const [uid] = await ctx.store.exec([['GET', K(ctx, 'acct', acct)]]);
+    const id = asStr(uid);
+    // 그 사이 탈퇴로 열쇠가 지워졌으면 처음부터 다시 만든다 (uid 없이 쿠키를 심지 않는다)
+    if (!id) continue;
+    // 지난번 계정 만들기가 열쇠만 남기고 끊겼으면 빈 칸을 채운다
+    const [created] = await ctx.store.exec([['HGET', K(ctx, 'u', id), 'created']]);
     await ctx.store.exec(
-      [['HSET', K(ctx, 'u', fresh), 'nick', display, 'real', real ? 1 : 0, 'acct', acct, 'via', provider, 'created', ctx.now,
-        'rating', RATING_START, 'played', 0, 'correct', 0, 'streak', 0, 'best', 0, 'ex', 0]],
+      [['HSET', K(ctx, 'u', id), 'nick', display, 'real', real ? 1 : 0, ...(asStr(created) ? [] : profile())]],
       { write: true },
     );
-    return fresh;
+    return id;
   }
-  const [uid] = await ctx.store.exec([['GET', K(ctx, 'acct', acct)]]);
-  const id = asStr(uid) as string;
-  await ctx.store.exec([['HSET', K(ctx, 'u', id), 'nick', display, 'real', real ? 1 : 0]], { write: true });
-  return id;
+  throw new PlazaError(503, '로그인을 마치지 못했어요. 잠시 뒤에 다시 해 주세요.');
 }
 
 /** 쿠키의 uid 가 아직 있는 회원인가 (탈퇴했으면 null) */
@@ -111,15 +121,36 @@ export async function authenticate(ctx: PlazaCtx, uid: string | null): Promise<s
  * 이미 채점이 끝난 판의 '몇 명이 어느 쪽' 숫자는 남는다(누구인지 알 수 없는 합계라서).
  */
 export async function leave(ctx: PlazaCtx, uid: string): Promise<void> {
-  const [acct, mine] = await ctx.store.exec([['HGET', K(ctx, 'u', uid), 'acct'], ['SMEMBERS', K(ctx, 'up', uid)]]);
-  const pids = Array.isArray(mine) ? mine.map((x) => asStr(x) ?? '').filter(Boolean) : [];
+  const [acct, mine, rounds, liked, reported] = await ctx.store.exec([
+    ['HGET', K(ctx, 'u', uid), 'acct'],
+    ['SMEMBERS', K(ctx, 'up', uid)],
+    ['SMEMBERS', K(ctx, 'urd', uid)],
+    ['SMEMBERS', K(ctx, 'ul', uid)],
+    ['SMEMBERS', K(ctx, 'ur', uid)],
+  ]);
+  const list = (r: Reply) => (Array.isArray(r) ? r.map((x) => asStr(x) ?? '').filter(Boolean) : []);
+  const pids = list(mine);
   const cmds: Cmd[] = [
-    ['DEL', K(ctx, 'u', uid), K(ctx, 'h', uid), K(ctx, 'ul', uid), K(ctx, 'ur', uid), K(ctx, 'up', uid)],
+    ['DEL', K(ctx, 'u', uid), K(ctx, 'h', uid), K(ctx, 'ul', uid), K(ctx, 'ur', uid), K(ctx, 'up', uid), K(ctx, 'urd', uid)],
     ['ZREM', K(ctx, 'lb'), uid],
     ['HDEL', K(ctx, 'lbinfo'), uid],
   ];
   if (asStr(acct)) cmds.push(['DEL', K(ctx, 'acct', asStr(acct) as string)]);
-  for (const pid of pids) cmds.push(['HDEL', K(ctx, 'posts'), pid], ['LREM', K(ctx, 'posts', 'ids'), 0, pid]);
+  for (const pid of pids) {
+    cmds.push(
+      ['HDEL', K(ctx, 'posts'), pid], ['LREM', K(ctx, 'posts', 'ids'), 0, pid],
+      ['DEL', K(ctx, 'lk', pid), K(ctx, 'rp', pid)], ['HDEL', K(ctx, 'likes'), pid], ['HDEL', K(ctx, 'reports'), pid],
+    );
+  }
+  // 남의 글에 누른 공감 · 신고에서 내 이름(uid)을 뺀다. 공감 수는 함께 줄이고, 신고 수(누구인지 모르는 합계)는 남긴다
+  const own = new Set(pids);
+  for (const pid of list(liked)) if (!own.has(pid)) cmds.push(['SREM', K(ctx, 'lk', pid), uid], ['HINCRBY', K(ctx, 'likes'), pid, -1]);
+  for (const pid of list(reported)) if (!own.has(pid)) cmds.push(['SREM', K(ctx, 'rp', pid), uid]);
+  // 내가 고른 모든 판(마감 전 · 진행 중 · 채점 끝)에서 내 선택을 지운다. 채점 끝난 판의 합계(rm)는 남는다
+  for (const r of list(rounds)) {
+    const [m, date] = r.split(':');
+    if (GAME_MARKET_IDS.includes(m as GameMarketId) && /^\d{4}-\d{2}-\d{2}$/.test(date)) cmds.push(['HDEL', K(ctx, 'r', m, date), uid]);
+  }
   for (const m of GAME_MARKET_IDS) cmds.push(['HDEL', K(ctx, 'r', m, roundsAt(ctx.now, m, HOLIDAYS[m]).open), uid]);
   await ctx.store.exec(cmds, { write: true });
 }
@@ -136,13 +167,18 @@ export async function predict(ctx: PlazaCtx, uid: string, market: unknown, pick:
     [
       ['HSET', K(ctx, 'r', m, open), uid, pick],
       ['SADD', K(ctx, 'pending'), `${m}:${open}`],
+      // 탈퇴할 때 내 선택이 남은 판을 모두 찾아 지우려고
+      ['SADD', K(ctx, 'urd', uid), `${m}:${open}`],
     ],
     { write: true },
   );
 }
 
-/** 그 시장 종가 표 — 같은 날 여러 번 부르지 않게 10분 기억한다 */
-async function closesFor(ctx: PlazaCtx, m: GameMarketId): Promise<Map<string, number>> {
+/**
+ * 그 시장 종가 표 — 같은 날 여러 번 부르지 않게 10분 기억한다.
+ * fetchedAt 을 함께 돌려준다: 채점 시각 전에 받은 표의 '오늘' 값은 종가가 아니라 장중 값일 수 있다.
+ */
+async function closesFor(ctx: PlazaCtx, m: GameMarketId): Promise<{ table: Map<string, number>; fetchedAt: number }> {
   const g = GAME_MARKETS[m];
   const res = await swr(
     `${ctx.mode}:plaza-closes:${m}:${dayKey(ctx.now)}`,
@@ -152,7 +188,7 @@ async function closesFor(ctx: PlazaCtx, m: GameMarketId): Promise<Map<string, nu
     },
     { ttlMs: 10 * 60_000, maxStaleMs: 60 * 60_000 },
   );
-  return new Map(res.value);
+  return { table: new Map(res.value), fetchedAt: res.fetchedAt };
 }
 
 function lastBefore(closes: Map<string, number>, date: string): number | null {
@@ -166,13 +202,8 @@ function lastBefore(closes: Map<string, number>, date: string): number | null {
  * 자료가 아직 없으면 두고, 7일이 지나도 없으면 무효로 닫는다(0 으로 채우지 않는다).
  */
 export async function resolvePending(ctx: PlazaCtx): Promise<number> {
-  const lock = K(ctx, 'lock', 'resolve');
-  const [got] = await ctx.store.exec([['SET', lock, '1', 'NX', 'EX', 60]], { write: true });
-  if (got !== 'OK') return 0;
-  let resolved = 0;
-  try {
-    const [pend] = await ctx.store.exec([['SMEMBERS', K(ctx, 'pending')]]);
-    const due = (Array.isArray(pend) ? pend.map((x) => asStr(x) ?? '') : [])
+  const dueOf = (pend: Reply | undefined) =>
+    (Array.isArray(pend) ? pend.map((x) => asStr(x) ?? '') : [])
       .map((s) => {
         const [m, date] = s.split(':');
         return { m: m as GameMarketId, date, raw: s };
@@ -180,12 +211,26 @@ export async function resolvePending(ctx: PlazaCtx): Promise<number> {
       .filter((r) => GAME_MARKET_IDS.includes(r.m) && /^\d{4}-\d{2}-\d{2}$/.test(r.date))
       .filter((r) => roundTimes(r.m, r.date).resolveAt <= ctx.now)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // 채점할 판이 없으면 잠금을 잡지 않는다 — 광장을 열 때마다 저장소에 쓰지 않게
+  const [peek] = await ctx.store.exec([['SMEMBERS', K(ctx, 'pending')]]);
+  if (!dueOf(peek).length) return 0;
+
+  const lock = K(ctx, 'lock', 'resolve');
+  const token = randomBytes(8).toString('hex');
+  const [got] = await ctx.store.exec([['SET', lock, token, 'NX', 'EX', 60]], { write: true });
+  if (got !== 'OK') return 0;
+  let resolved = 0;
+  try {
+    const [pend] = await ctx.store.exec([['SMEMBERS', K(ctx, 'pending')]]);
+    const due = dueOf(pend);
     if (!due.length) return 0;
 
-    const closes: Partial<Record<GameMarketId, Map<string, number>>> = {};
+    const closes: Partial<Record<GameMarketId, { table: Map<string, number>; fetchedAt: number }>> = {};
     for (const r of due) {
-      closes[r.m] ??= await closesFor(ctx, r.m).catch(() => new Map<string, number>());
-      const table = closes[r.m]!;
+      closes[r.m] ??= await closesFor(ctx, r.m).catch(() => ({ table: new Map<string, number>(), fetchedAt: ctx.now }));
+      const { table, fetchedAt } = closes[r.m]!;
+      // 채점 시각 전에 받아 둔 표(캐시)에는 그날 종가 대신 장중 값이 들어 있을 수 있다 — 새 표가 올 때까지 둔다
+      if (fetchedAt < roundTimes(r.m, r.date).resolveAt) continue;
       const c = table.get(r.date) ?? null;
       const p = table.get(prevTradingDay(r.date, HOLIDAYS[r.m])) ?? lastBefore(table, r.date);
       let result: PlazaResult;
@@ -199,7 +244,9 @@ export async function resolvePending(ctx: PlazaCtx): Promise<number> {
       resolved += 1;
     }
   } finally {
-    await ctx.store.exec([['DEL', lock]], { write: true });
+    // 내 잠금일 때만 푼다 — 60초가 지나 다른 곳이 새로 잡은 잠금을 지우지 않게
+    const [held] = await ctx.store.exec([['GET', lock]]);
+    if (asStr(held) === token) await ctx.store.exec([['DEL', lock]], { write: true });
   }
   return resolved;
 }
@@ -207,7 +254,12 @@ export async function resolvePending(ctx: PlazaCtx): Promise<number> {
 async function settle(
   ctx: PlazaCtx, m: GameMarketId, date: string, raw: string, result: PlazaResult, close: number | null, prev: number | null,
 ): Promise<void> {
-  const [all] = await ctx.store.exec([['HGETALL', K(ctx, 'r', m, date)]]);
+  const [all, done] = await ctx.store.exec([['HGETALL', K(ctx, 'r', m, date)], ['HGET', K(ctx, 'rm', m, date), 'result']]);
+  // 이미 채점된 판이면 대기 목록에서만 뺀다 — 두 번 채점해 레이팅 · 기록이 두 번 움직이지 않게
+  if (asStr(done)) {
+    await ctx.store.exec([['SREM', K(ctx, 'pending'), raw]], { write: true });
+    return;
+  }
   const preds = pairs(all).filter(([, v]) => v === 'up' || v === 'down') as [string, PlazaPick][];
   const ups = preds.filter(([, v]) => v === 'up').length;
   const downs = preds.length - ups;
@@ -381,29 +433,67 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
   // 채점이 실패해도 광장은 열린다 — 판은 다음에 다시 채점한다
   await resolvePending(ctx).catch(() => 0);
 
-  const markets: PlazaMarketRounds[] = [];
-  for (const m of GAME_MARKET_IDS) {
+  /*
+   * 저장소(Upstash REST)는 부를 때마다 한 번 오간다. 그래서 읽기를 세 묶음으로 모은다 —
+   * ① 판 · 순위표 · 나 · 글 목록 ② 지난 판 결과 · 순위표 이름 · 글 본문 ③ 글쓴이 레이팅.
+   */
+  const rounds = GAME_MARKET_IDS.map((m) => ({ m, ...roundsAt(ctx.now, m, HOLIDAYS[m]) }));
+  const first: Cmd[] = rounds.flatMap(({ m, open, running }) => [
+    ['HGETALL', K(ctx, 'r', m, open)],
+    running ? ['HGETALL', K(ctx, 'r', m, running)] : ['HGETALL', K(ctx, 'none')],
+    ['LRANGE', K(ctx, 'done', m), 0, 4],
+  ] as Cmd[]);
+  const iLb = first.length;
+  first.push(['ZREVRANGE', K(ctx, 'lb'), 0, 19, 'WITHSCORES'], ['ZCARD', K(ctx, 'lb')]);
+  const iIds = first.length;
+  first.push(['LRANGE', K(ctx, 'posts', 'ids'), 0, FEED_SIZE - 1]);
+  const iMe = first.length;
+  if (uid) {
+    first.push(
+      ['HGETALL', K(ctx, 'u', uid)],
+      ['ZREVRANK', K(ctx, 'lb'), uid],
+      ['LRANGE', K(ctx, 'h', uid), 0, 9],
+      ['SMEMBERS', K(ctx, 'ul', uid)],
+      ['SMEMBERS', K(ctx, 'ur', uid)],
+    );
+  }
+  const r1st = await ctx.store.exec(first);
+
+  const doneDates = rounds.map((_, k) => {
+    const l = r1st[k * 3 + 2];
+    return Array.isArray(l) ? l.map((x) => asStr(x) ?? '').filter(Boolean) : [];
+  });
+  const topPairs = pairs(r1st[iLb]);
+  const ranked = r1st[iLb + 1];
+  const ids = r1st[iIds];
+  const idList = Array.isArray(ids) ? ids.map((x) => asStr(x) ?? '').filter(Boolean) : [];
+
+  const second: Cmd[] = [];
+  const metaAt = rounds.map(({ m }, k) => {
+    const at = second.length;
+    for (const d of doneDates[k]) second.push(['HGETALL', K(ctx, 'rm', m, d)], uid ? ['HGET', K(ctx, 'r', m, d), uid] : ['GET', K(ctx, 'none')]);
+    return at;
+  });
+  const iInfo = second.length;
+  if (topPairs.length) second.push(['HMGET', K(ctx, 'lbinfo'), ...topPairs.map(([u]) => u)]);
+  const iPosts = second.length;
+  if (idList.length) {
+    second.push(['HMGET', K(ctx, 'posts'), ...idList], ['HMGET', K(ctx, 'likes'), ...idList], ['HMGET', K(ctx, 'reports'), ...idList]);
+  }
+  const r2nd = second.length ? await ctx.store.exec(second) : [];
+
+  const tally = (r: Reply) => {
+    const p = pairs(r);
+    const ups = p.filter(([, v]) => v === 'up').length;
+    return { n: p.length, ups, downs: p.length - ups, mine: (uid ? (p.find(([k]) => k === uid)?.[1] ?? null) : null) as PlazaPick | null };
+  };
+  const markets: PlazaMarketRounds[] = rounds.map(({ m, open, running }, k) => {
     const g = GAME_MARKETS[m];
-    const { open, running } = roundsAt(ctx.now, m, HOLIDAYS[m]);
-    const [openAll, runAll, doneList] = await ctx.store.exec([
-      ['HGETALL', K(ctx, 'r', m, open)],
-      running ? ['HGETALL', K(ctx, 'r', m, running)] : ['HGETALL', K(ctx, 'none')],
-      ['LRANGE', K(ctx, 'done', m), 0, 4],
-    ]);
-    const tally = (r: Reply) => {
-      const p = pairs(r);
-      const ups = p.filter(([, v]) => v === 'up').length;
-      return { n: p.length, ups, downs: p.length - ups, mine: (uid ? (p.find(([k]) => k === uid)?.[1] ?? null) : null) as PlazaPick | null };
-    };
-    const o = tally(openAll);
-    const rn = tally(runAll);
-    const dates = Array.isArray(doneList) ? doneList.map((x) => asStr(x) ?? '').filter(Boolean) : [];
-    const metas = dates.length
-      ? await ctx.store.exec(dates.flatMap((d) => [['HGETALL', K(ctx, 'rm', m, d)], uid ? ['HGET', K(ctx, 'r', m, d), uid] : ['GET', K(ctx, 'none')]] as Cmd[]))
-      : [];
-    const recent = dates.map((date, i) => {
-      const meta = Object.fromEntries(pairs(metas[i * 2]));
-      const myPick = (asStr(metas[i * 2 + 1]) as PlazaPick | null) ?? null;
+    const o = tally(r1st[k * 3]);
+    const rn = tally(r1st[k * 3 + 1]);
+    const recent = doneDates[k].map((date, i) => {
+      const meta = Object.fromEntries(pairs(r2nd[metaAt[k] + i * 2]));
+      const myPick = (asStr(r2nd[metaAt[k] + i * 2 + 1]) as PlazaPick | null) ?? null;
       const result = (meta.result ?? 'void') as PlazaResult;
       const ups = Number(meta.ups ?? 0);
       const downs = Number(meta.downs ?? 0);
@@ -418,7 +508,7 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
         myDelta: myPick ? ratingDelta(myPick, result, ups, downs) : null,
       };
     });
-    markets.push({
+    return {
       market: m,
       name: g.name,
       region: g.region,
@@ -434,15 +524,11 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
         ? { date: running, resolveAt: new Date(roundTimes(m, running).resolveAt).toISOString(), n: rn.n, ups: rn.ups, downs: rn.downs, myPick: rn.mine }
         : null,
       recent,
-    });
-  }
+    };
+  });
 
   /* 순위표 */
-  const [top, ranked] = await ctx.store.exec([['ZREVRANGE', K(ctx, 'lb'), 0, 19, 'WITHSCORES'], ['ZCARD', K(ctx, 'lb')]]);
-  const topPairs = pairs(top);
-  const [infos] = topPairs.length
-    ? await ctx.store.exec([['HMGET', K(ctx, 'lbinfo'), ...topPairs.map(([u]) => u)]])
-    : [[]];
+  const infos = topPairs.length ? r2nd[iInfo] : [];
   const leaderboard: PlazaLeader[] = topPairs.map(([u, score], i) => {
     const info = JSON.parse(asStr((infos as Reply[])[i]) ?? '{}');
     return {
@@ -462,13 +548,7 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
   let likedSet = new Set<string>();
   let reportedSet = new Set<string>();
   if (uid) {
-    const [u, rank, hist, ul, ur] = await ctx.store.exec([
-      ['HGETALL', K(ctx, 'u', uid)],
-      ['ZREVRANK', K(ctx, 'lb'), uid],
-      ['LRANGE', K(ctx, 'h', uid), 0, 9],
-      ['SMEMBERS', K(ctx, 'ul', uid)],
-      ['SMEMBERS', K(ctx, 'ur', uid)],
-    ]);
+    const [u, rank, hist, ul, ur] = r1st.slice(iMe, iMe + 5);
     const f = Object.fromEntries(pairs(u));
     me = {
       name: f.nick ?? '',
@@ -486,15 +566,9 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
   }
 
   /* 한 줄 토론 */
-  const [ids] = await ctx.store.exec([['LRANGE', K(ctx, 'posts', 'ids'), 0, FEED_SIZE - 1]]);
-  const idList = Array.isArray(ids) ? ids.map((x) => asStr(x) ?? '').filter(Boolean) : [];
   let posts: PlazaPost[] = [];
   if (idList.length) {
-    const [raws, likes, reps] = await ctx.store.exec([
-      ['HMGET', K(ctx, 'posts'), ...idList],
-      ['HMGET', K(ctx, 'likes'), ...idList],
-      ['HMGET', K(ctx, 'reports'), ...idList],
-    ]);
+    const [raws, likes, reps] = r2nd.slice(iPosts, iPosts + 3);
     const items = idList
       .map((id, i) => ({ id, raw: asStr((raws as Reply[])[i]), likes: asNum((likes as Reply[])[i]), reports: asNum((reps as Reply[])[i]) }))
       .filter((x) => x.raw);

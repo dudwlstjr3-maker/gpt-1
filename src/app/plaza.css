@@ -36,6 +36,15 @@
 .pz-btn:focus-visible, .pz-pick:focus-visible, .pz-small:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pz-list { padding-left: 16px; }
 .pz-hint { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted-fg, var(--muted)); word-break: keep-all; }
+/* 카카오 로그인 단추 — 카카오 디자인 가이드의 노랑 바탕 · 검정 글자 */
+.pz-kakao {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border: 0; border-radius: var(--box-radius);
+  background: #fee500; color: rgba(0, 0, 0, .85); font: inherit; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer;
+}
+.pz-kakao:disabled { opacity: .5; cursor: not-allowed; }
+.pz-kakao:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pz-row { margin-top: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pz-link { display: inline-flex; align-items: center; min-height: 32px; font-size: 13px; color: var(--accent); text-decoration: underline; }
 .pz-err { margin: 8px 0 0; font-size: 13px; color: var(--danger); }
 .pz-more > summary { min-height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--fg); cursor: pointer; }
 .pz-key { margin: 8px 0 0; padding: 8px 12px; border-radius: var(--box-radius); background: var(--surface-2); font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: .04em; color: var(--fg-strong); word-break: break-all; }

@@ -3262,13 +3262,23 @@ __PLAZA_CSS__
      데이터는 미리보기를 구울 때 DEMO 서버의 /api/plaza 에서 받은 것(예시 회원 · 예시 글)이다. */
   __PLAZA_TEXT__
 
-  const PLAZA_PREVIEW_NOTE = '미리보기에서는 참여할 수 없어요. 앱에서 닉네임을 정하면 고르고 글을 올릴 수 있어요.';
+  const PLAZA_PREVIEW_NOTE = '미리보기에서는 참여할 수 없어요. 앱에서 카카오로 로그인하면 고르고 글을 올릴 수 있어요.';
+
+  __PRIVACY_TEXT__
+
+  /* 개인정보 처리방침 — 앱 /privacy 와 같은 글(src/lib/privacyText.mjs). 문의처는 앱의 PLAZA_CONTACT 라 미리보기에서는 비운다 */
+  function viewPrivacy() {
+    return '<div class="plaza"><div><div class="pz-head"><h1>개인정보 처리방침</h1></div>' +
+      '<p class="pz-lede">쫄탐광장(다음 거래일 맞히기 · 한 줄 토론)에서 다루는 개인정보입니다. 시행일 ' + esc(PRIVACY_EFFECTIVE) + '.</p></div>' +
+      privacySections(null).map((s) => '<section class="pz-sec"><h2>' + esc(s.title) + '</h2><div class="pz-card"><ul class="pz-hint pz-list" style="margin:0">' +
+        s.body.map((b) => '<li>' + esc(b) + '</li>').join('') + '</ul></div></section>').join('') + '</div>';
+  }
 
   function homePlazaCard() {
     const st = DATA.plaza;
     if (!st) return '';
     return '<section class="pz-card pz-home" aria-labelledby="home-plaza-title">' +
-      '<div class="pz-home-head"><h3 id="home-plaza-title">쫄탐광장 · 다음 거래일 맞히기</h3><span>닉네임만 정하면 참여</span></div>' +
+      '<div class="pz-home-head"><h3 id="home-plaza-title">쫄탐광장 · 다음 거래일 맞히기</h3><span>카카오로 로그인하면 참여</span></div>' +
       '<ul>' + st.markets.map((m) => '<li><b>' + esc(m.name) + ' ' + esc(plazaDay(m.open.date)) + '</b><span>' +
         m.open.n.toLocaleString('ko-KR') + '명 참여</span></li>').join('') + '</ul>' +
       '<button type="button" class="pz-go" data-go="plaza">오를까 내릴까 맞히러 가기 →</button></section>';
@@ -3285,7 +3295,7 @@ __PLAZA_CSS__
         '<p class="pz-q">직전 거래일 종가보다 오를까요, 내릴까요?</p>' +
         '<div class="pz-picks" role="group" aria-label="' + esc(m.name) + ' 고르기">' +
         ['up', 'down'].map((pk) => '<button type="button" class="pz-pick" aria-pressed="false" disabled>' + plazaPick(pk) + '</button>').join('') + '</div>' +
-        '<p class="pz-meta">마감 ' + esc(plazaKst(o.cutoff)) + ' (한국시간) · ' + o.n.toLocaleString('ko-KR') + '명 참여 · 닉네임을 정하면 고를 수 있어요</p>' +
+        '<p class="pz-meta">마감 ' + esc(plazaKst(o.cutoff)) + ' (한국시간) · ' + o.n.toLocaleString('ko-KR') + '명 참여 · 로그인하면 고를 수 있어요</p>' +
         (m.running
           ? '<p class="pz-running">' + esc(plazaDay(m.running.date)) + ' 장 진행 중 — 결과는 ' + esc(plazaKst(m.running.resolveAt)) + ' 이후 · ' + m.running.n.toLocaleString('ko-KR') + '명</p>'
           : '') +
@@ -3299,13 +3309,13 @@ __PLAZA_CSS__
         '</article>';
     };
     const lb = st.leaderboard.length
-      ? '<table class="pz-table"><thead><tr><th scope="col">순위</th><th scope="col">닉네임</th><th scope="col">레이팅</th></tr></thead><tbody>' +
-        st.leaderboard.map((l) => '<tr><td class="rank">' + l.rank + '</td><td>' + esc(l.nick) + (l.example ? '<span class="pz-tag">예시</span>' : '') +
+      ? '<table class="pz-table"><thead><tr><th scope="col">순위</th><th scope="col">이름</th><th scope="col">레이팅</th></tr></thead><tbody>' +
+        st.leaderboard.map((l) => '<tr><td class="rank">' + l.rank + '</td><td>' + esc(l.name) + (l.real ? '<span class="pz-tag">' + PLAZA_REAL_TAG + '</span>' : '') + (l.example ? '<span class="pz-tag">예시</span>' : '') +
           '<span class="acc">' + esc(plazaAccuracy(l.correct, l.played)) + '</span></td><td>' + l.rating.toLocaleString('ko-KR') + '</td></tr>').join('') +
         '</tbody></table>'
       : '<p class="pz-hint" style="margin:0">아직 순위에 오른 사람이 없어요. 결과가 ' + st.rules.minPlayed + '판 이상 나면 올라요.</p>';
     const posts = st.posts.length
-      ? '<ul class="pz-posts">' + st.posts.map((q) => '<li class="pz-post"><div class="pz-post-head"><b>' + esc(q.nick) + '</b>' +
+      ? '<ul class="pz-posts">' + st.posts.map((q) => '<li class="pz-post"><div class="pz-post-head"><b>' + esc(q.name) + '</b>' + (q.real ? '<span class="pz-tag">' + PLAZA_REAL_TAG + '</span>' : '') +
           (q.rating !== null ? '<span>' + q.rating.toLocaleString('ko-KR') + '</span>' : '') +
           '<span>' + esc(plazaAgo(q.t, now)) + '</span>' + (q.example ? '<span class="pz-tag">예시</span>' : '') + '</div>' +
           (q.text !== null ? '<p>' + esc(q.text) + '</p>' : '<p class="hidden">신고가 쌓여 가려진 글이에요.</p>') +
@@ -3316,10 +3326,10 @@ __PLAZA_CSS__
       '<div><div class="pz-head"><h1>쫄탐광장</h1>' + modeBadge() + '</div>' +
       '<p class="pz-lede">' + esc(PLAZA_LEDE) + '</p>' +
       '<p class="pz-note">' + esc(PLAZA_PREVIEW_NOTE) + '</p></div>' +
-      '<section class="pz-card" aria-labelledby="pz-join-title"><h2 id="pz-join-title" style="margin:0 0 8px;font-size:15px;font-weight:750">닉네임만 정하면 바로 참여</h2>' +
-      '<div class="pz-form"><input aria-label="닉네임" placeholder="' + st.rules.nickMin + '~' + st.rules.nickMax + '자 (한글 · 영문 · 숫자)" disabled>' +
-      '<button type="button" class="pz-btn primary" disabled>참여하기</button></div>' +
-      '<p class="pz-hint">가입 · 이메일 · 전화번호가 필요 없어요. 참여하면 복구 코드를 하나 드려요.</p></section>' +
+      /* 로그인은 카카오만 (앱 Account 와 같은 문구). 미리보기에는 서버가 없어 단추를 잠근다 */
+      '<section class="pz-card" aria-labelledby="pz-join-title"><h2 id="pz-join-title" style="margin:0 0 8px;font-size:15px;font-weight:750">카카오로 로그인하고 참여</h2>' +
+      '<button type="button" class="pz-kakao" disabled>카카오 로그인</button>' +
+      '<p class="pz-hint">' + esc(PLAZA_LOGIN_NOTE) + ' <button type="button" class="pz-link linkbtn" data-go="privacy">개인정보 처리방침</button></p></section>' +
       '<section class="pz-sec" aria-labelledby="pz-game-title"><h2 id="pz-game-title">다음 거래일 맞히기 <small>장 시작 전까지 · 바꿀 수 있어요</small></h2>' +
       '<div class="pz-stack">' + st.markets.map(round).join('') + '</div></section>' +
       '<section class="pz-sec" aria-labelledby="pz-lb-title"><h2 id="pz-lb-title">순위표 <small>레이팅 순 · ' + st.ranked.toLocaleString('ko-KR') + '명</small></h2>' +
@@ -3327,7 +3337,7 @@ __PLAZA_CSS__
       '<details class="pz-more" style="margin-top:8px"><summary>레이팅은 어떻게 오르나요? ▾</summary><ul class="pz-hint pz-list">' +
       plazaRatingHelp(st.rules).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></details></div></section>' +
       '<section class="pz-sec" aria-labelledby="pz-talk-title"><h2 id="pz-talk-title">한 줄 토론 <small>신고 ' + st.rules.hideAfter + '번이면 가려져요</small></h2>' +
-      '<div class="pz-stack"><p class="pz-hint" style="margin:0">닉네임을 정하면 글을 올릴 수 있어요. ' + esc(PLAZA_POST_NOTE) + '</p>' + posts + '</div></section>' +
+      '<div class="pz-stack"><p class="pz-hint" style="margin:0">로그인하면 글을 올릴 수 있어요. ' + esc(PLAZA_POST_NOTE) + '</p>' + posts + '</div></section>' +
       '<p class="pz-foot">' + esc(PLAZA_FOOT) + '</p></div>';
   }
 
@@ -4872,6 +4882,7 @@ __PLAZA_CSS__
       fng: viewFng,
       regime: viewRegime,
       plaza: viewPlaza,
+      privacy: viewPrivacy,
     }[state.view];
     /*
      * 새 내용이 살짝 아래에서 올라오며 나타난다.

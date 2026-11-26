@@ -77,5 +77,8 @@ export function plazaRatingHelp(rules) {
 
 export const PLAZA_LEDE = '다음 거래일에 장이 오를지 내릴지 맞히고, 한 줄로 이야기해요. 상금이나 실제 돈은 없어요.';
 export const PLAZA_POST_NOTE = '회원 글은 개인 의견이며 투자 조언이 아니에요. 링크 · 리딩방 홍보 · 욕설은 올릴 수 없어요.';
-export const PLAZA_FOOT = '게임 점수는 투자 실력을 뜻하지 않아요. 닉네임 말고는 아무 개인정보도 받지 않아요.';
+export const PLAZA_FOOT = '게임 점수는 투자 실력을 뜻하지 않아요. 카카오에서 이름만 받고, 화면에는 가운데를 가려 보여 줘요. 탈퇴하면 기록과 글이 지워져요.';
+export const PLAZA_LOGIN_NOTE = '카카오 로그인으로 참여해요. 이름(실명)은 김*수 처럼 가운데를 가려서만 보여 주고, 다른 정보는 받지 않아요.';
+export const PLAZA_KAKAO_OFF = '카카오 로그인이 아직 설정되지 않았어요. 운영자가 카카오 앱을 연결하면 열려요.';
+export const PLAZA_REAL_TAG = '실명';
 export const PLAZA_MEMORY_NOTE = '지금은 기록이 서버 메모리에만 있어서, 서버가 다시 뜨면 사라져요.';

@@ -1245,7 +1245,10 @@ export interface PlazaMarketRounds {
 
 export interface PlazaLeader {
   rank: number;
-  nick: string;
+  /** 가운데를 가린 이름 (김*수) */
+  name: string;
+  /** 카카오 실명(이름) 항목으로 받은 이름이면 true, 카카오 닉네임이면 false */
+  real: boolean;
   rating: number;
   played: number;
   correct: number;
@@ -1256,7 +1259,8 @@ export interface PlazaLeader {
 
 export interface PlazaPost {
   id: string;
-  nick: string;
+  name: string;
+  real: boolean;
   /** 글쓴이 레이팅 (순위표 기준 판 수 미만이면 null) */
   rating: number | null;
   /** 가려진 글은 null (내 글이면 보인다) */
@@ -1279,7 +1283,8 @@ export interface PlazaHistoryItem {
 }
 
 export interface PlazaMe {
-  nick: string;
+  name: string;
+  real: boolean;
   rating: number;
   played: number;
   correct: number;
@@ -1300,5 +1305,7 @@ export interface PlazaState {
   /** 순위표에 오른 사람 수 */
   ranked: number;
   posts: PlazaPost[];
-  rules: { nickMin: number; nickMax: number; postMax: number; minPlayed: number; hideAfter: number; ratingStart: number; k: number };
+  /** 카카오 로그인이 설정됐는가 · DEMO 연습 로그인이 열려 있는가 */
+  auth: { kakao: boolean; demo: boolean };
+  rules: { postMax: number; minPlayed: number; hideAfter: number; ratingStart: number; k: number };
 }

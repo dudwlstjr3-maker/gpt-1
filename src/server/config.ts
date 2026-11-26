@@ -66,6 +66,28 @@ export function getPlazaAdminKey(): string | null {
   return k && k.length >= 16 ? k : null;
 }
 
+/**
+ * 카카오 로그인 (2026-11-26 — 사용자: "로그인은 카톡으로만, 실명으로").
+ * Kakao Developers → 내 애플리케이션 → 앱 키의 REST API 키, 보안의 Client Secret.
+ * 둘 다 서버에서만 읽는다. 없으면 로그인 단추가 '아직 설정되지 않음' 으로 잠긴다.
+ */
+export function getKakaoConfig(): { clientId: string; clientSecret: string | null; redirectUri: string | null } | null {
+  const clientId = env('KAKAO_REST_API_KEY');
+  if (!clientId) return null;
+  return { clientId, clientSecret: env('KAKAO_CLIENT_SECRET'), redirectUri: env('KAKAO_REDIRECT_URI') };
+}
+
+/** 로그인 쿠키 서명 키 — 32자 이상만. 짧으면 없는 것으로 본다(LIVE 로그인이 꺼진다) */
+export function getAuthSecret(): string | null {
+  const v = env('AUTH_SECRET');
+  return v && v.length >= 32 ? v : null;
+}
+
+/** 개인정보 처리방침의 문의처 (비밀값 아님) */
+export function getPlazaContact(): string | null {
+  return env('PLAZA_CONTACT');
+}
+
 export type ModePreference = 'auto' | 'demo' | 'live';
 
 export function getModePreference(): ModePreference {

@@ -250,11 +250,16 @@ export class UpstashStore implements PlazaStore {
 
 /* ------------------------------ 고르기 ------------------------------ */
 
-let memory: MemoryStore | null = null;
+/*
+ * 메모리 저장소는 globalThis 에 하나만 둔다. 모듈 변수에 두면 라우트마다(로그인 · 광장) 모듈 사본이
+ * 따로 생길 수 있고, 개발 서버는 새 라우트를 컴파일할 때 모듈을 다시 읽는다 — 그러면 로그인한 회원이
+ * 광장에서 사라지거나 글 순서가 뒤섞인다(실제로 겪었다).
+ */
+const G = globalThis as typeof globalThis & { __ztPlazaMemory?: MemoryStore };
 
 export function getPlazaStore(): PlazaStore {
   const cfg = getPlazaStoreConfig();
   if (cfg) return new UpstashStore(cfg.url, cfg.token);
-  memory ??= new MemoryStore();
-  return memory;
+  G.__ztPlazaMemory ??= new MemoryStore();
+  return G.__ztPlazaMemory;
 }

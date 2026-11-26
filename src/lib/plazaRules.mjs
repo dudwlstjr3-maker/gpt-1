@@ -74,6 +74,20 @@ export function checkPost(raw) {
   return { ok: true, value };
 }
 
+/**
+ * 화면에 보일 이름 — 가운데를 가린다 (2026-11-26 사용자 결정: 카카오 실명, 가운데 가림).
+ *   김민수 → 김*수 · 남궁민수 → 남**수 · 김수 → 김* · 한 글자 → *
+ * 서버는 가린 이름만 저장한다. 가리기 전 이름은 저장하지 않는다(필요 없는 개인정보를 쥐지 않는다).
+ */
+export function maskName(raw) {
+  const s = String(raw ?? '').replace(/\s+/g, '').slice(0, 20);
+  const chars = [...s];
+  if (chars.length === 0) return '';
+  if (chars.length === 1) return '*';
+  if (chars.length === 2) return `${chars[0]}*`;
+  return chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
+}
+
 /* ------------------------------ 레이팅 ------------------------------ */
 
 /**

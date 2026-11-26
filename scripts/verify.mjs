@@ -3894,20 +3894,27 @@ async function main() {
      * 2026-11-26 사용자: "커뮤니티도 넣어 놓고, 내일의 주식이 어떨지 … 상승 or 하락 맞추는 걸로
      * 순위표나 elo 형식으로". 정한 것: 닉네임만 · 한 줄 토론 · S&P 500 과 KOSPI.
      * 규칙 src/lib/plazaRules.mjs · 문구 src/lib/plazaText.mjs · 저장 src/server/plaza.
-     * 여기서는 DEMO(메모리 저장소) 서버에 실제로 가입 · 고르기 · 글쓰기 · 공감 · 신고를 해 본다.
+     * 여기서는 DEMO(메모리 저장소) 서버에 실제로 로그인(DEMO 연습 로그인) · 고르기 · 글쓰기 · 공감 · 신고를 해 본다.
+     * 로그인은 카카오만이고(2026-11-26 사용자 결정), 카카오 쪽 흐름은 [8-44] 가 본다.
      */
-    const { roundTimes, outcome, closesByDate, GAME_MARKETS, isTradingDay } = await import('../src/lib/plazaRules.mjs');
-    const call = async (body, key, extra = {}) => {
+    const { roundTimes, outcome, closesByDate, GAME_MARKETS, isTradingDay, maskName } = await import('../src/lib/plazaRules.mjs');
+    // cookie = 'zt_session=…' (로그인 쿠키). 쓰기에는 x-plaza: 1 을 붙인다 — 화면이 하는 그대로
+    const call = async (body, cookie, extra = {}) => {
       const r = await fetch(`${BASE}/api/plaza`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', ...(key ? { 'x-plaza-key': key } : {}), ...extra },
+        headers: { 'content-type': 'application/json', 'x-plaza': '1', ...(cookie ? { cookie } : {}), ...extra },
         body: JSON.stringify(body),
       });
+      return { status: r.status, body: await r.json().catch(() => ({})), setCookie: r.headers.getSetCookie?.() ?? [] };
+    };
+    const look = async (cookie) => {
+      const r = await fetch(`${BASE}/api/plaza`, { headers: cookie ? { cookie } : {} });
       return { status: r.status, body: await r.json().catch(() => ({})) };
     };
-    const look = async (key) => {
-      const r = await fetch(`${BASE}/api/plaza`, { headers: key ? { 'x-plaza-key': key } : {} });
-      return { status: r.status, body: await r.json().catch(() => ({})) };
+    const demoLogin = async (name, headers = { 'x-plaza': '1' }) => {
+      const r = await fetch(`${BASE}/api/auth/demo`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name }) });
+      const sc = r.headers.getSetCookie?.() ?? [];
+      return { status: r.status, raw: sc.join(' | '), cookie: sc.map((x) => x.split(';')[0]).find((x) => x.startsWith('zt_session=') && x.length > 12) ?? null };
     };
     const g = await look();
     const st = g.body;
@@ -3921,9 +3928,10 @@ async function main() {
     check('고르기 전에는 사람들 몫을 보여 주지 않음 (따라 고르기를 줄이려고)', (st.markets ?? []).every((m) => m.open.ups === null && m.open.downs === null));
     // DEMO 예시 — 순위표 · 글은 모두 '예시' 표시, 레이팅 내림차순, 지난 결과는 DEMO 종가와 같은 방향
     // 같은 서버에 검증을 두 번 돌리면 앞 회의 검사 글이 섞여 있다 — '예시_' 이름과 예시 표시가 짝이 맞는지만 본다
-    const exOk = (x) => x.example === x.nick.startsWith('예시_');
-    check('DEMO 예시 회원 · 글에 예시 표시', (st.leaderboard ?? []).some((l) => l.example) && st.leaderboard.every(exOk) &&
-      (st.posts ?? []).some((p) => p.example) && st.posts.every(exOk));
+    check('DEMO 예시 회원 · 글에 예시 표시 · 실명 표시는 붙지 않음', (st.leaderboard ?? []).some((l) => l.example && !l.real) &&
+      (st.posts ?? []).some((p) => p.example && !p.real));
+    check('보이는 이름은 모두 가운데를 가린 꼴', [...(st.leaderboard ?? []), ...(st.posts ?? [])].every((x) => /\*/.test(x.name)),
+      [...new Set([...(st.leaderboard ?? []), ...(st.posts ?? [])].map((x) => x.name))].slice(0, 6).join(' '));
     check('순위표가 레이팅 순 · 순위 번호가 1부터 이어짐',
       (st.leaderboard ?? []).every((l, i, a) => l.rank === i + 1 && (i === 0 || a[i - 1].rating >= l.rating)));
     const { body: fd } = await getJson('/api/fng/us');
@@ -3937,21 +3945,26 @@ async function main() {
     check('S&P 500 지난 결과가 같은 DEMO 종가로 다시 낸 방향과 같음', spxRecent.length > 0 && mism.length === 0,
       `${spxRecent.length}판 · 어긋남 ${mism.map((r) => r.date).join(',')}`);
 
-    // 가입
+    // 로그인 — DEMO 연습 로그인 (카카오 앱 없이도 광장을 끝까지 눌러 볼 수 있게, DEMO 에서만)
     const tag = Date.now().toString(36).slice(-5);
-    const a = await call({ action: 'join', nickname: `검사${tag}` });
-    const key = a.body?.account?.key ?? '';
-    check('닉네임만으로 참여 · 복구 코드 형식', a.status === 200 && /^ZT-[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/.test(key), `${a.status} ${key.replace(/[0-9A-Z]{4}$/, '****')}`);
-    check('같은 닉네임은 다시 못 씀 (409)', (await call({ action: 'join', nickname: `검사${tag}` })).status === 409);
-    check('운영자 사칭 · 짧은 닉네임은 거름 (400)',
-      (await call({ action: 'join', nickname: '운영자' })).status === 400 && (await call({ action: 'join', nickname: '가' })).status === 400);
-    const rs = await call({ action: 'restore', key: key.toLowerCase().replace(/-/g, ' ') });
-    check('복구 코드로 다른 기기에서 이어 하기 (대소문자 · 띄어쓰기 무관)', rs.status === 200 && rs.body?.state?.me?.nick === `검사${tag}`);
-    check('없는 복구 코드는 404', (await call({ action: 'restore', key: 'ZT-0000-0000-0000-0000' })).status === 404);
+    const demoName = `검사${tag}`;
+    check('광장이 로그인 길을 알려 줌 — DEMO 연습 로그인 열림', st.auth?.demo === true && typeof st.auth?.kakao === 'boolean', JSON.stringify(st.auth));
+    check('연습 로그인도 화면에서 온 요청만 (x-plaza 없으면 403)', (await demoLogin(demoName, {})).status === 403);
+    const a = await demoLogin(demoName);
+    const key = a.cookie;
+    check('로그인 쿠키 — httpOnly · SameSite=Lax · 경로 /', a.status === 200 && !!key && /HttpOnly/i.test(a.raw) && /SameSite=lax/i.test(a.raw) && /Path=\//.test(a.raw),
+      a.raw.replace(/zt_session=[^;]+/, 'zt_session=…'));
+    const meNow = (await look(key)).body?.me;
+    check('이름은 가운데를 가려 보임 · 연습 로그인은 실명 표시 없음', meNow?.name === maskName(demoName) && meNow?.real === false, `${meNow?.name}`);
+    check('위조한 쿠키는 로그인으로 치지 않음', (await look('zt_session=eyJ1aWQiOiJ4In0.AAAA')).body?.me === null &&
+      (await call({ action: 'post', text: '위조' }, 'zt_session=eyJ1aWQiOiJ4In0.AAAA')).status === 401);
+    check('쓰기는 화면에서 온 요청만 (x-plaza 없으면 403)', (await fetch(`${BASE}/api/plaza`, {
+      method: 'POST', headers: { 'content-type': 'application/json', cookie: key ?? '' }, body: JSON.stringify({ action: 'post', text: '몰래' }),
+    })).status === 403);
 
     // 고르기
     const spx = (st.markets ?? []).find((m) => m.market === 'spx');
-    check('닉네임 없이 고르면 401', (await call({ action: 'predict', market: 'spx', pick: 'up', date: spx?.open.date })).status === 401);
+    check('로그인 없이 고르면 401', (await call({ action: 'predict', market: 'spx', pick: 'up', date: spx?.open.date })).status === 401);
     check('마감된 판(다른 날짜)은 409', (await call({ action: 'predict', market: 'spx', pick: 'up', date: '2020-01-02' }, key)).status === 409);
     check('없는 쪽 · 없는 시장은 400',
       (await call({ action: 'predict', market: 'spx', pick: 'buy', date: spx?.open.date }, key)).status === 400 &&
@@ -3980,8 +3993,8 @@ async function main() {
       lk2.body?.state?.posts?.[0]?.likes === 0);
     check('내 글은 신고할 수 없음 (400)', (await call({ action: 'report', id: mine?.id }, key)).status === 400);
     for (let i = 0; i < 3; i += 1) {
-      const u = await call({ action: 'join', nickname: `신고${tag}${i}` });
-      await call({ action: 'report', id: mine?.id }, u.body?.account?.key);
+      const u = await demoLogin(`신고${tag}${i}`);
+      await call({ action: 'report', id: mine?.id }, u.cookie);
     }
     const other = (await look()).body?.posts?.find((p) => p.id === mine?.id);
     const self = (await look(key)).body?.posts?.find((p) => p.id === mine?.id);
@@ -3990,7 +4003,21 @@ async function main() {
     check('관리자 키 없이 지우기는 403', (await call({ action: 'delete', id: mine?.id })).status === 403 &&
       (await call({ action: 'delete', id: mine?.id }, null, { 'x-plaza-admin': 'x'.repeat(20) })).status === 403);
     const pub = JSON.stringify((await look()).body);
-    check('응답에 복구 코드 · 해시 · 회원 id 가 실리지 않음', !/ZT-[0-9A-Z]{4}-/.test(pub) && !/"uid"|"key"|[0-9a-f]{64}/.test(pub));
+    check('응답에 회원 id · 계정 열쇠 · 해시가 실리지 않음', !/"uid"|"acct"|"key"|[0-9a-f]{40}/.test(pub));
+
+    // 로그아웃 · 탈퇴
+    const out = await fetch(`${BASE}/api/auth/logout`, { method: 'POST', headers: { 'x-plaza': '1', cookie: key ?? '' } });
+    const outCookie = (out.headers.getSetCookie?.() ?? []).join(' ');
+    check('로그아웃은 쿠키를 비움', out.status === 200 && /zt_session=;/.test(outCookie) && /Max-Age=0/i.test(outCookie));
+    const leaver = await demoLogin(`탈퇴${tag}`);
+    const lp = await call({ action: 'post', text: `탈퇴 전 글 ${tag}` }, leaver.cookie);
+    const lpId = lp.body?.state?.posts?.[0]?.id;
+    const lv = await call({ action: 'leave' }, leaver.cookie);
+    const after = (await look()).body;
+    check('탈퇴하면 내 글이 지워지고 로그인도 풀림', lv.status === 200 && !!lpId && !(after?.posts ?? []).some((p) => p.id === lpId) &&
+      lv.setCookie.join(' ').includes('Max-Age=0'));
+    check('탈퇴한 뒤 옛 쿠키로는 아무것도 못 함', (await look(leaver.cookie)).body?.me === null &&
+      (await call({ action: 'post', text: '탈퇴 뒤' }, leaver.cookie)).status === 401);
 
     const rd = (f) => readFile(f, 'utf8');
     const [svc, store, cfg, http, route, page, home, nav, css, txt, tplP, buildP, pkg] = await Promise.all([
@@ -4005,8 +4032,7 @@ async function main() {
     check('DEMO 와 LIVE 이름공간이 다름 · 예시는 DEMO 메모리에서만',
       /const ns = \(ctx: PlazaCtx\) => `zt:\$\{ctx\.mode\.toLowerCase\(\)\}:`/.test(svc) &&
       /if \(ctx\.mode !== 'DEMO' \|\| ctx\.store\.kind !== 'memory'\) return;/.test(svc));
-    check('IP 를 저장하지 않음 — 날짜와 섞은 해시만', /return sha\(`\$\{ip\}\|\$\{dayKey\(now\)\}`\)\.slice\(0, 16\)/.test(svc) && !/K\(ctx[^)]*\bip\b/.test(svc) &&
-      /join\(ctx, body\.nickname, ipTag\(clientIp\(req\), ctx\.now\)\)/.test(route));
+    check('IP 를 저장소에 남기지 않음 (요청 수 제한은 서버 메모리에서만)', !/\bip\b/i.test(svc) && /rateLimit\(`plaza:\$\{clientIp\(req\)\}`/.test(route));
     check('관리자 삭제는 PLAZA_ADMIN_KEY(16자 이상)일 때만', /k && k\.length >= 16 \? k : null/.test(cfg) && /if \(!admin \|\| req\.headers\.get\('x-plaza-admin'\) !== admin\)/.test(route));
     const plazaWords = page + home + txt + (tplP.match(/function viewPlaza\(\) \{[\s\S]*?\n  \}\n/)?.[0] ?? '');
     check('사고팔라는 말을 쓰지 않음 (오른다 / 내린다)', !/매수|매도|사세요|파세요|추천/.test(plazaWords) && /plazaPick/.test(page) && /'▲ 오른다'/.test(txt));
@@ -4023,7 +4049,7 @@ async function main() {
     check('미리보기 — 광장 화면 · 홈 문 · 탭', /plaza: viewPlaza,/.test(tplP) && /homePlazaCard\(\) \+/.test(tplP) && /\{ id: 'plaza', label: '광장'/.test(tplP) &&
       /const plaza = await j\('\/api\/plaza'\);/.test(buildP));
     check('미리보기는 참여하지 못한다고 적고 단추를 잠금', /PLAZA_PREVIEW_NOTE/.test(tplP) &&
-      /class="pz-pick" aria-pressed="false" disabled/.test(tplP) && /class="pz-btn primary" disabled/.test(tplP));
+      /class="pz-pick" aria-pressed="false" disabled/.test(tplP) && /class="pz-kakao" disabled/.test(tplP));
   }
 
   console.log('\n[8-43] 심리 상세 다듬기 — 차례 · 접기 · 작은 글자');
@@ -4051,6 +4077,66 @@ async function main() {
     check('심리 상세 · 위기 목록 · 기여도 막대에 12px 아래 글자 없음 (앱)', ![pg, crisis, contrib].some((t) => /text-\[(1[01](\.\d)?|[0-9](\.\d)?)px\]/.test(t)));
     const cc = tplF.slice(tplF.indexOf('  function crisisCard('), tplF.indexOf('\n  function ', tplF.indexOf('  function crisisCard(') + 10));
     check('미리보기 심리 상세 · 위기 카드에도 12px 아래 글자 없음', ![vf, cc].some((t) => /font-size:\s?(1[01](\.\d)?|[0-9](\.\d)?)px/.test(t)));
+  }
+
+  console.log('\n[8-44] 카카오 로그인 · 가운데 가린 실명 · 탈퇴 · 개인정보 처리방침');
+  {
+    /*
+     * 2026-11-26 사용자: "로그인 가능하게, 그거는 카톡으로만, 그리고 실명으로". 정한 것: 이름은 가운데 가림(김*수).
+     * 사업자등록이 없어 카카오 '이름' 항목은 심사 뒤에야 받는다 — 그 전에는 카카오 닉네임을 같은 방식으로 가린다.
+     * 카카오와 실제로 주고받는 부분은 여기서 돌릴 수 없다(키 · 바깥 연결 없음). 대신 흐름의 문을 하나씩 본다.
+     */
+    const r = await fetch(`${BASE}/api/auth/kakao/login?next=/plaza`, { redirect: 'manual' });
+    const loc = r.headers.get('location') ?? '';
+    const st = (await getJson('/api/plaza')).body;
+    if (st?.auth?.kakao) {
+      const sc = (r.headers.getSetCookie?.() ?? []).join(' ');
+      check('카카오 설정이 있으면 카카오 동의 화면으로 · state 를 서명 쿠키에', /^https:\/\/kauth\.kakao\.com\/oauth\/authorize\?/.test(loc) &&
+        /[?&]state=/.test(loc) && /[?&]response_type=code/.test(loc) && /zt_oauth=/.test(sc) && /HttpOnly/i.test(sc), loc.replace(/client_id=[^&]+/, 'client_id=…'));
+    } else {
+      check('카카오 설정이 없으면 광장으로 돌려보내고 화면이 알림', [302, 303, 307, 308].includes(r.status) && /\/plaza\?login=unavailable$/.test(loc), `${r.status} ${loc}`);
+    }
+    const cb = await fetch(`${BASE}/api/auth/kakao/callback?code=x&state=y`, { redirect: 'manual' });
+    check('state 쿠키 없이 돌아온 요청은 로그인시키지 않음', /\/plaza\?login=(unavailable|state)$/.test(cb.headers.get('location') ?? '') &&
+      !(cb.headers.getSetCookie?.() ?? []).some((c) => /^zt_session=[^;]{10,}/.test(c)), cb.headers.get('location') ?? '');
+
+    const rd = (f) => readFile(f, 'utf8');
+    const [cfg, sess, core, login, callback, demo, svc, page, priv, privPage, tplK, buildK, routeP] = await Promise.all([
+      'src/server/config.ts', 'src/server/plaza/session.ts', 'src/server/plaza/authCore.mjs', 'src/app/api/auth/kakao/login/route.ts',
+      'src/app/api/auth/kakao/callback/route.ts', 'src/app/api/auth/demo/route.ts', 'src/server/plaza/service.ts', 'src/app/plaza/page.tsx',
+      'src/lib/privacyText.mjs', 'src/app/privacy/page.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/api/plaza/route.ts'].map(rd));
+    const others = [sess, login, callback, demo, svc, page, routeP].join('\n');
+    check('카카오 키 · 서명 키는 config.ts 에서만, NEXT_PUBLIC_ 없음',
+      /env\('KAKAO_REST_API_KEY'\)/.test(cfg) && /env\('KAKAO_CLIENT_SECRET'\)/.test(cfg) && /env\('AUTH_SECRET'\)/.test(cfg) &&
+      !/KAKAO_CLIENT_SECRET|AUTH_SECRET'/.test(others) && !/NEXT_PUBLIC_[A-Z_]*(KAKAO|AUTH)/.test(cfg + others));
+    check('서명 키는 32자 이상만 — 짧으면 LIVE 로그인이 꺼짐', /v && v\.length >= 32 \? v : null/.test(cfg) &&
+      /getAuthSecret\(\) \?\? \(mode === 'DEMO' \? DEMO_SECRET : null\)/.test(sess));
+    check('로그인 쿠키 — httpOnly · SameSite=Lax · 운영에서 Secure · 모드를 서명 안에',
+      /httpOnly: true,/.test(sess) && /secure: process\.env\.NODE_ENV === 'production'/.test(sess) && /sameSite: 'lax'/.test(sess) &&
+      /p\.m === mode/.test(sess));
+    check('서명은 HMAC · 비교는 시간 일정(timingSafeEqual)', /createHmac\('sha256', secret\)/.test(core) && /timingSafeEqual\(sig, want\)/.test(core));
+    check('카카오 흐름 — state 비교 · code 교환은 POST 한 번(재시도 없음) · 바깥 호출은 fetchJson',
+      /q\.get\('state'\) !== st\.s/.test(callback) && /fetchJson<[\s\S]{0,60}'https:\/\/kauth\.kakao\.com\/oauth\/token'[\s\S]{0,200}retries: 0/.test(callback) &&
+      /'https:\/\/kapi\.kakao\.com\/v2\/user\/me'/.test(callback) && /application\/x-www-form-urlencoded/.test(callback));
+    check('토큰 · 카카오 회원번호 · 가리기 전 이름을 저장하지 않음',
+      !/access_token/.test(svc) && /const display = maskName\(rawName\)/.test(svc) && /accountKey\(provider, subject, secret\)/.test(svc) &&
+      !/HSET[^\n]*rawName/.test(svc) && !/HSET[^\n]*subject/.test(svc));
+    check('돌아갈 곳은 우리 사이트 안만 (열린 리다이렉트 막음)', /const next = safeNext\(/.test(login) && /new URL\(st\.next, req\.nextUrl\.origin\)/.test(callback));
+    check('DEMO 연습 로그인은 DEMO 에서만 (LIVE 404)', /if \(ctx\.mode !== 'DEMO'\) return NextResponse\.json\(\{ error: '없는 주소예요\.' \}, \{ status: 404 \}\)/.test(demo) &&
+      /demo: adapter\.mode === 'DEMO'/.test(await rd('src/server/plaza/context.ts')));
+    check('닉네임 가입 · 복구 코드는 없앰', !/action === 'join'|action === 'restore'|복구 코드|x-plaza-key/.test(routeP + page + svc));
+    check('탈퇴 — 회원 · 계정 열쇠 · 순위 · 기록 · 내 글 · 마감 전 선택을 지움',
+      /\['DEL', K\(ctx, 'u', uid\), K\(ctx, 'h', uid\)/.test(svc) && /\['DEL', K\(ctx, 'acct'/.test(svc) && /\['ZREM', K\(ctx, 'lb'\), uid\]/.test(svc) &&
+      /\['HDEL', K\(ctx, 'posts'\), pid\], \['LREM', K\(ctx, 'posts', 'ids'\), 0, pid\]/.test(svc) && /HDEL', K\(ctx, 'r', m, roundsAt/.test(svc));
+    const policy = priv;
+    check('개인정보 처리방침 — 받는 것 · 가림 · 탈퇴 · 맡기는 곳(국외) · 쿠키 · 문의를 적음',
+      ['받는 정보', '가운데를 가려', '탈퇴', 'Vercel', 'Upstash', '국외', 'zt_session', '문의'].every((w) => policy.includes(w)) &&
+      /privacySections\(getPlazaContact\(\)\)/.test(privPage));
+    check('광장에서 처리방침으로 가는 길 (앱 · 미리보기)', /href="\/privacy"/.test(page) && /data-go="privacy"/.test(tplK) && /privacy: viewPrivacy,/.test(tplK) &&
+      /__PRIVACY_TEXT__/.test(tplK) && /\.replace\('__PRIVACY_TEXT__'[\s\S]{0,140}privacyText\.mjs/.test(buildK));
+    const pp = await fetch(`${BASE}/privacy`);
+    const ppText = await pp.text();
+    check('/privacy 화면이 열림', pp.status === 200 && ppText.includes('개인정보 처리방침') && ppText.includes('가운데를 가려'));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

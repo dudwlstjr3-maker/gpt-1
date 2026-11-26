@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  checkNickname, checkPost, crowdShare, ratingDelta, outcome, RATING_K, CROWD_PRIOR, POST_MAX,
+  checkNickname, checkPost, maskName, crowdShare, ratingDelta, outcome, RATING_K, CROWD_PRIOR, POST_MAX,
   dateKeyIn, zonedToUtc, isTradingDay, nextTradingDay, prevTradingDay, roundTimes, roundsAt, closesByDate,
 } from '../src/lib/plazaRules.mjs';
 
@@ -114,4 +114,14 @@ test('종가 표 — 그 도시 날짜로 묶고, 숫자가 아닌 점은 버림
     { t: Date.parse('2026-11-27T14:30:00Z'), v: 101 },
   ], 'America/New_York');
   assert.deepEqual([...m], [['2026-11-25', 100], ['2026-11-27', 101]]);
+});
+
+test('이름 가운데 가림 — 김*수, 두 글자는 끝을, 한 글자는 통째로', () => {
+  assert.equal(maskName('김민수'), '김*수');
+  assert.equal(maskName('남궁민수'), '남**수');
+  assert.equal(maskName('김수'), '김*');
+  assert.equal(maskName('김'), '*');
+  assert.equal(maskName(' 김 민 수 '), '김*수');
+  assert.equal(maskName(''), '');
+  assert.equal(maskName(null), '');
 });

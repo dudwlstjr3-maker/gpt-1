@@ -14,6 +14,7 @@ export const HIDE_AFTER_REPORTS: number;
 
 export type Checked = { ok: true; value: string } | { ok: false; reason: string };
 export function checkNickname(raw: unknown): Checked;
+export function maskName(raw: unknown): string;
 export function checkPost(raw: unknown): Checked;
 
 export function crowdShare(ups: number, downs: number, pick: Pick): number;

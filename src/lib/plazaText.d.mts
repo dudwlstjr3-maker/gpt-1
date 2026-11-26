@@ -12,3 +12,6 @@ export const PLAZA_LEDE: string;
 export const PLAZA_POST_NOTE: string;
 export const PLAZA_FOOT: string;
 export const PLAZA_MEMORY_NOTE: string;
+export const PLAZA_LOGIN_NOTE: string;
+export const PLAZA_KAKAO_OFF: string;
+export const PLAZA_REAL_TAG: string;

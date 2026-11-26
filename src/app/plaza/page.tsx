@@ -14,12 +14,12 @@ import { SkeletonCard } from '@/components/ui/States';
 import { usePlaza } from '@/components/plaza/usePlaza';
 import {
   plazaAccuracy, plazaAgo, plazaChange, plazaCrowd, plazaDay, plazaKst, plazaPick, plazaRatingHelp, plazaResult, plazaSigned,
-  PLAZA_FOOT, PLAZA_LEDE, PLAZA_MEMORY_NOTE, PLAZA_POST_NOTE,
+  PLAZA_FOOT, PLAZA_KAKAO_OFF, PLAZA_LEDE, PLAZA_LOGIN_NOTE, PLAZA_MEMORY_NOTE, PLAZA_POST_NOTE, PLAZA_REAL_TAG,
 } from '@/lib/plazaText.mjs';
 import type { PlazaMarketRounds, PlazaPick, PlazaState } from '@/types';
 
 export default function PlazaPage() {
-  const { state, key, error, busy, loading, act, leave } = usePlaza();
+  const { state, error, busy, loading, act, demoLogin, logout } = usePlaza();
 
   if (loading && !state) {
     return (
@@ -53,7 +53,7 @@ export default function PlazaPage() {
         ) : null}
       </div>
 
-      <Account state={state} plazaKey={key} busy={busy} act={act} leave={leave} />
+      <Account state={state} busy={busy} act={act} demoLogin={demoLogin} logout={logout} />
 
       <section className="pz-sec" aria-labelledby="pz-game-title">
         <h2 id="pz-game-title">
@@ -77,26 +77,43 @@ export default function PlazaPage() {
 
 type Act = (body: Record<string, unknown>) => Promise<boolean>;
 
-function Account({ state, plazaKey, busy, act, leave }: { state: PlazaState; plazaKey: string | null; busy: boolean; act: Act; leave: () => void }) {
-  const [nick, setNick] = useState('');
-  const [code, setCode] = useState('');
+function Account({
+  state, busy, act, demoLogin, logout,
+}: { state: PlazaState; busy: boolean; act: Act; demoLogin: (name: string) => Promise<void>; logout: () => Promise<void> }) {
+  const [name, setName] = useState('');
   const me = state.me;
   if (me) {
     return (
       <section className="pz-card" aria-label="내 기록">
         <div className="pz-me">
-          <b>{me.nick}</b>
+          <b>{me.name}</b>
+          {me.real ? <span className="pz-tag">{PLAZA_REAL_TAG}</span> : null}
           <span className="pz-rating">레이팅 {me.rating.toLocaleString('ko-KR')}</span>
           <span>{me.rank ? `순위 ${me.rank}위` : `순위는 ${state.rules.minPlayed}판부터`}</span>
           <span>{plazaAccuracy(me.correct, me.played)}</span>
           {me.streak > 1 ? <span>연속 {me.streak}번 맞힘</span> : null}
         </div>
+        <div className="pz-row">
+          <button type="button" className="pz-small" disabled={busy} onClick={() => void logout()}>
+            로그아웃
+          </button>
+          <a className="pz-link" href="/privacy">
+            개인정보 처리방침
+          </a>
+        </div>
         <details className="pz-more">
-          <summary>복구 코드 · 다른 기기에서 이어 하기 ▾</summary>
-          <p className="pz-key">{plazaKey}</p>
-          <p className="pz-hint">이 코드가 있으면 누구든 이 닉네임으로 참여할 수 있어요. 적어 두되 다른 곳에 올리지 마세요.</p>
-          <button type="button" className="pz-btn" style={{ marginTop: 8 }} onClick={leave}>
-            이 기기에서 나가기
+          <summary>탈퇴 — 내 기록 · 글 지우기 ▾</summary>
+          <p className="pz-hint">탈퇴하면 레이팅 · 지난 기록 · 내가 쓴 글이 지워지고 되돌릴 수 없어요.</p>
+          <button
+            type="button"
+            className="pz-btn"
+            style={{ marginTop: 8 }}
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm('정말 탈퇴할까요? 기록과 글이 모두 지워져요.')) void act({ action: 'leave' });
+            }}
+          >
+            탈퇴하기
           </button>
         </details>
       </section>
@@ -105,43 +122,45 @@ function Account({ state, plazaKey, busy, act, leave }: { state: PlazaState; pla
   return (
     <section className="pz-card" aria-labelledby="pz-join-title">
       <h2 id="pz-join-title" style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 750 }}>
-        닉네임만 정하면 바로 참여
+        카카오로 로그인하고 참여
       </h2>
-      <form
-        className="pz-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void act({ action: 'join', nickname: nick });
-        }}
-      >
-        <input
-          aria-label="닉네임"
-          placeholder={`${state.rules.nickMin}~${state.rules.nickMax}자 (한글 · 영문 · 숫자)`}
-          value={nick}
-          maxLength={state.rules.nickMax}
-          onChange={(e) => setNick(e.target.value)}
-        />
-        <button type="submit" className="pz-btn primary" disabled={busy || nick.trim().length < state.rules.nickMin}>
-          참여하기
-        </button>
-      </form>
-      <p className="pz-hint">가입 · 이메일 · 전화번호가 필요 없어요. 참여하면 복구 코드를 하나 드려요.</p>
-      <details className="pz-more">
-        <summary>복구 코드가 있어요 ▾</summary>
-        <form
-          className="pz-form"
-          style={{ marginTop: 8 }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void act({ action: 'restore', key: code });
-          }}
-        >
-          <input aria-label="복구 코드" placeholder="ZT-XXXX-XXXX-XXXX-XXXX" value={code} onChange={(e) => setCode(e.target.value)} />
-          <button type="submit" className="pz-btn" disabled={busy || code.trim().length < 16}>
-            불러오기
+      {state.auth.kakao ? (
+        <a className="pz-kakao" href="/api/auth/kakao/login?next=/plaza">
+          카카오 로그인
+        </a>
+      ) : (
+        <>
+          <button type="button" className="pz-kakao" disabled>
+            카카오 로그인
           </button>
-        </form>
-      </details>
+          <p className="pz-hint">{PLAZA_KAKAO_OFF}</p>
+        </>
+      )}
+      <p className="pz-hint">
+        {PLAZA_LOGIN_NOTE}{' '}
+        <a className="pz-link" href="/privacy">
+          개인정보 처리방침
+        </a>
+      </p>
+      {state.auth.demo ? (
+        <details className="pz-more">
+          <summary>DEMO 연습 로그인 ▾</summary>
+          <p className="pz-hint">DEMO 모드에서만 열리는 연습용이에요. 실제 서비스(LIVE)에는 없어요.</p>
+          <form
+            className="pz-form"
+            style={{ marginTop: 8 }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void demoLogin(name);
+            }}
+          >
+            <input aria-label="연습용 이름" placeholder="연습용 이름 (2~12자)" value={name} maxLength={12} onChange={(e) => setName(e.target.value)} />
+            <button type="submit" className="pz-btn" disabled={busy || name.trim().length < 2}>
+              연습 로그인
+            </button>
+          </form>
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -168,7 +187,7 @@ function Round({ m, joined, busy, act }: { m: PlazaMarketRounds; joined: boolean
       </div>
       <p className="pz-meta">
         마감 {plazaKst(o.cutoff)} (한국시간) · {o.n.toLocaleString('ko-KR')}명 참여
-        {!joined ? ' · 닉네임을 정하면 고를 수 있어요' : o.myPick ? '' : ' · 고르면 사람들 선택이 보여요'}
+        {!joined ? ' · 로그인하면 고를 수 있어요' : o.myPick ? '' : ' · 고르면 사람들 선택이 보여요'}
       </p>
       {crowd ? (
         <div className="pz-crowd" aria-label={`사람들 선택: 오른다 ${crowd.up}%, 내린다 ${crowd.down}%`}>
@@ -223,16 +242,17 @@ function Leaderboard({ state }: { state: PlazaState }) {
             <thead>
               <tr>
                 <th scope="col">순위</th>
-                <th scope="col">닉네임</th>
+                <th scope="col">이름</th>
                 <th scope="col">레이팅</th>
               </tr>
             </thead>
             <tbody>
               {state.leaderboard.map((l) => (
-                <tr key={`${l.rank}-${l.nick}`} className={l.me ? 'me' : undefined}>
+                <tr key={`${l.rank}-${l.name}`} className={l.me ? 'me' : undefined}>
                   <td className="rank">{l.rank}</td>
                   <td>
-                    {l.nick}
+                    {l.name}
+                    {l.real ? <span className="pz-tag">{PLAZA_REAL_TAG}</span> : null}
                     {l.example ? <span className="pz-tag">예시</span> : null}
                     {l.me ? <span className="pz-tag">나</span> : null}
                     <span className="acc">{plazaAccuracy(l.correct, l.played)}</span>
@@ -298,7 +318,7 @@ function Posts({ state, busy, act }: { state: PlazaState; busy: boolean; act: Ac
           </form>
         ) : (
           <p className="pz-hint" style={{ margin: 0 }}>
-            닉네임을 정하면 글을 올릴 수 있어요. {PLAZA_POST_NOTE}
+            로그인하면 글을 올릴 수 있어요. {PLAZA_POST_NOTE}
           </p>
         )}
         {state.posts.length ? (
@@ -306,7 +326,8 @@ function Posts({ state, busy, act }: { state: PlazaState; busy: boolean; act: Ac
             {state.posts.map((p) => (
               <li key={p.id} className="pz-post">
                 <div className="pz-post-head">
-                  <b>{p.nick}</b>
+                  <b>{p.name}</b>
+                  {p.real ? <span className="pz-tag">{PLAZA_REAL_TAG}</span> : null}
                   {p.rating !== null ? <span>{p.rating.toLocaleString('ko-KR')}</span> : null}
                   <span>{plazaAgo(p.t, now)}</span>
                   {p.example ? <span className="pz-tag">예시</span> : null}

@@ -17,7 +17,7 @@ test('고른 쪽 · 결과는 기호와 말로 — 사고팔라는 말 없음', 
   assert.match(T.plazaResult('flat'), /보합/);
   assert.match(T.plazaResult('void'), /무효/);
   const all = [T.plazaPick('up'), T.plazaPick('down'), ...['up', 'down', 'flat', 'void'].map(T.plazaResult), ...T.plazaRatingHelp({ ratingStart: 1000, k: 32, minPlayed: 5 }),
-    T.PLAZA_LEDE, T.PLAZA_POST_NOTE, T.PLAZA_FOOT, T.PLAZA_MEMORY_NOTE].join(' ');
+    T.PLAZA_LEDE, T.PLAZA_POST_NOTE, T.PLAZA_FOOT, T.PLAZA_MEMORY_NOTE, T.PLAZA_LOGIN_NOTE, T.PLAZA_KAKAO_OFF].join(' ');
   // "사라져요" 는 지시가 아니다 — 사라 뒤에 끝맺음이 오는 경우만 본다
   assert.doesNotMatch(all, /매수|매도|사세요|파세요|사라[!.\s]|팔라|수익/);
 });

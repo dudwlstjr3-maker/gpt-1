@@ -16,7 +16,7 @@ export function HomePlazaCard() {
     <section className="pz-card pz-home" aria-labelledby="home-plaza-title">
       <div className="pz-home-head">
         <h3 id="home-plaza-title">쫄탐광장 · 다음 거래일 맞히기</h3>
-        <span>{state.me ? `${state.me.nick} · ${state.me.rating.toLocaleString('ko-KR')}` : '닉네임만 정하면 참여'}</span>
+        <span>{state.me ? `${state.me.name} · ${state.me.rating.toLocaleString('ko-KR')}` : '카카오로 로그인하면 참여'}</span>
       </div>
       <ul>
         {state.markets.map((m) => (

@@ -4,9 +4,10 @@
  * 규칙과 계산은 src/lib/plazaRules.mjs, 저장은 ./store.ts. 여기는 그 둘을 잇는다.
  *
  * 지키는 것
- *  - 가입 없이 닉네임만. 개인정보를 받지 않는다. 계정은 '복구 코드' 하나로 옮긴다 —
- *    코드는 해시로만 저장하고, 응답에는 만든 사람에게 한 번 돌려줄 때만 담는다.
- *  - IP 는 저장하지 않는다. 가입 횟수 제한에 쓰는 표는 IP + 날짜를 해시한 값이고 하루 뒤 사라진다.
+ *  - 로그인은 카카오만 (2026-11-26 사용자 결정). 화면 이름은 카카오 실명을 가운데 가린 것 —
+ *    가리기 전 이름 · 카카오 회원번호 · 토큰은 저장하지 않는다. 회원번호는 비밀값을 섞은 해시(계정 열쇠)로만 남는다.
+ *    실명(이름) 항목은 카카오 심사가 필요해서, 승인 전에는 카카오 닉네임을 같은 방식으로 가린다(real=0).
+ *  - 탈퇴하면 회원 정보 · 기록 · 글을 지운다.
  *  - DEMO 와 LIVE 는 이름공간이 다르다(zt:demo: / zt:live:). 서로의 판 · 순위 · 글이 섞이지 않는다.
  *  - DEMO 예시 회원 · 글은 메모리 저장소의 DEMO 에서만 만든다. 화면에 '예시' 로 적는다. LIVE 에는 없다.
  *  - 채점은 따로 도는 작업 없이, 누군가 광장을 열 때 밀린 판을 채점한다(잠금으로 한 번만).
@@ -14,10 +15,11 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import {
-  checkNickname, checkPost, ratingDelta, outcome, roundsAt, roundTimes, prevTradingDay, closesByDate,
+  checkPost, maskName, ratingDelta, outcome, roundsAt, roundTimes, prevTradingDay, closesByDate,
   GAME_MARKETS, GAME_MARKET_IDS, RATING_START, RATING_K, LEADER_MIN_PLAYED, HIDE_AFTER_REPORTS,
-  NICK_MIN, NICK_MAX, POST_MAX, type GameMarketId,
+  POST_MAX, type GameMarketId,
 } from '@/lib/plazaRules.mjs';
+import { accountKey } from './authCore.mjs';
 import { US_HOLIDAYS, KR_HOLIDAYS } from '@/lib/marketHours';
 import { mulberry32, hashSeed } from '@/lib/rng';
 import { swr } from '@/server/cache';
@@ -28,8 +30,6 @@ import type {
 import type { Cmd, PlazaStore, Reply } from './store';
 
 const HOLIDAYS: Record<GameMarketId, Record<string, string>> = { spx: US_HOLIDAYS, kospi: KR_HOLIDAYS };
-/** 하루에 한 곳(IP)에서 만들 수 있는 닉네임 수. DEMO 는 연습용이라 넉넉하게 */
-const JOIN_PER_DAY: Record<DataMode, number> = { LIVE: 3, DEMO: 100 };
 const POST_GAP_SEC = 20;
 const POST_PER_DAY = 50;
 const FEED_SIZE = 30;
@@ -49,6 +49,8 @@ export interface PlazaCtx {
   now: number;
   adapter: MarketAdapter;
   actx: AdapterContext;
+  /** 화면에 알릴 로그인 상태 — 카카오 설정이 있는가, DEMO 연습 로그인이 열려 있는가 */
+  auth: { kakao: boolean; demo: boolean };
 }
 
 const ns = (ctx: PlazaCtx) => `zt:${ctx.mode.toLowerCase()}:`;
@@ -68,69 +70,58 @@ const pairs = (r: Reply | undefined): [string, string][] => {
 };
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
-/* ------------------------------ 복구 코드 ------------------------------ */
+/* ------------------------------ 회원 (카카오) ------------------------------ */
 
-const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+export type Provider = 'kakao' | 'demo';
 
-/** 80비트 무작위 → ZT-XXXX-XXXX-XXXX-XXXX */
-function newKey(): string {
-  const bytes = randomBytes(10);
-  let bits = '';
-  for (const b of bytes) bits += b.toString(2).padStart(8, '0');
-  let out = '';
-  for (let i = 0; i < 80; i += 5) out += B32[parseInt(bits.slice(i, i + 5), 2)];
-  return `ZT-${out.match(/.{4}/g)!.join('-')}`;
+/**
+ * 로그인할 때마다 부른다. 처음이면 계정을 만들고, 다시 오면 화면 이름만 새로 고친다.
+ * rawName 은 여기서 바로 가린다 — 가리기 전 이름은 어디에도 남기지 않는다.
+ */
+export async function loginAccount(
+  ctx: PlazaCtx, provider: Provider, subject: string, rawName: string | null, real: boolean, secret: string,
+): Promise<string> {
+  const display = maskName(rawName) || '회원';
+  const acct = accountKey(provider, subject, secret);
+  const fresh = randomBytes(8).toString('hex');
+  const [set] = await ctx.store.exec([['SET', K(ctx, 'acct', acct), fresh, 'NX']], { write: true });
+  if (set === 'OK') {
+    await ctx.store.exec(
+      [['HSET', K(ctx, 'u', fresh), 'nick', display, 'real', real ? 1 : 0, 'acct', acct, 'via', provider, 'created', ctx.now,
+        'rating', RATING_START, 'played', 0, 'correct', 0, 'streak', 0, 'best', 0, 'ex', 0]],
+      { write: true },
+    );
+    return fresh;
+  }
+  const [uid] = await ctx.store.exec([['GET', K(ctx, 'acct', acct)]]);
+  const id = asStr(uid) as string;
+  await ctx.store.exec([['HSET', K(ctx, 'u', id), 'nick', display, 'real', real ? 1 : 0]], { write: true });
+  return id;
 }
 
-/** 붙여 넣을 때 섞이는 공백 · 대시 · 소문자를 걷어 낸다 */
-function normKey(raw: string): string {
-  return raw.toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^ZT/, '');
-}
-
-export function ipTag(ip: string, now: number): string {
-  return sha(`${ip}|${dayKey(now)}`).slice(0, 16);
-}
-
-/* ------------------------------ 회원 ------------------------------ */
-
-export async function authenticate(ctx: PlazaCtx, rawKey: string | null): Promise<string | null> {
-  if (!rawKey) return null;
-  const nk = normKey(rawKey);
-  if (nk.length !== 16) return null;
-  const [uid] = await ctx.store.exec([['GET', K(ctx, 'key', sha(nk))]]);
-  const id = asStr(uid);
-  if (!id) return null;
-  const [nick] = await ctx.store.exec([['HGET', K(ctx, 'u', id), 'nick']]);
-  return asStr(nick) ? id : null;
-}
-
-export async function join(ctx: PlazaCtx, nickRaw: unknown, tag: string): Promise<{ nick: string; key: string }> {
-  const c = checkNickname(nickRaw);
-  if (!c.ok) throw new PlazaError(400, c.reason);
-  const rl = K(ctx, 'rl', 'join', tag, dayKey(ctx.now));
-  const [count] = await ctx.store.exec([['INCR', rl], ['EXPIRE', rl, 86_400]], { write: true });
-  if (asNum(count) > JOIN_PER_DAY[ctx.mode]) throw new PlazaError(429, '오늘은 이곳에서 닉네임을 더 만들 수 없어요. 내일 다시 해 주세요.');
-  const uid = randomBytes(8).toString('hex');
-  const [taken] = await ctx.store.exec([['SET', K(ctx, 'nick', c.value.toLowerCase()), uid, 'NX']], { write: true });
-  if (taken !== 'OK') throw new PlazaError(409, '이미 쓰는 닉네임이에요. 다른 이름을 골라 주세요.');
-  const key = newKey();
-  await ctx.store.exec(
-    [
-      ['SET', K(ctx, 'key', sha(normKey(key))), uid],
-      ['HSET', K(ctx, 'u', uid), 'nick', c.value, 'created', ctx.now, 'rating', RATING_START, 'played', 0, 'correct', 0, 'streak', 0, 'best', 0, 'ex', 0],
-    ],
-    { write: true },
-  );
-  return { nick: c.value, key };
-}
-
-export async function restore(ctx: PlazaCtx, rawKey: unknown): Promise<{ nick: string; key: string }> {
-  const key = typeof rawKey === 'string' ? rawKey : '';
-  const uid = await authenticate(ctx, key);
-  if (!uid) throw new PlazaError(404, '복구 코드를 찾지 못했어요. 다시 확인해 주세요.');
+/** 쿠키의 uid 가 아직 있는 회원인가 (탈퇴했으면 null) */
+export async function authenticate(ctx: PlazaCtx, uid: string | null): Promise<string | null> {
+  if (!uid || !/^[0-9a-f]{16}$/.test(uid)) return null;
   const [nick] = await ctx.store.exec([['HGET', K(ctx, 'u', uid), 'nick']]);
-  const n = normKey(key);
-  return { nick: asStr(nick) ?? '', key: `ZT-${n.match(/.{4}/g)!.join('-')}` };
+  return asStr(nick) ? uid : null;
+}
+
+/**
+ * 탈퇴 — 회원 정보 · 계정 열쇠 · 순위 · 기록 · 내가 쓴 글 · 아직 마감 전인 내 선택을 지운다.
+ * 이미 채점이 끝난 판의 '몇 명이 어느 쪽' 숫자는 남는다(누구인지 알 수 없는 합계라서).
+ */
+export async function leave(ctx: PlazaCtx, uid: string): Promise<void> {
+  const [acct, mine] = await ctx.store.exec([['HGET', K(ctx, 'u', uid), 'acct'], ['SMEMBERS', K(ctx, 'up', uid)]]);
+  const pids = Array.isArray(mine) ? mine.map((x) => asStr(x) ?? '').filter(Boolean) : [];
+  const cmds: Cmd[] = [
+    ['DEL', K(ctx, 'u', uid), K(ctx, 'h', uid), K(ctx, 'ul', uid), K(ctx, 'ur', uid), K(ctx, 'up', uid)],
+    ['ZREM', K(ctx, 'lb'), uid],
+    ['HDEL', K(ctx, 'lbinfo'), uid],
+  ];
+  if (asStr(acct)) cmds.push(['DEL', K(ctx, 'acct', asStr(acct) as string)]);
+  for (const pid of pids) cmds.push(['HDEL', K(ctx, 'posts'), pid], ['LREM', K(ctx, 'posts', 'ids'), 0, pid]);
+  for (const m of GAME_MARKET_IDS) cmds.push(['HDEL', K(ctx, 'r', m, roundsAt(ctx.now, m, HOLIDAYS[m]).open), uid]);
+  await ctx.store.exec(cmds, { write: true });
 }
 
 /* ------------------------------ 맞히기 ------------------------------ */
@@ -221,7 +212,7 @@ async function settle(
   const ups = preds.filter(([, v]) => v === 'up').length;
   const downs = preds.length - ups;
   const users = preds.length
-    ? await ctx.store.exec(preds.map(([uid]) => ['HMGET', K(ctx, 'u', uid), 'rating', 'played', 'correct', 'streak', 'best', 'nick', 'ex']))
+    ? await ctx.store.exec(preds.map(([uid]) => ['HMGET', K(ctx, 'u', uid), 'rating', 'played', 'correct', 'streak', 'best', 'nick', 'ex', 'real']))
     : [];
   const counted = result === 'up' || result === 'down';
   const writes: Cmd[] = [];
@@ -248,7 +239,7 @@ async function settle(
     if (played >= LEADER_MIN_PLAYED) {
       writes.push(
         ['ZADD', K(ctx, 'lb'), rating, uid],
-        ['HSET', K(ctx, 'lbinfo'), uid, JSON.stringify({ nick: asStr(u[5]), played, correct, ex: asStr(u[6]) === '1' })],
+        ['HSET', K(ctx, 'lbinfo'), uid, JSON.stringify({ nick: asStr(u[5]), played, correct, ex: asStr(u[6]) === '1', real: asStr(u[7]) === '1' })],
       );
     }
   });
@@ -273,11 +264,15 @@ export async function addPost(ctx: PlazaCtx, uid: string, textRaw: unknown): Pro
   if (okGap !== 'OK') throw new PlazaError(429, `글은 ${POST_GAP_SEC}초에 하나씩 올릴 수 있어요.`);
   const [n] = await ctx.store.exec([['INCR', daily], ['EXPIRE', daily, 86_400]], { write: true });
   if (asNum(n) > POST_PER_DAY) throw new PlazaError(429, `하루에 ${POST_PER_DAY}개까지 올릴 수 있어요.`);
-  const [id, nick] = await ctx.store.exec([['INCR', K(ctx, 'seq', 'post')], ['HGET', K(ctx, 'u', uid), 'nick']], { write: true });
+  const [id, nick, real] = await ctx.store.exec(
+    [['INCR', K(ctx, 'seq', 'post')], ['HGET', K(ctx, 'u', uid), 'nick'], ['HGET', K(ctx, 'u', uid), 'real']],
+    { write: true },
+  );
   const pid = String(asNum(id));
   await ctx.store.exec(
     [
-      ['HSET', K(ctx, 'posts'), pid, JSON.stringify({ id: pid, uid, nick: asStr(nick), text: c.value, t: ctx.now, ex: 0 })],
+      ['HSET', K(ctx, 'posts'), pid, JSON.stringify({ id: pid, uid, nick: asStr(nick), real: asStr(real) === '1' ? 1 : 0, text: c.value, t: ctx.now, ex: 0 })],
+      ['SADD', K(ctx, 'up', uid), pid],
       ['LPUSH', K(ctx, 'posts', 'ids'), pid],
       ['LTRIM', K(ctx, 'posts', 'ids'), 0, FEED_KEEP - 1],
     ],
@@ -324,7 +319,8 @@ export async function adminDelete(ctx: PlazaCtx, id: unknown): Promise<void> {
 
 /* ------------------------------ DEMO 예시 ------------------------------ */
 
-const EXAMPLE_NICKS = ['예시_황소', '예시_곰', '예시_거북이', '예시_다람쥐', '예시_올빼미', '예시_고래', '예시_치타', '예시_판다', '예시_펭귄', '예시_여우', '예시_수달', '예시_너구리'];
+/** 가운데를 가린 이름 꼴. 화면에는 '예시' 표가 붙고 실명 표시는 붙지 않는다 */
+const EXAMPLE_NICKS = ['김*수', '이*영', '박*준', '최*희', '정*호', '강*진', '조*연', '윤*석', '장*미', '임*혁', '한*름', '오*결'];
 /** 오른다를 고를 확률 — 낙관 · 비관 · 반반이 섞이게 */
 const EXAMPLE_BIAS = [0.75, 0.25, 0.5, 0.6, 0.4, 0.55, 0.7, 0.45, 0.5, 0.35, 0.65, 0.5];
 const EXAMPLE_POSTS = [
@@ -347,7 +343,7 @@ export async function seedExamples(ctx: PlazaCtx): Promise<void> {
   const rand = mulberry32(hashSeed(`plaza-examples:${dayKey(ctx.now)}`));
   const uids = EXAMPLE_NICKS.map((_, i) => `ex${String(i).padStart(2, '0')}`);
   const cmds: Cmd[] = uids.map((uid, i) => [
-    'HSET', K(ctx, 'u', uid), 'nick', EXAMPLE_NICKS[i], 'created', ctx.now, 'rating', RATING_START,
+    'HSET', K(ctx, 'u', uid), 'nick', EXAMPLE_NICKS[i], 'real', 0, 'created', ctx.now, 'rating', RATING_START,
     'played', 0, 'correct', 0, 'streak', 0, 'best', 0, 'ex', 1,
   ]);
   for (const m of GAME_MARKET_IDS) {
@@ -370,7 +366,7 @@ export async function seedExamples(ctx: PlazaCtx): Promise<void> {
     const pid = `${900000 + i}`;
     const uid = uids[(i * 5) % uids.length];
     cmds.push(
-      ['HSET', K(ctx, 'posts'), pid, JSON.stringify({ id: pid, uid, nick: EXAMPLE_NICKS[(i * 5) % uids.length], text, t: ctx.now - (EXAMPLE_POSTS.length - i) * 23 * 60_000, ex: 1 })],
+      ['HSET', K(ctx, 'posts'), pid, JSON.stringify({ id: pid, uid, nick: EXAMPLE_NICKS[(i * 5) % uids.length], real: 0, text, t: ctx.now - (EXAMPLE_POSTS.length - i) * 23 * 60_000, ex: 1 })],
       ['LPUSH', K(ctx, 'posts', 'ids'), pid],
       ['HSET', K(ctx, 'likes'), pid, Math.floor(rand() * 9)],
     );
@@ -451,7 +447,8 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
     const info = JSON.parse(asStr((infos as Reply[])[i]) ?? '{}');
     return {
       rank: i + 1,
-      nick: String(info.nick ?? ''),
+      name: String(info.nick ?? ''),
+      real: !!info.real,
       rating: Math.round(Number(score)),
       played: Number(info.played ?? 0),
       correct: Number(info.correct ?? 0),
@@ -474,7 +471,8 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
     ]);
     const f = Object.fromEntries(pairs(u));
     me = {
-      nick: f.nick ?? '',
+      name: f.nick ?? '',
+      real: f.real === '1',
       rating: Math.round(Number(f.rating ?? RATING_START)),
       played: Number(f.played ?? 0),
       correct: Number(f.correct ?? 0),
@@ -500,7 +498,7 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
     const items = idList
       .map((id, i) => ({ id, raw: asStr((raws as Reply[])[i]), likes: asNum((likes as Reply[])[i]), reports: asNum((reps as Reply[])[i]) }))
       .filter((x) => x.raw);
-    const parsed = items.map((x) => ({ ...x, p: JSON.parse(x.raw as string) as { id: string; uid: string; nick: string; text: string; t: number; ex: number } }));
+    const parsed = items.map((x) => ({ ...x, p: JSON.parse(x.raw as string) as { id: string; uid: string; nick: string; real?: number; text: string; t: number; ex: number } }));
     const authors = [...new Set(parsed.map((x) => x.p.uid))];
     const scores = authors.length ? await ctx.store.exec(authors.map((a) => ['ZSCORE', K(ctx, 'lb'), a] as Cmd)) : [];
     const scoreOf = new Map(authors.map((a, i) => [a, asStr(scores[i])]));
@@ -510,7 +508,8 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
       const sc = scoreOf.get(p.uid);
       return {
         id: p.id,
-        nick: p.nick,
+        name: p.nick,
+        real: p.real === 1,
         rating: sc ? Math.round(Number(sc)) : null,
         text: hidden && !mine ? null : p.text,
         t: new Date(p.t).toISOString(),
@@ -533,6 +532,7 @@ export async function getState(ctx: PlazaCtx, uid: string | null): Promise<Plaza
     leaderboard,
     ranked: asNum(ranked),
     posts,
-    rules: { nickMin: NICK_MIN, nickMax: NICK_MAX, postMax: POST_MAX, minPlayed: LEADER_MIN_PLAYED, hideAfter: HIDE_AFTER_REPORTS, ratingStart: RATING_START, k: RATING_K },
+    auth: ctx.auth,
+    rules: { postMax: POST_MAX, minPlayed: LEADER_MIN_PLAYED, hideAfter: HIDE_AFTER_REPORTS, ratingStart: RATING_START, k: RATING_K },
   };
 }

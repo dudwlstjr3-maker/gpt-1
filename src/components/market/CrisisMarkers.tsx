@@ -20,7 +20,7 @@ export function MarkerIndex({ n, color, active }: { n: number; color: string; ac
   return (
     <span
       aria-hidden="true"
-      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
+      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
       style={{
         background: color,
         color: 'var(--bg)',
@@ -62,7 +62,7 @@ function Row({
           <MarkerIndex n={index} color={color} active={active} />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] leading-tight font-semibold break-keep text-fg">{marker.label}</p>
-            <p className="tnum mt-0.5 text-[11.5px] text-subtle">
+            <p className="tnum mt-0.5 text-[12px] text-subtle">
               {formatKstDate(marker.t)}
               <span className="ml-2">{MARKET_EVENT_CATEGORY_LABEL[marker.category]}</span>
             </p>
@@ -71,7 +71,7 @@ function Row({
             <p className="tnum text-[16px] leading-none font-bold" style={{ color: textColor }}>
               {marker.score === null ? NO_VALUE : formatNumber(marker.score, 1)}
             </p>
-            <p className="mt-1 text-[11.5px] font-semibold" style={{ color: textColor }}>
+            <p className="mt-1 text-[12px] font-semibold" style={{ color: textColor }}>
               {marker.stageLabel ?? '산출 불가'}
             </p>
           </div>
@@ -118,7 +118,7 @@ export function CrisisMarkers({
     <div className="card p-3">
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-fg-strong">과거 위기 때의 점수</h3>
-        <span className="tnum text-[11.5px] text-subtle">{events.markers.length}건</span>
+        <span className="tnum text-[12px] text-subtle">{events.markers.length}건</span>
       </div>
       <p className="mb-2 text-[12.5px] leading-relaxed break-keep text-muted">
         누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.
@@ -182,7 +182,7 @@ export function CrisisMarkers({
       </details>
 
       {events.outOfRange > 0 ? (
-        <p className="mt-2 text-[11.5px] break-keep text-subtle">
+        <p className="mt-2 text-[12px] break-keep text-subtle">
           히스토리 범위보다 앞선 사건 {events.outOfRange}건은 점수를 산출할 수 없어 표시하지 않았습니다.
         </p>
       ) : null}

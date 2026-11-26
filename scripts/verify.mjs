@@ -3888,6 +3888,171 @@ async function main() {
       /fetchDailySeries\(yahooConfig\(envUrl\(this\.baseUrlEnvFor\(market\)\)\), id, 3650\)/.test(liveIdx));
   }
 
+  console.log('\n[8-42] 쫄탐광장 — 다음 거래일 맞히기 · 순위표 · 한 줄 토론');
+  {
+    /*
+     * 2026-11-26 사용자: "커뮤니티도 넣어 놓고, 내일의 주식이 어떨지 … 상승 or 하락 맞추는 걸로
+     * 순위표나 elo 형식으로". 정한 것: 닉네임만 · 한 줄 토론 · S&P 500 과 KOSPI.
+     * 규칙 src/lib/plazaRules.mjs · 문구 src/lib/plazaText.mjs · 저장 src/server/plaza.
+     * 여기서는 DEMO(메모리 저장소) 서버에 실제로 가입 · 고르기 · 글쓰기 · 공감 · 신고를 해 본다.
+     */
+    const { roundTimes, outcome, closesByDate, GAME_MARKETS, isTradingDay } = await import('../src/lib/plazaRules.mjs');
+    const call = async (body, key, extra = {}) => {
+      const r = await fetch(`${BASE}/api/plaza`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(key ? { 'x-plaza-key': key } : {}), ...extra },
+        body: JSON.stringify(body),
+      });
+      return { status: r.status, body: await r.json().catch(() => ({})) };
+    };
+    const look = async (key) => {
+      const r = await fetch(`${BASE}/api/plaza`, { headers: key ? { 'x-plaza-key': key } : {} });
+      return { status: r.status, body: await r.json().catch(() => ({})) };
+    };
+    const g = await look();
+    const st = g.body;
+    check('광장 API 200 · DEMO · 메모리 저장소', g.status === 200 && st.mode === 'DEMO' && st.storage === 'memory', `${g.status} ${st.mode} ${st.storage}`);
+    check('맞히는 판은 S&P 500 · KOSPI 둘', JSON.stringify((st.markets ?? []).map((m) => m.market)) === '["spx","kospi"]');
+    const nowMs = Date.now();
+    check('받는 판은 거래일 · 마감(장 시작)은 아직 오지 않음 · 마감 시각이 규칙과 같음',
+      (st.markets ?? []).every((m) => isTradingDay(m.open.date) && Date.parse(m.open.cutoff) > nowMs &&
+        Date.parse(m.open.cutoff) === roundTimes(m.market, m.open.date).cutoff),
+      (st.markets ?? []).map((m) => `${m.market} ${m.open.date} ${m.open.cutoff}`).join(' · '));
+    check('고르기 전에는 사람들 몫을 보여 주지 않음 (따라 고르기를 줄이려고)', (st.markets ?? []).every((m) => m.open.ups === null && m.open.downs === null));
+    // DEMO 예시 — 순위표 · 글은 모두 '예시' 표시, 레이팅 내림차순, 지난 결과는 DEMO 종가와 같은 방향
+    // 같은 서버에 검증을 두 번 돌리면 앞 회의 검사 글이 섞여 있다 — '예시_' 이름과 예시 표시가 짝이 맞는지만 본다
+    const exOk = (x) => x.example === x.nick.startsWith('예시_');
+    check('DEMO 예시 회원 · 글에 예시 표시', (st.leaderboard ?? []).some((l) => l.example) && st.leaderboard.every(exOk) &&
+      (st.posts ?? []).some((p) => p.example) && st.posts.every(exOk));
+    check('순위표가 레이팅 순 · 순위 번호가 1부터 이어짐',
+      (st.leaderboard ?? []).every((l, i, a) => l.rank === i + 1 && (i === 0 || a[i - 1].rating >= l.rating)));
+    const { body: fd } = await getJson('/api/fng/us');
+    const spxCloses = closesByDate(fd?.detail?.benchmark?.series ?? [], GAME_MARKETS.spx.tz);
+    const spxRecent = (st.markets ?? []).find((m) => m.market === 'spx')?.recent ?? [];
+    const dates = [...spxCloses.keys()].sort();
+    const mism = spxRecent.filter((r) => {
+      const i = dates.indexOf(r.date);
+      return i < 1 || outcome(spxCloses.get(r.date), spxCloses.get(dates[i - 1])) !== r.result;
+    });
+    check('S&P 500 지난 결과가 같은 DEMO 종가로 다시 낸 방향과 같음', spxRecent.length > 0 && mism.length === 0,
+      `${spxRecent.length}판 · 어긋남 ${mism.map((r) => r.date).join(',')}`);
+
+    // 가입
+    const tag = Date.now().toString(36).slice(-5);
+    const a = await call({ action: 'join', nickname: `검사${tag}` });
+    const key = a.body?.account?.key ?? '';
+    check('닉네임만으로 참여 · 복구 코드 형식', a.status === 200 && /^ZT-[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/.test(key), `${a.status} ${key.replace(/[0-9A-Z]{4}$/, '****')}`);
+    check('같은 닉네임은 다시 못 씀 (409)', (await call({ action: 'join', nickname: `검사${tag}` })).status === 409);
+    check('운영자 사칭 · 짧은 닉네임은 거름 (400)',
+      (await call({ action: 'join', nickname: '운영자' })).status === 400 && (await call({ action: 'join', nickname: '가' })).status === 400);
+    const rs = await call({ action: 'restore', key: key.toLowerCase().replace(/-/g, ' ') });
+    check('복구 코드로 다른 기기에서 이어 하기 (대소문자 · 띄어쓰기 무관)', rs.status === 200 && rs.body?.state?.me?.nick === `검사${tag}`);
+    check('없는 복구 코드는 404', (await call({ action: 'restore', key: 'ZT-0000-0000-0000-0000' })).status === 404);
+
+    // 고르기
+    const spx = (st.markets ?? []).find((m) => m.market === 'spx');
+    check('닉네임 없이 고르면 401', (await call({ action: 'predict', market: 'spx', pick: 'up', date: spx?.open.date })).status === 401);
+    check('마감된 판(다른 날짜)은 409', (await call({ action: 'predict', market: 'spx', pick: 'up', date: '2020-01-02' }, key)).status === 409);
+    check('없는 쪽 · 없는 시장은 400',
+      (await call({ action: 'predict', market: 'spx', pick: 'buy', date: spx?.open.date }, key)).status === 400 &&
+      (await call({ action: 'predict', market: 'btc', pick: 'up', date: spx?.open.date }, key)).status === 400);
+    const pr = await call({ action: 'predict', market: 'spx', pick: 'down', date: spx?.open.date }, key);
+    const o2 = pr.body?.state?.markets?.find((m) => m.market === 'spx')?.open;
+    check('고르면 내 선택 · 사람들 몫이 보이고 참여 수가 하나 늘어남',
+      pr.status === 200 && o2?.myPick === 'down' && Number.isFinite(o2?.ups) && o2.ups + o2.downs === o2.n && o2.n === (spx?.open.n ?? -1) + 1,
+      JSON.stringify(o2));
+    const pr2 = await call({ action: 'predict', market: 'spx', pick: 'up', date: spx?.open.date }, key);
+    const o3 = pr2.body?.state?.markets?.find((m) => m.market === 'spx')?.open;
+    check('마감 전에는 바꿀 수 있고, 바꿔도 한 사람으로 셈', o3?.myPick === 'up' && o3?.n === o2?.n);
+
+    // 한 줄 토론
+    check('링크 · 리딩방 · 140자 넘는 글은 400',
+      (await call({ action: 'post', text: 'naver.com 오세요' }, key)).status === 400 &&
+      (await call({ action: 'post', text: '리딩방 무료 입장' }, key)).status === 400 &&
+      (await call({ action: 'post', text: '가'.repeat(141) }, key)).status === 400);
+    const ps = await call({ action: 'post', text: `검사 글 ${tag}` }, key);
+    const mine = ps.body?.state?.posts?.[0];
+    check('글이 맨 위에 내 글로 올라옴', ps.status === 200 && mine?.mine === true && mine?.text === `검사 글 ${tag}` && mine?.example === false);
+    check('20초 안에 또 쓰면 429', (await call({ action: 'post', text: '또 씀' }, key)).status === 429);
+    const lk1 = await call({ action: 'like', id: mine?.id }, key);
+    const lk2 = await call({ action: 'like', id: mine?.id }, key);
+    check('공감은 한 번 더 누르면 취소', lk1.body?.state?.posts?.[0]?.likes === 1 && lk1.body.state.posts[0].liked === true &&
+      lk2.body?.state?.posts?.[0]?.likes === 0);
+    check('내 글은 신고할 수 없음 (400)', (await call({ action: 'report', id: mine?.id }, key)).status === 400);
+    for (let i = 0; i < 3; i += 1) {
+      const u = await call({ action: 'join', nickname: `신고${tag}${i}` });
+      await call({ action: 'report', id: mine?.id }, u.body?.account?.key);
+    }
+    const other = (await look()).body?.posts?.find((p) => p.id === mine?.id);
+    const self = (await look(key)).body?.posts?.find((p) => p.id === mine?.id);
+    check('서로 다른 세 명이 신고하면 남에게는 가려짐 (글을 보내지 않음)', other?.hidden === true && other?.text === null);
+    check('가려져도 글쓴이에게는 보임', self?.hidden === true && self?.text === `검사 글 ${tag}`);
+    check('관리자 키 없이 지우기는 403', (await call({ action: 'delete', id: mine?.id })).status === 403 &&
+      (await call({ action: 'delete', id: mine?.id }, null, { 'x-plaza-admin': 'x'.repeat(20) })).status === 403);
+    const pub = JSON.stringify((await look()).body);
+    check('응답에 복구 코드 · 해시 · 회원 id 가 실리지 않음', !/ZT-[0-9A-Z]{4}-/.test(pub) && !/"uid"|"key"|[0-9a-f]{64}/.test(pub));
+
+    const rd = (f) => readFile(f, 'utf8');
+    const [svc, store, cfg, http, route, page, home, nav, css, txt, tplP, buildP, pkg] = await Promise.all([
+      'src/server/plaza/service.ts', 'src/server/plaza/store.ts', 'src/server/config.ts', 'src/server/http.ts', 'src/app/api/plaza/route.ts',
+      'src/app/plaza/page.tsx', 'src/components/plaza/HomePlazaCard.tsx', 'src/components/nav/Navigation.tsx', 'src/app/plaza.css',
+      'src/lib/plazaText.mjs', 'tools/preview/template.html', 'tools/preview/build.mjs', 'package.json'].map(rd));
+    check('저장소 토큰은 config.ts 에서만 · NEXT_PUBLIC_ 없음',
+      /UPSTASH_REDIS_REST_TOKEN/.test(cfg) && !/UPSTASH_REDIS_REST_TOKEN|KV_REST_API_TOKEN/.test(svc + store + route) && !/NEXT_PUBLIC_[A-Z_]*(UPSTASH|KV_|PLAZA)/.test(svc + store + route + page + cfg));
+    check('Upstash 는 바깥 호출 규칙대로 fetchJson · 쓰기는 재시도 안 함',
+      /fetchJson<[\s\S]{0,80}\/pipeline`/.test(store) && /retries: opts\.write \? 0 : 1/.test(store) && /method: options\.method \?\? 'GET'/.test(http));
+    check('새 npm 의존성 없음 (next · react · react-dom 셋)', Object.keys(JSON.parse(pkg).dependencies ?? {}).sort().join(',') === 'next,react,react-dom');
+    check('DEMO 와 LIVE 이름공간이 다름 · 예시는 DEMO 메모리에서만',
+      /const ns = \(ctx: PlazaCtx\) => `zt:\$\{ctx\.mode\.toLowerCase\(\)\}:`/.test(svc) &&
+      /if \(ctx\.mode !== 'DEMO' \|\| ctx\.store\.kind !== 'memory'\) return;/.test(svc));
+    check('IP 를 저장하지 않음 — 날짜와 섞은 해시만', /return sha\(`\$\{ip\}\|\$\{dayKey\(now\)\}`\)\.slice\(0, 16\)/.test(svc) && !/K\(ctx[^)]*\bip\b/.test(svc) &&
+      /join\(ctx, body\.nickname, ipTag\(clientIp\(req\), ctx\.now\)\)/.test(route));
+    check('관리자 삭제는 PLAZA_ADMIN_KEY(16자 이상)일 때만', /k && k\.length >= 16 \? k : null/.test(cfg) && /if \(!admin \|\| req\.headers\.get\('x-plaza-admin'\) !== admin\)/.test(route));
+    const plazaWords = page + home + txt + (tplP.match(/function viewPlaza\(\) \{[\s\S]*?\n  \}\n/)?.[0] ?? '');
+    check('사고팔라는 말을 쓰지 않음 (오른다 / 내린다)', !/매수|매도|사세요|파세요|추천/.test(plazaWords) && /plazaPick/.test(page) && /'▲ 오른다'/.test(txt));
+    check('상금 없음 · 투자 실력 아님 · 회원 글은 투자 조언 아님을 적음',
+      /상금이나 실제 돈은 없어요/.test(txt) && /투자 실력을 뜻하지 않아요/.test(txt) && /투자 조언이 아니에요/.test(txt));
+    check('메모리 저장소면 기록이 오래 남지 않는다고 알림', /state\.storage === 'memory' \? <p className="pz-note">\{PLAZA_MEMORY_NOTE\}/.test(page));
+    check('하단 탭에 광장 · 홈에 광장 문', /href: '\/plaza', label: '광장'/.test(nav) && /href="\/plaza"/.test(home));
+    check('글자 12px 아래 없음 · 큰 단추 48px · 작은 단추 32px (광장 CSS)',
+      ![...css.matchAll(/font-size: (\d+(?:\.\d+)?)px/g)].some((m) => Number(m[1]) < 12) &&
+      /\.pz-pick \{[^}]*min-height: 48px/.test(css) && /\.pz-small \{[^}]*min-height: 32px/.test(css));
+    check('미리보기 — 같은 CSS · 같은 문구 함수를 끼워 넣음',
+      /__PLAZA_CSS__/.test(tplP) && /__PLAZA_TEXT__/.test(tplP) &&
+      /\.replace\('__PLAZA_CSS__'[\s\S]{0,120}plaza\.css/.test(buildP) && /\.replace\('__PLAZA_TEXT__'[\s\S]{0,140}plazaText\.mjs/.test(buildP));
+    check('미리보기 — 광장 화면 · 홈 문 · 탭', /plaza: viewPlaza,/.test(tplP) && /homePlazaCard\(\) \+/.test(tplP) && /\{ id: 'plaza', label: '광장'/.test(tplP) &&
+      /const plaza = await j\('\/api\/plaza'\);/.test(buildP));
+    check('미리보기는 참여하지 못한다고 적고 단추를 잠금', /PLAZA_PREVIEW_NOTE/.test(tplP) &&
+      /class="pz-pick" aria-pressed="false" disabled/.test(tplP) && /class="pz-btn primary" disabled/.test(tplP));
+  }
+
+  console.log('\n[8-43] 심리 상세 다듬기 — 차례 · 접기 · 작은 글자');
+  {
+    /*
+     * 2026-11-26 사용자: "심리 상세 좀 더 다듬어". 잰 값(390px): 6,045px(화면 7.2장) · 12px 미만 글자 48%.
+     * '오늘 왜 움직였나'(기여도)를 요약 바로 아래로, 긴 설명 셋(차트 읽는 법 · 사이클과 구간 통계 · 산출 방법)을 접었다.
+     */
+    const rd = (f) => readFile(f, 'utf8');
+    const [pg, crisis, contrib, tplF] = await Promise.all(['src/app/fng/[market]/page.tsx', 'src/components/market/CrisisMarkers.tsx',
+      'src/components/charts/ContributionBars.tsx', 'tools/preview/template.html'].map(rd));
+    const order = (t, marks) => marks.map((m) => t.indexOf(m));
+    const ao = order(pg, ['aria-label="점수 요약"', 'id="fng-contrib-title"', 'id="fng-chart-title"', 'id="fng-cycle-title"', 'id="fng-comp-title"', 'id="fng-method-title"']);
+    check('앱 차례 — 요약 · 기여도 · 추이 · 사이클 · 구성요소 · 산출 방법', ao.every((v, i) => v > 0 && (i === 0 || ao[i - 1] < v)), ao.join(' < '));
+    const vf = tplF.slice(tplF.indexOf('  function viewFng() {'), tplF.indexOf('\n  function ', tplF.indexOf('  function viewFng() {') + 10));
+    const to = order(vf, ['<h2>점수 상승·하락 기여도</h2>', '<h2>점수 추이</h2>', '<h2>사이클과 구간 통계</h2>', '<h2>구성요소와 가중치</h2>', '<h2>산출 방법</h2>']);
+    check('미리보기도 같은 차례', to.every((v, i) => v > 0 && (i === 0 || to[i - 1] < v)), to.join(' < '));
+    check('긴 설명 셋을 접음 — 차트 읽는 법 · 사이클과 구간 통계 · 산출 방법 (앱)',
+      /<details className="mt-2" data-chart-howto>/.test(pg) && (pg.match(/<details className="fng-fold">/g) ?? []).length === 2);
+    check('미리보기도 같은 셋을 접음',
+      /<details class="howto" data-chart-howto>/.test(vf) && (vf.match(/<details class="fng-fold">/g) ?? []).length === 2);
+    check('겹침 설명(신호가 아님)은 접지 않고 그대로 보임',
+      pg.indexOf('data-overlay-note') > pg.indexOf('</details>', pg.indexOf('data-chart-howto')) &&
+      vf.indexOf('data-overlay-note') > vf.indexOf('</p></details>', vf.indexOf('data-chart-howto')));
+    check('심리 상세 · 위기 목록 · 기여도 막대에 12px 아래 글자 없음 (앱)', ![pg, crisis, contrib].some((t) => /text-\[(1[01](\.\d)?|[0-9](\.\d)?)px\]/.test(t)));
+    const cc = tplF.slice(tplF.indexOf('  function crisisCard('), tplF.indexOf('\n  function ', tplF.indexOf('  function crisisCard(') + 10));
+    check('미리보기 심리 상세 · 위기 카드에도 12px 아래 글자 없음', ![vf, cc].some((t) => /font-size:\s?(1[01](\.\d)?|[0-9](\.\d)?)px/.test(t)));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

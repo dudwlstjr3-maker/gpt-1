@@ -835,6 +835,11 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .tip .tt-row { display: flex; justify-content: space-between; gap: 8px; }
 .tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 4px; }
 .tip .tt-row b { color: var(--fg); font-weight: 600; }
+/* 심리 상세의 접힌 절 (앱 fng-fold · data-chart-howto 와 같은 모양) */
+details.fng-fold > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: var(--box-radius); background: var(--surface); font-size: 13px; font-weight: 600; color: var(--fg); cursor: pointer; }
+details.fng-fold > summary::-webkit-details-marker, details.howto > summary::-webkit-details-marker { display: none; }
+details.howto { margin-top: 8px; }
+details.howto > summary { list-style: none; display: flex; align-items: center; min-height: 24px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tip .tt-span { margin-top: 2px; display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); word-break: keep-all; }
 .swatch-shade { display: inline-block; width: 12px; height: 12px; border-radius: 2px; opacity: .35; flex-shrink: 0; }
 .tip .swatch-shade { width: 8px; height: 8px; opacity: 1; }
@@ -877,6 +882,7 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 __HOME_MOOD_CSS__
+__PLAZA_CSS__
 </style>
 
 <div class="preview">
@@ -2520,16 +2526,16 @@ __HOME_MOOD_CSS__
         (on ? 'color-mix(in srgb,' + col + ' 45%,var(--border))' : 'var(--border)') + ';background:' +
         (on ? 'color-mix(in srgb,' + col + ' 8%,var(--surface))' : 'var(--surface)') + '">' +
         '<div style="display:flex;align-items:flex-start;gap:8px">' +
-        '<span aria-hidden="true" style="display:inline-flex;flex-shrink:0;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;font-size:11.5px;font-weight:700;background:' +
+        '<span aria-hidden="true" style="display:inline-flex;flex-shrink:0;width:18px;height:18px;align-items:center;justify-content:center;border-radius:50%;font-size:12px;font-weight:700;background:' +
         scoreFill(m.score) + ';color:var(--bg)">' + (i + 1) + '</span>' +
         '<div style="min-width:0;flex:1">' +
         '<p style="margin:0;font-size:13px;font-weight:600;line-height:1.3;word-break:keep-all;color:var(--fg)">' + esc(m.label) + '</p>' +
-        '<p class="tnum" style="margin:2px 0 0;font-size:11.5px;color:var(--subtle)">' + esc(kYmd(m.t)) +
+        '<p class="tnum" style="margin:2px 0 0;font-size:12px;color:var(--subtle)">' + esc(kYmd(m.t)) +
         '<span style="margin-left:8px">' + (EVENT_CAT_LABEL[m.category] || '') + '</span></p></div>' +
         '<div style="flex-shrink:0;text-align:right">' +
         '<p class="tnum" style="margin:0;font-size:16px;line-height:1;font-weight:700;color:' + col + '">' +
         (m.score === null ? NO : esc(fmtNum(m.score, 1))) + '</p>' +
-        '<p style="margin:4px 0 0;font-size:11.5px;font-weight:600;color:' + col + '">' + esc(m.stageLabel || '산출 불가') + '</p>' +
+        '<p style="margin:4px 0 0;font-size:12px;font-weight:600;color:' + col + '">' + esc(m.stageLabel || '산출 불가') + '</p>' +
         '</div></div>' +
         (on
           ? '<p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' + esc(m.note) + '</p>'
@@ -2542,7 +2548,7 @@ __HOME_MOOD_CSS__
       '<div class="card" style="padding:12px">' +
       '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">' +
       '<h3 style="margin:0;font-size:14px;font-weight:700;color:var(--fg-strong)">과거 위기 때의 점수</h3>' +
-      '<span class="tnum" style="font-size:11.5px;color:var(--subtle)">' + ev.markers.length + '건</span></div>' +
+      '<span class="tnum" style="font-size:12px;color:var(--subtle)">' + ev.markers.length + '건</span></div>' +
       '<p style="margin:4px 0 10px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">누르면 그 시점을 차트에서 강조하고 무슨 일이 있었는지 보여 줍니다. 번호는 차트 위 세로선과 같습니다.</p>' +
       (lowest && currentScore !== null
         ? '<p style="margin:0 0 10px;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--fg)">' +
@@ -2563,7 +2569,7 @@ __HOME_MOOD_CSS__
         '<td style="white-space:nowrap">' + esc(m.stageLabel || NO) + '</td></tr>').join('') +
       '</tbody></table></div></details>' +
       (ev.outOfRange > 0
-        ? '<p style="margin:8px 0 0;font-size:11.5px;word-break:keep-all;color:var(--subtle)">히스토리 범위보다 앞선 사건 ' + ev.outOfRange + '건은 점수를 산출할 수 없어 표시하지 않았습니다.</p>'
+        ? '<p style="margin:8px 0 0;font-size:12px;word-break:keep-all;color:var(--subtle)">히스토리 범위보다 앞선 사건 ' + ev.outOfRange + '건은 점수를 산출할 수 없어 표시하지 않았습니다.</p>'
         : '') +
       '<p class="notice n-warn" style="margin-top:8px"><span>ⓘ</span><span>' + esc(ev.caveat) +
       ' 과거에 이랬다는 기록일 뿐입니다.</span></p>' +
@@ -3250,6 +3256,81 @@ __HOME_MOOD_CSS__
     return null;
   }
 
+  /* ---------------- 쫄탐광장 (2026-11-26) ----------------
+     문구는 src/lib/plazaText.mjs 를 그대로 끼워 넣는다(build.mjs). CSS 는 src/app/plaza.css 그대로.
+     미리보기에는 서버가 없어서 참여할 수 없다 — 단추는 그대로 두되 눌리지 않게 하고 그 사실을 적는다.
+     데이터는 미리보기를 구울 때 DEMO 서버의 /api/plaza 에서 받은 것(예시 회원 · 예시 글)이다. */
+  __PLAZA_TEXT__
+
+  const PLAZA_PREVIEW_NOTE = '미리보기에서는 참여할 수 없어요. 앱에서 닉네임을 정하면 고르고 글을 올릴 수 있어요.';
+
+  function homePlazaCard() {
+    const st = DATA.plaza;
+    if (!st) return '';
+    return '<section class="pz-card pz-home" aria-labelledby="home-plaza-title">' +
+      '<div class="pz-home-head"><h3 id="home-plaza-title">쫄탐광장 · 다음 거래일 맞히기</h3><span>닉네임만 정하면 참여</span></div>' +
+      '<ul>' + st.markets.map((m) => '<li><b>' + esc(m.name) + ' ' + esc(plazaDay(m.open.date)) + '</b><span>' +
+        m.open.n.toLocaleString('ko-KR') + '명 참여</span></li>').join('') + '</ul>' +
+      '<button type="button" class="pz-go" data-go="plaza">오를까 내릴까 맞히러 가기 →</button></section>';
+  }
+
+  function viewPlaza() {
+    const st = DATA.plaza;
+    if (!st) return '<p style="padding:20px">광장 자료가 없습니다.</p>';
+    const now = Date.parse(st.asOf);
+    const round = (m) => {
+      const o = m.open;
+      return '<article class="pz-card" aria-label="' + esc(m.name + ' ' + plazaDay(o.date)) + ' 맞히기">' +
+        '<div class="pz-round-head"><b>' + esc(m.name) + '</b><span>' + esc(m.region) + ' · ' + esc(plazaDay(o.date)) + ' 장</span></div>' +
+        '<p class="pz-q">직전 거래일 종가보다 오를까요, 내릴까요?</p>' +
+        '<div class="pz-picks" role="group" aria-label="' + esc(m.name) + ' 고르기">' +
+        ['up', 'down'].map((pk) => '<button type="button" class="pz-pick" aria-pressed="false" disabled>' + plazaPick(pk) + '</button>').join('') + '</div>' +
+        '<p class="pz-meta">마감 ' + esc(plazaKst(o.cutoff)) + ' (한국시간) · ' + o.n.toLocaleString('ko-KR') + '명 참여 · 닉네임을 정하면 고를 수 있어요</p>' +
+        (m.running
+          ? '<p class="pz-running">' + esc(plazaDay(m.running.date)) + ' 장 진행 중 — 결과는 ' + esc(plazaKst(m.running.resolveAt)) + ' 이후 · ' + m.running.n.toLocaleString('ko-KR') + '명</p>'
+          : '') +
+        (m.recent.length
+          ? '<ul class="pz-recent" aria-label="' + esc(m.name) + ' 지난 결과">' + m.recent.slice(0, 3).map((r) => {
+              const hit = r.result === 'up' ? r.ups : r.result === 'down' ? r.downs : null;
+              return '<li><b>' + esc(plazaDay(r.date) + ' ' + plazaResult(r.result) + (r.changePct !== null ? ' ' + plazaChange(r.changePct) : '')) + '</b>' +
+                '<span>' + (hit !== null && r.n ? '맞힌 사람 ' + Math.round((hit / r.n) * 100) + '%' : r.n + '명') + '</span></li>';
+            }).join('') + '</ul>'
+          : '') +
+        '</article>';
+    };
+    const lb = st.leaderboard.length
+      ? '<table class="pz-table"><thead><tr><th scope="col">순위</th><th scope="col">닉네임</th><th scope="col">레이팅</th></tr></thead><tbody>' +
+        st.leaderboard.map((l) => '<tr><td class="rank">' + l.rank + '</td><td>' + esc(l.nick) + (l.example ? '<span class="pz-tag">예시</span>' : '') +
+          '<span class="acc">' + esc(plazaAccuracy(l.correct, l.played)) + '</span></td><td>' + l.rating.toLocaleString('ko-KR') + '</td></tr>').join('') +
+        '</tbody></table>'
+      : '<p class="pz-hint" style="margin:0">아직 순위에 오른 사람이 없어요. 결과가 ' + st.rules.minPlayed + '판 이상 나면 올라요.</p>';
+    const posts = st.posts.length
+      ? '<ul class="pz-posts">' + st.posts.map((q) => '<li class="pz-post"><div class="pz-post-head"><b>' + esc(q.nick) + '</b>' +
+          (q.rating !== null ? '<span>' + q.rating.toLocaleString('ko-KR') + '</span>' : '') +
+          '<span>' + esc(plazaAgo(q.t, now)) + '</span>' + (q.example ? '<span class="pz-tag">예시</span>' : '') + '</div>' +
+          (q.text !== null ? '<p>' + esc(q.text) + '</p>' : '<p class="hidden">신고가 쌓여 가려진 글이에요.</p>') +
+          '<div class="pz-post-acts"><button type="button" class="pz-small" aria-pressed="false" disabled>♡ 공감 ' + q.likes + '</button>' +
+          '<button type="button" class="pz-small" disabled>신고</button></div></li>').join('') + '</ul>'
+      : '<p class="pz-hint" style="margin:0">아직 글이 없어요. 첫 한 줄을 남겨 보세요.</p>';
+    return '<div class="plaza">' +
+      '<div><div class="pz-head"><h1>쫄탐광장</h1>' + modeBadge() + '</div>' +
+      '<p class="pz-lede">' + esc(PLAZA_LEDE) + '</p>' +
+      '<p class="pz-note">' + esc(PLAZA_PREVIEW_NOTE) + '</p></div>' +
+      '<section class="pz-card" aria-labelledby="pz-join-title"><h2 id="pz-join-title" style="margin:0 0 8px;font-size:15px;font-weight:750">닉네임만 정하면 바로 참여</h2>' +
+      '<div class="pz-form"><input aria-label="닉네임" placeholder="' + st.rules.nickMin + '~' + st.rules.nickMax + '자 (한글 · 영문 · 숫자)" disabled>' +
+      '<button type="button" class="pz-btn primary" disabled>참여하기</button></div>' +
+      '<p class="pz-hint">가입 · 이메일 · 전화번호가 필요 없어요. 참여하면 복구 코드를 하나 드려요.</p></section>' +
+      '<section class="pz-sec" aria-labelledby="pz-game-title"><h2 id="pz-game-title">다음 거래일 맞히기 <small>장 시작 전까지 · 바꿀 수 있어요</small></h2>' +
+      '<div class="pz-stack">' + st.markets.map(round).join('') + '</div></section>' +
+      '<section class="pz-sec" aria-labelledby="pz-lb-title"><h2 id="pz-lb-title">순위표 <small>레이팅 순 · ' + st.ranked.toLocaleString('ko-KR') + '명</small></h2>' +
+      '<div class="pz-card">' + lb +
+      '<details class="pz-more" style="margin-top:8px"><summary>레이팅은 어떻게 오르나요? ▾</summary><ul class="pz-hint pz-list">' +
+      plazaRatingHelp(st.rules).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></details></div></section>' +
+      '<section class="pz-sec" aria-labelledby="pz-talk-title"><h2 id="pz-talk-title">한 줄 토론 <small>신고 ' + st.rules.hideAfter + '번이면 가려져요</small></h2>' +
+      '<div class="pz-stack"><p class="pz-hint" style="margin:0">닉네임을 정하면 글을 올릴 수 있어요. ' + esc(PLAZA_POST_NOTE) + '</p>' + posts + '</div></section>' +
+      '<p class="pz-foot">' + esc(PLAZA_FOOT) + '</p></div>';
+  }
+
   function viewHome() {
     const s = snap();
     const fng = s.sections.fng.data || [];
@@ -3319,6 +3400,8 @@ __HOME_MOOD_CSS__
             '<span aria-hidden="true" style="margin-right:4px;color:var(--accent)">—</span>' + esc(t) + '</p>'
           : '';
       })() +
+      /* 쫄탐광장 들어가는 문 (2026-11-26) — 앱 HomePlazaCard 와 같은 마크업 */
+      homePlazaCard() +
       '<details class="home-fold" id="home-prices"' + (state.homePricesOpen ? ' open' : '') + '><summary>시세와 시장 흐름</summary>' +
       /* 공포·탐욕이 "요즘 분위기(1년)" 라면 전광판은 "지금이 20년 중 어디인가" 다. */
       regimeBlock() +
@@ -3974,39 +4057,7 @@ __HOME_MOOD_CSS__
       stageStrip(f.score) +
       '</div></section>' +
 
-      '<section class="block"><div class="block-head"><h2>점수 추이</h2>' +
-      '<div class="seg" role="group" aria-label="기간">' +
-      ['1M', '3M', '1Y', '3Y', '10Y'].map((r) => '<button type="button" data-range="' + r + '" aria-pressed="' + (state.range === r) + '">' +
-        ({ '1M': '1개월', '3M': '3개월', '1Y': '1년', '3Y': '3년', '10Y': '10년' })[r] + '</button>').join('') + '</div></div>' +
-      '<div class="card" style="padding:12px">' + lineChart(series, 240, MARKET_LABEL[m] + ' 심리 점수와 ' + (d.benchmark ? d.benchmark.name : '대표 지수') + ' 비교', chartMarks, chartSpans) +
-      '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle);word-break:keep-all">' +
-      (d.benchmark
-        ? '위 칸은 0~100 심리 점수, 아래 칸은 ' + esc(d.benchmark.name) + ' 가격입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다 — 한 눈금에 겹쳐 그리면 눈금을 어디에 두느냐에 따라 없던 상관관계가 보입니다.'
-        : '세로축은 0~100 심리 점수입니다.') +
-      ' 점수가 산출되지 않은 날은 선이 이어지지 않습니다.' +
-      (chartMarks.length
-        ? ' 세로 점선은 과거 사건 ' + chartMarks.length + '건이며, 번호는 아래 목록과 같습니다.'
-        : ' 기간을 10년으로 바꾸면 과거 위기 시점이 표시됩니다.') +
-      (smooth
-        ? ' 이 구간의 선은 하루치 점수를 ' + SMOOTH_DAYS + '일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.'
-        : '') +
-      '</p>' +
-      (ov
-        ? '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle);word-break:keep-all" data-overlay-note>' +
-          (ov.trend
-            ? '회색 칸은 ' + esc(ov.trend.name) + ' 가격이 ' + ov.trend.maDays + '일(약 10개월) 평균선 아래에 있던 기간입니다. '
-            : esc(d.benchmark ? d.benchmark.name : '대표 지수') + ' 평균선은 지금 받지 못해 그리지 않았습니다. ') +
-          (ov.vix
-            ? (d.benchmark ? '두 칸 사이' : '맨 위') + '의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ' + ov.vix.threshold + ' 이상이던 날입니다. '
-            : 'VIX 는 지금 받지 못해 그리지 않았습니다. ') +
-          '둘 다 그때 시장이 어떤 상태였는지 보여 줄 뿐, 사고팔 때를 알려 주는 신호가 아닙니다.</p>'
-        : '') +
-      '</div>' +
-      '<div style="margin-top:8px">' + crisisCard(d.events, f.score) + '</div></section>' +
-
-      '<section class="block"><div class="block-head"><h2>사이클과 구간 통계</h2></div>' +
-      '<div class="riskcards">' + cycleCard(f.cycle) + bandStatsCard(d.bandStats) + '</div></section>' +
-
+      /* 기여도 — '오늘 왜 움직였나'. 홈의 '이유 보기' 가 오는 곳이라 요약 바로 아래 (앱과 같은 차례, 2026-11-26) */
       '<section class="block"><div class="block-head"><h2>점수 상승·하락 기여도</h2></div>' +
       '<div class="card" style="padding:12px">' +
       (function () {
@@ -4021,19 +4072,56 @@ __HOME_MOOD_CSS__
         const pct = v === null ? 0 : (Math.abs(v) / maxAbs) * 50;
         return '<li><div class="bar-top"><span>' + esc(c.label) + '</span><span style="flex-shrink:0"><b class="tnum" style="font-size:14px;color:' + dirColor(v) + '">' +
           (v === null ? '결측' : (CONTRIB_GLYPH[r.dir] + ' ' + r.text).trim()) + '</b>' +
-          (v === null ? '' : '<small class="tnum" style="margin-left:8px;font-size:11.5px;color:var(--subtle)">' + esc(fmtSigned(v, 1)) + '점</small>') + '</span></div>' +
+          (v === null ? '' : '<small class="tnum" style="margin-left:8px;font-size:12px;color:var(--subtle)">' + esc(fmtSigned(v, 1)) + '점</small>') + '</span></div>' +
           '<div class="bar-track"><span class="bar-zero"></span>' +
           (v === null ? '' : '<span class="bar-fill" style="background:' + dirColor(v) + ';left:' + (v > 0 ? 50 : 50 - pct) + '%;width:' + pct + '%"></span>') +
           '</div></li>';
       }).join('') + '</ul>' +
-      '<p style="margin:8px 0 0;font-size:11.5px;line-height:1.6;color:var(--subtle);word-break:keep-all">%는 오늘 움직인 크기 가운데 그 지표가 맡은 몫입니다. 올린 쪽(▲)과 내린 쪽(▼)을 합쳐 100%. 옆의 \'점\'은 100점 만점 점수가 그 지표 때문에 움직인 만큼입니다.</p>' +
+      '<p style="margin:8px 0 0;font-size:12px;line-height:1.6;color:var(--subtle);word-break:keep-all">%는 오늘 움직인 크기 가운데 그 지표가 맡은 몫입니다. 올린 쪽(▲)과 내린 쪽(▼)을 합쳐 100%. 옆의 \'점\'은 100점 만점 점수가 그 지표 때문에 움직인 만큼입니다.</p>' +
       '<div style="display:grid;gap:8px;grid-template-columns:1fr;margin-top:12px;border-top:1px solid var(--border);padding-top:12px" class="drivers-grid">' +
       [['가장 큰 상승 요인', f.topPositive], ['가장 큰 하락 요인', f.topNegative]].map(([l, dr]) =>
         '<div style="background:var(--surface-2);border-radius: var(--box-radius);padding:12px">' +
-        '<div style="font-size:11.5px;color:var(--muted)">' + l + '</div>' +
+        '<div style="font-size:12px;color:var(--muted)">' + l + '</div>' +
         '<div style="font-size:13px;font-weight:600;margin-top:2px;word-break:keep-all">' + esc(dr ? dr.label : '해당 없음') + '</div>' +
-        (dr ? '<div style="font-size:11.5px;color:var(--subtle)">' + esc(dr.detail) + '</div>' : '') + '</div>').join('') +
+        (dr ? '<div style="font-size:12px;color:var(--subtle)">' + esc(dr.detail) + '</div>' : '') + '</div>').join('') +
       '</div></div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>점수 추이</h2>' +
+      '<div class="seg" role="group" aria-label="기간">' +
+      ['1M', '3M', '1Y', '3Y', '10Y'].map((r) => '<button type="button" data-range="' + r + '" aria-pressed="' + (state.range === r) + '">' +
+        ({ '1M': '1개월', '3M': '3개월', '1Y': '1년', '3Y': '3년', '10Y': '10년' })[r] + '</button>').join('') + '</div></div>' +
+      '<div class="card" style="padding:12px">' + lineChart(series, 240, MARKET_LABEL[m] + ' 심리 점수와 ' + (d.benchmark ? d.benchmark.name : '대표 지수') + ' 비교', chartMarks, chartSpans) +
+      /* 길게 이어지던 설명은 접는다 — 차트를 처음 보는 사람만 펼치면 된다 (앱 data-chart-howto) */
+      '<details class="howto" data-chart-howto><summary>차트 읽는 법 ▾</summary>' +
+      '<p style="margin:4px 0 0;font-size:12px;color:var(--subtle);word-break:keep-all">' +
+      (d.benchmark
+        ? '위 칸은 0~100 심리 점수, 아래 칸은 ' + esc(d.benchmark.name) + ' 가격입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다 — 한 눈금에 겹쳐 그리면 눈금을 어디에 두느냐에 따라 없던 상관관계가 보입니다.'
+        : '세로축은 0~100 심리 점수입니다.') +
+      ' 점수가 산출되지 않은 날은 선이 이어지지 않습니다.' +
+      (chartMarks.length
+        ? ' 세로 점선은 과거 사건 ' + chartMarks.length + '건이며, 번호는 아래 목록과 같습니다.'
+        : ' 기간을 10년으로 바꾸면 과거 위기 시점이 표시됩니다.') +
+      (smooth
+        ? ' 이 구간의 선은 하루치 점수를 ' + SMOOTH_DAYS + '일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.'
+        : '') +
+      '</p></details>' +
+      (ov
+        ? '<p style="margin:8px 0 0;font-size:12px;color:var(--subtle);word-break:keep-all" data-overlay-note>' +
+          (ov.trend
+            ? '회색 칸은 ' + esc(ov.trend.name) + ' 가격이 ' + ov.trend.maDays + '일(약 10개월) 평균선 아래에 있던 기간입니다. '
+            : esc(d.benchmark ? d.benchmark.name : '대표 지수') + ' 평균선은 지금 받지 못해 그리지 않았습니다. ') +
+          (ov.vix
+            ? (d.benchmark ? '두 칸 사이' : '맨 위') + '의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ' + ov.vix.threshold + ' 이상이던 날입니다. '
+            : 'VIX 는 지금 받지 못해 그리지 않았습니다. ') +
+          '둘 다 그때 시장이 어떤 상태였는지 보여 줄 뿐, 사고팔 때를 알려 주는 신호가 아닙니다.</p>'
+        : '') +
+      '</div>' +
+      '<div style="margin-top:8px">' + crisisCard(d.events, f.score) + '</div></section>' +
+
+      '<section class="block"><div class="block-head"><h2>사이클과 구간 통계</h2></div>' +
+      /* 두 카드를 합치면 화면 한 장 반이었다 — 한 줄로 접어 둔다 (앱 fng-fold) */
+      '<details class="fng-fold"><summary>지금 국면 · 과거 같은 점수 구간 뒤 6개월 <span aria-hidden="true">▾</span></summary>' +
+      '<div class="riskcards" style="margin-top:8px">' + cycleCard(f.cycle) + bandStatsCard(d.bandStats) + '</div></details></section>' +
 
       (d.methodology && d.methodology.compositionNote
         ? '<section class="block"><p class="notice n-neutral"><span>ⓘ</span><span>' +
@@ -4072,20 +4160,21 @@ __HOME_MOOD_CSS__
               '<thead><tr><th>하위 지표</th><th>내부 가중치</th><th>원시값</th><th>점수</th></tr></thead><tbody>' +
               c.subMetrics.map((sm) =>
                 '<tr><th style="font-weight:400">' + esc(sm.label) +
-                (sm.inverted ? '<span style="margin-left:4px;font-size:11.5px;color:var(--subtle)" title="값이 클수록 공포 → 점수 반전">(반전)</span>' : '') +
-                (sm.missingReason ? '<span style="display:block;font-size:11.5px;color:var(--warn)">' + esc(sm.missingReason) + '</span>' : '') + '</th>' +
+                (sm.inverted ? '<span style="margin-left:4px;font-size:12px;color:var(--subtle)" title="값이 클수록 공포 → 점수 반전">(반전)</span>' : '') +
+                (sm.missingReason ? '<span style="display:block;font-size:12px;color:var(--warn)">' + esc(sm.missingReason) + '</span>' : '') + '</th>' +
                 '<td class="tnum">' + sm.weight + '%</td>' +
                 '<td class="tnum">' + esc(sm.raw === null ? NO : fmtNum(sm.raw, 3)) + '</td>' +
                 '<td class="tnum" style="font-weight:600;color:' + scoreColor(sm.score) + '">' + esc(sm.score === null ? NO : fmtNum(sm.score, 1)) + '</td></tr>').join('') +
               '</tbody></table></div>' +
-              '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle)">출처: ' + esc(c.sources.map((x) => x.name).join(', ') || '알 수 없음') +
+              '<p style="margin:8px 0 0;font-size:12px;color:var(--subtle)">출처: ' + esc(c.sources.map((x) => x.name).join(', ') || '알 수 없음') +
               (c.asOf ? ' · 기준 ' + esc(kFull(c.asOf)) : '') + '</p></div>'
             : '') +
           '</div>';
       }).join('') + '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>산출 방법</h2></div>' +
-      '<div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">' +
+      '<details class="fng-fold"><summary>점수를 어떻게 내나요 — 단계별 설명 <span aria-hidden="true">▾</span></summary>' +
+      '<div class="card" style="margin-top:8px;padding:12px;display:flex;flex-direction:column;gap:8px">' +
       '<p style="margin:0;font-size:13px;line-height:1.7;word-break:keep-all">' + esc(d.methodology.summary) + '</p>' +
       /* 네 줄은 실제로 차례다 — 모으고, 백분위를 내고, 가중평균하고, 구간을 붙인다.
          한 단계가 앞 단계의 결과를 받는다. 순서가 뜻을 가지므로 번호를 되살렸다. */
@@ -4095,14 +4184,14 @@ __HOME_MOOD_CSS__
       '<p style="margin:0;font-size:12.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">극단치 처리 · </b>' + esc(d.methodology.winsorization) + '</p>' +
       '<p style="margin:0;font-size:12.5px;color:var(--muted);line-height:1.7;word-break:keep-all"><b style="color:var(--fg)">결측 처리 · </b>' + esc(d.methodology.coverageRule) + '</p></div>' +
       '<p class="notice n-neutral"><span>ⓘ</span><span>' + esc(d.methodology.scaleWarning) + '</span></p>' +
-      '</div></section>' +
+      '</div></details></section>' +
 
       '<section class="block"><div class="block-head"><h2>데이터 출처와 업데이트</h2></div>' +
       '<div class="card" style="padding:12px">' +
       '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' +
       f.meta.sources.map((x) =>
         '<li><div style="font-size:13px;font-weight:600">' + esc(x.name) + '</div>' +
-        '<div style="font-size:11.5px;color:var(--subtle);word-break:keep-all">' +
+        '<div style="font-size:12px;color:var(--subtle);word-break:keep-all">' +
         (x.delayMinutes === null ? '지연 정보 없음' : x.delayMinutes === 0 ? '실시간' : x.delayMinutes + '분 지연') +
         (x.terms ? ' · ' + esc(x.terms) : '') + '</div>' +
         /* 날 URL 을 그대로 깔면 한 줄이 주소로 꽉 찬다. 필요한 건 '어디' 라서
@@ -4113,7 +4202,7 @@ __HOME_MOOD_CSS__
             '<span aria-hidden="true"> ↗</span><span class="sr"> (새 창에서 열림)</span></a>'
           : '') +
         '</li>').join('') +
-      '</ul><p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:11.5px;color:var(--subtle)">데이터 기준 시각 ' +
+      '</ul><p style="margin:8px 0 0;border-top:1px solid var(--border);padding-top:8px;font-size:12px;color:var(--subtle)">데이터 기준 시각 ' +
       esc(kFull(f.meta.asOf)) + ' · 수집 ' + esc(kFull(f.meta.fetchedAt)) + '</p></div></section>'
     );
   }
@@ -4708,6 +4797,7 @@ __HOME_MOOD_CSS__
     { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
     { id: 'indicators', label: '경제지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
     { id: 'fng', label: '심리 상세', icon: icon('M12 21a9 9 0 1 0-9-9M12 12l5-3M3 12h3M12 3v3') },
+    { id: 'plaza', label: '광장', icon: icon('M4 5h16v10H9l-5 4zM8 9h8M8 12h5') },
   ];
 
   /*
@@ -4769,7 +4859,7 @@ __HOME_MOOD_CSS__
     document.documentElement.setAttribute('data-cm', state.colorMode);
     document.getElementById('statusbar').innerHTML = statusBar();
     /* 하단 탭으로 갈 수 있는 화면은 길을 잃지 않는다. 나머지에만 붙인다. */
-    const TAB_VIEWS = ['home', 'indices', 'basics', 'calendar', 'fng'];
+    const TAB_VIEWS = ['home', 'indices', 'basics', 'calendar', 'fng', 'plaza'];
     const needsBack = TAB_VIEWS.indexOf(state.view) < 0;
     const v = {
       home: viewHome,
@@ -4781,6 +4871,7 @@ __HOME_MOOD_CSS__
       indicators: viewIndicators,
       fng: viewFng,
       regime: viewRegime,
+      plaza: viewPlaza,
     }[state.view];
     /*
      * 새 내용이 살짝 아래에서 올라오며 나타난다.

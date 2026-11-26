@@ -1190,3 +1190,115 @@ export interface AlertEvent {
   dedupeKey: string;
   read: boolean;
 }
+
+/* ------------------------------------------------------------------ */
+/* 쫄탐광장 — 내일 맞히기 · 한 줄 토론 (2026-11-26)                        */
+/* ------------------------------------------------------------------ */
+
+export type PlazaPick = 'up' | 'down';
+export type PlazaMarketId = 'spx' | 'kospi';
+/** up/down = 직전 거래일 종가 대비, flat = 보합(점수 변동 없음), void = 자료가 끝내 없어 무효 */
+export type PlazaResult = 'up' | 'down' | 'flat' | 'void';
+
+/** 지금 받는 판 — 사람들 몫은 내가 고른 뒤에만 보인다(따라 고르기를 줄이려고) */
+export interface PlazaRoundOpen {
+  date: string;
+  /** 마감 = 장 시작 (ISO) */
+  cutoff: string;
+  n: number;
+  ups: number | null;
+  downs: number | null;
+  myPick: PlazaPick | null;
+}
+
+/** 마감됐고 결과를 기다리는 판 */
+export interface PlazaRoundRunning {
+  date: string;
+  /** 채점 가능 시각 = 장 마감 30분 뒤 (ISO) */
+  resolveAt: string;
+  n: number;
+  ups: number;
+  downs: number;
+  myPick: PlazaPick | null;
+}
+
+export interface PlazaRoundDone {
+  date: string;
+  result: PlazaResult;
+  /** 직전 거래일 종가 대비 % (무효면 null) */
+  changePct: number | null;
+  n: number;
+  ups: number;
+  downs: number;
+  myPick: PlazaPick | null;
+  myDelta: number | null;
+}
+
+export interface PlazaMarketRounds {
+  market: PlazaMarketId;
+  name: string;
+  region: string;
+  open: PlazaRoundOpen;
+  running: PlazaRoundRunning | null;
+  recent: PlazaRoundDone[];
+}
+
+export interface PlazaLeader {
+  rank: number;
+  nick: string;
+  rating: number;
+  played: number;
+  correct: number;
+  me: boolean;
+  /** DEMO 예시 회원 */
+  example: boolean;
+}
+
+export interface PlazaPost {
+  id: string;
+  nick: string;
+  /** 글쓴이 레이팅 (순위표 기준 판 수 미만이면 null) */
+  rating: number | null;
+  /** 가려진 글은 null (내 글이면 보인다) */
+  text: string | null;
+  t: string;
+  likes: number;
+  liked: boolean;
+  reported: boolean;
+  hidden: boolean;
+  mine: boolean;
+  example: boolean;
+}
+
+export interface PlazaHistoryItem {
+  market: PlazaMarketId;
+  date: string;
+  pick: PlazaPick;
+  result: PlazaResult;
+  delta: number;
+}
+
+export interface PlazaMe {
+  nick: string;
+  rating: number;
+  played: number;
+  correct: number;
+  streak: number;
+  best: number;
+  rank: number | null;
+  history: PlazaHistoryItem[];
+}
+
+export interface PlazaState {
+  mode: DataMode;
+  /** memory = 서버가 다시 뜨면 사라짐, redis = 오래 남음 */
+  storage: 'memory' | 'redis';
+  asOf: string;
+  me: PlazaMe | null;
+  markets: PlazaMarketRounds[];
+  leaderboard: PlazaLeader[];
+  /** 순위표에 오른 사람 수 */
+  ranked: number;
+  posts: PlazaPost[];
+  rules: { nickMin: number; nickMax: number; postMax: number; minPlayed: number; hideAfter: number; ratingStart: number; k: number };
+}

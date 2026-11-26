@@ -96,6 +96,13 @@ export interface FetchOptions {
   timeoutMs?: number;
   /** 재시도해도 소용없는 상태코드 */
   noRetryStatus?: number[];
+  /**
+   * 기본 GET. POST 는 쫄탐광장 저장소(Upstash Redis REST, 2026-11-26) 용이다.
+   * 쓰기 요청은 두 번 가면 두 번 적히므로 부르는 쪽에서 retries: 0 을 준다.
+   */
+  method?: 'GET' | 'POST';
+  /** POST 본문 (JSON 문자열) */
+  body?: string;
 }
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -130,7 +137,13 @@ async function fetchWith<T>(
     try {
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { accept, ...(options.headers ?? {}) },
+        method: options.method ?? 'GET',
+        ...(options.body !== undefined ? { body: options.body } : {}),
+        headers: {
+          accept,
+          ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
+          ...(options.headers ?? {}),
+        },
         // 캐시는 우리 SWR 레이어가 담당한다.
         cache: 'no-store',
       });

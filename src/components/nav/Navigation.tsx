@@ -52,6 +52,7 @@ const NAV: NavItem[] = [
   { href: '/basics', label: '생활', icon: <I d="M4 8h16l-1.3 11.1a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9zM9 8V5.5a3 3 0 0 1 6 0V8" /> },
   { href: '/indicators', label: '경제지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
   { href: '/calendar', label: '캘린더', icon: <I d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4" /> },
+  { href: '/plaza', label: '광장', icon: <I d="M4 5h16v10H9l-5 4zM8 9h8M8 12h5" /> },
   { href: '/watchlist', label: '관심', icon: <I d="m12 4 2.5 5.2 5.5.8-4 3.9 1 5.6L12 16.9 7 19.5l1-5.6-4-3.9 5.5-.8z" /> },
   { href: '/more', label: '더보기', icon: <I d="M4 7h16M4 12h16M4 17h10" /> },
 ];

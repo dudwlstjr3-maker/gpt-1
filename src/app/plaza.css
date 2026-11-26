@@ -1,0 +1,104 @@
+/* 쫄탐광장 (2026-11-26) — 앱(src/app/plaza/page.tsx · HomePlazaCard)과 미리보기(template.html)가 같은 마크업 · 같은 CSS.
+   미리보기는 tools/preview/build.mjs 가 이 파일을 그대로 끼워 넣는다(__PLAZA_CSS__).
+   방향(오른다/내린다)은 기호와 말이 전한다. 색은 등락 색 설정(한국식 · 해외식)과 엇갈리지 않게 중립으로 둔다.
+   글자는 12px 아래로 내리지 않는다. 누를 자리는 큰 단추 48px, 작은 단추 32px.
+   카드는 앱 디자인 규칙대로 테두리 없이 바탕 단차로, 모서리는 --box-radius 하나. 간격은 4px 격자. */
+
+.plaza { padding: 8px 12px 0; display: grid; gap: 20px; }
+.pz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pz-head h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--fg-strong); }
+.pz-lede { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--muted-fg, var(--muted)); word-break: keep-all; }
+.pz-note {
+  margin: 8px 0 0; padding: 8px 12px; border-radius: var(--box-radius); font-size: 12.5px; line-height: 1.55; word-break: keep-all;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border)); background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--fg);
+}
+.pz-sec h2 { margin: 0 0 8px; font-size: 16px; font-weight: 750; color: var(--fg-strong); display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pz-sec h2 small { font-size: 12px; font-weight: 500; color: var(--muted-fg, var(--muted)); }
+.pz-card { border-radius: var(--box-radius); background: var(--surface); padding: 12px; }
+.pz-stack { display: grid; gap: 12px; }
+
+/* 계정 */
+.pz-me { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.pz-me b { font-size: 16px; color: var(--fg-strong); }
+.pz-me .pz-rating { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg-strong); }
+.pz-me span { font-size: 13px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; }
+.pz-form { display: flex; gap: 8px; }
+.pz-form input, .pz-compose textarea {
+  flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; border-radius: var(--box-radius); font: inherit; font-size: 15px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--fg-strong);
+}
+.pz-btn {
+  min-height: 44px; padding: 0 16px; border-radius: var(--box-radius); border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--fg-strong); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.pz-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.pz-btn:disabled { opacity: .45; cursor: not-allowed; }
+.pz-btn:focus-visible, .pz-pick:focus-visible, .pz-small:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pz-list { padding-left: 16px; }
+.pz-hint { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted-fg, var(--muted)); word-break: keep-all; }
+.pz-err { margin: 8px 0 0; font-size: 13px; color: var(--danger); }
+.pz-more > summary { min-height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--fg); cursor: pointer; }
+.pz-key { margin: 8px 0 0; padding: 8px 12px; border-radius: var(--box-radius); background: var(--surface-2); font-family: ui-monospace, monospace; font-size: 15px; letter-spacing: .04em; color: var(--fg-strong); word-break: break-all; }
+
+/* 맞히기 */
+.pz-round-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pz-round-head b { font-size: 16px; color: var(--fg-strong); }
+.pz-round-head span { font-size: 12.5px; color: var(--muted-fg, var(--muted)); }
+.pz-q { margin: 8px 0 0; font-size: 14px; color: var(--fg); word-break: keep-all; }
+.pz-picks { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pz-pick {
+  min-height: 48px; border-radius: var(--box-radius); border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--fg-strong); font: inherit; font-size: 16px; font-weight: 750; cursor: pointer;
+}
+.pz-pick[aria-pressed="true"] { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); }
+.pz-pick:disabled { cursor: not-allowed; opacity: .55; }
+.pz-meta { margin: 8px 0 0; font-size: 12.5px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; word-break: keep-all; }
+.pz-crowd { margin-top: 8px; }
+.pz-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--surface-2); }
+.pz-bar i { display: block; height: 100%; }
+.pz-bar i.up { background: color-mix(in srgb, var(--fg) 58%, transparent); }
+.pz-bar i.down { background: color-mix(in srgb, var(--fg) 22%, transparent); }
+.pz-crowd p { margin: 4px 0 0; display: flex; justify-content: space-between; font-size: 12.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.pz-running { margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--fg); word-break: keep-all; }
+.pz-recent { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.pz-recent li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 8px; font-size: 12.5px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; }
+.pz-recent li b { color: var(--fg); font-weight: 600; }
+
+/* 순위표 */
+.pz-table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.pz-table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted-fg, var(--muted)); padding: 4px 4px 8px; }
+.pz-table td { padding: 8px 4px; border-top: 1px solid var(--border); color: var(--fg); }
+.pz-table td:nth-child(3), .pz-table th:nth-child(3) { text-align: right; }
+.pz-table tr.me td { background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 700; }
+.pz-table .rank { width: 32px; color: var(--muted-fg, var(--muted)); }
+.pz-table .acc { display: block; font-size: 12px; color: var(--muted-fg, var(--muted)); }
+.pz-tag { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: var(--box-radius-sm); font-size: 12px; font-weight: 600; border: 1px solid var(--border); color: var(--muted-fg, var(--muted)); vertical-align: 1px; }
+
+/* 한 줄 토론 */
+.pz-compose { display: grid; gap: 8px; }
+.pz-compose textarea { min-height: 72px; resize: vertical; line-height: 1.5; }
+.pz-compose-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted-fg, var(--muted)); font-variant-numeric: tabular-nums; }
+.pz-posts { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.pz-post { border-radius: var(--box-radius); background: var(--surface); padding: 8px 12px; }
+.pz-post-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; font-size: 12.5px; color: var(--muted-fg, var(--muted)); }
+.pz-post-head b { font-size: 13.5px; color: var(--fg-strong); }
+.pz-post p { margin: 4px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--fg); word-break: break-word; }
+.pz-post p.hidden { font-size: 13px; color: var(--muted-fg, var(--muted)); font-style: italic; }
+.pz-post-acts { margin-top: 4px; display: flex; gap: 8px; }
+.pz-small {
+  min-height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent;
+  color: var(--fg); font: inherit; font-size: 12.5px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.pz-small[aria-pressed="true"] { border-color: var(--accent); color: var(--fg-strong); font-weight: 700; }
+.pz-small:disabled { opacity: .5; cursor: not-allowed; }
+.pz-foot { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted-fg, var(--muted)); word-break: keep-all; }
+
+/* 홈 카드 — 광장 들어가는 문 */
+.pz-home { display: grid; gap: 8px; margin: 12px 12px 0; }
+.pz-home-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pz-home-head h3 { margin: 0; font-size: 15px; font-weight: 750; color: var(--fg-strong); }
+.pz-home-head span { font-size: 12.5px; color: var(--muted-fg, var(--muted)); }
+.pz-home ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.pz-home li { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.pz-home li span { color: var(--muted-fg, var(--muted)); font-size: 12.5px; }
+.pz-home .pz-go { display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: var(--box-radius); background: var(--surface-2); border: 1px solid var(--border); color: var(--fg-strong); font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; font-family: inherit; width: 100%; }

@@ -44,6 +44,28 @@ export function envUrl(name: string): string | null {
   return v && v.trim() !== '' ? v.trim() : null;
 }
 
+/**
+ * 쫄탐광장 저장소 — Upstash Redis REST (2026-11-26).
+ *
+ * Vercel 의 Upstash 연결(Marketplace)을 붙이면 아래 이름 중 한 쌍이 저절로 들어온다.
+ * 둘 다 없으면 서버 메모리에 둔다 — 서버가 다시 뜨면 사라지므로 화면이 그 사실을 알린다.
+ * 토큰은 서버에서만 읽는다. NEXT_PUBLIC_ 을 붙이지 않는다.
+ */
+export function getPlazaStoreConfig(): { url: string; token: string } | null {
+  const url = env('UPSTASH_REDIS_REST_URL') ?? env('KV_REST_API_URL');
+  const token = env('UPSTASH_REDIS_REST_TOKEN') ?? env('KV_REST_API_TOKEN');
+  return url && token ? { url: url.replace(/\/+$/, ''), token } : null;
+}
+
+/**
+ * 한 줄 토론 관리자 삭제 키. 16자 미만이면 없는 것으로 본다(짐작하기 쉬운 키로 열리지 않게).
+ * 비워 두면 관리자 삭제는 꺼진다 — 신고 누적 가림은 그대로 돈다.
+ */
+export function getPlazaAdminKey(): string | null {
+  const k = env('PLAZA_ADMIN_KEY');
+  return k && k.length >= 16 ? k : null;
+}
+
 export type ModePreference = 'auto' | 'demo' | 'live';
 
 export function getModePreference(): ModePreference {

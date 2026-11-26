@@ -46,6 +46,15 @@ export const FRED_SERIES = {
   fx_cad: 'DEXCAUS',            // 달러/캐나다달러
   fx_aud: 'DEXUSAL',            // 호주달러/달러
   fx_chf: 'DEXSZUS',            // 달러/스위스프랑
+  /*
+   * 가계부채 비율 (GDP 대비 %, 연간) — IMF 세계부채 데이터베이스를 FRED 가 다시 싣는 계열 (2026-11-26 추가).
+   * 한국(HDTGPDKRA163N)은 FRED 페이지로 확인했다. 중국 · 일본 · 미국은 같은 이름 규칙을 따른 것이고
+   * 실제 응답으로는 확인하지 못했다 — `npm run check:live` 가 받아 보고 알려 준다. 못 받으면 그 나라 칸은 빈다.
+   */
+  hh_debt_kr: 'HDTGPDKRA163N',
+  hh_debt_cn: 'HDTGPDCNA163N',
+  hh_debt_jp: 'HDTGPDJPA163N',
+  hh_debt_us: 'HDTGPDUSA163N',
 } as const;
 
 export type FredSeriesKey = keyof typeof FRED_SERIES;

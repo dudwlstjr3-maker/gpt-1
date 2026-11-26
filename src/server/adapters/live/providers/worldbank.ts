@@ -42,6 +42,8 @@ export const WB_INDICATOR = {
   ppp: 'PA.NUS.PPP',
   /** 시장 환율 (자국통화/달러) */
   fx: 'PA.NUS.FCRF',
+  /** 합계출산율 (여성 1명당 출생아 수) — 2026-11-26 추가 */
+  fertility: 'SP.DYN.TFRT.IN',
 } as const;
 
 export type WbIndicator = keyof typeof WB_INDICATOR;

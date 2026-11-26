@@ -1,7 +1,9 @@
 /**
  * 생활 경제 지수 실데이터 — 세계은행 + 이코노미스트.
  *
- * 아홉 개 가운데 무료로 닿는 다섯 개만 만든다.
+ * 열한 개 가운데 무료로 닿는 일곱 개만 만든다 (2026-11-26 가계부채 비율 · 합계출산율 추가).
+ *   · 합계출산율   세계은행 (키 불필요)
+ *   · 가계부채 비율 IMF 세계부채 데이터베이스 — FRED 가 다시 싣는 계열. FRED 키가 있을 때만
  * 못 닿는 것을 DEMO 로만 보여 주면 기대만 만들고, 값을 지어내면 거짓말이 된다.
  *   · 엥겔계수   통계청 가계동향조사 — 공개 API 가 없다
  *   · PIR        기관마다 정의가 달라 한 숫자로 못 모은다
@@ -23,9 +25,17 @@ import {
   previousOf,
   type WorldBankConfig,
 } from './providers/worldbank';
+import { fetchSeries, type FredConfig, type FredSeriesKey } from './providers/fred';
 
 const WB: DataSource = { ...WORLDBANK_SOURCE };
 const BM: DataSource = { ...BIGMAC_SOURCE };
+/** 가계부채 비율 — IMF 가 집계하고 FRED 가 다시 싣는다. 출처는 집계한 곳을 앞에 쓴다. */
+const IMF_VIA_FRED: DataSource = {
+  name: '국제통화기금(IMF) · FRED 경유',
+  url: 'https://fred.stlouisfed.org/series/HDTGPDKRA163N',
+  delayMinutes: 0,
+  terms: 'IMF 세계부채 데이터베이스. 연 1회 갱신되며 나라마다 최신 연도가 다를 수 있습니다.',
+};
 
 function meta(asOf: number | null, fetchedAt: string, source: DataSource) {
   return {
@@ -43,11 +53,13 @@ function yearLabel(t: number | null): string {
 export interface BasicsDeps {
   wb: WorldBankConfig;
   bigmac: BigMacConfig;
+  /** 가계부채 비율용. 키가 없으면 null — 그 지표만 빠지고 나머지는 그대로 나온다 */
+  fred: FredConfig | null;
   now: Date;
 }
 
 export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]> {
-  const { wb, bigmac, now } = deps;
+  const { wb, bigmac, fred, now } = deps;
   const fetchedAt = now.toISOString();
   const out: EconomyBasic[] = [];
 
@@ -60,14 +72,26 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
   };
 
   /* ---------------- 세계은행 ---------------- */
-  const [gdp, gini, infl, unemp, ppp, fx] = await Promise.all([
+  const [gdp, gini, infl, unemp, ppp, fx, tfr] = await Promise.all([
     soft(() => fetchIndicator(wb, 'per_capita_gdp', 25)),
     soft(() => fetchIndicator(wb, 'gini', 25)),
     soft(() => fetchIndicator(wb, 'inflation', 25)),
     soft(() => fetchIndicator(wb, 'unemployment', 25)),
     soft(() => fetchIndicator(wb, 'ppp', 25)),
     soft(() => fetchIndicator(wb, 'fx', 25)),
+    soft(() => fetchIndicator(wb, 'fertility', 25)),
   ]);
+
+  /* 가계부채 비율 — 나라마다 FRED 계열이 따로라 네 번 받는다. 못 받은 나라는 빈 칸으로 둔다. */
+  const HH_DEBT: Record<string, FredSeriesKey> = { KR: 'hh_debt_kr', CN: 'hh_debt_cn', JP: 'hh_debt_jp', US: 'hh_debt_us' };
+  const hhDebt = fred
+    ? await (async () => {
+        const rows = await Promise.all(
+          WB_COUNTRIES.map(async (c) => [c.code, (await soft(() => fetchSeries(fred, HH_DEBT[c.code], { start: '2000-01-01' }))) ?? []] as const),
+        );
+        return new Map<string, SeriesPoint[]>(rows.map(([code, pts]) => [code, [...pts]]));
+      })()
+    : null;
 
   /** 네 나라 비교값을 만든다. 한국이 대표값이 된다. */
   const build = (
@@ -85,6 +109,9 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
       caution?: string;
       comparisonNote?: string;
       sameScale?: boolean;
+      /** 세계은행이 아닌 곳에서 받은 값이면 그 출처 */
+      source?: DataSource;
+      asOfNote?: string;
     },
   ): EconomyBasic | null => {
     if (!data) return null;
@@ -141,10 +168,10 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
         label: c.label,
         points: (data.get(c.code) ?? []).map((p) => ({ t: p.t, v: tf(p.v) })),
       })),
-      asOfLabel: `${yearLabel(last.t)} 기준 · 연 1회 발표`,
+      asOfLabel: `${yearLabel(last.t)} 기준 · ${opts.asOfNote ?? '연 1회 발표'}`,
       official: true,
       ...(opts.caution ? { officialNote: opts.caution } : {}),
-      meta: meta(last.t, fetchedAt, WB),
+      meta: meta(last.t, fetchedAt, opts.source ?? WB),
     } satisfies EconomyBasic;
   };
 
@@ -194,6 +221,29 @@ export async function buildLiveBasics(deps: BasicsDeps): Promise<EconomyBasic[]>
       if (item) out.push(item);
     }
   }
+
+  /* 가계부채 비율 · 합계출산율 (2026-11-26 추가) — 묶음 순서대로 미저리 지수 다음 */
+  const debtItem = build('household_debt', '가계가 진 빚이 경제 규모의 몇 %', '가계부채 비율 · Household debt to GDP', hhDebt, {
+    precision: 1,
+    suffix: '%',
+    reading: (v, y) => `${y} 한국은 GDP 의 ${v.toFixed(1)}% 입니다. 나라가 1년 동안 만든 가치의 ${Math.round(v)}% 만큼을 가계가 빚지고 있다는 뜻입니다.`,
+    caution: '나라 전체 평균이라 빚이 누구에게 몰려 있는지는 보여주지 않습니다. 한국은 전세보증금이 빚으로 잡히지 않습니다.',
+    comparisonNote: '네 나라 모두 그 나라 GDP 를 100% 로 놓은 비율이라 같은 잣대입니다.',
+    source: IMF_VIA_FRED,
+    asOfNote: '연 1회 · IMF 집계',
+  });
+  if (debtItem) out.push(debtItem);
+
+  const tfrItem = build('fertility', '여성 한 명이 평생 낳을 아이 수', '합계출산율 · Total fertility rate', tfr, {
+    precision: 2,
+    suffix: '명',
+    reading: (v, y) =>
+      v < 1
+        ? `${y} 한국은 ${v.toFixed(2)}명입니다. 인구가 유지되려면 약 2.1명이 필요한데, 1명 아래라 한 세대마다 아이 세대가 부모 세대의 절반 아래로 줄어드는 수준입니다.`
+        : `${y} 한국은 ${v.toFixed(2)}명입니다. 인구가 유지되려면 약 2.1명이 필요합니다.`,
+    caution: '그해의 나이별 출산율로 계산한 가상의 숫자입니다. 한 해의 반등을 흐름이 바뀌었다고 단정할 수 없습니다.',
+  });
+  if (tfrItem) out.push(tfrItem);
 
   /* 구매력평가 환율 괴리 = (PPP 환율 / 시장 환율 - 1) × 100 */
   if (ppp && fx) {

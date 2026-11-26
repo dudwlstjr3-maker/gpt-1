@@ -504,9 +504,12 @@ export class LiveAdapter implements MarketAdapter {
    * 발표 시점이 서로 달라 값마다 asOfLabel 을 개별로 채운다.
    */
   async getBasics(ctx: AdapterContext): Promise<EconomyBasic[]> {
+    const fredKey = getKeys().macro;
     return buildLiveBasics({
       wb: worldBankConfig(envUrl('WORLDBANK_BASE_URL')),
       bigmac: bigMacConfig(envUrl('BIGMAC_CSV_URL')),
+      // 가계부채 비율은 IMF 값을 FRED 로 받는다. 키가 없으면 그 지표만 빠진다
+      fred: fredKey ? fredConfig(fredKey, envUrl('MACRO_BASE_URL')) : null,
       now: ctx.now,
     });
   }

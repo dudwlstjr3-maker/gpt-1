@@ -69,7 +69,10 @@ if (!FRED_KEY) {
   console.log('  · MACRO_API_KEY 가 비어 있습니다. https://fred.stlouisfed.org/docs/api/api_key.html 에서 무료 발급');
   bad += 1;
 } else {
-  for (const [label, id] of [['VIX', 'VIXCLS'], ['하이일드 스프레드', 'BAMLH0A0HYM2'], ['장단기 금리차', 'T10Y2Y'], ['원/달러', 'DEXKOUS'], ['미국 CPI', 'CPIAUCSL']]) {
+  for (const [label, id] of [['VIX', 'VIXCLS'], ['하이일드 스프레드', 'BAMLH0A0HYM2'], ['장단기 금리차', 'T10Y2Y'], ['원/달러', 'DEXKOUS'], ['미국 CPI', 'CPIAUCSL'],
+    // 생활 탭 가계부채 비율 (IMF → FRED). 한국만 페이지로 확인했고 나머지 셋은 이름 규칙을 따른 것이라 여기서 확인한다
+    ['가계부채 비율 · 한국', 'HDTGPDKRA163N'], ['가계부채 비율 · 중국', 'HDTGPDCNA163N'],
+    ['가계부채 비율 · 일본', 'HDTGPDJPA163N'], ['가계부채 비율 · 미국', 'HDTGPDUSA163N']]) {
     await probe(label, `${FRED}/series/observations?series_id=${id}&api_key=${FRED_KEY}&file_type=json&sort_order=desc&limit=1`,
       (b) => `${b.observations?.[0]?.date} = ${b.observations?.[0]?.value}`);
   }
@@ -329,6 +332,7 @@ for (const [label, ind] of [
   ['실업률', 'SL.UEM.TOTL.ZS'],
   ['PPP 환산계수', 'PA.NUS.PPP'],
   ['시장 환율', 'PA.NUS.FCRF'],
+  ['합계출산율', 'SP.DYN.TFRT.IN'],
 ]) {
   await probe(label, `${WB}/country/KR;CN;JP;US/indicator/${ind}?format=json&per_page=8&mrnev=2`,
     (b) => {

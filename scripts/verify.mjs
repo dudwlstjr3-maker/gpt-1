@@ -494,9 +494,11 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 9개', list.length === 9, `${list.map((b) => b.id).join(', ')}`);
+    // 2026-11-26 가계부채 비율 · 합계출산율을 더해 11개. 경제 기사에 늘 나오는 두 숫자다.
+    // 청년실업률은 보류 — 기사는 통계청 15~29세, 세계은행은 15~24세라 같은 이름에 다른 숫자가 선다.
+    check('지표 11개', list.length === 11, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'ppp_gap', 'engel', 'pir', 'cli', 'ccsi'];
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'household_debt', 'fertility', 'bigmac', 'ppp_gap', 'engel', 'pir', 'cli', 'ccsi'];
     // 발표 기관이 없는 개념은 담지 않는다
     for (const gone of ['latte', 'buffett', 'lipstick', 'pentagon_pizza']) {
       check(`${gone} 는 빠짐 (비공식이라 제외)`, !list.some((b) => b.id === gone));
@@ -868,7 +870,7 @@ async function main() {
     check('시장 지수 본문은 그리지 않음', !life.includes('지수 숫자를 읽는 법'));
 
     const basics = snap.sections?.basics?.data ?? [];
-    check('생활 경제 지수가 아홉 가지', basics.length === 9, `${basics.length}개`);
+    check('생활 경제 지수가 열한 가지', basics.length === 11, `${basics.length}개`);
     // 표시 이름이 아니라 **id** 로 확인한다. 큰 글씨는 쉬운 우리말로 바뀔 수 있고
     // 실제로 바뀌었다 ('1인당 GDP' → '국민 한 사람 몫의 생산'). 정체는 id 다.
     const ids9 = basics.map((b) => b.id);
@@ -876,7 +878,7 @@ async function main() {
       ['engel', '엥겔계수'], ['gini', '지니계수']]) {
       check(`생활 경제 지수에 ${was} 있음`, ids9.includes(id), ids9.join(', ').slice(0, 60));
     }
-    // 아홉 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
+    // 열한 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
     // 있으면 화면에서 "그 밖의 지표" 로 밀려나므로 원본에서 확인한다.
     const lib = await readFile('src/lib/economyBasics.ts', 'utf8');
     const grouped = [...lib.matchAll(/ids:\s*\[([^\]]*)\]/g)]
@@ -886,6 +888,16 @@ async function main() {
     }
     const ungrouped = basics.map((b) => b.id).filter((id) => !grouped.includes(id));
     check('묶음에서 빠진 항목이 없음', ungrouped.length === 0, ungrouped.join(', ') || '없음');
+    // 미리보기는 해설 · 묶음을 손으로 옮긴 JSON 을 갖는다 — 앱과 같은 묶음 · 같은 항목이어야 한다
+    {
+      const tplB = await readFile('tools/preview/template.html', 'utf8');
+      const tGroups = JSON.parse(tplB.match(/\n  const BASIC_GROUPS = (\[.*\]);\n/)?.[1] ?? '[]');
+      const tGuide = JSON.parse(tplB.match(/\n  const BASIC_GUIDE = (\{.*\});\n/)?.[1] ?? '{}');
+      check('미리보기 묶음이 앱과 같음', JSON.stringify(tGroups.flatMap((g) => g.ids)) === JSON.stringify(grouped),
+        tGroups.flatMap((g) => g.ids).join(','));
+      check('미리보기에 새 두 지표의 해설이 있음',
+        ['household_debt', 'fertility'].every((id) => tGuide[id]?.headline && lib.includes(`  ${id}: {`) && lib.includes(tGuide[id].headline)));
+    }
     // 시세가 아니라 형편을 재는 값이라, 점수 구성요소가 아님을 밝혀야 한다
     check('투자심리 구성요소가 아님을 밝힘', life.includes('투자심리 점수의 구성요소가 아닙니다'));
     // 공식 지표만 담는다 — 발표 기관이 없는 개념은 넣지 않는다
@@ -3101,7 +3113,7 @@ async function main() {
 
     /*
      * 생활 경제 지수 — 세계은행(연 1회)과 이코노미스트 빅맥지수(연 2회).
-     * 아홉 가운데 다섯만 닿는다. 나머지 넷은 무료로 받을 길이 없어서 비워 둔다.
+     * 열한 가운데 일곱만 닿는다 (가계부채 비율은 FRED 키가 있을 때). 나머지 넷은 무료로 받을 길이 없어서 비워 둔다.
      * 못 닿는 것을 지어내지 않는 것이 이 화면의 유일한 규칙이다.
      */
     const basicsSrc = await readFile('src/server/adapters/live/basics.ts', 'utf8');
@@ -3117,6 +3129,16 @@ async function main() {
     for (const what of ['엥겔계수', 'PIR', 'OECD 경기선행지수']) {
       check(`못 받는 지표 사유: ${what}`, basicsSrc.includes(what));
     }
+    // 2026-11-26 더한 둘 — 합계출산율은 세계은행, 가계부채 비율은 IMF 값을 FRED 로. 실제 호출 확인은 check:live
+    const wbSrc = await readFile('src/server/adapters/live/providers/worldbank.ts', 'utf8');
+    const fredSrc = await readFile('src/server/adapters/live/providers/fred.ts', 'utf8');
+    const chkLive = await readFile('scripts/check-live.mjs', 'utf8');
+    check('합계출산율이 세계은행에 연결됨 (SP.DYN.TFRT.IN)',
+      /fertility: 'SP\.DYN\.TFRT\.IN'/.test(wbSrc) && basicsSrc.includes("fetchIndicator(wb, 'fertility'") && chkLive.includes("'SP.DYN.TFRT.IN'"));
+    check('가계부채 비율이 IMF→FRED 네 나라 계열에 연결됨',
+      ['KR', 'CN', 'JP', 'US'].every((c) => fredSrc.includes(`'HDTGPD${c}A163N'`) && chkLive.includes(`'HDTGPD${c}A163N'`)) &&
+      basicsSrc.includes('source: IMF_VIA_FRED') && /fred: fredKey \? fredConfig\(fredKey/.test(live));
+    check('확인 못 한 계열이라는 사실을 적어 둠', /실제 응답으로는 확인하지 못했다/.test(fredSrc));
     // 값을 못 받으면 빈 목록이지, 0 이나 지어낸 값이 아니다
     check('생활 경제 지수가 실패를 0 으로 채우지 않음',
       basicsSrc.includes('return null;') && !/\|\|\s*0[,;)]/.test(basicsSrc));

@@ -29,7 +29,7 @@ const OUT =
 const OUT_BARE = OUT.replace(/\.html$/, '') + '.artifact.html';
 
 /** 자산 상세까지 담고 싶은 종목. 없으면 조용히 건너뛴다. */
-const ASSET_IDS = ['spx', 'kospi', 'btc'];
+const ASSET_IDS = ['spx', 'kospi', 'nvda']; // 크립토(btc)는 2026-11-26 뺐다
 
 /**
  * '지수' 화면에 필요한 목록과 기준점을 카탈로그에서 그대로 읽어 온다.
@@ -113,7 +113,8 @@ function readIndexCatalog() {
   for (const m of idsBlock[1].matchAll(/(\w+):\s*\[([^\]]*)\]/g)) {
     ids[m[1]] = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   }
-  for (const m of ['us', 'kr', 'crypto']) {
+  // 크립토는 뺐다 (2026-11-26) — catalog.ts 의 INDEX_IDS.crypto 는 빈 칸이다
+  for (const m of ['us', 'kr']) {
     if (!ids[m]?.length) throw new Error(`INDEX_IDS 에 ${m} 이 비어 있습니다.`);
   }
 
@@ -158,9 +159,9 @@ async function main() {
   // 부분 실패 화면을 미리보기에서도 전환해 볼 수 있게 같이 담는다
   const partial = await j('/api/snapshot?scenario=partial');
 
-  // 점수를 내는 시장만. 한국은 무료 소스로 확보 가중치가 약 33% 라 시장에서 뺐다.
+  // 점수를 내는 시장만. 한국은 무료 소스로 확보 가중치가 약 33% 라 시장에서 뺐고, 크립토는 2026-11-26 뺐다.
   const details = {};
-  for (const m of ['us', 'crypto']) details[m] = (await j(`/api/fng/${m}`)).detail;
+  for (const m of ['us']) details[m] = (await j(`/api/fng/${m}`)).detail;
 
   const assets = {};
   for (const id of ASSET_IDS) {
@@ -244,6 +245,8 @@ async function main() {
       fs.readFileSync(path.join(HERE, '../../public/mood-dial.svg')).toString('base64'))
     .replace('__HOME_MOOD_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/home-mood.css'), 'utf8'))
     .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace('export function', 'function'))
+    // 홈 카드 두 칩(추세 · VIX)의 문구 — 앱과 같은 함수를 그대로 쓴다
+    .replace('__OVERLAY_CHIPS_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/overlayChips.mjs'), 'utf8').replace('export function', 'function'))
     .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)
     .replace('__DATA__', JSON.stringify(bundle).replace(/</g, '\\u003c'));
 

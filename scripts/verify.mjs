@@ -89,7 +89,9 @@ async function main() {
   const fng = snap.sections?.fng?.data ?? [];
   // 한국은 심리 점수를 낼 수 없어(무료 소스로 확보 가중치 약 33%) 시장에서 뺐다.
   // KOSPI·KOSDAQ 시세와 원/달러는 지수·지표 화면에 그대로 남아 있다.
-  check('심리 카드는 미국·크립토 둘', fng.length === 2, `${fng.map((f) => f.market).join(', ')}`);
+  // 크립토도 뺐다 (2026-11-26 사용자: "크립토는 그냥 빼버리자, 관심없다"). 심리 카드는 미국 하나다.
+  check('심리 카드는 미국 하나 (크립토는 뺐다)', fng.length === 1 && fng[0]?.market === 'us', `${fng.map((f) => f.market).join(', ')}`);
+  check('심리 카드에 크립토가 없음', !fng.some((f) => f.market === 'crypto'));
   check('심리 카드에 한국이 없음', !fng.some((f) => f.market === 'kr'));
 
   for (const f of fng) {
@@ -198,7 +200,7 @@ async function main() {
   }
 
   // 점수를 내는 시장만 검사한다 (한국은 시장에서 뺐다)
-  const SCORED = ['us', 'crypto'];
+  const SCORED = ['us'];
   for (const m of SCORED) {
     const { body } = await getJson(`/api/fng/${m}`);
     await checkWeighting(`[${m}]`, body.detail);
@@ -207,6 +209,8 @@ async function main() {
   {
     const { status } = await getJson('/api/fng/kr');
     check('/api/fng/kr 은 404', status === 404, `status=${status}`);
+    const { status: cs } = await getJson('/api/fng/crypto');
+    check('/api/fng/crypto 도 404 (크립토는 뺐다)', cs === 404, `status=${cs}`);
   }
   // 결측이 생겨 재조정이 실제로 일어나는 경로도 같은 잣대로 확인한다
   for (const m of SCORED) {
@@ -216,9 +220,10 @@ async function main() {
 
   console.log('\n[2] 가격 카드');
   const quotes = snap.sections?.quotes?.data ?? {};
-  const flat = ['us', 'kr', 'crypto'].flatMap((m) => quotes[m] ?? []);
-  check('세 시장 모두 시세 존재', ['us', 'kr', 'crypto'].every((m) => (quotes[m] ?? []).length > 0),
-    ['us', 'kr', 'crypto'].map((m) => `${m}:${(quotes[m] ?? []).length}`).join(' '));
+  const flat = ['us', 'kr'].flatMap((m) => quotes[m] ?? []);
+  check('미국 · 한국 시세 존재', ['us', 'kr'].every((m) => (quotes[m] ?? []).length > 0),
+    ['us', 'kr'].map((m) => `${m}:${(quotes[m] ?? []).length}`).join(' '));
+  check('크립토 시세는 받지 않음 (크립토는 뺐다)', !(quotes.crypto ?? []).length, `crypto:${(quotes.crypto ?? []).length}`);
   check('모든 가격에 기준 시각(asOf) 존재', flat.every((q) => typeof q.meta?.asOf === 'string' && !Number.isNaN(Date.parse(q.meta.asOf))));
   check('모든 가격에 지연 정보 존재', flat.every((q) => q.meta?.sources?.[0] && q.meta.sources[0].delayMinutes !== undefined));
   check('모든 가격에 실시간/지연 상태 표기', flat.every((q) => ['live', 'delayed', 'stale', 'demo'].includes(q.meta?.freshness)));
@@ -226,11 +231,25 @@ async function main() {
 
   const requiredUs = ['spx', 'ndx', 'dji', 'rut', 'vix', 'ust2', 'ust10', 'us_spread_10_2', 'dxy', 'gold', 'wti', 'nvda', 'aapl', 'msft', 'amzn', 'tsla'];
   const requiredKr = ['kospi', 'kosdaq', 'kospi200', 'vkospi', 'usdkrw', 'ktb3', 'ktb10', 'samsung', 'hynix', 'hyundai', 'naver', 'kakao'];
-  const requiredCr = ['btc', 'eth', 'xrp', 'sol', 'bnb', 'total_mcap', 'total_vol', 'btc_dom', 'stable_mcap', 'funding', 'open_interest', 'liquidations'];
   const has = (list, ids) => ids.filter((id) => !list.some((q) => q.id === id));
   check('미국 필수 항목 모두 존재', has(quotes.us ?? [], requiredUs).length === 0, has(quotes.us ?? [], requiredUs).join(','));
   check('한국 필수 항목 모두 존재', has(quotes.kr ?? [], requiredKr).length === 0, has(quotes.kr ?? [], requiredKr).join(','));
-  check('크립토 필수 항목 모두 존재', has(quotes.crypto ?? [], requiredCr).length === 0, has(quotes.crypto ?? [], requiredCr).join(','));
+  // 뺀 크립토 항목이 다른 칸에 섞여 들어오지도 않는다
+  const goneIds = ['btc', 'eth', 'xrp', 'sol', 'bnb', 'total_mcap', 'total_vol', 'btc_dom', 'stable_mcap', 'funding', 'open_interest', 'liquidations'];
+  check('뺀 크립토 항목이 어느 시세 칸에도 없음', !flat.some((q) => goneIds.includes(q.id)), flat.filter((q) => goneIds.includes(q.id)).map((q) => q.id).join(','));
+  // 시세 밖의 자리에도 크립토가 남지 않는다 — 거래 시간 칩 · 일정 · 기사 · 선물 · 위험 신호등
+  {
+    const sec = snap.sections ?? {};
+    const sessions = sec.sessions?.data ?? [];
+    check('거래 시간 칩은 미국 · 한국 둘 (크립토 24시간 칩 없음)',
+      sessions.length === 2 && !sessions.some((x) => x.market === 'crypto'), sessions.map((x) => x.market).join(','));
+    const cal = sec.calendar?.data ?? [];
+    check('일정에 크립토가 없음', cal.length > 0 && !cal.some((e) => e.market === 'crypto' || e.category === 'crypto'), `${cal.length}건`);
+    const news = sec.news?.data ?? [];
+    check('기사에 크립토 표시가 없음', !news.some((n) => (n.markets ?? []).includes('crypto')), `${news.length}건`);
+    const fut = sec.futures?.data?.rows ?? [];
+    check('선물에 크립토 무기한선물이 없음', fut.length > 0 && !fut.some((r) => r.group === 'crypto' || /비트코인|이더리움/.test(r.name ?? '')), `${fut.length}줄`);
+  }
 
   /* ---------------- 3. 나머지 섹션 ---------------- */
   console.log('\n[3] 요약 · 캘린더 · 지표 · 수급');
@@ -291,7 +310,7 @@ async function main() {
 
   /* ---------------- 6. 상세 라우트 ---------------- */
   console.log('\n[6] 상세 API');
-  for (const m of ['us', 'crypto']) {
+  for (const m of ['us']) {
     const { status: s, body } = await getJson(`/api/fng/${m}`);
     check(`[${m}] 점수 상세 200`, s === 200, `status=${s}`);
     const d = body.detail;
@@ -314,7 +333,8 @@ async function main() {
   const risk = snap.sections?.risk?.data;
   check('위험 섹션 존재', risk !== undefined && risk !== null);
   // VKOSPI 를 뺐다 — 무료로 받을 길이 없고, 한국을 시장에서 뺀 뒤로 놓일 자리도 없다.
-  check('지표가 정확히 6개', (risk?.indicators ?? []).length === 6, `${risk?.indicators?.length}개`);
+  // 크립토 펀딩비도 뺐다 (2026-11-26) — 크립토를 앱에서 뺀 뒤로 놓일 자리가 없다.
+  check('지표가 정확히 5개', (risk?.indicators ?? []).length === 5, `${risk?.indicators?.length}개`);
   check('VKOSPI 는 없음', !(risk?.indicators ?? []).some((i) => i.id === 'vkospi'));
   check('종합 문구 제공', typeof risk?.headline === 'string' && risk.headline.length > 0, risk?.headline);
 
@@ -344,8 +364,9 @@ async function main() {
     if (!i.why || !i.reading) check(`${label} 설명·해석 제공`, false, '');
   }
   check('모든 지표의 구간·단계·위치·설명이 일관됨', true);
-  check('미국·글로벌·크립토가 모두 포함됨',
-    ['us', 'global', 'crypto'].every((m) => (risk?.indicators ?? []).some((i) => i.scope === m)),
+  check('미국·글로벌이 포함되고 크립토(펀딩비)는 없음',
+    ['us', 'global'].every((m) => (risk?.indicators ?? []).some((i) => i.scope === m)) &&
+      !(risk?.indicators ?? []).some((i) => i.scope === 'crypto'),
     (risk?.indicators ?? []).map((i) => i.scope).join(','));
   // 원/달러는 한국을 뺀 뒤에도 남는다 — 실제 값이 나오고 통화 전환에 계속 쓰인다
   check('원/달러가 글로벌로 남아 있음',
@@ -387,7 +408,7 @@ async function main() {
 
   /* ---------------- 7-3. 구간별 과거 통계 ---------------- */
   console.log('\n[7-3] 구간별 과거 통계');
-  for (const m of ['us', 'crypto']) {
+  for (const m of ['us']) {
     const { body } = await getJson(`/api/fng/${m}`);
     const bs = body.detail?.bandStats;
     check(`[${m}] 구간 통계 제공`, bs !== null && bs !== undefined, bs ? `표본 ${bs.totalDays}일` : '없음');
@@ -403,7 +424,7 @@ async function main() {
 
   /* ---------------- 7-4. 10년 히스토리와 과거 위기 표식 ---------------- */
   console.log('\n[7-4] 10년 히스토리 · 과거 위기 표식');
-  for (const m of ['us', 'crypto']) {
+  for (const m of ['us']) {
     const { body } = await getJson(`/api/fng/${m}`);
     const d = body.detail;
     const hist = d?.history ?? [];
@@ -448,9 +469,8 @@ async function main() {
   {
     const want = {
       us: { comps: 7, must: [], missing: [] },
-      crypto: { comps: 8, must: ['search_trend', 'news_sentiment'], missing: [] },
     };
-    for (const m of ['us', 'crypto']) {
+    for (const m of ['us']) {
       const { body } = await getJson(`/api/fng/${m}`);
       const d = body.detail;
       const comps = d?.components ?? [];
@@ -466,14 +486,6 @@ async function main() {
         typeof note === 'string' && !/복제|그대로 가져|공식 지수입니다/.test(note),
       );
     }
-    // 크립토는 검색 관심도가 새로 들어간 자리다
-    const { body: cb } = await getJson('/api/fng/crypto');
-    const attn = (cb.detail?.components ?? []).find((c) => c.id === 'cr_attention');
-    check('[crypto] 검색 관심도 구성요소 존재', !!attn, attn ? `${attn.weight}%` : '없음');
-    if (attn) {
-      const w = attn.subMetrics.reduce((a, s) => a + s.weight, 0);
-      check('[crypto] 검색 관심도 하위 가중치 합 100', Math.abs(w - 100) < 0.001, `합계=${w}`);
-    }
   }
 
   /* ---------------- 9. 생활 속 경제 이야기 ---------------- */
@@ -482,9 +494,11 @@ async function main() {
     const basics = snap.sections?.basics;
     check('basics 섹션 존재', !!basics, `status=${basics?.status}`);
     const list = basics?.data ?? [];
-    check('지표 9개', list.length === 9, `${list.map((b) => b.id).join(', ')}`);
+    // 2026-11-26 가계부채 비율 · 합계출산율을 더해 11개. 경제 기사에 늘 나오는 두 숫자다.
+    // 청년실업률은 보류 — 기사는 통계청 15~29세, 세계은행은 15~24세라 같은 이름에 다른 숫자가 선다.
+    check('지표 11개', list.length === 11, `${list.map((b) => b.id).join(', ')}`);
 
-    const wanted = ['per_capita_gdp', 'gini', 'misery', 'bigmac', 'ppp_gap', 'engel', 'pir', 'cli', 'ccsi'];
+    const wanted = ['per_capita_gdp', 'gini', 'misery', 'household_debt', 'fertility', 'bigmac', 'ppp_gap', 'engel', 'pir', 'cli', 'ccsi'];
     // 발표 기관이 없는 개념은 담지 않는다
     for (const gone of ['latte', 'buffett', 'lipstick', 'pentagon_pizza']) {
       check(`${gone} 는 빠짐 (비공식이라 제외)`, !list.some((b) => b.id === gone));
@@ -677,7 +691,7 @@ async function main() {
 
   /* ---------------- 8. 시장별 분리 화면 ---------------- */
   console.log('\n[8] 시장별 분리 화면');
-  for (const path of ['/market/us', '/market/kr', '/market/crypto', '/fng/us', '/basics', '/indicators', '/calendar']) {
+  for (const path of ['/market/us', '/market/kr', '/fng/us', '/basics', '/indicators', '/calendar']) {
     const res = await fetch(`${BASE}${path}`);
     const html = await res.text();
     check(`${path} 렌더링`, res.status === 200 && html.includes('쫄탐일보'), `status=${res.status}`);
@@ -713,10 +727,13 @@ async function main() {
     // 서버가 찍어 주는 화면에도 길이 남아 있어야 한다 (지수 · 더보기)
     const idxHtml = await (await fetch(`${BASE}/indices`)).text();
     const moreHtml = await (await fetch(`${BASE}/more`)).text();
-    for (const m of ['us', 'crypto']) {
+    for (const m of ['us']) {
       check(`지수·더보기에 ${m} 시장으로 가는 길이 있음`,
         idxHtml.includes(`/market/${m}`) && moreHtml.includes(`/market/${m}`));
     }
+    // 크립토는 뺐다 (2026-11-26) — 없는 곳으로 가는 문을 그리지 않는다
+    check('크립토 시장으로 가는 길은 없음',
+      !idxHtml.includes('/market/crypto') && !moreHtml.includes('/market/crypto'));
     // 한국은 심리 점수를 낼 만큼의 무료 데이터가 없어 시장 화면이 없다 — 없는 곳으로 가는 문을 그리지 않는다
     check('한국 시장으로 가는 길은 없음',
       !idxHtml.includes('/market/kr') && !moreHtml.includes('/market/kr'));
@@ -800,23 +817,24 @@ async function main() {
       check(`탭 ${label} 이 ${href} 를 가리킴`, idx.includes(`href="${href}"`));
     }
 
-    // 세 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다)
-    for (const label of ['미국', '한국', '크립토']) {
+    // 두 시장이 모두 한 화면에 있어야 한다 (고르게 하지 않는다). 크립토는 뺐다 (2026-11-26).
+    for (const label of ['미국', '한국']) {
       check(`지수 화면에 ${label} 묶음이 있음`, idx.includes(`>${label}</span>`));
     }
+    check('지수 화면에 크립토 묶음이 없음', !idx.includes('>크립토</span>'));
 
     // 목록은 카탈로그가 정하고 값만 받아 온다. 그래서 이름·기호는 값이 오기 전에도
     // 서 있어야 하고(서버가 그린 HTML 에 있어야 하고), 값은 스냅샷에 있어야 한다.
     const quotes = snap.sections?.quotes?.data ?? {};
-    const all = [...(quotes.us ?? []), ...(quotes.kr ?? []), ...(quotes.crypto ?? [])];
+    const all = [...(quotes.us ?? []), ...(quotes.kr ?? [])];
     // 한국에서 실제로 쓰는 말이 있는 지수는 한글 이름으로 세운다.
     // 원문 기호(SPX·KOSPI 등)는 이름 아래에 그대로 남아 검색이 막히지 않는다.
-    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', '코스피'], ['total_mcap', '전체 시가총액']]) {
+    for (const [id, name] of [['spx', 'S&amp;P 500'], ['kospi', '코스피']]) {
       check(`지수 화면에 ${id} 줄이 있음`, idx.includes(`>${name}</p>`));
       check(`${id} 값이 스냅샷에 있음`, all.some((x) => x.id === id && x.price !== null));
     }
     // 지수만 모은 화면이다 — 개별 종목이 섞여 들어오면 안 된다
-    for (const [id, name] of [['samsung', '삼성전자'], ['nvda', '엔비디아'], ['btc', '비트코인']]) {
+    for (const [id, name] of [['samsung', '삼성전자'], ['nvda', '엔비디아']]) {
       check(`지수 화면에 개별 종목 ${id} 은 없음`, !idx.includes(`>${name}</p>`) && !idx.includes(`/asset/${id}"`));
     }
 
@@ -830,13 +848,12 @@ async function main() {
     // 다우는 기준값 자체가 없는 방식이다
     check('다우는 기준값이 없다고 밝힘', idx.includes('기준값이 없습니다'));
 
-    // 크립토에 공식 지수가 없다는 사실을 지어내지 않고 밝히는가
-    check('크립토에 공식 지수가 없다고 밝힘', idx.includes('공식 지수는 크립토에 없습니다'));
-
-    // 시장별 화면으로 들어가는 입구를 겸한다
-    for (const m of ['us', 'crypto']) {
+    // 시장별 화면으로 들어가는 입구를 겸한다 (크립토는 2026-11-26 뺐다)
+    for (const m of ['us']) {
       check(`지수 화면에서 ${m} 시장 화면으로 갈 수 있음`, idx.includes(`/market/${m}`));
     }
+    check('지수 화면에 크립토 값(시가총액 · 도미넌스)이 없음',
+      !idx.includes('전체 시가총액') && !idx.includes('비트코인 점유율') && !idx.includes('공식 지수는 크립토에 없습니다'));
     // 한국 묶음은 남지만 시장 화면은 없다 — 링크를 걸지 않는다
     check('지수 화면에 한국 시장 화면 링크는 없음', !idx.includes('/market/kr'));
   }
@@ -853,7 +870,7 @@ async function main() {
     check('시장 지수 본문은 그리지 않음', !life.includes('지수 숫자를 읽는 법'));
 
     const basics = snap.sections?.basics?.data ?? [];
-    check('생활 경제 지수가 아홉 가지', basics.length === 9, `${basics.length}개`);
+    check('생활 경제 지수가 열한 가지', basics.length === 11, `${basics.length}개`);
     // 표시 이름이 아니라 **id** 로 확인한다. 큰 글씨는 쉬운 우리말로 바뀔 수 있고
     // 실제로 바뀌었다 ('1인당 GDP' → '국민 한 사람 몫의 생산'). 정체는 id 다.
     const ids9 = basics.map((b) => b.id);
@@ -861,7 +878,7 @@ async function main() {
       ['engel', '엥겔계수'], ['gini', '지니계수']]) {
       check(`생활 경제 지수에 ${was} 있음`, ids9.includes(id), ids9.join(', ').slice(0, 60));
     }
-    // 아홉 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
+    // 열한 개를 한 줄로 늘어놓지 않고 세 묶음으로 나눈다. 묶음에 빠진 항목이
     // 있으면 화면에서 "그 밖의 지표" 로 밀려나므로 원본에서 확인한다.
     const lib = await readFile('src/lib/economyBasics.ts', 'utf8');
     const grouped = [...lib.matchAll(/ids:\s*\[([^\]]*)\]/g)]
@@ -871,6 +888,16 @@ async function main() {
     }
     const ungrouped = basics.map((b) => b.id).filter((id) => !grouped.includes(id));
     check('묶음에서 빠진 항목이 없음', ungrouped.length === 0, ungrouped.join(', ') || '없음');
+    // 미리보기는 해설 · 묶음을 손으로 옮긴 JSON 을 갖는다 — 앱과 같은 묶음 · 같은 항목이어야 한다
+    {
+      const tplB = await readFile('tools/preview/template.html', 'utf8');
+      const tGroups = JSON.parse(tplB.match(/\n  const BASIC_GROUPS = (\[.*\]);\n/)?.[1] ?? '[]');
+      const tGuide = JSON.parse(tplB.match(/\n  const BASIC_GUIDE = (\{.*\});\n/)?.[1] ?? '{}');
+      check('미리보기 묶음이 앱과 같음', JSON.stringify(tGroups.flatMap((g) => g.ids)) === JSON.stringify(grouped),
+        tGroups.flatMap((g) => g.ids).join(','));
+      check('미리보기에 새 두 지표의 해설이 있음',
+        ['household_debt', 'fertility'].every((id) => tGuide[id]?.headline && lib.includes(`  ${id}: {`) && lib.includes(tGuide[id].headline)));
+    }
     // 시세가 아니라 형편을 재는 값이라, 점수 구성요소가 아님을 밝혀야 한다
     check('투자심리 구성요소가 아님을 밝힘', life.includes('투자심리 점수의 구성요소가 아닙니다'));
     // 공식 지표만 담는다 — 발표 기관이 없는 개념은 넣지 않는다
@@ -931,9 +958,9 @@ async function main() {
   /* ---------------- 8-6. 공포·탐욕 구성요소 개수 ---------------- */
   console.log('\n[8-6] 공포·탐욕 구성요소');
   {
-    // 미국·한국은 CNN 방식과 같은 7개. 크립토는 검색 관심도·뉴스 심리를 더해 8개다.
+    // 미국은 CNN 방식과 같은 7개. (크립토 8개 구성은 2026-11-26 앱에서 뺐다)
     // 개수가 말없이 바뀌면 화면의 설명과 어긋나므로 못 박아 둔다.
-    const EXPECT = { us: 7, kr: 7, crypto: 8 };
+    const EXPECT = { us: 7, kr: 7 };
     for (const f of snap.sections?.fng?.data ?? []) {
       check(`[${f.market}] 구성요소 ${EXPECT[f.market]}개`, f.components.length === EXPECT[f.market],
         `${f.components.length}개`);
@@ -1300,6 +1327,8 @@ async function main() {
     for (const v of ['MACRO_BASE_URL', 'US_MARKET_BASE_URL', 'CRYPTO_BASE_URL', 'CBOE_CSV_URL']) {
       check(`.env.example 에 ${v} 가 있음`, envExample.includes(v));
     }
+    /* 예시 파일이 demo 로 고정돼 있으면, 그대로 배포 환경변수에 옮긴 사람은 키를 넣어도 예시 데이터만 본다 (2026-11-25) */
+    check('.env.example 의 모드는 auto — 키를 넣으면 실제 데이터로', /^MARKET_MOOD_MODE=auto$/m.test(envExample) && !/^MARKET_MOOD_MODE=demo$/m.test(envExample));
 
     /* 산출 못 한 것을 정상이라고 말하지 않는가 */
     const snapSrc = await readFile('src/server/snapshot.ts', 'utf8');
@@ -2072,7 +2101,7 @@ async function main() {
       tsla?.valuation?.per === null && /적자/.test(String(tsla?.valuation?.note ?? '')),
       String(tsla?.valuation?.note ?? '').slice(0, 40));
     // 공시가 없는 대상은 없다고 말한다
-    for (const id of ['spx', 'btc', 'usdkrw']) {
+    for (const id of ['spx', 'usdkrw']) {
       const d = (await getJson(`/api/asset/${id}?scenario=normal`)).body;
       check(`${id} 은 재무제표가 없다고 밝힘`, !d?.fundamentals && /공시/.test(String(d?.fundamentalsUnavailable ?? '')));
     }
@@ -2302,7 +2331,7 @@ async function main() {
     const TRADE = new Set(['equity', 'index', 'crypto', 'commodity']);
     const { pickHeat } = await import('../src/lib/heatRank.mjs');
     let boards = 0;
-    for (const m of ['us', 'kr', 'crypto']) {
+    for (const m of ['us', 'kr']) {
       const b = pickHeat((quotes[m] ?? []).filter((q) => TRADE.has(q.kind)));
       if (!b) continue;
       boards += 1;
@@ -2316,7 +2345,7 @@ async function main() {
         check(`${m} — 내린 것을 올랐다고 말하지 않음`, b.top.slot === '가장 덜 내린 것' && Boolean(b.top.note));
       }
     }
-    check('세 시장 모두 판이 만들어짐', boards === 3, `${boards}/3`);
+    check('미국 · 한국 판이 모두 만들어짐', boards === 2, `${boards}/2`);
   }
 
   /* ---------------- 8-27. 이름이 잘리지 않는가 ---------------- */
@@ -2784,8 +2813,9 @@ async function main() {
       cover.includes('이유 보기 →') && reasonDetail.includes('id="fng-contrib-title"') &&
       shell.includes('<HashScroll />') && hashScroll.includes('MutationObserver') && hashScroll.includes('header.sticky'));
     check('미리보기도 이유 보기가 기여도 절로 바로 감',
-      tpl16.includes('data-go-to="contrib"') && tpl16.includes("d.goTo === 'contrib'") &&
-      tpl16.includes("x.textContent.trim() === '점수 상승·하락 기여도'") && tpl16.includes('<h2>점수 상승·하락 기여도</h2>'));
+      // 2026-11-26: 홈 칩(→ 점수 추이)이 생기면서 갈 곳을 표 하나(GO_TO_TITLE)로 묶었다
+      tpl16.includes('data-go-to="contrib"') && tpl16.includes("contrib: '점수 상승·하락 기여도'") &&
+      tpl16.includes('x.textContent.trim() === GO_TO_TITLE[d.goTo]') && tpl16.includes('<h2>점수 상승·하락 기여도</h2>'));
     check('점수가 없으면(산출 불가) 이유 보기 대신 심리 상세로',
       /mood \? \([\s\S]{0,200}이유 보기 →[\s\S]{0,120}\) : \([\s\S]{0,80}심리 상세 →/.test(cover) &&
       /\(mood\s*\?[\s\S]{0,200}이유 보기 →[\s\S]{0,80}:[\s\S]{0,80}심리 상세 →/.test(tpl16));
@@ -2882,17 +2912,15 @@ async function main() {
      *
      * 예전에는 미국·크립토 두 장을 옆으로 미는 줄이었고, 그때 이 자리는 "두 장의 폭이
      * 다른 카드와 같아야 한다" 를 지켰다(85cqw 라 66px 좁았던 일). 이제 옆으로 미는 줄이
-     * 없다 — 미국 한 장이 칸을 꽉 채우고 크립토는 카드가 아니라 아래 한 줄이다.
-     * 크립토를 지우지는 않는다. 점수·단계·어제 대비가 그 줄에 있다.
+     * 없다 — 미국 한 장이 칸을 꽉 채운다. 아래 크립토 한 줄도 2026-11-26 에 뺐다
+     * (사용자: "크립토는 그냥 빼버리자, 관심없다").
      */
     const fngSec = await readFile('src/components/market/FngSection.tsx', 'utf8');
     check('1면 카드는 미국 한 장 (옆으로 미는 줄 없음)',
       /s\.market === 'us'/.test(fngSec) && !/function Carousel\(/.test(fngSec) && !/snap-item/.test(fngSec));
-    check('크립토는 지우지 않고 한 줄로 내림', /function MarketLine\(/.test(fngSec) && /rest\.map/.test(fngSec));
-    check('한 줄도 단계를 색만이 아니라 기호와 이름으로 말함',
-      /STAGE_GLYPH\[stage\.id\]/.test(fngSec) && /stage\.label/.test(fngSec));
+    check('1면 아래 크립토 한 줄도 없음', !/function MarketLine\(/.test(fngSec) && !/rest\.map/.test(fngSec));
     check('미리보기도 같은 구성',
-      /x\.market === 'us'/.test(tpl16) && /function marketLine\(f\)/.test(tpl16) && !/id="fngscroll"/.test(tpl16));
+      /x\.market === 'us'/.test(tpl16) && !/function marketLine\(f\)/.test(tpl16) && !/id="fngscroll"/.test(tpl16));
     check('쓰지 않게 된 캐러셀 스타일을 지움',
       !/\.snap-row \{/.test(await readFile('src/app/globals.css', 'utf8')) && !/\.fng-scroll \{/.test(tpl16));
 
@@ -2992,6 +3020,41 @@ async function main() {
       /aria-label="찾기 \(Ctrl\+K\)"/.test(await readFile('src/components/market/StatusBar.tsx', 'utf8')));
     /* 기준 칸 안의 fixed 는 화면이 아니라 그 칸에 붙는다 — 큰 그림 창과 같은 이유 */
     check('찾기 창도 문서 맨 위로 옮겨 그림', /createPortal\(/.test(dialog) && /document\.body,/.test(dialog));
+
+    /*
+     * [8-39] 점수표에서 깎인 것 (2026-11-26, 390px 에서 탭마다 잼).
+     *   경제지표 화면이 5.5장 길이 — 다섯 카드가 '무슨 지표인가' 와 '오르면 · 내리면' 을 늘 펼쳐 둠.
+     *   누를 자리 24px 미달 — 홈 '시장 경고' 21px, 심리 상세 '표로 보기' 19px.
+     *   더보기 · 데이터 진단이 문 닫은 Stooq 를 시세 출처라고 말함 (실제는 Yahoo Finance).
+     */
+    console.log('\n[8-39] 점수표 반영 — 지표 설명 접기 · 누를 자리 · 진단 문구');
+    {
+      const gauges = await readFile('src/components/market/RiskGauges.tsx', 'utf8');
+      const card = gauges.slice(gauges.indexOf('export function RiskCard'), gauges.indexOf('export function RiskGaugesSection'));
+      const fold = card.slice(card.indexOf('<details'), card.indexOf('</details>'));
+      check('경제지표 카드 — 지금 읽는 법은 펼쳐 두고, 지표 설명은 접음 (앱)',
+        card.indexOf('지금 읽는 법 · ') > 0 && card.indexOf('지금 읽는 법 · ') < card.indexOf('<details') &&
+        fold.includes('이게 무슨 지표인가요? ▾') && fold.includes('무슨 지표인가 · ') && fold.includes('<UpDownExplainer') &&
+        fold.includes('<summary className="tap ') && card.indexOf('</details>') > card.indexOf('<details') &&
+        !card.slice(card.indexOf('</details>')).includes('무슨 지표인가 · '));
+      const tplCard = tpl16.slice(tpl16.indexOf('function riskCard(i)'), tpl16.indexOf("'</article>'", tpl16.indexOf('function riskCard(i)')));
+      const tplFold = tplCard.slice(tplCard.indexOf('<details class="risk-more"'), tplCard.indexOf('</dl></details>'));
+      check('미리보기 경제지표 카드도 같게',
+        tplCard.indexOf('지금 읽는 법 · ') > 0 && tplCard.indexOf('지금 읽는 법 · ') < tplCard.indexOf('<details class="risk-more"') &&
+        tplFold.includes('이게 무슨 지표인가요? ▾') && tplFold.includes('무슨 지표인가 · ') && tplFold.includes('값이 오르면') &&
+        tplFold.includes('<summary class="linkbtn"') && tplCard.indexOf('</dl></details>') > tplCard.indexOf('<details class="risk-more"') &&
+        !tplCard.slice(tplCard.indexOf('</dl></details>')).includes('무슨 지표인가 · '));
+      const alertLine = await readFile('src/components/market/RiskAlertLine.tsx', 'utf8');
+      const tableToggles = await Promise.all(['CrisisMarkers', 'BandStatsView', 'FundamentalsCard'].map((n) => readFile(`src/components/market/${n}.tsx`, 'utf8')));
+      check('누를 자리 24px — 홈 시장 경고 줄 · 표로 보기 (앱 · 미리보기)',
+        alertLine.includes('flex min-h-6 items-center') &&
+        tableToggles.every((t) => t.includes('<summary className="min-h-6 cursor-pointer') && !t.includes('<summary className="cursor-pointer text-[12.5px]')) &&
+        tpl16.includes('data-go="risk" style="display:flex;gap:8px;align-items:center;min-height:24px;') &&
+        tpl16.includes('<summary style="min-height:24px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>'));
+      const cfg = await readFile('src/server/config.ts', 'utf8');
+      check('데이터 진단이 시세 출처를 Yahoo Finance 로 말함 (Stooq 는 문 닫음)',
+        cfg.includes('미국·한국 시세(Yahoo Finance)') && !cfg.includes('시세(Stooq)'));
+    }
   }
 
   /* ---------------- 8-9. LIVE 연결 ---------------- */
@@ -3000,26 +3063,24 @@ async function main() {
     // 이 컨테이너는 제공사로 나갈 수 없어 실제 호출은 못 한다.
     // 대신 "무엇이 붙었고 무엇이 아직인지" 를 원본에서 확인한다.
     const live = await readFile('src/server/adapters/live/index.ts', 'utf8');
-    const crypto = await readFile('src/server/adapters/live/crypto.ts', 'utf8');
     const macro = await readFile('src/server/adapters/live/macro.ts', 'utf8');
 
-    check('CoinGecko 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/coingecko.ts'));
     check('Stooq 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/stooq.ts'));
     check('Cboe 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/cboe.ts'));
-    check('Binance 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/binance.ts'));
     check('FRED 제공사 모듈이 있음', existsSync('src/server/adapters/live/providers/fred.ts'));
 
-    check('크립토 시세가 연결됨', live.includes('cryptoQuotes') && live.includes('fetchCoinQuotes'));
-    check('크립토 심리 입력이 연결됨', live.includes('buildCryptoFngInput'));
-    check('크립토 벤치마크가 연결됨', /getBenchmark[\s\S]{0,400}fetchCoinSeries/.test(live));
     check('거시 지표가 FRED 에 연결됨', live.includes('buildFredMacro'));
     check('환율이 연결됨', /getUsdKrw[\s\S]{0,300}fetchLatest/.test(live));
 
-    // 못 채우는 지표는 지어내지 않고 사유를 남긴다
-    for (const id of ['long_liq_share', 'exchange_netflow_14d', 'search_trend', 'news_sentiment']) {
-      check(`[${id}] 못 받는 지표에 사유가 있음`, crypto.includes(`forcedMissing.${id} =`));
-    }
-    check('결측을 0 으로 채우지 않음', !/\|\|\s*0;/.test(crypto) && crypto.includes('null'));
+    /*
+     * 크립토는 앱에서 뺐다 (2026-11-26). CoinGecko · Binance 모듈 파일은 남아 있지만
+     * 스냅샷이 도는 시장 목록(MARKET_IDS · INDEX_MARKET_IDS)에 없어 부르지 않는다 —
+     * 화면에 그리지 않을 값을 받으려고 바깥 제공사를 두드리지 않는다.
+     */
+    const typesSrc = await readFile('src/types/index.ts', 'utf8');
+    check('서버가 크립토를 받지 않음 — 점수 · 시세 목록에 없음',
+      /export const MARKET_IDS: MarketId\[\] = \['us'\];/.test(typesSrc) &&
+      /export const INDEX_MARKET_IDS: MarketId\[\] = \['us', 'kr'\];/.test(typesSrc));
 
     // 근거 없는 위험 단계를 매기지 않는다
     check('구간 기준이 없으면 단계를 매기지 않음', macro.includes("return { level: 'unknown'"));
@@ -3053,7 +3114,7 @@ async function main() {
 
     /*
      * 생활 경제 지수 — 세계은행(연 1회)과 이코노미스트 빅맥지수(연 2회).
-     * 아홉 가운데 다섯만 닿는다. 나머지 넷은 무료로 받을 길이 없어서 비워 둔다.
+     * 열한 가운데 일곱만 닿는다 (가계부채 비율은 FRED 키가 있을 때). 나머지 넷은 무료로 받을 길이 없어서 비워 둔다.
      * 못 닿는 것을 지어내지 않는 것이 이 화면의 유일한 규칙이다.
      */
     const basicsSrc = await readFile('src/server/adapters/live/basics.ts', 'utf8');
@@ -3069,6 +3130,16 @@ async function main() {
     for (const what of ['엥겔계수', 'PIR', 'OECD 경기선행지수']) {
       check(`못 받는 지표 사유: ${what}`, basicsSrc.includes(what));
     }
+    // 2026-11-26 더한 둘 — 합계출산율은 세계은행, 가계부채 비율은 IMF 값을 FRED 로. 실제 호출 확인은 check:live
+    const wbSrc = await readFile('src/server/adapters/live/providers/worldbank.ts', 'utf8');
+    const fredSrc = await readFile('src/server/adapters/live/providers/fred.ts', 'utf8');
+    const chkLive = await readFile('scripts/check-live.mjs', 'utf8');
+    check('합계출산율이 세계은행에 연결됨 (SP.DYN.TFRT.IN)',
+      /fertility: 'SP\.DYN\.TFRT\.IN'/.test(wbSrc) && basicsSrc.includes("fetchIndicator(wb, 'fertility'") && chkLive.includes("'SP.DYN.TFRT.IN'"));
+    check('가계부채 비율이 IMF→FRED 네 나라 계열에 연결됨',
+      ['KR', 'CN', 'JP', 'US'].every((c) => fredSrc.includes(`'HDTGPD${c}A163N'`) && chkLive.includes(`'HDTGPD${c}A163N'`)) &&
+      basicsSrc.includes('source: IMF_VIA_FRED') && /fred: fredKey \? fredConfig\(fredKey/.test(live));
+    check('확인 못 한 계열이라는 사실을 적어 둠', /실제 응답으로는 확인하지 못했다/.test(fredSrc));
     // 값을 못 받으면 빈 목록이지, 0 이나 지어낸 값이 아니다
     check('생활 경제 지수가 실패를 0 으로 채우지 않음',
       basicsSrc.includes('return null;') && !/\|\|\s*0[,;)]/.test(basicsSrc));
@@ -3129,7 +3200,7 @@ async function main() {
     check('구간 목록을 따로 들고 있지 않음',
       !/RANGES(:\s*RangeKey\[\])?\s*=\s*\[/.test(assetPage.replace(/ASSET_RANGES/g, '')) &&
       !/RANGES(:\s*RangeKey\[\])?\s*=\s*\[/.test(assetRoute.replace(/ASSET_RANGES/g, '')));
-    const detailBody = await (await fetch(`${BASE}/api/asset/btc`)).json();
+    const detailBody = await (await fetch(`${BASE}/api/asset/nvda`)).json();
     const served = Object.keys(detailBody.ranges ?? {});
     check('API 가 화면에 없는 구간을 받아 오지 않음', !served.includes('3Y'), served.join('·'));
     check('화면이 쓰는 다섯 구간이 모두 옴', served.length === 5, `${served.length}개`);
@@ -3205,13 +3276,12 @@ async function main() {
   {
     const cat = await readFile('src/lib/catalog.ts', 'utf8');
     const stooq = await readFile('src/server/adapters/live/providers/stooq.ts', 'utf8');
-    const gecko = await readFile('src/server/adapters/live/providers/coingecko.ts', 'utf8');
 
     /* 늘린 이름들이 목록에 있는가 */
     const HOT_US = ['meta', 'googl', 'avgo', 'amd', 'nflx', 'pltr', 'coin', 'mstr', 'mu', 'smci'];
-    const HOT_COIN = ['doge', 'ada', 'trx', 'avax', 'link'];
-    const missingCat = [...HOT_US, ...HOT_COIN].filter((id) => !new RegExp(`\\{\\s*id:\\s*'${id}'`).test(cat));
-    check('핫한 종목이 카탈로그에 들어옴 — 미국 10 · 코인 5',
+    // 늘렸던 코인 다섯(도지 · 에이다 · 트론 · 아발란체 · 체인링크)은 2026-11-26 크립토와 함께 뺐다
+    const missingCat = HOT_US.filter((id) => !new RegExp(`\\{\\s*id:\\s*'${id}'`).test(cat));
+    check('핫한 종목이 카탈로그에 들어옴 — 미국 10',
       missingCat.length === 0, missingCat.join(', '));
 
     /*
@@ -3220,8 +3290,6 @@ async function main() {
      */
     const noSymbol = HOT_US.filter((id) => !new RegExp(`^\\s*${id}: '${id}\\.us',`, 'm').test(stooq));
     check('늘린 미국 종목마다 Stooq 심볼이 있음', noSymbol.length === 0, noSymbol.join(', '));
-    const noCoin = HOT_COIN.filter((id) => !new RegExp(`^\\s*${id}: '[a-z0-9-]+',`, 'm').test(gecko));
-    check('늘린 코인마다 CoinGecko id 가 있음', noCoin.length === 0, noCoin.join(', '));
 
     /*
      * 한국 개별 종목은 늘리지 않았다 — 무료로 닿는 시세 제공처가 없다.
@@ -3235,11 +3303,11 @@ async function main() {
     const quotes = (await getJson('/api/snapshot?scenario=normal')).body?.sections?.quotes?.data ?? {};
     const byId = new Map();
     for (const rows of Object.values(quotes)) for (const q of rows ?? []) byId.set(q.id, q);
-    const blank = [...HOT_US, ...HOT_COIN].filter((id) => {
+    const blank = HOT_US.filter((id) => {
       const q = byId.get(id);
       return !q || q.price === null || q.price === undefined || !Number.isFinite(q.changePct);
     });
-    check('늘린 종목 전부에 값과 등락이 옴 — 15개', blank.length === 0, blank.join(', '));
+    check('늘린 종목 전부에 값과 등락이 옴 — 10개', blank.length === 0, blank.join(', '));
 
     /*
      * 값이 오기만 하면 안 된다. 자릿수가 말이 돼야 한다.
@@ -3252,7 +3320,7 @@ async function main() {
     check('미국 종목 값이 주식다운 자릿수임', odd.length === 0, odd.join(', '));
 
     /* 큰 그림도 그려지는가 — 구간마다 점이 와야 한다 */
-    for (const id of ['smci', 'avax']) {
+    for (const id of ['smci', 'pltr']) {
       const ranges = (await getJson(`/api/asset/${id}`)).body?.ranges ?? {};
       const empty = Object.entries(ranges).filter(([, v]) => !(v?.length > 1)).map(([k]) => k);
       check(`${id} 의 모든 구간에 그림이 있음`, Object.keys(ranges).length === 5 && empty.length === 0,
@@ -3303,7 +3371,7 @@ async function main() {
     check('CIK 를 짐작으로 적지 않는다고 밝힘', /짐작으로 적으면 엉뚱한 회사의 재무제표가 나오므로/.test(cc));
     check('조사를 이름의 받침이 정함', /\$\{topic\(item\.name\)\}/.test(cc));
     const reasons = {};
-    for (const id of ['meta', 'mu', 'doge']) {
+    for (const id of ['meta', 'mu']) {
       reasons[id] = (await getJson(`/api/asset/${id}`)).body?.fundamentalsUnavailable ?? '';
     }
     check('미국 종목에는 아직 안 이었다고 말함',
@@ -3311,7 +3379,9 @@ async function main() {
     check('받침 있는 이름에 은, 없는 이름에 는',
       reasons.mu.startsWith('마이크론은') && reasons.meta.startsWith('메타는'),
       `${reasons.mu.slice(0, 6)} / ${reasons.meta.slice(0, 5)}`);
-    check('코인에는 공시가 없다고 말함', /공시가 없습니다/.test(reasons.doge) && !/미국 상장사지만/.test(reasons.doge));
+    // 뺀 코인의 상세는 열리지 않는다 — 옛 링크가 빈 화면이 아니라 '없음' 으로 끝난다
+    const goneAsset = await fetch(`${BASE}/api/asset/doge`);
+    check('뺀 코인 상세 API 는 404', goneAsset.status === 404, `status=${goneAsset.status}`);
 
     /*
      * 시총 300위 문턱은 그대로다 — 늘린 종목도 그 문을 지난다.
@@ -3623,15 +3693,16 @@ async function main() {
   }
 
   /* ---------------- 8-38. 쫄탐일보 지면 ---------------- */
-  console.log('\n[8-38] 쫄탐일보 지면 — 미국이 1면, 한국이 2면, 크립토는 뒤');
+  console.log('\n[8-38] 쫄탐일보 지면 — 미국이 1면, 한국이 2면 (크립토는 뺐다)');
   {
     /*
      * 2026-11-24 리밸런싱. 홈에서 크립토가 무게를 갖던 곳은 가격 칸이 아니라 셋이었다 —
      * 쫄탐 카드의 절반, 오늘의 한 줄(출렁임이 커서 거의 늘), 오늘의 칸 6개 중 2개.
      * 한국은 카탈로그에 지수 셋 · 환율 · 종목 다섯이 있는데 8칸 제한에 걸려 2칸만 나왔다.
      *
-     * 크립토는 지우지 않는다. 줄을 세운다 — 미국이 조용한 날에는 여전히 헤드라인에 서고,
-     * 점수는 1면 카드 밑 한 줄에, 시세는 지면 맨 뒤에 있다.
+     * 그때는 크립토를 지우지 않고 줄만 세웠다. 2026-11-26 에는 앱에서 아예 뺐다
+     * (사용자: "크립토는 그냥 빼버리자, 관심없다"). 헤드라인 규칙(todayLine.mjs)의 순서표에는
+     * 'crypto' 가 끝자리로 남아 있지만, 스냅샷에 크립토가 오지 않으니 쓰일 일이 없다.
      */
     const tl = await readFile('src/lib/todayLine.mjs', 'utf8');
     const tpl = await readFile('tools/preview/template.html', 'utf8');
@@ -3652,15 +3723,15 @@ async function main() {
     const slots = (src, re) => src.match(re)?.[1] ?? '';
     const appSlots = slots(prices, /HOME_SLOTS: Record<MarketId, number> = (\{[^}]*\})/);
     const tplSlots = slots(tpl, /const HOME_SLOTS = (\{[^}]*\})/);
-    check('시장별 칸 수: 미국 10 · 한국 6 · 크립토 2', appSlots === '{ us: 10, kr: 6, crypto: 2 }', appSlots);
+    check('시장별 칸 수: 미국 10 · 한국 6 · 크립토 0', appSlots === '{ us: 10, kr: 6, crypto: 0 }', appSlots);
     check('미리보기도 같은 칸 수', tplSlots === appSlots, tplSlots);
     check('시장별 소제목으로 묶어 실음', /MARKET_LABEL\[g\.market\]/.test(prices) && /class="price-group-h"/.test(tpl));
     check('시장 구분 없이 앞에서 자르던 8칸 제한을 지움', !/MAX_ON_HOME/.test(prices) && !/ordered\.slice\(0, 9\)/.test(tpl));
 
-    // ③ 홈 기본 항목 — 미국이 가장 많고 한국이 그다음, 크립토는 하나
+    // ③ 홈 기본 항목 — 미국이 가장 많고 한국이 그다음, 크립토는 없음
     const homeOf = (m) => [...cat.matchAll(new RegExp(`id: '([a-z0-9_]+)'[^\\n]*market: '${m}'[^\\n]*home: true`, 'g'))].map((x) => x[1]);
     const us = homeOf('us'), kr = homeOf('kr'), cr = homeOf('crypto');
-    check('홈 기본 항목: 미국 > 한국 > 크립토', us.length > kr.length && kr.length > cr.length && cr.length <= 1,
+    check('홈 기본 항목: 미국 > 한국, 크립토 없음', us.length > kr.length && kr.length > 0 && cr.length === 0,
       `미국 ${us.length} · 한국 ${kr.length} · 크립토 ${cr.length}`);
     // 무료로 받을 길이 없는 것은 홈 기본값에 두지 않는다 — LIVE 에서 늘 빈 칸이 된다
     check('VKOSPI 를 홈 기본값에서 뺌 (KRX 유료 데이터)', !kr.includes('vkospi'));
@@ -3678,12 +3749,143 @@ async function main() {
     check('예전 기본값을 기록해 둠', /export const PREVIOUS_DEFAULTS = \{/.test(cat));
     check('저장된 관심목록 · 홈 항목을 그 규칙으로 옮김',
       (settings.match(/upgradeDefault\(arr\(r\.(watchlist|homeItems)/g) ?? []).length === 2);
+    // 크립토를 뺀 뒤 — 저장된 관심목록 · 홈 항목 · 알림에 남은 크립토만 덜어낸다 (나머지는 그대로)
+    const removedIds = [...(cat.match(/export const REMOVED_IDS: readonly string\[\] = \[([\s\S]*?)\];/)?.[1] ?? '').matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]);
+    check('뺀 크립토 17개를 적어 두고, 카탈로그에는 하나도 없음',
+      removedIds.length === 17 && removedIds.every((id) => !new RegExp(`\\{ id: '${id}'`).test(cat)), `${removedIds.length}개`);
+    check('저장된 관심목록 · 홈 항목에서 뺀 것만 덜어냄',
+      (settings.match(/dropRemoved\(upgradeDefault\(arr\(r\.(watchlist|homeItems)/g) ?? []).length === 2 && settings.includes('REMOVED_IDS),'));
+    check('크립토를 겨눈 알림 · 기준도 덜어냄',
+      /a\.target !== 'crypto' && !REMOVED_IDS\.includes\(a\.target\)/.test(settings) && /c\.kind === 'fng' && c\.market === 'crypto'/.test(settings));
     check('관심목록 기본값에 비트코인 대신 나스닥',
       /return \['spx', 'ndx', 'kospi', 'usdkrw', 'vix'\];/.test(cat) && /watch: new Set\(\['spx', 'ndx', 'kospi', 'usdkrw', 'vix'\]\)/.test(tpl));
 
     // ⑥ 한국이 빠진 뒤로 틀린 말이던 것
     const consts = await readFile('src/components/market/constants.ts', 'utf8');
     check('"세 점수" 라는 틀린 말이 남지 않음', !/세 점수/.test(consts) && !/세 점수/.test(tpl));
+  }
+
+  console.log('\n[8-40] 크립토 빼기 — 화면 · 미리보기 · 옛 링크');
+  {
+    /*
+     * 2026-11-26 사용자: "크립토는 그냥 빼버리자, 관심없다".
+     * 쫄탐일보는 미국 · 한국 시장 신문이다. 서버는 크립토를 받지 않고([8-9]), 스냅샷에도 없다([1] · [2]).
+     * 여기서는 크립토로 가는 문 · 고르는 단추 · 설명 문구가 남지 않았는지 본다. 앱과 미리보기 둘 다.
+     */
+    const rd = (f) => readFile(f, 'utf8');
+    const [calPage, calMonth, status, hours, defs, cfgSrc, morePage, riskSrc, futCat, build, fngPage, regionPage, indPage, critBoard, tplX] =
+      await Promise.all(['src/app/calendar/page.tsx', 'src/components/market/CalendarMonth.tsx', 'src/components/market/StatusBar.tsx',
+        'src/lib/marketHours.ts', 'src/server/fng/definitions.ts', 'src/server/config.ts', 'src/app/more/page.tsx', 'src/server/risk.ts',
+        'src/lib/futuresCatalog.ts', 'tools/preview/build.mjs', 'src/app/fng/[market]/page.tsx', 'src/app/market/[region]/page.tsx',
+        'src/app/indicators/page.tsx', 'src/components/market/CriteriaBoard.tsx', 'tools/preview/template.html'].map(rd));
+    check('캘린더에 크립토 시장 · 분류 단추가 없음',
+      !/value: 'crypto'/.test(calPage) && /\.filter\(\(c\) => c !== 'crypto'\)/.test(calPage) && !/'crypto', 'global'\]/.test(calMonth));
+    check('거래 시간 칩은 미국 · 한국 (24시간 칩 없음)',
+      /return \[getSession\('us', now\), getSession\('kr', now\)\];/.test(hours) && /\['us', 'kr'\]\.map\(\(m\) =>/.test(status));
+    check('위험 신호등 · 선물 목록에 크립토 항목이 없음',
+      !/scope: 'crypto'/.test(riskSrc) && !/group: 'crypto'/.test(futCat) && !/\{ id: 'crypto', label:/.test(futCat));
+    check('고를 시장이 하나뿐이면 시장 단추를 세우지 않음 (심리 상세 · 경제지표 · 기준)',
+      [fngPage, indPage, critBoard].every((t) => /MARKET_IDS\.length > 1/.test(t)));
+    check('옛 링크 — /market/crypto 는 홈으로, /fng/crypto 는 /fng/us 로',
+      /isCrypto\) router\.replace\('\/'\)/.test(regionPage) && /if \(params\.market !== market\) router\.replace\(`\/fng\/\$\{market\}/.test(fngPage));
+    check('설명 문구에 크립토가 남지 않음 (산식 · 척도 안내 · 진단 · 바로가기)',
+      !/크립토/.test(defs.match(/export const METHODOLOGY_STEPS[\s\S]*?\];/)?.[0] ?? '크립토') &&
+      !/크립토/.test(defs.match(/export const SCALE_WARNING =[\s\S]*?;\n/)?.[0] ?? '크립토') &&
+      !/CoinGecko/.test(cfgSrc.match(/reason:\s*\n[\s\S]*?missing: \[\.\.\.missing\]/)?.[0] ?? 'CoinGecko') &&
+      !/펀딩비|\/market\/crypto/.test(morePage));
+    check('미리보기도 미국 · 한국만 (시장 목록 · 단추)',
+      /const MARKETS = \['us'\];/.test(tplX) && /const INDEX_MARKETS = \['us', 'kr'\];/.test(tplX) &&
+      !/\['crypto', ?'크립토'\]/.test(tplX) && !/class="mklines"/.test(tplX));
+    check('미리보기 빌드가 크립토를 받지 않음',
+      /const ASSET_IDS = \['spx', 'kospi', 'nvda'\];/.test(build) && /for \(const m of \['us'\]\) details\[m\]/.test(build) &&
+      /for \(const m of \['us', 'kr'\]\) \{\n\s*if \(!ids\[m\]\?\.length\)/.test(build));
+  }
+
+  console.log('\n[8-41] 쫄탐지수 + 추세(200일선) + VIX 35 — 한눈에');
+  {
+    /*
+     * 2026-11-26 사용자: "쫄탐지수에 겹쳐서 볼 수 있는 방법이 있을까? 한눈에 세 가지 다 볼 수 있게".
+     * 홈 카드: 계기판 아래 칩 두 개(추세 · VIX). 심리 상세 차트: S&P 500 이 200일 평균선 아래였던 기간은 음영,
+     * VIX 35 이상인 날은 두 칸 사이의 띠(처음 30 → 사용자 요청으로 35, 근거는 overlays.mjs 머리말). 둘 다 지금 상태를 적는 사실이지 사고팔 신호가 아니다.
+     * 계산은 src/lib/overlays.mjs 한 곳 — 여기서 API 값을 그 계산으로 다시 내 맞춰 본다.
+     */
+    const { belowMaSpans, trendNow, TREND_MA_DAYS, VIX_HIGH } = await import('../src/lib/overlays.mjs');
+    const { overlayChips } = await import('../src/lib/overlayChips.mjs');
+    const { body: fb } = await getJson('/api/fng/us');
+    const d = fb?.detail ?? {};
+    const ov = d.overlays;
+    const sane = (spans) => Array.isArray(spans) && spans.every((sp, i) =>
+      Number.isFinite(sp.from) && Number.isFinite(sp.to) && sp.from <= sp.to && (i === 0 || spans[i - 1].to < sp.from));
+    check('심리 상세 API 에 겹침 구간이 있음 (추세 200일 · VIX 35)',
+      !!ov && ov.trend?.maDays === TREND_MA_DAYS && TREND_MA_DAYS === 200 && ov.vix?.threshold === VIX_HIGH && VIX_HIGH === 35,
+      JSON.stringify(ov && { trend: ov.trend && { ...ov.trend, spans: ov.trend.spans.length }, vix: ov.vix && { ...ov.vix, spans: ov.vix.spans.length } }));
+    check('구간이 시간 순 · 겹치지 않음 · 시작 ≤ 끝', sane(ov?.trend?.spans) && sane(ov?.vix?.spans));
+    const bm = d.benchmark?.series ?? [];
+    const again = belowMaSpans(bm, TREND_MA_DAYS);
+    check('추세 음영이 차트에 그린 그 S&P 500 으로 다시 계산한 값과 같음',
+      bm.length >= TREND_MA_DAYS && JSON.stringify(again) === JSON.stringify(ov?.trend?.spans),
+      `다시 계산 ${again.length}곳 · API ${ov?.trend?.spans?.length}곳`);
+    // 평균을 낼 날이 모이기 전(첫 200거래일)에는 음영이 없다 — 메우지 않는다
+    check('첫 200거래일에는 음영을 만들지 않음', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
+    check('DEMO 10년 안에 VIX 35 이상인 날이 있음 (띠가 실제로 그려짐)', !fb?.mode || fb.mode !== 'demo' || (ov?.vix?.spans?.length ?? 0) > 0,
+      `${ov?.vix?.spans?.length ?? 0}곳`);
+    const tn = trendNow(bm, TREND_MA_DAYS);
+    const now = d.overlayNow;
+    check('지금 추세(위/아래 · %)가 같은 계열로 다시 계산한 값과 같음',
+      !!now?.trend && now.trend.above === tn.above && now.trend.gapPct === tn.gapPct, JSON.stringify(now?.trend));
+    check('지금 VIX 가 35 이상인지가 값과 맞음',
+      !!now?.vix && Number.isFinite(now.vix.value) && now.vix.high === (now.vix.value >= VIX_HIGH), JSON.stringify(now?.vix));
+    const { body: sb } = await getJson('/api/snapshot');
+    const sNow = sb?.sections?.fng?.data?.find((f) => f.market === 'us')?.overlayNow;
+    check('홈(스냅샷)의 지금 값이 심리 상세와 같음', JSON.stringify(sNow) === JSON.stringify(now), JSON.stringify(sNow));
+    const chips = overlayChips(sNow) ?? [];
+    check('홈 칩 두 개 — 위/아래를 말로 · 사고팔 말 없음',
+      chips.length === 2 && /200일선 (위|아래)/.test(chips[0].value) && /^35 (이상|아래)$/.test(chips[1].sub ?? '') &&
+      !/매수|매도|사세요|파세요|추천/.test(JSON.stringify(chips)), JSON.stringify(chips.map((c) => [c.value, c.sub])));
+    check('칩 값이 없으면 산출 불가 — 0 이나 위로 채우지 않음',
+      overlayChips({ trend: { name: 'S&P 500', maDays: 200, above: null, gapPct: null }, vix: null }).every((c) => c.value === '산출 불가' && c.sub === null));
+
+    const rd = (f) => readFile(f, 'utf8');
+    const [chartSrc, fngPage, homeCard, css, tplO, buildO, liveIdx, snapSrc, route, ovSrv] = await Promise.all([
+      'src/components/charts/InteractiveChart.tsx', 'src/app/fng/[market]/page.tsx', 'src/components/market/HomeMoodCard.tsx',
+      'src/app/home-mood.css', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/server/adapters/live/index.ts',
+      'src/server/snapshot.ts', 'src/app/api/fng/[market]/route.ts', 'src/server/overlays.ts'].map(rd));
+    // 그리는 차례: 음영 → 선 → 표식 → 띠. 띠를 선보다 먼저 그렸더니 같은 날의 위기 표식 점선에 가려 안 보였다
+    const iShade = chartSrc.indexOf("if (sp.kind !== 'shade') return null;");
+    const iSeries = chartSrc.indexOf('{/* 시리즈 */}');
+    const iMarks = chartSrc.indexOf('{/* 시점 표식 — 세로 점선');
+    const iStrip = chartSrc.indexOf("if (sp.kind !== 'strip') return null;");
+    check('차트 — 음영은 선보다 먼저, 띠는 표식 다음에 (앱)', iShade > 0 && iShade < iSeries && iMarks < iStrip, `${iShade}/${iSeries}/${iMarks}/${iStrip}`);
+    check('차트 — 같은 차례 (미리보기)', /'<g class="sel"><\/g>' \+ spanRects \+ paths \+ marks \+ stripRects \+ '<g class="cross">/.test(tplO));
+    check('차트 — 띠는 두 칸 사이(칸 간격 가운데)에 앉음',
+      /geometry\.split\s*\?\s*geometry\.bands\[0\]\.top \+ geometry\.bands\[0\]\.h \+ \(SPLIT_GAP - STRIP_H\) \/ 2/.test(chartSrc) &&
+      /c\.bands\[0\]\.top \+ c\.bands\[0\]\.h \+ \(SPLIT_GAP - STRIP_H\) \/ 2/.test(tplO));
+    check('차트 — 색만으로 말하지 않음 (범례 · 툴팁 · 대체 텍스트에 이름)',
+      /spanKinds\.map\(\(k\) =>/.test(chartSrc) && /cursorSpans\.map\(\(sp\) =>/.test(chartSrc) && /\$\{spanSummary\}`/.test(chartSrc) &&
+      /spanKinds\(spans \|\| \[\]\)\.map/.test(tplO) && /onSpans\.map\(\(sp\) => '<div class="tt-span">/.test(tplO) && /c\.label \+ markerAria \+ spanAria/.test(tplO));
+    check('크게 보기 창에도 같은 구간이 넘어감', /markers=\{markers\}\s*\n\s*spans=\{spans\}\s*\n\s*focusT=\{focusT\}\s*\n\s*maxPoints=\{maxPoints\}\s*\n\s*expandable=\{false\}/.test(chartSrc));
+    check('띠 두께가 앱과 미리보기에서 같음', /const STRIP_H = 6;/.test(chartSrc) && /const STRIP_H = 6;/.test(tplO));
+    check('심리 상세 차트에 구간을 넘기고, 신호가 아니라고 적음',
+      /spans=\{chartSpans\}/.test(fngPage) && /사고팔 때를 알려 주는 신호가 아닙니다/.test(fngPage) &&
+      /' 비교', chartMarks, chartSpans\)/.test(tplO) && /사고팔 때를 알려 주는 신호가 아닙니다/.test(tplO));
+    check('보는 기간 앞에서 시작한 구간은 기간 첫날로 자름 (앱 · 미리보기)',
+      /sp\.to >= cutoff \? \{ from: Math\.max\(sp\.from, cutoff\), to: sp\.to \} : null/.test(fngPage) &&
+      /sp\.to >= cutoff \? \{ from: Math\.max\(sp\.from, cutoff\), to: sp\.to \} : null/.test(tplO));
+    check('홈 칩 — 같은 문구 함수를 앱과 미리보기가 씀',
+      /overlayChips\(score\.overlayNow\)/.test(homeCard) && /overlayChips\(now\)/.test(tplO) && /moodChips\(f\.overlayNow\)/.test(tplO) &&
+      /__OVERLAY_CHIPS_FN__/.test(tplO) && /\.replace\('__OVERLAY_CHIPS_FN__'[\s\S]{0,140}overlayChips\.mjs/.test(buildO));
+    check('홈 칩을 누르면 겹쳐 그린 차트로 (앱 #fng-chart-title · 미리보기 점수 추이)',
+      /CHART_ANCHOR = 'fng-chart-title'/.test(homeCard) && /id="fng-chart-title"/.test(fngPage) &&
+      /data-go-fng="us" data-go-to="chart"/.test(tplO) && /chart: '점수 추이'/.test(tplO));
+    check('홈 칩 줄은 누를 자리 44px 이상 · 단계 색을 입히지 않음',
+      /\.mood-chips \{[^}]*min-height: 44px/.test(css) && !/\.mood-chip[^{]*\{[^}]*var\(--ink\)/.test(css));
+    check('서버 — 미국만 · 상세와 홈이 같은 계산',
+      /market === 'us' \? await overlayInputs\(adapter, ctx, benchmark\) : null/.test(route) &&
+      /if \(m === 'us'\) latest\.overlayNow = overlayNowFrom\(await overlayInputs\(adapter, ctx\)\)/.test(snapSrc) &&
+      /from '@\/lib\/overlays\.mjs'/.test(ovSrv));
+    check('LIVE — VIX 는 FRED VIXCLS, S&P 500 은 10년치 (음영이 10년을 덮게)',
+      /fetchSeries\(fredConfig\(key, envUrl\('MACRO_BASE_URL'\)\), 'vix'/.test(liveIdx) &&
+      /fetchDailySeries\(yahooConfig\(envUrl\(this\.baseUrlEnvFor\(market\)\)\), id, 3650\)/.test(liveIdx));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

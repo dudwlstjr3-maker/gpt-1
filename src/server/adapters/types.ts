@@ -54,6 +54,12 @@ export interface MarketAdapter {
   /** F&G 점수와 비교할 대표 시장 가격 */
   getBenchmark(market: MarketId, ctx: AdapterContext): Promise<BenchmarkSeries | null>;
 
+  /**
+   * VIX 일별 종가 — 쫄탐지수와 겹쳐 보는 'VIX 35 이상' 구간용 (2026-11-26).
+   * 받지 못하면 null. 빈 값을 지어내지 않는다.
+   */
+  getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null>;
+
   /** 한국 투자자별 순매수 */
   getFlows(ctx: AdapterContext): Promise<FlowSummary>;
 

@@ -29,7 +29,7 @@ import { MARKET_LABEL } from '@/types';
 /** 탭과 화면 — 이름을 아는 사람이 바로 가는 길 */
 const SCREENS: SearchEntry[] = [
   { id: 'scr-home', kind: 'screen', name: '홈', sub: '오늘의 한 줄과 투자심리', href: '/' },
-  { id: 'scr-indices', kind: 'screen', name: '시장 지수', sub: '미국 · 한국 · 크립토', href: '/indices' },
+  { id: 'scr-indices', kind: 'screen', name: '시장 지수', sub: '미국 · 한국', href: '/indices' },
   { id: 'scr-basics', kind: 'screen', name: '생활 경제 지수', sub: '나라 살림과 소득', href: '/basics' },
   { id: 'scr-indicators', kind: 'screen', name: '경제 · 위험 지표', sub: '위험 신호등', href: '/indicators' },
   { id: 'scr-calendar', kind: 'screen', name: '경제 캘린더', sub: '발표 일정', href: '/calendar' },

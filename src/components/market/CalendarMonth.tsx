@@ -19,7 +19,7 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 
 /**
  * 점의 두 채널.
- *  - 색  = 어느 시장 일정인가 (미국·한국·크립토·글로벌)
+ *  - 색  = 어느 시장 일정인가 (미국·한국·글로벌)
  *  - 크기 = 중요도. 높음만 굵게 찍는다.
  * 색과 크기를 서로 다른 뜻에 쓰면 두 가지를 한 번에 읽을 수 있다.
  * 색만으로 말하지 않도록 각 칸의 스크린리더 라벨에 시장과 건수를 글로 적는다.
@@ -198,7 +198,7 @@ export function CalendarMonth({
       </div>
 
       <ul className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 text-[11.5px] text-subtle">
-        {(['us', 'kr', 'crypto', 'global'] as const).map((m) => (
+        {(['us', 'kr', 'global'] as const).map((m) => (
           <li key={m} className="flex items-center gap-1">
             <span
               aria-hidden="true"

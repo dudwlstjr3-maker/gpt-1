@@ -1,15 +1,14 @@
 'use client';
 
 /**
- * 홈 — 시세 지면. 미국 → 한국 → 크립토 순으로 **시장별로 묶어** 싣는다.
+ * 홈 — 시세 지면. 미국 → 한국 순으로 **시장별로 묶어** 싣는다. (크립토는 2026-11-26 뺐다)
  *
  * 쫄탐일보는 미국 신문이다 (2026-11-24 리밸런싱). 예전에는 시장 구분 없이 앞에서부터
  * 8칸을 잘랐다. 그러다 보니 카탈로그에 지수 셋 · 환율 · 종목 다섯이 있는 한국이 홈에는
  * 2칸밖에 나오지 않았고, 무엇이 어느 시장인지도 섞여 보였다.
  *
- * 이제 시장마다 실을 칸 수를 정해 둔다 — 미국을 가장 많이, 한국을 그다음, 크립토는
- * 두 칸까지. 관심목록에 넣은 것은 그 시장 안에서 앞에 선다. 크립토를 관심목록에 여럿
- * 넣어도 홈에서는 두 칸이다. 나머지는 관심목록 화면에 다 있다.
+ * 이제 시장마다 실을 칸 수를 정해 둔다 — 미국을 가장 많이, 한국을 그다음.
+ * 관심목록에 넣은 것은 그 시장 안에서 앞에 선다. 나머지는 관심목록 화면에 다 있다.
  */
 
 import Link from 'next/link';
@@ -21,7 +20,7 @@ import { PriceCard } from './PriceCard';
 import { INDEX_MARKET_IDS, MARKET_LABEL, type MarketId, type Quote } from '@/types';
 
 /** 시장마다 홈에 실을 칸 수. 미리보기(template.html)의 HOME_SLOTS 와 같은 값이다. */
-export const HOME_SLOTS: Record<MarketId, number> = { us: 10, kr: 6, crypto: 2 };
+export const HOME_SLOTS: Record<MarketId, number> = { us: 10, kr: 6, crypto: 0 };
 
 export function HomePrices() {
   const { snapshot, refresh } = useData();
@@ -30,7 +29,7 @@ export function HomePrices() {
 
   const groups = useMemo(() => {
     if (!section?.data) return [];
-    // 시장은 응답의 칸(us/kr/crypto)으로 정한다 — 그 칸에 담겨 온 것이 그 시장이다.
+    // 시장은 응답의 칸(us/kr)으로 정한다 — 그 칸에 담겨 온 것이 그 시장이다.
     const all = new Map<string, { quote: Quote; market: MarketId }>();
     for (const m of INDEX_MARKET_IDS) for (const q of section.data[m] ?? []) all.set(q.id, { quote: q, market: m });
 

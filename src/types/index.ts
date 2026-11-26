@@ -22,11 +22,17 @@
  */
 export type MarketId = 'us' | 'kr' | 'crypto';
 
-/** 심리 점수를 내고 시장 화면을 갖는 시장. 한국은 여기 없다. */
-export const MARKET_IDS: MarketId[] = ['us', 'crypto'];
+/**
+ * 심리 점수를 내고 시장 화면을 갖는 시장. 한국은 여기 없다.
+ *
+ * 크립토는 뺐다 (2026-11-26 사용자: "크립토는 그냥 빼버리자, 관심없다").
+ * 쫄탐일보는 미국 · 한국 시장 신문이다. 'crypto' 라는 이름은 형(MarketId)에만 남아
+ * 서버 내부 코드가 컴파일되게 할 뿐, 이 두 목록에 없으니 받지도 그리지도 않는다.
+ */
+export const MARKET_IDS: MarketId[] = ['us'];
 
-/** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
-export const INDEX_MARKET_IDS: MarketId[] = ['us', 'kr', 'crypto'];
+/** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. 크립토는 없다. */
+export const INDEX_MARKET_IDS: MarketId[] = ['us', 'kr'];
 
 export const MARKET_LABEL: Record<MarketId, string> = {
   us: '미국',
@@ -281,7 +287,46 @@ export interface FngScore {
   /** 사이클 — 기간별 심리 위치와 현재 국면 */
   cycle: FngCycle;
 
+  /**
+   * 쫄탐지수와 함께 보는 두 가지의 지금 상태 (2026-11-26, 미국만).
+   * 추세(대표 지수가 200일 평균선 위인가)와 VIX(30을 넘었나). 사실 표시이지 매매 신호가 아니다.
+   * 받지 못하면 없다 — 0 이나 '위' 로 채우지 않는다.
+   */
+  overlayNow?: FngOverlayNow | null;
+
   meta: Meta;
+}
+
+/** 시간 구간 (epoch ms, 양 끝 포함) */
+export interface TimeSpan {
+  from: number;
+  to: number;
+}
+
+/** 홈 카드에 붙는 두 칩의 지금 값 */
+export interface FngOverlayNow {
+  trend: {
+    /** 대표 지수 이름 (S&P 500) */
+    name: string;
+    maDays: number;
+    /** 평균선 위면 true, 아래면 false, 날이 모자라면 null */
+    above: boolean | null;
+    /** 평균선에서 떨어진 정도 (%) */
+    gapPct: number | null;
+  } | null;
+  vix: {
+    threshold: number;
+    value: number | null;
+    high: boolean | null;
+  } | null;
+}
+
+/** 심리 상세 차트에 겹치는 구간들 */
+export interface FngOverlays {
+  /** 대표 지수가 평균선 아래였던 구간 */
+  trend: { name: string; maDays: number; spans: TimeSpan[] } | null;
+  /** VIX 가 기준 이상이던 구간 */
+  vix: { threshold: number; spans: TimeSpan[] } | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -455,6 +500,8 @@ export interface FngDetail extends FngScore {
   events: FngEvents;
   /** 구간별 과거 통계 (표본이 부족하면 null) */
   bandStats: FngBandStats | null;
+  /** 추세 · VIX 35 구간 — 차트에 겹쳐 본다 (2026-11-26) */
+  overlays: FngOverlays | null;
   /** 대표 시장 가격 (점수와 겹쳐 보기용) */
   benchmark: {
     id: string;

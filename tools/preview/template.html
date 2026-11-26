@@ -555,22 +555,10 @@ section.block { padding: 0 12px; margin-top: 20px; }
 
 /* -------------------------------- F&G 카드 -------------------------------- */
 
-/* 1면 — 미국 한 장이 칸을 꽉 채운다. 크립토는 카드가 아니라 아래 한 줄(.mkline)이다.
+/* 1면 — 미국 한 장이 칸을 꽉 채운다. 아래 크립토 한 줄은 2026-11-26 뺐다.
    앱의 FngSection 과 같다. 예전의 옆으로 미는 줄(.fng-scroll)과 점(.fng-dots)은 지웠다. */
 .fng-lead { padding: 0 12px; }
-.mklines { list-style: none; margin: 8px 0 0; padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
-.mkline {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 12px;
-  border: 0; border-radius: var(--box-radius-sm); background: var(--surface-2);
-  color: inherit; text-align: left; cursor: pointer; font-family: inherit;
-}
-.mkline:hover { background: var(--surface-3); }
-.mkline .nm { font-size: 13px; font-weight: 600; color: var(--fg); }
-.mkline .sc { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mkline .st { font-size: 12.5px; font-weight: 600; }
-.mkline .dl { font-size: 12.5px; color: var(--subtle); font-variant-numeric: tabular-nums; }
-.mkline .go { margin-left: auto; flex-shrink: 0; font-size: 12.5px; color: var(--subtle); }
-/* 시세 지면의 시장 소제목 — 미국 → 한국 → 크립토. 앱 HomePrices 와 같다. */
+/* 시세 지면의 시장 소제목 — 미국 → 한국. 앱 HomePrices 와 같다. */
 .price-group + .price-group { margin-top: 16px; }
 .price-group-h { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
@@ -847,6 +835,10 @@ table.data thead th { color: var(--muted); font-weight: 600; font-size: 12.5px; 
 .tip .tt-row { display: flex; justify-content: space-between; gap: 8px; }
 .tip .tt-row span { color: var(--muted); display: flex; align-items: center; gap: 4px; }
 .tip .tt-row b { color: var(--fg); font-weight: 600; }
+.tip .tt-span { margin-top: 2px; display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); word-break: keep-all; }
+.swatch-shade { display: inline-block; width: 12px; height: 12px; border-radius: 2px; opacity: .35; flex-shrink: 0; }
+.tip .swatch-shade { width: 8px; height: 8px; opacity: 1; }
+.swatch-strip { display: inline-block; width: 16px; height: 6px; border-radius: 2px; opacity: .9; flex-shrink: 0; }
 
 /* --------------------------------- 하단 탭 --------------------------------- */
 
@@ -1006,9 +998,9 @@ __HOME_MOOD_CSS__
   };
 
   const snap = () => (state.scenario === 'partial' ? DATA.partial : DATA.snapshot);
-  const MARKETS = ['us', 'crypto'];
+  const MARKETS = ['us']; /* 크립토는 뺐다 (2026-11-26) — 앱 MARKET_IDS 와 같다 */
   /** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
-  const INDEX_MARKETS = ['us', 'kr', 'crypto'];
+  const INDEX_MARKETS = ['us', 'kr'];
   const MARKET_LABEL = { us: '미국', kr: '한국', crypto: '크립토' };
 
   /* ====================================================================== */
@@ -1387,6 +1379,9 @@ __HOME_MOOD_CSS__
   /* 왼쪽은 눈금값이 앉는 자리. '4,425.06' 이 그 폭을 그대로 먹어 앞의 '4' 가
      그림 밖으로 밀려 나갔다. 값이 잘리면 다른 값이 되어 보인다. 앱과 같은 값이다. */
   const M = { top: 10, right: 46, bottom: 22, left: 58 };
+  /** 겹친 구간 중 띠(strip)의 두께 — 앱 InteractiveChart 의 STRIP_H 와 같다.
+      두 칸이면 칸 사이(SPLIT_GAP 가운데)에 앉는다 — 꼭대기에 두면 같은 날의 위기 표식에 가려졌다 */
+  const STRIP_H = 6;
   /* 두 칸으로 나눌 때 칸 사이 틈 · 더 쓰는 세로 길이 · 차트 안 글자 크기 */
   const SPLIT_GAP = 16, SPLIT_EXTRA = 76, TICK_FONT = 11;
 
@@ -1503,14 +1498,21 @@ __HOME_MOOD_CSS__
     document.body.style.overflow = '';
   }
 
-  function lineChart(series, height, label, markers) {
+  /** 구간 종류(이름)마다 첫 구간 하나 — 범례 · 툴팁 · 대체 텍스트가 같은 이름을 한 번만 적는다 */
+  function spanKinds(spans) {
+    const seen = {};
+    return spans.filter((sp) => (seen[sp.label] ? false : (seen[sp.label] = true)));
+  }
+
+  /* spans — 겹쳐 칠하는 시간 구간 [{id, from, to, kind:'shade'|'strip', color, label}] (앱 InteractiveChart 의 ChartSpan) */
+  function lineChart(series, height, label, markers, spans) {
     const id = 'c' + ++uid;
     const clean = series.map((s) => Object.assign({}, s, { points: s.points.filter((p) => isNum(p.v)) })).filter((s) => s.points.length > 1);
     if (!clean.length) return '<p style="font-size:13px;color:var(--muted);text-align:center;padding:24px 0">차트를 그릴 데이터가 부족합니다.</p>';
     const allT = clean.flatMap((s) => [s.points[0].t, s.points[s.points.length - 1].t]);
     const fullT0 = Math.min(...allT), fullT1 = Math.max(...allT);
     CHARTS[id] = {
-      series: clean, all: clean, height, label, markers: markers || [], focusT: state.crisisT,
+      series: clean, all: clean, height, label, markers: markers || [], spans: spans || [], focusT: state.crisisT,
       full: fullT1 > fullT0 ? { t0: fullT0, t1: fullT1 } : null,
       view: null,
     };
@@ -1519,7 +1521,9 @@ __HOME_MOOD_CSS__
 
     const legend = clean.map((s) =>
       '<li><span class="swatch" style="background:' + s.color + (s.dashed ? ';opacity:.85' : '') + '"></span>' + esc(s.name) +
-      (s.axis === 'right' ? '<span style="color:var(--subtle)">(아래 칸)</span>' : '') + '</li>').join('');
+      (s.axis === 'right' ? '<span style="color:var(--subtle)">(아래 칸)</span>' : '') + '</li>').join('') +
+      spanKinds(spans || []).map((k) =>
+        '<li><span class="' + (k.kind === 'shade' ? 'swatch-shade' : 'swatch-strip') + '" style="background:' + k.color + '"></span>' + esc(k.label) + '</li>').join('');
 
     return (
       '<div>' +
@@ -1615,6 +1619,19 @@ __HOME_MOOD_CSS__
       g += '<text x="' + x(t) + '" y="' + (h - 6) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '" font-size="' + TICK_FONT + '" fill="var(--subtle)">' + esc(c.longSpan ? kYearMonth(t) : kDate(t)) + '</text>';
     });
 
+    /* 겹친 구간. 음영은 선을 가리지 않도록 선보다 먼저(최소 2px),
+       띠는 표식 점선에 가리지 않게 표식 다음에(최소 3px) — 두 칸이면 칸 사이, 한 칸이면 꼭대기 */
+    let spanRects = '', stripRects = '';
+    const stripY = splitAxes ? c.bands[0].top + c.bands[0].h + (SPLIT_GAP - STRIP_H) / 2 : c.bands[0].top;
+    (c.spans || []).forEach((sp) => {
+      const x0 = Math.max(M.left, x(sp.from)), x1 = Math.min(M.left + innerW, x(sp.to));
+      if (x1 < M.left || x0 > M.left + innerW) return;
+      if (sp.kind === 'shade')
+        spanRects += '<rect x="' + x0.toFixed(1) + '" y="' + top + '" width="' + Math.max(2, x1 - x0).toFixed(1) + '" height="' + (c.plotBottom - top) + '" fill="' + sp.color + '" opacity=".14"/>';
+      else
+        stripRects += '<rect x="' + x0.toFixed(1) + '" y="' + stripY + '" width="' + Math.max(3, x1 - x0).toFixed(1) + '" height="' + STRIP_H + '" fill="' + sp.color + '" rx="1"/>';
+    });
+
     let paths = '';
     c.series.forEach((s) => {
       const bd = (splitAxes && s.axis === 'right') ? c.bands[1] : c.bands[0];
@@ -1644,10 +1661,12 @@ __HOME_MOOD_CSS__
     const markerAria = (c.markers || []).length
       ? ' 표시된 시점 ' + c.markers.length + '건: ' + c.markers.map((mk) => mk.index + '번 ' + kYmd(mk.t) + ' ' + mk.label).join(', ') + '.'
       : '';
+    /* 겹친 구간도 그림으로만 전달되면 안 된다 — 종류마다 몇 곳인지 적는다 */
+    const spanAria = spanKinds(c.spans || []).map((k) => ' ' + k.label + ': ' + c.spans.filter((sp) => sp.label === k.label).length + '곳.').join('');
 
     box.innerHTML =
-      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" tabindex="0" role="img" aria-label="' + esc(c.label + markerAria) + '">' +
-      g + '<g class="sel"></g>' + paths + marks + '<g class="cross"></g></svg>' +
+      '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" tabindex="0" role="img" aria-label="' + esc(c.label + markerAria + spanAria) + '">' +
+      g + '<g class="sel"></g>' + spanRects + paths + marks + stripRects + '<g class="cross"></g></svg>' +
       '<div class="tip"></div><p class="sr" aria-live="polite"></p>';
 
     Object.assign(c, { x, yL, yR, w, innerH, top, innerW, split: splitAxes, plotBottom: c.plotBottom });
@@ -1721,6 +1740,7 @@ __HOME_MOOD_CSS__
     /* 크로스헤어가 표식 위에 서 있으면 그 사건을 툴팁 머리에 적는다 */
     const onMark = (c.markers || []).filter((mk) => Math.abs(c.x(mk.t) - c.x(pt.t)) <= MARKER_SNAP)[0] || null;
     const at = (s) => { let b = null, d = Infinity; for (const p of s.points) { const q = Math.abs(p.t - pt.t); if (q < d) { d = q; b = p; } } return b ? b.v : null; };
+    const onSpans = spanKinds((c.spans || []).filter((sp) => sp.from <= pt.t && pt.t <= sp.to));
 
     const cross = box.querySelector('.cross');
     cross.innerHTML =
@@ -1746,12 +1766,15 @@ __HOME_MOOD_CSS__
           '<span>' + esc(onMark.label) + '</span></div>'
         : '') +
       '<div class="tt-time">' + esc(c.longSpan ? kYmd(pt.t) : kYmd(pt.t) + ' ' + kTime(pt.t)) + '</div>' +
-      c.series.map((s) => '<div class="tt-row"><span><span class="swatch" style="background:' + s.color + '"></span>' + esc(s.name) + '</span><b class="tnum">' + esc(fmtNum(at(s), s.precision) + (s.suffix || '')) + '</b></div>').join('');
+      c.series.map((s) => '<div class="tt-row"><span><span class="swatch" style="background:' + s.color + '"></span>' + esc(s.name) + '</span><b class="tnum">' + esc(fmtNum(at(s), s.precision) + (s.suffix || '')) + '</b></div>').join('') +
+      /* 이 날짜에 걸친 구간 — 색만 보고 짐작하지 않게 이름으로 적는다 */
+      onSpans.map((sp) => '<div class="tt-span"><span class="swatch-shade" style="background:' + sp.color + '"></span>' + esc(sp.label) + '</div>').join('');
     tip.style.left = Math.max(0, Math.min(c.w - 168, c.x(pt.t) - 84)) + 'px';
     tip.classList.add('on');
     box.querySelector('.sr').textContent =
       (onMark ? onMark.index + '번 ' + onMark.label + '. ' : '') +
-      kYmd(pt.t) + ' ' + kTime(pt.t) + ', ' + c.series.map((s) => s.name + ' ' + fmtNum(at(s), s.precision)).join(', ');
+      kYmd(pt.t) + ' ' + kTime(pt.t) + ', ' + c.series.map((s) => s.name + ' ' + fmtNum(at(s), s.precision)).join(', ') +
+      onSpans.map((sp) => ', ' + sp.label).join('');
     c.cursor = best;
   }
 
@@ -1882,32 +1905,30 @@ __HOME_MOOD_CSS__
     );
   }
 
-  /**
-   * 1면 카드 밑의 한 줄 — 크립토 쫄탐. 앱의 FngSection 안 MarketLine 과 같다.
-   * 단계는 색만이 아니라 기호와 이름으로 말한다. 어제 대비는 부호가 방향을 말하므로
-   * 색을 입히지 않는다 — 한국식·해외식 등락 색 설정에 따라 뜻이 엇갈리지 않게.
-   */
-  function marketLine(f) {
-    const st = stageOf(f.score);
-    const body = f.score === null || !st
-      ? '<span class="dl">산출 불가</span>'
-      : '<span class="sc" style="color:' + scoreColor(f.score) + '">' + esc(fmtNum(f.score, 0)) + '</span>' +
-        '<span class="st" style="color:' + scoreColor(f.score) + '"><span aria-hidden="true">' + st.glyph + '</span> ' + esc(st.label) + '</span>' +
-        (isNum(f.deltaDay) ? '<span class="dl">어제 ' + esc(fmtSigned(f.deltaDay, 1)) + '</span>' : '');
-    return '<li><button type="button" class="mkline" data-go-fng="' + f.market + '">' +
-      '<span class="nm">' + esc(MARKET_LABEL[f.market]) + ' 쫄탐</span>' + body +
-      '<span class="go">상세 <span aria-hidden="true">→</span></span></button></li>';
-  }
-
   __HOME_MOOD_FN__
+  __OVERLAY_CHIPS_FN__
 
   /** 홈 1면 카드 — 계기판 · 점수 · 전일 변화는 심리 상세와 같은 moodGauge 가 그린다 (앱 HomeMoodCard 와 같은 구성) */
+  /* 함께 보는 두 가지 — 지금 상태를 적는 사실이지 사고팔 신호가 아니다. 누르면 겹쳐 그린 차트로 (앱 HomeMoodCard 와 같은 마크업) */
+  function moodChips(now) {
+    const chips = overlayChips(now);
+    if (!chips) return '';
+    return '<button type="button" class="mood-chips" data-go-fng="us" data-go-to="chart">' +
+      chips.map((c) => '<span class="mood-chip" data-chip="' + c.id + '" role="img" aria-label="' + esc(c.aria) + '">' +
+        '<small>' + esc(c.label) + '</small>' +
+        '<b>' + (c.glyph ? '<span aria-hidden="true">' + c.glyph + ' </span>' : '') + esc(c.value) + '</b>' +
+        (c.sub ? '<span class="mood-chip-sub">' + esc(c.sub) + '</span>' : '') + '</span>').join('') +
+      '<span class="mood-chips-go" aria-hidden="true">›</span>' +
+      '<span class="mood-vh">— 쫄탐지수 차트에 겹쳐 보기</span></button>';
+  }
+
   function homeMoodCard(f) {
     const mood = homeMood(f.score, f.deltaDay);
     return '<article class="card mood-cover" style="padding:12px;--ink:' + scoreColor(mood && mood.score) + '" aria-label="미국 쫄탐지수">' +
       '<header><h3>미국 쫄탐지수</h3>' + modeBadge() + '</header>' +
       moodGauge(f.score, f.deltaDay) +
       (mood ? '' : '<p class="mood-na-why">' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
+      moodChips(f.overlayNow) +
       '<footer><span>자체 산출 · ' + esc(kTime(f.computedAt)) + '</span>' +
       /* 점수가 있으면 '이유 보기' — 심리 상세의 기여도 절로 바로 간다. 없으면 상세 맨 위로 */
       (mood
@@ -2123,8 +2144,8 @@ __HOME_MOOD_CSS__
    * 목록 스캔을 방해하지 않도록 접어 두고 누른 항목만 펼친다.
    * 화살표는 값의 방향일 뿐 좋고 나쁨이 아니므로 등락 색을 쓰지 않는다.
    */
-  const BASIC_GUIDE = {"per_capita_gdp":{"headline":"나라가 1년에 만든 부가가치를 인구수로 나눈 값. 흔히 \"국민소득\"이라 부르는 숫자입니다.","plain":"한 나라 안에서 1년 동안 새로 만들어진 가치(GDP)를 그 나라 인구로 나눈 값입니다. \"국민 한 사람 몫으로 치면 이만큼\"이라는 계산이지, 실제로 내 통장에 들어오는 돈이 아닙니다.","howToRead":"보통 달러로 환산해 나라끼리 비교합니다. 3만 달러대면 선진국 문턱, 6만 달러 이상이면 최상위권으로 이야기합니다. 다른 나라 값과 나란히 놓고 봐야 의미가 생깁니다.","whenUp":"나라 전체가 만들어내는 가치가 늘었거나, 인구가 줄어 1인당 몫이 커졌다는 뜻입니다. 원인이 정반대일 수 있어 둘 중 무엇 때문인지 같이 봅니다.","whenDown":"경제가 실제로 쪼그라들었거나, 원화가 약해져 달러로 환산한 금액이 줄었다는 뜻입니다. 한국은 환율 때문에 달러 기준 숫자가 크게 출렁이는 편입니다.","caution":"평균이라 분배를 전혀 보여주지 못합니다. 1인당 GDP가 올라도 대부분의 가구 살림이 나아졌다는 보장은 없습니다. 물가 수준이 다른 나라끼리 단순 비교하면 실제 생활 수준 차이가 과장됩니다.","marketLink":"한 나라의 성장 속도와 통화 가치를 이야기할 때 배경 숫자로 자주 등장합니다. 달러 기준 1인당 GDP가 줄었다는 기사는 환율이 크게 움직였다는 이야기인 경우가 많습니다.","baseline":"기준 연도가 없는 금액입니다. 대신 어느 해 가격인지(명목/실질)와 어떤 환율로 환산했는지가 숫자를 좌우합니다."},"bigmac":{"headline":"전 세계 어디서나 파는 빅맥 하나의 값을 견줘 통화가 싼지 비싼지 재보는 지수입니다.","plain":"영국 경제지 이코노미스트가 1986년부터 발표하는 지수입니다. 같은 햄버거라면 어느 나라에서나 값이 비슷해야 한다는 생각에서 출발해, 나라별 빅맥 가격을 비교해 통화가 제 값보다 싼지 비싼지를 봅니다. 어려운 환율 이론을 햄버거 하나로 설명한 것이 인기 비결입니다.","howToRead":"한국 빅맥 값을 미국 빅맥 값으로 나누면 \"빅맥 환율\"이 나옵니다. 이 빅맥 환율이 실제 시장 환율보다 낮으면 원화가 그만큼 싸게 거래되고 있다(저평가)는 뜻입니다. −30%는 \"빅맥으로 재보면 원화가 30% 싸다\"로 읽습니다.","whenUp":"0에 가까워지면 원화가 제 값을 찾아가는 중이라는 뜻입니다. 원화가 강해졌거나 국내 물가가 미국보다 더 올랐을 때 그렇게 됩니다.","whenDown":"마이너스 폭이 커지면 원화가 더 싸게 거래되고 있다는 뜻입니다. 환율이 오르거나(원화 약세) 국내 햄버거 값이 상대적으로 덜 올랐을 때 벌어집니다.","caution":"재미로 보라고 만든 지수입니다. 임대료·인건비·세금이 나라마다 달라서 원래 싼 나라가 있고, 햄버거 하나로 나라 경제 전체를 잴 수는 없습니다. \"저평가니까 환율이 곧 내려간다\"는 식으로 읽으면 안 됩니다.","marketLink":"환율이 장기적으로 어디쯤이 적정한가를 이야기할 때 가장 자주 인용되는 눈대중입니다. 바로 뒤에 나오는 구매력평가(PPP) 환율의 쉬운 버전이라고 보면 됩니다.","baseline":"달러 = 0%가 기준. 각 통화가 달러 대비 몇 % 어긋나 있는지를 봅니다."},"ppp_gap":{"headline":"같은 물건 바구니를 두 나라에서 사는 데 드는 돈으로 계산한 \"적정 환율\"과 실제 환율의 차이입니다.","plain":"구매력평가(PPP, Purchasing Power Parity) 환율은 빅맥 하나가 아니라 수백 가지 물건과 서비스를 한 바구니에 담아 계산합니다. OECD와 IMF가 정기적으로 발표하는 공식 통계로, 빅맥지수의 어른 버전이라고 보면 됩니다.","howToRead":"PPP 환율이 900원인데 시장 환율이 1,350원이라면, 시장에서는 달러를 PPP보다 50% 비싸게 사고 있다는 뜻입니다. 이 앱은 원화 쪽에서 읽어 \"원화가 PPP 대비 몇 % 싸게 거래되는가\"로 표시합니다.","whenUp":"0에 가까워지면 시장 환율이 물가로 계산한 적정 수준에 다가서고 있다는 뜻입니다.","whenDown":"마이너스 폭이 커지면 시장 환율이 물가 기준에서 더 멀어졌다는 뜻입니다.","caution":"PPP는 \"언젠가 이쯤 갈 것\"이라는 예측이 아닙니다. 실제 환율은 금리 차이, 자본 이동, 무역수지 같은 다른 힘으로 결정되며 수십 년째 PPP와 벌어져 있는 나라도 많습니다. 시점을 못 박는 근거로 쓸 수 없습니다.","marketLink":"나라 사이 소득이나 경제 규모를 비교할 때 시장 환율 대신 PPP 환율을 쓰기도 합니다. 같은 나라인데 \"1인당 GDP 순위\"가 기사마다 다른 이유가 대개 이것입니다.","baseline":"달러 = 0%가 기준. 빅맥지수와 같은 방식이되 품목이 수백 개입니다."},"engel":{"headline":"가계가 쓰는 돈 가운데 먹거리에 들어가는 비중. 19세기 통계학자 엥겔의 이름입니다.","plain":"가구가 한 달에 쓰는 소비지출에서 식료품과 비주류음료가 차지하는 비율입니다. 소득이 늘어도 먹는 양은 그만큼 늘지 않기 때문에, 형편이 나아질수록 이 비중이 낮아진다는 관찰에서 나왔습니다. 한국은 통계청이 발표합니다.","howToRead":"보통 10%대에서 움직입니다. 낮을수록 먹는 것 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다. 나라끼리 비교할 때는 외식 문화와 식재료 물가가 달라 주의가 필요합니다.","whenUp":"먹는 데 쓰는 비중이 커졌다는 뜻입니다. 식품 물가가 크게 올랐거나, 소득이 줄어 다른 소비를 먼저 줄였을 때 올라갑니다.","whenDown":"먹거리 말고 다른 곳에 쓸 여지가 늘었다는 뜻입니다. 다만 외식을 줄이고 집밥으로 옮겨가도 숫자가 내려갈 수 있어 원인을 같이 봅니다.","caution":"가구 구성과 나이대에 따라 크게 달라집니다. 1인 가구가 늘면 평균값 자체가 움직이므로, 한 해 변화만 보고 살림살이가 나아졌다고 단정할 수 없습니다.","marketLink":"소비 여력이 어디로 향하는지를 보여줍니다. 이 비중이 오르는 국면에서는 필수 소비재가, 내리는 국면에서는 여행·의류 같은 선택적 소비가 화제에 오르는 편입니다."},"cli":{"headline":"여러 지표를 묶어 경기의 방향을 몇 달 앞서 보여준다는 공식 지수. 100이 장기 평균입니다.","plain":"OECD 경기선행지수(CLI)는 재고·주문·주가·금리차처럼 경기보다 먼저 움직이는 지표들을 묶어 하나의 숫자로 만든 것입니다. 실제 경기보다 대략 6~9개월 앞서 방향을 보여준다고 알려져 있어, 각국 정부와 중앙은행이 참고하는 대표적인 공식 선행지표입니다.","howToRead":"100이 장기 평균입니다. 수준과 방향을 같이 봅니다 — 100 위에서 오르면 확장, 100 위에서 내리면 둔화, 100 아래에서 오르면 회복, 100 아래에서 내리면 침체 국면으로 읽습니다. 100.3 처럼 소수점 한 자리의 변화도 방향이 바뀌면 의미 있게 봅니다.","whenUp":"앞으로 몇 달 뒤 경기가 나아지는 쪽으로 지표들이 움직이고 있다는 뜻입니다.","whenDown":"경기가 식는 쪽으로 지표들이 움직이고 있다는 뜻입니다. 100 위에 있어도 방향이 아래면 둔화 국면으로 봅니다.","caution":"나중에 자주 수정됩니다. 발표 당시 본 숫자와 몇 달 뒤 다시 계산된 숫자가 달라지는 일이 흔해서, 지나간 시점의 값으로 \"그때 맞았다\"고 판단하면 안 됩니다. 방향의 전환 시점을 정확히 맞히는 도구도 아닙니다.","marketLink":"경기 방향을 두고 논쟁이 붙을 때 양쪽이 모두 인용하는 숫자입니다. 다만 주가는 경기보다 더 앞서 움직이는 경우가 많아, 이 지수가 돌아설 무렵이면 시장은 이미 반응을 마친 뒤인 때가 많습니다.","baseline":"그 나라의 장기 추세 = 100. 나라 사이 높낮이가 아니라 각자 100에서 얼마나 벗어났는지를 봅니다."},"ccsi":{"headline":"한국은행이 매달 가계에 살림살이를 물어 만든 심리 지수. 100이 기준선입니다.","plain":"소비자심리지수(CCSI)는 한국은행이 전국 가구에 지금 형편과 앞으로의 전망을 물어 만든 지수입니다. 실제로 얼마를 벌고 썼는지가 아니라 \"어떻게 느끼는가\"를 재는 숫자라, 이 앱의 투자심리 점수와 성격이 비슷합니다.","howToRead":"100이 기준입니다. 100보다 크면 과거 평균보다 낙관적으로 보는 사람이 많다는 뜻이고, 작으면 비관적으로 보는 쪽이 많다는 뜻입니다. 절대 수준보다 방향과 폭이 더 많이 쓰입니다.","whenUp":"살림살이와 앞날을 밝게 보는 가구가 늘었다는 뜻입니다. 소비가 뒤따라 늘어나는 경우가 많습니다.","whenDown":"지갑을 닫는 쪽으로 마음이 기울었다는 뜻입니다. 금리·물가·고용 소식에 민감하게 반응합니다.","caution":"설문이라 실제 행동보다 앞서거나 어긋날 수 있습니다. 뉴스가 시끄러운 달에 크게 흔들리는 경향이 있어 한 달 값보다 몇 달의 흐름을 봅니다.","marketLink":"이 앱의 투자심리 점수가 시장 참여자의 심리라면, 소비자심리지수는 일반 가계의 심리입니다. 둘이 따로 놀 때가 있어 나란히 놓고 보면 지금 불안이 시장 안의 이야기인지 살림살이의 이야기인지 구분하는 데 도움이 됩니다.","baseline":"한국은 2003~2023년 평균 = 100. 나라마다 기준이 달라 일본은 50 부근, 미국은 1985년 = 100 입니다."},"gini":{"headline":"한 나라의 소득이 얼마나 고르게 나뉘어 있는지를 0과 1 사이 숫자 하나로 나타낸 값입니다.","plain":"모두가 똑같이 벌면 0, 한 사람이 전부 가져가면 1입니다. 이탈리아 통계학자 지니가 만들었고, 우리나라는 통계청이 매년 발표합니다. 1인당 GDP가 \"평균 얼마\"라면 지니계수는 \"얼마나 고르게 나뉘었나\"를 봅니다. 둘을 같이 봐야 그림이 완성됩니다.","howToRead":"보통 0.2~0.5 사이에서 움직입니다. 0.3 아래면 고른 편, 0.4를 넘으면 격차가 큰 편으로 이야기합니다. 세금과 복지를 반영하기 전(시장소득)과 반영한 뒤(처분가능소득)의 값이 다르며, 보통 인용되는 것은 반영한 뒤 값입니다.","whenUp":"소득 격차가 벌어졌다는 뜻입니다. 고소득층이 더 벌었거나 저소득층이 덜 벌었거나, 둘 다일 수 있습니다.","whenDown":"격차가 좁아졌다는 뜻입니다. 다만 모두가 함께 가난해져도 숫자는 내려가므로 소득 수준과 같이 봐야 합니다.","caution":"소득만 보고 재산은 보지 않습니다. 집과 주식을 얼마나 가졌는지는 이 숫자에 안 들어가서, 자산 격차까지 재면 훨씬 커집니다. 나라마다 조사 방식이 달라 소수점 둘째 자리 차이로 순위를 매기는 것은 의미가 없습니다.","marketLink":"소비가 어디서 나오는지를 가늠할 때 인용됩니다. 격차가 큰 사회일수록 명품과 초저가로 소비가 갈리는 이른바 양극화 이야기가 나옵니다.","baseline":"0 = 완전 평등, 1 = 한 사람이 전부. 기준 연도가 아니라 정의 자체가 척도입니다."},"misery":{"headline":"물가상승률과 실업률을 그냥 더한 값. \"살기 팍팍한 정도\"를 한 숫자로 만든 것입니다.","plain":"1970년대 미국 경제학자 아서 오쿤이 만들었습니다. 물가가 오르면 돈이 줄어드는 느낌이고 일자리가 없으면 벌이가 끊기니, 그 둘을 더해 체감 고통을 재보자는 발상입니다. 계산이 초등학교 덧셈 수준이라 뉴스에서 자주 인용됩니다.","howToRead":"두 숫자를 그냥 더한 값이라 절대 기준이 없습니다. 같은 나라의 예년과 비교하거나 나라끼리 견줄 때 씁니다. 한국은 실업률이 낮게 잡히는 편이라 다른 나라보다 낮게 나오는 경향이 있습니다.","whenUp":"물가가 더 올랐거나 일자리가 줄었다는 뜻입니다. 어느 쪽 때문인지는 두 숫자를 따로 봐야 알 수 있습니다.","whenDown":"물가 압력이 잦아들었거나 고용이 나아졌다는 뜻입니다.","caution":"성격이 다른 두 숫자를 아무 가중치 없이 더한 것입니다. 물가 1%p와 실업률 1%p가 똑같이 아프지는 않습니다. 실업률에는 구직을 포기한 사람이 안 잡히고, 집값이나 이자 부담도 들어가지 않아 체감과 어긋날 때가 많습니다.","marketLink":"중앙은행이 처한 곤란을 요약해 줍니다. 물가와 실업이 함께 높으면 금리를 올려도 내려도 한쪽이 나빠지는 상황이라, 이럴 때 정책 전망을 두고 시장이 크게 흔들립니다.","baseline":"기준선이 없습니다. 두 비율을 그냥 더한 값이라 예년이나 다른 나라와 견줄 때만 뜻이 생깁니다."},"pir":{"headline":"집값이 한 해 벌이의 몇 배인지. 한 푼도 안 쓰고 모았을 때 몇 년이 걸리는지로 읽습니다.","plain":"PIR(Price to Income Ratio)은 주택 가격을 가구의 연 소득으로 나눈 값입니다. 15배라면 소득을 한 푼도 안 쓰고 15년을 모아야 집 한 채 값이 된다는 뜻입니다. 집값 이야기에서 \"몇 배\"라는 말이 나오면 대개 이 숫자입니다.","howToRead":"어느 지역의 어떤 집을, 어느 가구의 소득으로 나눴는지가 전부입니다. 서울 아파트와 전국 주택은 두 배 넘게 차이 나고, 중위값을 쓰느냐 평균을 쓰느냐로도 달라집니다. 숫자만 보지 말고 기준을 같이 보세요.","whenUp":"집값이 소득보다 빨리 올랐다는 뜻입니다. 집을 사기까지 걸리는 시간이 길어졌습니다.","whenDown":"집값이 내렸거나 소득이 더 빨리 늘었다는 뜻입니다. 둘의 의미가 전혀 다르므로 어느 쪽인지 확인해야 합니다.","caution":"기관마다 정의가 달라 같은 도시인데도 숫자가 두세 배씩 차이 납니다. 대출 금리와 보유 기간을 전혀 반영하지 않아 실제 부담과도 다릅니다. 나라 간 비교는 특히 조심해야 합니다.","marketLink":"가계부채와 건설·은행 업종 이야기에 늘 따라붙습니다. 이 값이 높은 상태에서 금리가 오르면 상환 부담이 빠르게 커진다는 점이 자주 지적됩니다."}};
-  const BASIC_GROUPS = [{"id":"income","label":"나라 살림과 소득","note":"얼마나 벌고, 얼마나 고르게 나뉘고, 얼마나 팍팍한가. 모두 공식 통계입니다.","ids":["per_capita_gdp","gini","misery"]},{"id":"prices","label":"물가로 견주는 지수","note":"같은 물건 값을 나라끼리 견줘 통화와 생활비를 재봅니다. 품목 하나로 재는 것일수록 오차가 큽니다.","ids":["bigmac","ppp_gap","engel","pir"]},{"id":"ahead","label":"경기를 앞서 읽는 지수","note":"경기가 어느 쪽으로 가고 있는지를 앞서 가늠하는 숫자들입니다. 방향을 보는 것이지 시점을 맞히는 도구가 아닙니다.","ids":["cli","ccsi"]}];
+  const BASIC_GUIDE = {"per_capita_gdp":{"headline":"나라가 1년에 만든 부가가치를 인구수로 나눈 값. 흔히 \"국민소득\"이라 부르는 숫자입니다.","plain":"한 나라 안에서 1년 동안 새로 만들어진 가치(GDP)를 그 나라 인구로 나눈 값입니다. \"국민 한 사람 몫으로 치면 이만큼\"이라는 계산이지, 실제로 내 통장에 들어오는 돈이 아닙니다.","howToRead":"보통 달러로 환산해 나라끼리 비교합니다. 3만 달러대면 선진국 문턱, 6만 달러 이상이면 최상위권으로 이야기합니다. 다른 나라 값과 나란히 놓고 봐야 의미가 생깁니다.","whenUp":"나라 전체가 만들어내는 가치가 늘었거나, 인구가 줄어 1인당 몫이 커졌다는 뜻입니다. 원인이 정반대일 수 있어 둘 중 무엇 때문인지 같이 봅니다.","whenDown":"경제가 실제로 쪼그라들었거나, 원화가 약해져 달러로 환산한 금액이 줄었다는 뜻입니다. 한국은 환율 때문에 달러 기준 숫자가 크게 출렁이는 편입니다.","caution":"평균이라 분배를 전혀 보여주지 못합니다. 1인당 GDP가 올라도 대부분의 가구 살림이 나아졌다는 보장은 없습니다. 물가 수준이 다른 나라끼리 단순 비교하면 실제 생활 수준 차이가 과장됩니다.","marketLink":"한 나라의 성장 속도와 통화 가치를 이야기할 때 배경 숫자로 자주 등장합니다. 달러 기준 1인당 GDP가 줄었다는 기사는 환율이 크게 움직였다는 이야기인 경우가 많습니다.","baseline":"기준 연도가 없는 금액입니다. 대신 어느 해 가격인지(명목/실질)와 어떤 환율로 환산했는지가 숫자를 좌우합니다."},"bigmac":{"headline":"전 세계 어디서나 파는 빅맥 하나의 값을 견줘 통화가 싼지 비싼지 재보는 지수입니다.","plain":"영국 경제지 이코노미스트가 1986년부터 발표하는 지수입니다. 같은 햄버거라면 어느 나라에서나 값이 비슷해야 한다는 생각에서 출발해, 나라별 빅맥 가격을 비교해 통화가 제 값보다 싼지 비싼지를 봅니다. 어려운 환율 이론을 햄버거 하나로 설명한 것이 인기 비결입니다.","howToRead":"한국 빅맥 값을 미국 빅맥 값으로 나누면 \"빅맥 환율\"이 나옵니다. 이 빅맥 환율이 실제 시장 환율보다 낮으면 원화가 그만큼 싸게 거래되고 있다(저평가)는 뜻입니다. −30%는 \"빅맥으로 재보면 원화가 30% 싸다\"로 읽습니다.","whenUp":"0에 가까워지면 원화가 제 값을 찾아가는 중이라는 뜻입니다. 원화가 강해졌거나 국내 물가가 미국보다 더 올랐을 때 그렇게 됩니다.","whenDown":"마이너스 폭이 커지면 원화가 더 싸게 거래되고 있다는 뜻입니다. 환율이 오르거나(원화 약세) 국내 햄버거 값이 상대적으로 덜 올랐을 때 벌어집니다.","caution":"재미로 보라고 만든 지수입니다. 임대료·인건비·세금이 나라마다 달라서 원래 싼 나라가 있고, 햄버거 하나로 나라 경제 전체를 잴 수는 없습니다. \"저평가니까 환율이 곧 내려간다\"는 식으로 읽으면 안 됩니다.","marketLink":"환율이 장기적으로 어디쯤이 적정한가를 이야기할 때 가장 자주 인용되는 눈대중입니다. 바로 뒤에 나오는 구매력평가(PPP) 환율의 쉬운 버전이라고 보면 됩니다.","baseline":"달러 = 0%가 기준. 각 통화가 달러 대비 몇 % 어긋나 있는지를 봅니다."},"ppp_gap":{"headline":"같은 물건 바구니를 두 나라에서 사는 데 드는 돈으로 계산한 \"적정 환율\"과 실제 환율의 차이입니다.","plain":"구매력평가(PPP, Purchasing Power Parity) 환율은 빅맥 하나가 아니라 수백 가지 물건과 서비스를 한 바구니에 담아 계산합니다. OECD와 IMF가 정기적으로 발표하는 공식 통계로, 빅맥지수의 어른 버전이라고 보면 됩니다.","howToRead":"PPP 환율이 900원인데 시장 환율이 1,350원이라면, 시장에서는 달러를 PPP보다 50% 비싸게 사고 있다는 뜻입니다. 이 앱은 원화 쪽에서 읽어 \"원화가 PPP 대비 몇 % 싸게 거래되는가\"로 표시합니다.","whenUp":"0에 가까워지면 시장 환율이 물가로 계산한 적정 수준에 다가서고 있다는 뜻입니다.","whenDown":"마이너스 폭이 커지면 시장 환율이 물가 기준에서 더 멀어졌다는 뜻입니다.","caution":"PPP는 \"언젠가 이쯤 갈 것\"이라는 예측이 아닙니다. 실제 환율은 금리 차이, 자본 이동, 무역수지 같은 다른 힘으로 결정되며 수십 년째 PPP와 벌어져 있는 나라도 많습니다. 시점을 못 박는 근거로 쓸 수 없습니다.","marketLink":"나라 사이 소득이나 경제 규모를 비교할 때 시장 환율 대신 PPP 환율을 쓰기도 합니다. 같은 나라인데 \"1인당 GDP 순위\"가 기사마다 다른 이유가 대개 이것입니다.","baseline":"달러 = 0%가 기준. 빅맥지수와 같은 방식이되 품목이 수백 개입니다."},"engel":{"headline":"가계가 쓰는 돈 가운데 먹거리에 들어가는 비중. 19세기 통계학자 엥겔의 이름입니다.","plain":"가구가 한 달에 쓰는 소비지출에서 식료품과 비주류음료가 차지하는 비율입니다. 소득이 늘어도 먹는 양은 그만큼 늘지 않기 때문에, 형편이 나아질수록 이 비중이 낮아진다는 관찰에서 나왔습니다. 한국은 통계청이 발표합니다.","howToRead":"보통 10%대에서 움직입니다. 낮을수록 먹는 것 말고 다른 데 쓸 여유가 있다는 뜻으로 읽습니다. 나라끼리 비교할 때는 외식 문화와 식재료 물가가 달라 주의가 필요합니다.","whenUp":"먹는 데 쓰는 비중이 커졌다는 뜻입니다. 식품 물가가 크게 올랐거나, 소득이 줄어 다른 소비를 먼저 줄였을 때 올라갑니다.","whenDown":"먹거리 말고 다른 곳에 쓸 여지가 늘었다는 뜻입니다. 다만 외식을 줄이고 집밥으로 옮겨가도 숫자가 내려갈 수 있어 원인을 같이 봅니다.","caution":"가구 구성과 나이대에 따라 크게 달라집니다. 1인 가구가 늘면 평균값 자체가 움직이므로, 한 해 변화만 보고 살림살이가 나아졌다고 단정할 수 없습니다.","marketLink":"소비 여력이 어디로 향하는지를 보여줍니다. 이 비중이 오르는 국면에서는 필수 소비재가, 내리는 국면에서는 여행·의류 같은 선택적 소비가 화제에 오르는 편입니다."},"cli":{"headline":"여러 지표를 묶어 경기의 방향을 몇 달 앞서 보여준다는 공식 지수. 100이 장기 평균입니다.","plain":"OECD 경기선행지수(CLI)는 재고·주문·주가·금리차처럼 경기보다 먼저 움직이는 지표들을 묶어 하나의 숫자로 만든 것입니다. 실제 경기보다 대략 6~9개월 앞서 방향을 보여준다고 알려져 있어, 각국 정부와 중앙은행이 참고하는 대표적인 공식 선행지표입니다.","howToRead":"100이 장기 평균입니다. 수준과 방향을 같이 봅니다 — 100 위에서 오르면 확장, 100 위에서 내리면 둔화, 100 아래에서 오르면 회복, 100 아래에서 내리면 침체 국면으로 읽습니다. 100.3 처럼 소수점 한 자리의 변화도 방향이 바뀌면 의미 있게 봅니다.","whenUp":"앞으로 몇 달 뒤 경기가 나아지는 쪽으로 지표들이 움직이고 있다는 뜻입니다.","whenDown":"경기가 식는 쪽으로 지표들이 움직이고 있다는 뜻입니다. 100 위에 있어도 방향이 아래면 둔화 국면으로 봅니다.","caution":"나중에 자주 수정됩니다. 발표 당시 본 숫자와 몇 달 뒤 다시 계산된 숫자가 달라지는 일이 흔해서, 지나간 시점의 값으로 \"그때 맞았다\"고 판단하면 안 됩니다. 방향의 전환 시점을 정확히 맞히는 도구도 아닙니다.","marketLink":"경기 방향을 두고 논쟁이 붙을 때 양쪽이 모두 인용하는 숫자입니다. 다만 주가는 경기보다 더 앞서 움직이는 경우가 많아, 이 지수가 돌아설 무렵이면 시장은 이미 반응을 마친 뒤인 때가 많습니다.","baseline":"그 나라의 장기 추세 = 100. 나라 사이 높낮이가 아니라 각자 100에서 얼마나 벗어났는지를 봅니다."},"ccsi":{"headline":"한국은행이 매달 가계에 살림살이를 물어 만든 심리 지수. 100이 기준선입니다.","plain":"소비자심리지수(CCSI)는 한국은행이 전국 가구에 지금 형편과 앞으로의 전망을 물어 만든 지수입니다. 실제로 얼마를 벌고 썼는지가 아니라 \"어떻게 느끼는가\"를 재는 숫자라, 이 앱의 투자심리 점수와 성격이 비슷합니다.","howToRead":"100이 기준입니다. 100보다 크면 과거 평균보다 낙관적으로 보는 사람이 많다는 뜻이고, 작으면 비관적으로 보는 쪽이 많다는 뜻입니다. 절대 수준보다 방향과 폭이 더 많이 쓰입니다.","whenUp":"살림살이와 앞날을 밝게 보는 가구가 늘었다는 뜻입니다. 소비가 뒤따라 늘어나는 경우가 많습니다.","whenDown":"지갑을 닫는 쪽으로 마음이 기울었다는 뜻입니다. 금리·물가·고용 소식에 민감하게 반응합니다.","caution":"설문이라 실제 행동보다 앞서거나 어긋날 수 있습니다. 뉴스가 시끄러운 달에 크게 흔들리는 경향이 있어 한 달 값보다 몇 달의 흐름을 봅니다.","marketLink":"이 앱의 투자심리 점수가 시장 참여자의 심리라면, 소비자심리지수는 일반 가계의 심리입니다. 둘이 따로 놀 때가 있어 나란히 놓고 보면 지금 불안이 시장 안의 이야기인지 살림살이의 이야기인지 구분하는 데 도움이 됩니다.","baseline":"한국은 2003~2023년 평균 = 100. 나라마다 기준이 달라 일본은 50 부근, 미국은 1985년 = 100 입니다."},"gini":{"headline":"한 나라의 소득이 얼마나 고르게 나뉘어 있는지를 0과 1 사이 숫자 하나로 나타낸 값입니다.","plain":"모두가 똑같이 벌면 0, 한 사람이 전부 가져가면 1입니다. 이탈리아 통계학자 지니가 만들었고, 우리나라는 통계청이 매년 발표합니다. 1인당 GDP가 \"평균 얼마\"라면 지니계수는 \"얼마나 고르게 나뉘었나\"를 봅니다. 둘을 같이 봐야 그림이 완성됩니다.","howToRead":"보통 0.2~0.5 사이에서 움직입니다. 0.3 아래면 고른 편, 0.4를 넘으면 격차가 큰 편으로 이야기합니다. 세금과 복지를 반영하기 전(시장소득)과 반영한 뒤(처분가능소득)의 값이 다르며, 보통 인용되는 것은 반영한 뒤 값입니다.","whenUp":"소득 격차가 벌어졌다는 뜻입니다. 고소득층이 더 벌었거나 저소득층이 덜 벌었거나, 둘 다일 수 있습니다.","whenDown":"격차가 좁아졌다는 뜻입니다. 다만 모두가 함께 가난해져도 숫자는 내려가므로 소득 수준과 같이 봐야 합니다.","caution":"소득만 보고 재산은 보지 않습니다. 집과 주식을 얼마나 가졌는지는 이 숫자에 안 들어가서, 자산 격차까지 재면 훨씬 커집니다. 나라마다 조사 방식이 달라 소수점 둘째 자리 차이로 순위를 매기는 것은 의미가 없습니다.","marketLink":"소비가 어디서 나오는지를 가늠할 때 인용됩니다. 격차가 큰 사회일수록 명품과 초저가로 소비가 갈리는 이른바 양극화 이야기가 나옵니다.","baseline":"0 = 완전 평등, 1 = 한 사람이 전부. 기준 연도가 아니라 정의 자체가 척도입니다."},"misery":{"headline":"물가상승률과 실업률을 그냥 더한 값. \"살기 팍팍한 정도\"를 한 숫자로 만든 것입니다.","plain":"1970년대 미국 경제학자 아서 오쿤이 만들었습니다. 물가가 오르면 돈이 줄어드는 느낌이고 일자리가 없으면 벌이가 끊기니, 그 둘을 더해 체감 고통을 재보자는 발상입니다. 계산이 초등학교 덧셈 수준이라 뉴스에서 자주 인용됩니다.","howToRead":"두 숫자를 그냥 더한 값이라 절대 기준이 없습니다. 같은 나라의 예년과 비교하거나 나라끼리 견줄 때 씁니다. 한국은 실업률이 낮게 잡히는 편이라 다른 나라보다 낮게 나오는 경향이 있습니다.","whenUp":"물가가 더 올랐거나 일자리가 줄었다는 뜻입니다. 어느 쪽 때문인지는 두 숫자를 따로 봐야 알 수 있습니다.","whenDown":"물가 압력이 잦아들었거나 고용이 나아졌다는 뜻입니다.","caution":"성격이 다른 두 숫자를 아무 가중치 없이 더한 것입니다. 물가 1%p와 실업률 1%p가 똑같이 아프지는 않습니다. 실업률에는 구직을 포기한 사람이 안 잡히고, 집값이나 이자 부담도 들어가지 않아 체감과 어긋날 때가 많습니다.","marketLink":"중앙은행이 처한 곤란을 요약해 줍니다. 물가와 실업이 함께 높으면 금리를 올려도 내려도 한쪽이 나빠지는 상황이라, 이럴 때 정책 전망을 두고 시장이 크게 흔들립니다.","baseline":"기준선이 없습니다. 두 비율을 그냥 더한 값이라 예년이나 다른 나라와 견줄 때만 뜻이 생깁니다."},"pir":{"headline":"집값이 한 해 벌이의 몇 배인지. 한 푼도 안 쓰고 모았을 때 몇 년이 걸리는지로 읽습니다.","plain":"PIR(Price to Income Ratio)은 주택 가격을 가구의 연 소득으로 나눈 값입니다. 15배라면 소득을 한 푼도 안 쓰고 15년을 모아야 집 한 채 값이 된다는 뜻입니다. 집값 이야기에서 \"몇 배\"라는 말이 나오면 대개 이 숫자입니다.","howToRead":"어느 지역의 어떤 집을, 어느 가구의 소득으로 나눴는지가 전부입니다. 서울 아파트와 전국 주택은 두 배 넘게 차이 나고, 중위값을 쓰느냐 평균을 쓰느냐로도 달라집니다. 숫자만 보지 말고 기준을 같이 보세요.","whenUp":"집값이 소득보다 빨리 올랐다는 뜻입니다. 집을 사기까지 걸리는 시간이 길어졌습니다.","whenDown":"집값이 내렸거나 소득이 더 빨리 늘었다는 뜻입니다. 둘의 의미가 전혀 다르므로 어느 쪽인지 확인해야 합니다.","caution":"기관마다 정의가 달라 같은 도시인데도 숫자가 두세 배씩 차이 납니다. 대출 금리와 보유 기간을 전혀 반영하지 않아 실제 부담과도 다릅니다. 나라 간 비교는 특히 조심해야 합니다.","marketLink":"가계부채와 건설·은행 업종 이야기에 늘 따라붙습니다. 이 값이 높은 상태에서 금리가 오르면 상환 부담이 빠르게 커진다는 점이 자주 지적됩니다."},"household_debt":{"headline":"가계가 진 빚이 나라 경제 1년치(GDP)의 몇 %인지. 한국은 주요국 가운데 가장 높은 편입니다.","plain":"개인과 자영업자가 금융기관에 진 빚을 모두 더해 그 나라 국내총생산(GDP)으로 나눈 값입니다. 주택담보대출과 신용대출이 대부분입니다. 국제통화기금(IMF)과 국제결제은행(BIS)이 나라별로 모아 발표해 나라끼리 같은 잣대로 견줄 수 있습니다.","howToRead":"100%면 가계 빚이 나라가 1년 동안 만든 가치와 같다는 뜻입니다. 국제기구 연구에서는 이 비율이 너무 높으면 소비와 성장이 둔해진다는 결과가 여러 번 나왔지만, 몇 %부터라는 선은 연구마다 다릅니다. 한 해 값보다 몇 년의 방향을 봅니다.","whenUp":"빚이 경제 규모보다 빨리 늘었다는 뜻입니다. 집값이 오르며 주택담보대출이 불어날 때 주로 올라갑니다. 같은 금리 인상에도 이자 부담이 그만큼 더 커집니다.","whenDown":"빚을 갚았거나 경제가 빚보다 빨리 컸다는 뜻입니다. 대출 규제나 높은 금리로 새 대출이 줄 때도 내려갑니다.","caution":"나라 전체 평균이라 빚이 누구에게 몰려 있는지는 보여주지 않습니다. 같은 비율이라도 금리가 고정인지 변동인지, 집값 대비 얼마인지에 따라 위험이 크게 다릅니다. 한국은 전세보증금이 이 숫자에 잡히지 않아 실제 부담이 더 크다는 지적도 있습니다.","marketLink":"금리 이야기에 늘 따라붙습니다. 가계 빚이 많은 나라는 금리가 오를 때 소비가 더 빨리 식어서, 중앙은행이 금리를 정할 때 이 숫자를 함께 봅니다.","baseline":"그 나라 GDP = 100%. 빚의 크기를 경제 규모에 대 본 비율입니다."},"fertility":{"headline":"여성 한 명이 평생 낳을 것으로 예상되는 아이 수. 한국은 세계에서 가장 낮은 편입니다.","plain":"그해의 나이별 출산율을 모두 더해, 여성 한 명이 평생 아이를 몇 명 낳을지를 계산한 값입니다. 한국은 통계청이 매년 발표하고, 세계은행이 나라별로 모아 같은 잣대로 보여줍니다.","howToRead":"2.1명 안팎이면 인구가 늘지도 줄지도 않는 수준(대체출산율)으로 봅니다. 1명 아래면 한 세대가 지날 때마다 아이 세대가 부모 세대의 절반 아래로 줄어든다는 뜻입니다. 한국은 2023년 0.72명에서 2024년 0.75명으로 9년 만에 처음 올랐습니다(통계청 잠정).","whenUp":"아이를 낳는 사람이 늘었다는 뜻입니다. 결혼이 늘거나 아이를 많이 낳는 나이대 인구가 많아지면 오릅니다.","whenDown":"앞으로 일하고 세금을 낼 사람이 줄어든다는 뜻입니다. 20~30년 뒤의 일할 사람 수, 연금, 집 수요 이야기가 이 숫자에서 시작합니다.","caution":"그해의 나이별 출산율로 계산한 가상의 숫자라, 실제 여성들이 평생 낳은 아이 수와는 다릅니다. 결혼과 출산을 늦추기만 해도 한동안 크게 떨어졌다가 다시 오를 수 있어, 한 해의 반등을 흐름이 바뀌었다고 단정할 수 없습니다.","marketLink":"성장률 전망과 연금 재정, 부동산 · 교육 · 육아 산업 이야기에 배경 숫자로 쓰입니다. 정부의 인구 정책 발표도 이 숫자를 두고 나옵니다.","baseline":"기준선은 약 2.1명(대체출산율)입니다. 이 정도면 이민 없이도 인구가 유지됩니다."}};
+  const BASIC_GROUPS = [{"id":"income","label":"나라 살림과 소득","note":"얼마나 벌고, 얼마나 고르게 나뉘고, 얼마나 팍팍하고, 얼마나 빚졌고, 앞으로 일할 사람은 얼마나 될까. 모두 공식 통계입니다.","ids":["per_capita_gdp","gini","misery","household_debt","fertility"]},{"id":"prices","label":"물가로 견주는 지수","note":"같은 물건 값을 나라끼리 견줘 통화와 생활비를 재봅니다. 품목 하나로 재는 것일수록 오차가 큽니다.","ids":["bigmac","ppp_gap","engel","pir"]},{"id":"ahead","label":"경기를 앞서 읽는 지수","note":"경기가 어느 쪽으로 가고 있는지를 앞서 가늠하는 숫자들입니다. 방향을 보는 것이지 시점을 맞히는 도구가 아닙니다.","ids":["cli","ccsi"]}];
 
   function guidePanel(id) {
     const g = INDICATOR_GUIDE[id];
@@ -2411,9 +2432,11 @@ __HOME_MOOD_CSS__
           RISK_LABEL[b.level] + ' ' + esc(b.label) + '</span></li>';
       }).join('') + '</ul>' +
 
-      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">' +
-      '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
+      /* 지금 읽는 법은 늘 펼쳐 두고, 지표 설명은 접는다 (앱 RiskCard 와 같다) */
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px">' +
       '<p style="margin:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:' + RISK_COLOR[i.level] + '"><b>지금 읽는 법 · </b>' + esc(i.reading) + '</p></div>' +
+      '<details class="risk-more" style="margin-top:8px"><summary class="linkbtn" style="cursor:pointer;list-style:none">이게 무슨 지표인가요? ▾</summary>' +
+      '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)"><b style="color:var(--fg)">무슨 지표인가 · </b>' + esc(i.why) + '</p>' +
 
       /* 오르내리면 무슨 일이 생기는가 — 숫자만 보고는 알 수 없는 부분이다 */
       '<dl style="margin:8px 0 0;border-radius: var(--box-radius);background:var(--surface-2);padding:8px 10px;display:flex;flex-direction:column;gap:8px">' +
@@ -2423,7 +2446,7 @@ __HOME_MOOD_CSS__
         '<dt class="sr">' + lb + '</dt>' +
         '<dd style="margin:0;min-width:0;font-size:12.5px;line-height:1.7;word-break:keep-all;color:var(--muted)">' +
         '<b style="color:var(--fg)">' + lb + ' · </b>' + esc(tx || '') + '</dd></div>').join('') +
-      '</dl>' +
+      '</dl></details>' +
 
       '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle)">기준 ' + esc(kTime(i.meta.asOf)) + ' · 출처 ' + esc((i.meta.sources[0] || {}).name || '알 수 없음') + '</p>' +
       '</article>'
@@ -2529,7 +2552,7 @@ __HOME_MOOD_CSS__
           (curStage ? ' (' + curStage.label + ')' : '') + ' 입니다.</p>'
         : '') +
       '<ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">' + rows + '</ul>' +
-      '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
+      '<details style="margin-top:12px"><summary style="min-height:24px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)">표로 보기</summary>' +
       '<div class="scroll-x" style="margin-top:8px;border:1px solid var(--border);border-radius: var(--box-radius)">' +
       '<table class="data-table"><caption class="sr">과거 위기 시점의 자체 산출 심리 점수</caption>' +
       '<thead><tr><th scope="col">시점</th><th scope="col">사건</th><th scope="col">점수</th><th scope="col">단계</th></tr></thead><tbody>' +
@@ -3234,15 +3257,15 @@ __HOME_MOOD_CSS__
     const all = new Map();
     const marketOf = new Map();
     INDEX_MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => { all.set(q.id, q); marketOf.set(q.id, m); }));
-    /* 홈 기본 목록 — src/lib/catalog.ts 의 home:true 와 같다. 미국 10 · 한국 6 · 크립토 1.
+    /* 홈 기본 목록 — src/lib/catalog.ts 의 home:true 와 같다. 미국 10 · 한국 6 (크립토는 2026-11-26 뺐다).
        VKOSPI 는 뺐다 — KRX 유료 데이터라 LIVE 에서는 늘 빈 칸이었다. */
     const homeIds = ['spx', 'ndx', 'dji', 'vix', 'ust10', 'us_spread_10_2', 'dxy', 'nvda', 'aapl', 'tsla',
-      'kospi', 'kosdaq', 'kospi200', 'usdkrw', 'samsung', 'hynix', 'btc'];
+      'kospi', 'kosdaq', 'kospi200', 'usdkrw', 'samsung', 'hynix'];
     const ids = [];
     state.watch.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
     homeIds.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
     /* 시장별로 묶고 칸 수를 지킨다 — 앱 HomePrices 의 HOME_SLOTS 와 같은 값 */
-    const HOME_SLOTS = { us: 10, kr: 6, crypto: 2 };
+    const HOME_SLOTS = { us: 10, kr: 6, crypto: 0 };
     const priceGroups = INDEX_MARKETS
       .map((m) => ({ market: m, quotes: ids.filter((id) => marketOf.get(id) === m).slice(0, HOME_SLOTS[m]).map((id) => all.get(id)) }))
       .filter((g) => g.quotes.length > 0);
@@ -3259,14 +3282,12 @@ __HOME_MOOD_CSS__
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
       '<section class="block" style="padding-inline:0">' +
       '<h2 class="sr">오늘의 쫄탐</h2>' +
       (() => {
         const lead = fng.find((x) => x.market === 'us');
-        const rest = fng.filter((x) => x !== lead);
-        return '<div class="fng-lead">' + (lead ? homeMoodCard(lead) : '<p class="notice n-neutral">미국 쫄탐지수 · 산출 불가</p>') + '</div>' +
-          (rest.length ? '<ul class="mklines">' + rest.map(marketLine).join('') + '</ul>' : '');
+        return '<div class="fng-lead">' + (lead ? homeMoodCard(lead) : '<p class="notice n-neutral">미국 쫄탐지수 · 산출 불가</p>') + '</div>';
       })() +
       '</section>' +
 
@@ -3283,7 +3304,7 @@ __HOME_MOOD_CSS__
         if (!d || !d.alertCount) return '';
         const names = d.indicators.filter((i) => i.level === 'alert').slice(0, 2).map((i) => i.name);
         const tail = d.alertCount > names.length ? ' 등이' : subjectParticle(names.join(' · '));
-        return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:baseline;margin:12px 0 0;padding:0 12px;' +
+        return '<button type="button" data-go="risk" style="display:flex;gap:8px;align-items:center;min-height:24px;margin:12px 0 0;padding:0 12px;' +
           'border:0;background:none;text-align:left;font-size:13px;line-height:1.7;word-break:keep-all;color:var(--warn);cursor:pointer">' +
           '<span aria-hidden="true" style="flex-shrink:0">▲</span><span style="min-width:0;flex:1">' +
           '<b>시장 경고 · 지표 ' + d.alertCount + '개</b><span class="sr">' + esc(names.join(' · ')) + tail + ' 평소 범위를 벗어났습니다.</span></span>' +
@@ -3603,7 +3624,7 @@ __HOME_MOOD_CSS__
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">전체 지표 →</button></div>' +
 
       '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+      [['us','미국'],['kr','한국']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-riskscope="' + v + '" aria-pressed="' + (state.riskScope === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
 
@@ -3744,7 +3765,7 @@ __HOME_MOOD_CSS__
           (i === 0 ? 'var(--danger)' : i === 6 ? 'var(--accent)' : 'var(--subtle)') + '">' + w + '</div>';
       }).join('') + cells + '</div>' +
       '<ul style="list-style:none;margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--subtle)">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토'],['global','글로벌']].map(function (r) {
+      [['us','미국'],['kr','한국'],['global','글로벌']].map(function (r) {
         return '<li style="display:flex;align-items:center;gap:4px"><span aria-hidden="true" style="display:block;width:6px;height:6px;border-radius:99px;background:' + mkColor(r[0]) + '"></span>' + r[1] + '</li>';
       }).join('') +
       '<li style="display:flex;align-items:center;gap:4px"><span aria-hidden="true" style="display:block;width:6px;height:6px;border-radius:99px;background:var(--muted)"></span>' +
@@ -3779,7 +3800,7 @@ __HOME_MOOD_CSS__
       '<div style="padding:12px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.</p></div>' +
       '<div style="padding:12px 12px 0;display:flex;flex-wrap:wrap;gap:8px"><div class="seg lg" role="group" aria-label="시장">' +
-      [['all', '전체'], ['us', '미국'], ['kr', '한국'], ['crypto', '크립토']].map(([v, l]) =>
+      [['all', '전체'], ['us', '미국'], ['kr', '한국']].map(([v, l]) =>
         '<button type="button" data-cal="' + v + '" aria-pressed="' + (state.calMarket === v) + '">' + l + '</button>').join('') +
       '</div>' +
       '<div class="seg" role="group" aria-label="보기">' +
@@ -3811,7 +3832,7 @@ __HOME_MOOD_CSS__
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 속 경제 이야기 →</button></div>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 “생활” 탭에 따로 모았습니다.</p></div>' +
       '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+      [['us','미국'],['kr','한국']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
       '<div style="padding:8px 12px 0"><div class="seg" style="width:100%" role="group" aria-label="보기">' +
@@ -3912,6 +3933,14 @@ __HOME_MOOD_CSS__
       .filter((o) => o.mk.t >= cutoff)
       .map((o) => ({ id: o.mk.id, t: o.mk.t, index: o.index, label: o.mk.label, color: scoreFill(o.mk.score) }));
 
+    /* 쫄탐지수에 겹쳐 보는 두 가지 — 추세가 꺾였던 기간(음영)과 VIX 35 이상인 날(띠).
+       보고 있는 기간에 걸친 구간만, 기간 앞에서 시작한 구간은 기간 첫날로 자른다 (앱 chartSpans 와 같다) */
+    const ov = d.overlays || null;
+    const clip = (sp) => (sp.to >= cutoff ? { from: Math.max(sp.from, cutoff), to: sp.to } : null);
+    const chartSpans = [];
+    if (ov && ov.trend) ov.trend.spans.forEach((sp, i) => { const c = clip(sp); if (c) chartSpans.push(Object.assign({ id: 'trend-' + i }, c, { kind: 'shade', color: 'var(--muted)', label: ov.trend.name + ' ' + ov.trend.maDays + '일 평균선 아래' })); });
+    if (ov && ov.vix) ov.vix.spans.forEach((sp, i) => { const c = clip(sp); if (c) chartSpans.push(Object.assign({ id: 'vix-' + i }, c, { kind: 'strip', color: 'var(--series-4)', label: 'VIX ' + ov.vix.threshold + ' 이상' })); });
+
     const contribs = f.components.map((c) => c.contributionDay).filter((v) => v !== null && v !== 0);
     const maxAbs = Math.max(0.01, ...contribs.map(Math.abs));
     const contribShares = contributionShares(f.components.map((c) => c.contributionDay));
@@ -3949,7 +3978,7 @@ __HOME_MOOD_CSS__
       '<div class="seg" role="group" aria-label="기간">' +
       ['1M', '3M', '1Y', '3Y', '10Y'].map((r) => '<button type="button" data-range="' + r + '" aria-pressed="' + (state.range === r) + '">' +
         ({ '1M': '1개월', '3M': '3개월', '1Y': '1년', '3Y': '3년', '10Y': '10년' })[r] + '</button>').join('') + '</div></div>' +
-      '<div class="card" style="padding:12px">' + lineChart(series, 240, MARKET_LABEL[m] + ' 심리 점수와 ' + (d.benchmark ? d.benchmark.name : '대표 지수') + ' 비교', chartMarks) +
+      '<div class="card" style="padding:12px">' + lineChart(series, 240, MARKET_LABEL[m] + ' 심리 점수와 ' + (d.benchmark ? d.benchmark.name : '대표 지수') + ' 비교', chartMarks, chartSpans) +
       '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle);word-break:keep-all">' +
       (d.benchmark
         ? '위 칸은 0~100 심리 점수, 아래 칸은 ' + esc(d.benchmark.name) + ' 가격입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다 — 한 눈금에 겹쳐 그리면 눈금을 어디에 두느냐에 따라 없던 상관관계가 보입니다.'
@@ -3961,7 +3990,18 @@ __HOME_MOOD_CSS__
       (smooth
         ? ' 이 구간의 선은 하루치 점수를 ' + SMOOTH_DAYS + '일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.'
         : '') +
-      '</p></div>' +
+      '</p>' +
+      (ov
+        ? '<p style="margin:8px 0 0;font-size:11.5px;color:var(--subtle);word-break:keep-all" data-overlay-note>' +
+          (ov.trend
+            ? '회색 칸은 ' + esc(ov.trend.name) + ' 가격이 ' + ov.trend.maDays + '일(약 10개월) 평균선 아래에 있던 기간입니다. '
+            : esc(d.benchmark ? d.benchmark.name : '대표 지수') + ' 평균선은 지금 받지 못해 그리지 않았습니다. ') +
+          (ov.vix
+            ? (d.benchmark ? '두 칸 사이' : '맨 위') + '의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ' + ov.vix.threshold + ' 이상이던 날입니다. '
+            : 'VIX 는 지금 받지 못해 그리지 않았습니다. ') +
+          '둘 다 그때 시장이 어떤 상태였는지 보여 줄 뿐, 사고팔 때를 알려 주는 신호가 아닙니다.</p>'
+        : '') +
+      '</div>' +
       '<div style="margin-top:8px">' + crisisCard(d.events, f.score) + '</div></section>' +
 
       '<section class="block"><div class="block-head"><h2>사이클과 구간 통계</h2></div>' +
@@ -4813,8 +4853,10 @@ __HOME_MOOD_CSS__
     if (d.goFng) {
       state.fngMarket = d.goFng; state.view = 'fng'; state.openComp = null; window.scrollTo({ top: 0, behavior: 'instant' }); render();
       /* 홈의 '이유 보기' — 기여도 절(앱의 #fng-contrib-title)까지 바로 내려 준다. 상태바에 가리지 않게 그 높이만큼 덜 */
-      if (d.goTo === 'contrib') {
-        const h = Array.prototype.find.call(document.querySelectorAll('#view h2'), (x) => x.textContent.trim() === '점수 상승·하락 기여도');
+      /* 홈의 두 칩 — '점수 추이'(앱의 #fng-chart-title) 차트로. 거기에 두 가지가 겹쳐 그려져 있다 */
+      const GO_TO_TITLE = { contrib: '점수 상승·하락 기여도', chart: '점수 추이' };
+      if (GO_TO_TITLE[d.goTo]) {
+        const h = Array.prototype.find.call(document.querySelectorAll('#view h2'), (x) => x.textContent.trim() === GO_TO_TITLE[d.goTo]);
         const bar = document.getElementById('statusbar');
         if (h) window.scrollTo({ top: Math.max(0, h.getBoundingClientRect().top + window.scrollY - (bar ? bar.getBoundingClientRect().height : 0) - 8), behavior: 'instant' });
       }

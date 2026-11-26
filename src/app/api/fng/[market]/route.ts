@@ -3,6 +3,7 @@
  * 홈 스냅샷보다 계산량이 크므로 별도 캐시(TTL 10분)를 쓴다.
  */
 
+import { overlayInputs, overlayNowFrom, overlaysFrom } from '@/server/overlays';
 import { NextRequest, NextResponse } from 'next/server';
 import { swr } from '@/server/cache';
 import { getAdapter } from '@/server/adapters/registry';
@@ -103,11 +104,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mark
         // 과거 위기 표식 — 날짜와 이름은 사실, 점수는 이 앱의 자체 산출값이다.
         const events = buildEventMarkers(market, history, adapter.mode === 'DEMO');
 
+        // 쫄탐지수에 겹쳐 보는 추세(200일선) · VIX 35 구간 — 사실 표시이지 매매 신호가 아니다
+        const ov = market === 'us' ? await overlayInputs(adapter, ctx, benchmark) : null;
+
         return {
           ...latest,
+          ...(ov ? { overlayNow: overlayNowFrom(ov) } : {}),
           history,
           events,
           bandStats,
+          overlays: ov ? overlaysFrom(ov) : null,
           benchmark,
           methodology: {
             version: FORMULA_VERSION,

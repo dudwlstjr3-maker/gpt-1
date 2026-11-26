@@ -6,8 +6,8 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { defaultHomeIds, defaultWatchlist, PREVIOUS_DEFAULTS } from '@/lib/catalog';
-import { upgradeDefault } from '@/lib/defaults.mjs';
+import { defaultHomeIds, defaultWatchlist, PREVIOUS_DEFAULTS, REMOVED_IDS } from '@/lib/catalog';
+import { dropRemoved, upgradeDefault } from '@/lib/defaults.mjs';
 import type { AlertRule, Criterion, DemoScenario } from '@/types';
 import type { ChangeColorMode } from '@/lib/scale';
 import type { DisplayCurrency } from '@/lib/format';
@@ -81,13 +81,21 @@ function sanitize(raw: unknown): Settings {
       ? (r.scenario as DemoScenario)
       : 'normal',
     // 옛 기본값을 손대지 않고 쓰던 사람만 새 기본값으로 옮긴다. 직접 고른 것은 그대로 (lib/defaults.mjs).
-    watchlist: upgradeDefault(arr(r.watchlist, DEFAULTS.watchlist), PREVIOUS_DEFAULTS.watchlist, DEFAULTS.watchlist),
-    homeItems: upgradeDefault(arr(r.homeItems, DEFAULTS.homeItems), PREVIOUS_DEFAULTS.homeItems, DEFAULTS.homeItems),
+    // 그다음 앱에서 뺀 것(크립토)만 덜어낸다. 나머지는 순서까지 그대로 (lib/defaults.mjs dropRemoved).
+    watchlist: dropRemoved(upgradeDefault(arr(r.watchlist, DEFAULTS.watchlist), PREVIOUS_DEFAULTS.watchlist, DEFAULTS.watchlist), REMOVED_IDS),
+    homeItems: dropRemoved(upgradeDefault(arr(r.homeItems, DEFAULTS.homeItems), PREVIOUS_DEFAULTS.homeItems, DEFAULTS.homeItems), REMOVED_IDS),
     autoRefresh: typeof r.autoRefresh === 'boolean' ? r.autoRefresh : true,
     alertsEnabled: typeof r.alertsEnabled === 'boolean' ? r.alertsEnabled : false,
     notificationsGranted: typeof r.notificationsGranted === 'boolean' ? r.notificationsGranted : false,
-    alertRules: Array.isArray(r.alertRules) ? (r.alertRules as AlertRule[]) : [],
-    criteria: Array.isArray(r.criteria) ? (r.criteria as Criterion[]) : [],
+    // 크립토를 겨눈 알림 · 기준은 더는 울릴 수 없으니 뺀다 (시장 'crypto', 뺀 종목, 펀딩비 신호등)
+    alertRules: Array.isArray(r.alertRules)
+      ? (r.alertRules as AlertRule[]).filter((a) => a.target !== 'crypto' && !REMOVED_IDS.includes(a.target))
+      : [],
+    criteria: Array.isArray(r.criteria)
+      ? (r.criteria as Criterion[]).filter(
+          (c) => !(c.kind === 'fng' && c.market === 'crypto') && !(c.kind === 'risk_value' && REMOVED_IDS.includes(c.indicatorId)),
+        )
+      : [],
   };
 }
 

@@ -91,29 +91,20 @@ export const CATALOG: CatalogItem[] = [
   { id: 'hyundai', name: '현대차', symbol: '005380', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 10 },
   { id: 'naver', name: '네이버', symbol: '035420', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 11 },
   { id: 'kakao', name: '카카오', symbol: '035720', market: 'kr', kind: 'equity', unit: 'currency', precision: 0, currency: 'KRW', home: false, hasVolume: true, order: 12 },
-
-  /* ------------------------------ 크립토 ------------------------------ */
-  { id: 'btc', name: '비트코인', symbol: 'BTC', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 0, currency: 'USD', home: true, hasVolume: true, order: 1 },
-  { id: 'eth', name: '이더리움', symbol: 'ETH', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 2 },
-  { id: 'xrp', name: '리플', symbol: 'XRP', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 3 },
-  { id: 'sol', name: '솔라나', symbol: 'SOL', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 4 },
-  { id: 'bnb', name: 'BNB', symbol: 'BNB', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 5 },
-  /* 거래가 몰리는 코인들. 미국 종목과 같은 기준으로 골랐다 (위 주석 참고). */
-  { id: 'doge', name: '도지코인', symbol: 'DOGE', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 6 },
-  { id: 'ada', name: '에이다', symbol: 'ADA', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 7 },
-  { id: 'trx', name: '트론', symbol: 'TRX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 4, currency: 'USD', home: false, hasVolume: true, order: 8 },
-  { id: 'avax', name: '아발란체', symbol: 'AVAX', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 9 },
-  { id: 'link', name: '체인링크', symbol: 'LINK', market: 'crypto', kind: 'crypto', unit: 'currency', precision: 2, currency: 'USD', home: false, hasVolume: true, order: 10 },
-  { id: 'total_mcap', name: '전체 시가총액', symbol: 'TOTAL', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 11 },
-  { id: 'total_vol', name: '24시간 거래량', symbol: 'VOL24', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 12 },
-  { id: 'btc_dom', name: '비트코인 점유율', symbol: 'BTC.D', market: 'crypto', kind: 'stat', unit: 'percent', precision: 2, currency: null, home: false, hasVolume: false, order: 13, note: '전체 크립토 시총에서 비트코인이 차지하는 비중 (도미넌스)' },
-  { id: 'stable_mcap', name: '스테이블코인 시총', symbol: 'STABLE', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 14 },
-  { id: 'funding', name: '선물 펀딩비', symbol: 'FUNDING', market: 'crypto', kind: 'stat', unit: 'percent', precision: 4, currency: null, home: false, hasVolume: false, order: 15, note: '양수 = 롱 포지션이 비용 지불' },
-  { id: 'open_interest', name: '미결제약정', symbol: 'OI', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 2, currency: null, home: false, hasVolume: false, order: 16 },
-  { id: 'liquidations', name: '24시간 청산 규모', symbol: 'LIQ', market: 'crypto', kind: 'stat', unit: 'usd_bn', precision: 3, currency: null, home: false, hasVolume: false, order: 17 },
+  /* 크립토는 뺐다 (2026-11-26) — 쫄탐일보는 미국 · 한국 시장만 싣는다. 저장된 설정 정리는 REMOVED_IDS. */
 ];
 
 export const CATALOG_BY_ID = new Map(CATALOG.map((c) => [c.id, c]));
+
+/**
+ * 앱에서 뺀 항목 (2026-11-26 크립토 17개).
+ * 관심목록 · 홈 항목 · 알림에 이것이 저장돼 있으면 SettingsProvider 가 덜어낸다 — 값을 더는 받지 않아
+ * 그대로 두면 빈 칸만 남는다. 사용자가 고른 나머지는 건드리지 않는다.
+ */
+export const REMOVED_IDS: readonly string[] = [
+  'btc', 'eth', 'xrp', 'sol', 'bnb', 'doge', 'ada', 'trx', 'avax', 'link',
+  'total_mcap', 'total_vol', 'btc_dom', 'stable_mcap', 'funding', 'open_interest', 'liquidations',
+];
 
 export function catalogFor(market: MarketId): CatalogItem[] {
   return CATALOG.filter((c) => c.market === market).sort((a, b) => a.order - b.order);
@@ -154,7 +145,7 @@ export const PREVIOUS_DEFAULTS = {
 export const INDEX_IDS: Record<MarketId, string[]> = {
   us: ['spx', 'ndx', 'dji', 'rut', 'vix', 'dxy'],
   kr: ['kospi', 'kosdaq', 'kospi200', 'vkospi'],
-  crypto: ['total_mcap', 'total_vol', 'btc_dom', 'stable_mcap'],
+  crypto: [],
 };
 
 /** 그 시장의 지수 카탈로그 항목을 목록 순서대로 */

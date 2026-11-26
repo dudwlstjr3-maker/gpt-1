@@ -6,6 +6,7 @@
  *  - 값 검증에 실패하면 임의 보정하지 않고 해당 항목만 결측/오류 처리한다.
  */
 
+import { overlayInputs, overlayNowFrom } from '@/server/overlays';
 import { SECTION_STALE_AFTER, SECTION_TTL } from './config';
 import { swr } from './cache';
 import { getAdapter } from './adapters/registry';
@@ -226,6 +227,8 @@ export async function buildSnapshot({ scenario, now = new Date(), futuresRange }
           latest.stage = null;
           latest.unavailableReason = '산출된 점수가 허용 범위를 벗어나 표시하지 않습니다.';
         }
+        // 홈 카드에 붙는 두 칩 — 추세(200일선) · VIX. 못 받으면 칩만 빠진다
+        if (m === 'us') latest.overlayNow = overlayNowFrom(await overlayInputs(adapter, ctx));
         scores.push(latest);
       }
       return { data: scores, meta, notes: c.messages() };
@@ -294,7 +297,8 @@ export async function buildSnapshot({ scenario, now = new Date(), futuresRange }
     'calendar',
     `${ns}:calendar`,
     async () => {
-      const list = await adapter.getCalendar(ctx);
+      // 크립토 일정은 싣지 않는다 (2026-11-26 — 크립토는 앱에서 뺐다)
+      const list = (await adapter.getCalendar(ctx)).filter((e) => e.market !== 'crypto' && e.category !== 'crypto');
       return { data: list, meta: nowMeta(now, list[0] ? [list[0].source] : []) };
     },
     now,
@@ -333,7 +337,10 @@ export async function buildSnapshot({ scenario, now = new Date(), futuresRange }
     'news',
     `${ns}:news`,
     async () => {
-      const list = await adapter.getNews(ctx);
+      // 크립토만 다루는 기사는 싣지 않는다. 여러 시장에 걸친 기사는 크립토 표시만 뗀다.
+      const list = (await adapter.getNews(ctx))
+        .map((n) => ({ ...n, markets: n.markets.filter((m) => m !== 'crypto') }))
+        .filter((n) => n.markets.length > 0);
       return { data: list, meta: nowMeta(now) };
     },
     now,

@@ -831,6 +831,18 @@ const BASIC_PRICES = {
   ccsiCn: 88.4,
   ccsiJp: 34.9,
   ccsiUs: 97.6,
+  /* 가계부채 비율 (GDP 대비 %) — IMF · BIS 가 내는 수준대의 예시값 (2026-11-26 추가) */
+  hhDebtKr: 89.6,
+  hhDebtKrPrev: 91.2,
+  hhDebtCn: 61.4,
+  hhDebtJp: 64.0,
+  hhDebtUs: 69.9,
+  /* 합계출산율 (명) — 한국 직전값 0.72 는 2023년 통계청 확정치 수준, 나머지는 예시값 */
+  tfrKr: 0.75,
+  tfrKrPrev: 0.72,
+  tfrCn: 1.0,
+  tfrJp: 1.15,
+  tfrUs: 1.62,
 } as const;
 
 /**
@@ -923,6 +935,12 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
     comparisonNote?: string,
     /** 비교값들이 같은 잣대가 아니면 false — 화면이 막대를 그리지 않는다 */
     sameScale?: boolean,
+    /**
+     * 지나온 선의 방향 (나라 이름 → 걸음 중심값). 기본 0.42 는 "과거가 조금 낮다" — 대개 자라는 숫자다.
+     * 합계출산율처럼 실제로 줄곧 떨어진 숫자에 그 기본값을 쓰면 예시 선이 거꾸로 올라가 오해를 낳는다.
+     * 0.5 보다 크면 과거가 더 높다. 1.0 이면 한 해에 약 3% 씩 높아진다.
+     */
+    drift?: Record<string, number>,
   ): EconomyBasic => {
     const missing = broken && PARTIAL_BROKEN_BASICS.has(id);
     /*
@@ -944,7 +962,7 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
         // 거짓말을 하는 꼴이 된다. 그래서 한 해 전 자리는 걸음이 아니라 그 값이다.
         if (k === 0 && prevValue !== null && prevValue !== undefined) v = prevValue;
         // 해마다 조금씩 되돌린다. 폭은 값의 크기에 비례시켜 단위가 달라도 자연스럽게 보이게.
-        else v = v / (1 + (rnd() - 0.42) * 0.06);
+        else v = v / (1 + (rnd() - (drift?.[seedKey] ?? 0.42)) * 0.06);
       }
       return pts.reverse();
     };
@@ -1069,6 +1087,49 @@ function buildBasics(world: DemoWorld, ctx: AdapterContext): EconomyBasic[] {
       four(round(miseryKr, 1), round(miseryCn, 1), round(miseryJp, 1), round(miseryUs, 1), 1, ''),
       '매월 갱신 · 물가상승률 + 실업률',
       true,
+    ),
+
+    mk(
+      'household_debt',
+      '가계가 진 빚이 경제 규모의 몇 %',
+      '가계부채 비율 · Household debt to GDP',
+      B.hhDebtKr,
+      B.hhDebtKrPrev,
+      1,
+      '%',
+      (() => {
+        const others = [B.hhDebtCn, B.hhDebtJp, B.hhDebtUs];
+        const top = others.every((v) => B.hhDebtKr > v);
+        return `한국은 GDP 의 ${B.hhDebtKr}% 입니다. 나라가 1년 동안 만든 가치의 ${Math.round(B.hhDebtKr)}% 만큼을 가계가 빚지고 있다는 뜻으로, ${
+          top ? '네 나라 가운데 가장 높습니다' : '네 나라 가운데 높은 편입니다'
+        }. 직전 ${B.hhDebtKrPrev}% 에서 ${B.hhDebtKr < B.hhDebtKrPrev ? '조금 내려왔습니다' : '더 올랐습니다'}.`;
+      })(),
+      four(B.hhDebtKr, B.hhDebtCn, B.hhDebtJp, B.hhDebtUs, 1, '%'),
+      '연 1회 · 국제통화기금(IMF) 집계',
+      true,
+      undefined,
+      '네 나라 모두 그 나라 GDP 를 100% 로 놓은 비율이라 같은 잣대입니다. 다만 한국은 전세보증금이 빚으로 잡히지 않습니다.',
+    ),
+
+    mk(
+      'fertility',
+      '여성 한 명이 평생 낳을 아이 수',
+      '합계출산율 · Total fertility rate',
+      B.tfrKr,
+      B.tfrKrPrev,
+      2,
+      '명',
+      B.tfrKr < 1
+        ? `한국은 ${B.tfrKr}명입니다. 인구가 유지되려면 약 2.1명이 필요한데, 1명 아래라 한 세대마다 아이 세대가 부모 세대의 절반 아래로 줄어드는 수준입니다.`
+        : `한국은 ${B.tfrKr}명입니다. 인구가 유지되려면 약 2.1명이 필요합니다.`,
+      four(B.tfrKr, B.tfrCn, B.tfrJp, B.tfrUs, 2, '명'),
+      '연 1회 발표 · 통계청 · 세계은행',
+      true,
+      undefined,
+      undefined,
+      undefined,
+      // 네 나라 모두 2011년 무렵보다 낮아졌다. 한국 · 중국이 가장 가파르다 — 예시 선도 그 방향을 따른다
+      { 한국: 1.0, 중국: 0.95, 일본: 0.6, 미국: 0.65 },
     ),
 
     mk(
@@ -1403,6 +1464,15 @@ export class DemoAdapter implements MarketAdapter {
       series: values.map((v, i) => ({ t: dates[i], v: round(v, 6) })),
       precision: m.precision,
     };
+  }
+
+  /** DEMO 월드의 VIX — 같은 월드의 S&P 500 과 함께 움직여 급락 때 함께 튄다 */
+  async getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null> {
+    const world = getWorld(ctx.now);
+    const take = Math.min(world.s.vix.length, 2700);
+    const values = world.s.vix.slice(-take);
+    const dates = world.dates.slice(-take);
+    return values.map((v, i) => ({ t: dates[i], v: round(v, 2) }));
   }
 
   async getFlows(ctx: AdapterContext): Promise<FlowSummary> {

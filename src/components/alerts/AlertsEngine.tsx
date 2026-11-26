@@ -13,7 +13,7 @@ import { useSettings } from '@/components/providers/SettingsProvider';
 import { canFire, readStore, recordFire, writeStore } from './store';
 import { formatNumber, formatPercent, formatScore, formatKstTime } from '@/lib/format';
 import { stageOf } from '@/lib/scale';
-import { MARKET_LABEL, type AlertEvent, type AlertRule, type MarketId, type Quote, type Snapshot } from '@/types';
+import { INDEX_MARKET_IDS, MARKET_LABEL, type AlertEvent, type AlertRule, type Quote, type Snapshot } from '@/types';
 
 interface Fired {
   title: string;
@@ -23,7 +23,7 @@ interface Fired {
 
 function evaluate(rule: AlertRule, snapshot: Snapshot, prevStage: Record<string, string>, prevPrice: Record<string, number>): Fired | null {
   const quotes: Quote[] = snapshot.sections.quotes.data
-    ? (['us', 'kr', 'crypto'] as MarketId[]).flatMap((m) => snapshot.sections.quotes.data?.[m] ?? [])
+    ? (INDEX_MARKET_IDS).flatMap((m) => snapshot.sections.quotes.data?.[m] ?? [])
     : [];
   const findQuote = (id: string) => quotes.find((q) => q.id === id);
   const fng = snapshot.sections.fng.data ?? [];
@@ -176,7 +176,7 @@ export function AlertsEngine() {
       if (s) nextStage[f.market] = s.id;
     }
     const nextPrice: Record<string, number> = { ...store.lastPrice };
-    for (const m of ['us', 'kr', 'crypto'] as MarketId[]) {
+    for (const m of INDEX_MARKET_IDS) {
       for (const q of snapshot.sections.quotes.data?.[m] ?? []) {
         if (q.price !== null) nextPrice[q.id] = q.price;
       }

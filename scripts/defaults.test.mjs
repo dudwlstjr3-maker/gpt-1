@@ -38,3 +38,26 @@ test('새 기본값을 돌려줄 때 원본 배열을 함께 쓰지 않는다', 
   out.push('x');
   assert.deepEqual(NEW, ['spx', 'ndx', 'kospi', 'usdkrw', 'vix']);
 });
+
+/* 앱에서 뺀 항목 덜어내기 (2026-11-26 크립토) — src/lib/defaults.mjs dropRemoved */
+import { dropRemoved } from '../src/lib/defaults.mjs';
+const GONE = ['btc', 'eth', 'total_mcap'];
+
+test('뺀 항목만 덜어내고 나머지는 순서까지 그대로', () => {
+  assert.deepEqual(dropRemoved(['nvda', 'btc', 'spx', 'eth', 'kospi'], GONE), ['nvda', 'spx', 'kospi']);
+});
+
+test('뺀 것이 없으면 그대로 — 같은 내용의 새 배열', () => {
+  const mine = ['spx', 'kospi'];
+  const out = dropRemoved(mine, GONE);
+  assert.deepEqual(out, mine);
+  assert.notEqual(out, mine);
+});
+
+test('옛 기본값을 쓰던 사람은 새 기본값으로 옮긴 뒤 덜어내도 새 기본값 그대로', () => {
+  assert.deepEqual(dropRemoved(upgradeDefault([...OLD], OLD, NEW), GONE), NEW);
+});
+
+test('비트코인만 골라 둔 사람은 빈 목록 — 기본값으로 채우지 않는다', () => {
+  assert.deepEqual(dropRemoved(['btc'], GONE), []);
+});

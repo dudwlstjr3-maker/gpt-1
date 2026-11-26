@@ -415,8 +415,27 @@ export class LiveAdapter implements MarketAdapter {
     }
     const id = market === 'us' ? 'spx' : 'kospi';
     const name = market === 'us' ? 'S&P 500' : 'KOSPI';
-    const series = await fetchDailySeries(yahooConfig(envUrl(this.baseUrlEnvFor(market))), id, 400);
+    // 10년(Yahoo range=10y). 1년만 받으면 심리 상세의 3년·10년 비교 칸이 마지막 1년만 그려지고,
+    // 그 위에 겹치는 '200일 평균선 아래' 음영(2026-11-26)도 마지막 몇 달만 남는다.
+    // 첫 200거래일은 평균을 낼 날이 모이지 않아 음영이 없다 — 메우지 않는다.
+    const series = await fetchDailySeries(yahooConfig(envUrl(this.baseUrlEnvFor(market))), id, 3650);
     return series.length ? { id, name, series, precision: 2 } : null;
+  }
+
+  /**
+   * VIX 일별 종가 — FRED VIXCLS (2026-11-26, 쫄탐지수와 겹쳐 보는 'VIX 30 이상' 구간용).
+   * 국면 전광판이 이미 같은 계열을 받는다. 키가 없거나 실패하면 null — 그 겹침만 빠진다.
+   */
+  async getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null> {
+    const key = getKeys().macro;
+    if (!key) return null;
+    const start = new Date(ctx.now.getTime() - 11 * 365 * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const pts = await fetchSeries(fredConfig(key, envUrl('MACRO_BASE_URL')), 'vix', { start });
+      return pts.length ? pts : null;
+    } catch {
+      return null;
+    }
   }
 
   /* -------------------------- 투자자 수급 -------------------------- */

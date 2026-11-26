@@ -12,7 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { Gauge, StageLegend } from '@/components/charts/Gauge';
-import { InteractiveChart, type ChartMarker, type ChartSeries } from '@/components/charts/InteractiveChart';
+import { InteractiveChart, type ChartMarker, type ChartSeries, type ChartSpan } from '@/components/charts/InteractiveChart';
 import { ContributionBars } from '@/components/charts/ContributionBars';
 import { CrisisMarkers } from '@/components/market/CrisisMarkers';
 import { FngCycleView } from '@/components/market/FngCycleView';
@@ -232,6 +232,31 @@ export default function FngDetailPage() {
       }));
   }, [detail, range]);
 
+  /**
+   * 쫄탐지수에 겹쳐 보는 두 가지 (2026-11-26) — 추세가 꺾였던 기간(음영)과 VIX 30 이상인 날(띠).
+   * 보고 있는 기간에 걸친 구간만 넘기고, 기간 앞에서 시작한 구간은 기간 첫날로 자른다.
+   */
+  const chartSpans = useMemo<ChartSpan[]>(() => {
+    const ov = detail?.overlays;
+    if (!ov) return [];
+    const cutoff = Date.now() - RANGE_MS[range];
+    const out: ChartSpan[] = [];
+    const clip = (sp: { from: number; to: number }) => (sp.to >= cutoff ? { from: Math.max(sp.from, cutoff), to: sp.to } : null);
+    if (ov.trend) {
+      ov.trend.spans.forEach((sp, i) => {
+        const c = clip(sp);
+        if (c) out.push({ id: `trend-${i}`, ...c, kind: 'shade', color: 'var(--muted-fg)', label: `${ov.trend!.name} ${ov.trend!.maDays}일 평균선 아래` });
+      });
+    }
+    if (ov.vix) {
+      ov.vix.spans.forEach((sp, i) => {
+        const c = clip(sp);
+        if (c) out.push({ id: `vix-${i}`, ...c, kind: 'strip', color: 'var(--series-4)', label: `VIX ${ov.vix!.threshold} 이상` });
+      });
+    }
+    return out;
+  }, [detail, range]);
+
   if (loading && !detail) {
     return (
       <div className="space-y-3 px-3 pt-3">
@@ -360,6 +385,7 @@ export default function FngDetailPage() {
             label={`${MARKET_LABEL[market]} 심리 점수와 ${detail.benchmark?.name ?? '대표 지수'} 비교 (${range})`}
             emptyMessage="해당 기간에 산출된 점수가 없습니다."
             markers={chartMarkers}
+            spans={chartSpans}
             focusT={focusT}
           />
           <p className="mt-2 text-[11.5px] break-keep text-subtle">
@@ -374,6 +400,17 @@ export default function FngDetailPage() {
               ? ` 이 구간의 선은 하루치 점수를 ${SMOOTH_DAYS}일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.`
               : ''}
           </p>
+          {detail.overlays ? (
+            <p className="mt-2 text-[11.5px] break-keep text-subtle" data-overlay-note>
+              {detail.overlays.trend
+                ? `회색 칸은 ${detail.overlays.trend.name} 가격이 ${detail.overlays.trend.maDays}일(약 10개월) 평균선 아래에 있던 기간입니다. `
+                : `${detail.benchmark?.name ?? '대표 지수'} 평균선은 지금 받지 못해 그리지 않았습니다. `}
+              {detail.overlays.vix
+                ? `${detail.benchmark ? '두 칸 사이' : '맨 위'}의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ${detail.overlays.vix.threshold} 이상이던 날입니다. `
+                : 'VIX 는 지금 받지 못해 그리지 않았습니다. '}
+              둘 다 그때 시장이 어떤 상태였는지 보여 줄 뿐, 사고팔 때를 알려 주는 신호가 아닙니다.
+            </p>
+          ) : null}
         </div>
 
         {/* 과거 위기 표식 */}

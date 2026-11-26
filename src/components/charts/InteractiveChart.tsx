@@ -61,6 +61,29 @@ export interface ChartMarker {
   color: string;
 }
 
+/**
+ * 그림에 겹쳐 칠하는 시간 구간 (2026-11-26).
+ * 쫄탐지수 위에 '추세가 꺾였던 기간'(옅은 음영)과 'VIX 30 이상'(위 칸 꼭대기의 띠)을 겹쳐 본다.
+ * 선을 가리지 않도록 선보다 먼저 그리고, 색만으로 말하지 않도록 범례 · 툴팁 · 대체 텍스트에 이름을 적는다.
+ */
+export interface ChartSpan {
+  id: string;
+  from: number;
+  to: number;
+  /** shade: 그림 전체를 옅게 칠한다 · strip: 위 칸 꼭대기에 얇은 띠 */
+  kind: 'shade' | 'strip';
+  color: string;
+  /** 범례 · 툴팁 · 대체 텍스트에 쓰는 이름 (같은 종류끼리 같은 이름) */
+  label: string;
+}
+
+/**
+ * 띠(strip)의 두께. 두 칸으로 나뉘면 띠는 두 칸 **사이**(SPLIT_GAP 16px 의 가운데)에 앉는다 —
+ * 위 칸 꼭대기에 두었더니 위기 표식(번호 배지 · 점선)과 같은 날에 겹쳐 거의 보이지 않았다.
+ * VIX 가 30을 넘는 날은 대개 위기 표식이 찍힌 날이기 때문이다.
+ */
+const STRIP_H = 6;
+
 /*
  * 왼쪽은 눈금값이 앉는 자리다. 50 이었는데 '4,425.06' 이 50 을 그대로 먹어
  * 앞의 '4' 가 그림 밖으로 6 만큼 밀려 나갔다. 값이 잘리면 다른 값이 되어 보인다.
@@ -122,6 +145,7 @@ export function InteractiveChart({
   emptyMessage = '차트를 그릴 데이터가 부족합니다.',
   maxPoints = 320,
   markers = [],
+  spans = [],
   focusT = null,
   expandable = true,
 }: {
@@ -132,6 +156,8 @@ export function InteractiveChart({
   maxPoints?: number;
   /** 세로선으로 표시할 시점들 */
   markers?: ChartMarker[];
+  /** 겹쳐 칠할 시간 구간들 */
+  spans?: ChartSpan[];
   /** 바깥에서 지정한 강조 시점 (목록에서 항목을 고른 경우) */
   focusT?: number | null;
   /**
@@ -403,6 +429,12 @@ export function InteractiveChart({
           .join(', ')}.`
       : '';
 
+  /** 겹친 구간도 그림으로만 전달되면 안 된다 — 종류마다 몇 곳인지 적는다 */
+  const spanKinds = [...new Map(spans.map((sp) => [sp.label, sp])).values()];
+  const spanSummary = spanKinds
+    .map((k) => ` ${k.label}: ${spans.filter((sp) => sp.label === k.label).length}곳.`)
+    .join('');
+
   if (!base) {
     return (
       <div className="card-flat px-3 py-6 text-center text-xs text-muted" role="status">
@@ -446,10 +478,27 @@ export function InteractiveChart({
     return best ? best.v : null;
   };
 
+  /** 구간의 가로 자리 — 그림 밖이면 null, 너무 좁으면 최소 폭 */
+  const spanX = (sp: ChartSpan, minW: number) => {
+    if (!geometry) return null;
+    const left = MARGIN.left;
+    const right = MARGIN.left + geometry.innerW;
+    const x0 = Math.max(left, geometry.x(sp.from));
+    const x1 = Math.min(right, geometry.x(sp.to));
+    if (x1 < left || x0 > right) return null;
+    return { x: x0, w: Math.max(minW, x1 - x0) };
+  };
+
+  /** 커서가 선 날짜에 걸친 구간 종류 (같은 이름은 한 번만) */
+  const cursorSpans = cursorPoint
+    ? [...new Set(spans.filter((sp) => sp.from <= cursorPoint.t && cursorPoint.t <= sp.to).map((sp) => sp.label))]
+        .map((label) => spans.find((sp) => sp.label === label) as ChartSpan)
+    : [];
+
   const liveText = cursorPoint
     ? `${cursorMarker ? `${cursorMarker.index}번 ${cursorMarker.label}. ` : ''}${formatKstYmdTime(cursorPoint.t)}, ${prepared
         .map((s) => `${s.name} ${formatNumber(valueAt(s, cursorPoint.t), s.precision)}${s.suffix ?? ''}`)
-        .join(', ')}`
+        .join(', ')}${cursorSpans.map((sp) => `, ${sp.label}`).join('')}`
     : '';
 
   return (
@@ -468,6 +517,16 @@ export function InteractiveChart({
               />
               {s.name}
               {s.axis === 'right' ? <span className="text-subtle">(아래 칸)</span> : null}
+            </li>
+          ))}
+          {spanKinds.map((k) => (
+            <li key={`span-${k.label}`} className="flex items-center gap-2 text-[12.5px] text-muted">
+              <span
+                aria-hidden="true"
+                className={k.kind === 'shade' ? 'inline-block h-3 w-3 rounded-sm' : 'inline-block h-1.5 w-4 rounded-sm'}
+                style={{ background: k.color, opacity: k.kind === 'shade' ? 0.35 : 0.9 }}
+              />
+              {k.label}
             </li>
           ))}
         </ul>
@@ -511,7 +570,7 @@ export function InteractiveChart({
               height={boxH}
               viewBox={`0 0 ${geometry.w} ${boxH}`}
               role="img"
-              aria-label={`${label}. ${textSummary}${markerSummary}`}
+              aria-label={`${label}. ${textSummary}${markerSummary}${spanSummary}`}
               tabIndex={0}
               onKeyDown={onKeyDown}
               onMouseMove={(e) => {
@@ -584,6 +643,24 @@ export function InteractiveChart({
                     {longSpan ? formatKstYearMonth(t) : formatKstDate(t)}
                   </text>
                 );
+              })}
+
+              {/* 음영 구간 — 선을 가리지 않도록 선보다 먼저 그린다. 하루짜리도 보이게 최소 2px */}
+              {spans.map((sp) => {
+                if (sp.kind !== 'shade') return null;
+                const r = spanX(sp, 2);
+                return r ? (
+                  <rect
+                    key={sp.id}
+                    aria-hidden="true"
+                    x={r.x}
+                    y={geometry.top}
+                    width={r.w}
+                    height={geometry.plotBottom - geometry.top}
+                    fill={sp.color}
+                    opacity={0.14}
+                  />
+                ) : null;
               })}
 
               {/* 시리즈 */}
@@ -675,6 +752,18 @@ export function InteractiveChart({
                 );
               })}
 
+              {/* 띠 구간 — 표식 점선에 가리지 않게 표식 다음에 그린다. 두 칸이면 칸 사이, 한 칸이면 꼭대기 */}
+              {spans.map((sp) => {
+                if (sp.kind !== 'strip') return null;
+                const r = spanX(sp, 3);
+                const y = geometry.split
+                  ? geometry.bands[0].top + geometry.bands[0].h + (SPLIT_GAP - STRIP_H) / 2
+                  : geometry.bands[0].top;
+                return r ? (
+                  <rect key={sp.id} aria-hidden="true" x={r.x} y={y} width={r.w} height={STRIP_H} fill={sp.color} rx={1} />
+                ) : null;
+              })}
+
               {/* 크로스헤어 */}
               {cursorPoint ? (
                 <g>
@@ -750,6 +839,13 @@ export function InteractiveChart({
                   </span>
                 </div>
               ))}
+              {/* 이 날짜에 걸친 구간 — 색만 보고 짐작하지 않게 이름으로 적는다 */}
+              {cursorSpans.map((sp) => (
+                <div key={sp.label} className="mt-0.5 flex items-center gap-1 text-[11.5px] break-keep text-muted">
+                  <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0 rounded-sm" style={{ background: sp.color }} />
+                  {sp.label}
+                </div>
+              ))}
             </div>
           ) : null}
         </div>
@@ -787,6 +883,7 @@ export function InteractiveChart({
             height={380}
             label={label}
             markers={markers}
+            spans={spans}
             focusT={focusT}
             maxPoints={maxPoints}
             expandable={false}

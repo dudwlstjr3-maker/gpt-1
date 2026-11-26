@@ -6,6 +6,7 @@
  *  - 값 검증에 실패하면 임의 보정하지 않고 해당 항목만 결측/오류 처리한다.
  */
 
+import { overlayInputs, overlayNowFrom } from '@/server/overlays';
 import { SECTION_STALE_AFTER, SECTION_TTL } from './config';
 import { swr } from './cache';
 import { getAdapter } from './adapters/registry';
@@ -226,6 +227,8 @@ export async function buildSnapshot({ scenario, now = new Date(), futuresRange }
           latest.stage = null;
           latest.unavailableReason = '산출된 점수가 허용 범위를 벗어나 표시하지 않습니다.';
         }
+        // 홈 카드에 붙는 두 칩 — 추세(200일선) · VIX. 못 받으면 칩만 빠진다
+        if (m === 'us') latest.overlayNow = overlayNowFrom(await overlayInputs(adapter, ctx));
         scores.push(latest);
       }
       return { data: scores, meta, notes: c.messages() };

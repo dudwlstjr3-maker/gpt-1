@@ -2813,8 +2813,9 @@ async function main() {
       cover.includes('이유 보기 →') && reasonDetail.includes('id="fng-contrib-title"') &&
       shell.includes('<HashScroll />') && hashScroll.includes('MutationObserver') && hashScroll.includes('header.sticky'));
     check('미리보기도 이유 보기가 기여도 절로 바로 감',
-      tpl16.includes('data-go-to="contrib"') && tpl16.includes("d.goTo === 'contrib'") &&
-      tpl16.includes("x.textContent.trim() === '점수 상승·하락 기여도'") && tpl16.includes('<h2>점수 상승·하락 기여도</h2>'));
+      // 2026-11-26: 홈 칩(→ 점수 추이)이 생기면서 갈 곳을 표 하나(GO_TO_TITLE)로 묶었다
+      tpl16.includes('data-go-to="contrib"') && tpl16.includes("contrib: '점수 상승·하락 기여도'") &&
+      tpl16.includes('x.textContent.trim() === GO_TO_TITLE[d.goTo]') && tpl16.includes('<h2>점수 상승·하락 기여도</h2>'));
     check('점수가 없으면(산출 불가) 이유 보기 대신 심리 상세로',
       /mood \? \([\s\S]{0,200}이유 보기 →[\s\S]{0,120}\) : \([\s\S]{0,80}심리 상세 →/.test(cover) &&
       /\(mood\s*\?[\s\S]{0,200}이유 보기 →[\s\S]{0,80}:[\s\S]{0,80}심리 상세 →/.test(tpl16));
@@ -3798,6 +3799,93 @@ async function main() {
     check('미리보기 빌드가 크립토를 받지 않음',
       /const ASSET_IDS = \['spx', 'kospi', 'nvda'\];/.test(build) && /for \(const m of \['us'\]\) details\[m\]/.test(build) &&
       /for \(const m of \['us', 'kr'\]\) \{\n\s*if \(!ids\[m\]\?\.length\)/.test(build));
+  }
+
+  console.log('\n[8-41] 쫄탐지수 + 추세(200일선) + VIX 30 — 한눈에');
+  {
+    /*
+     * 2026-11-26 사용자: "쫄탐지수에 겹쳐서 볼 수 있는 방법이 있을까? 한눈에 세 가지 다 볼 수 있게".
+     * 홈 카드: 계기판 아래 칩 두 개(추세 · VIX). 심리 상세 차트: S&P 500 이 200일 평균선 아래였던 기간은 음영,
+     * VIX 30 이상인 날은 두 칸 사이의 띠. 둘 다 지금 상태를 적는 사실이지 사고팔 신호가 아니다.
+     * 계산은 src/lib/overlays.mjs 한 곳 — 여기서 API 값을 그 계산으로 다시 내 맞춰 본다.
+     */
+    const { belowMaSpans, trendNow, TREND_MA_DAYS, VIX_HIGH } = await import('../src/lib/overlays.mjs');
+    const { overlayChips } = await import('../src/lib/overlayChips.mjs');
+    const { body: fb } = await getJson('/api/fng/us');
+    const d = fb?.detail ?? {};
+    const ov = d.overlays;
+    const sane = (spans) => Array.isArray(spans) && spans.every((sp, i) =>
+      Number.isFinite(sp.from) && Number.isFinite(sp.to) && sp.from <= sp.to && (i === 0 || spans[i - 1].to < sp.from));
+    check('심리 상세 API 에 겹침 구간이 있음 (추세 200일 · VIX 30)',
+      !!ov && ov.trend?.maDays === TREND_MA_DAYS && TREND_MA_DAYS === 200 && ov.vix?.threshold === VIX_HIGH && VIX_HIGH === 30,
+      JSON.stringify(ov && { trend: ov.trend && { ...ov.trend, spans: ov.trend.spans.length }, vix: ov.vix && { ...ov.vix, spans: ov.vix.spans.length } }));
+    check('구간이 시간 순 · 겹치지 않음 · 시작 ≤ 끝', sane(ov?.trend?.spans) && sane(ov?.vix?.spans));
+    const bm = d.benchmark?.series ?? [];
+    const again = belowMaSpans(bm, TREND_MA_DAYS);
+    check('추세 음영이 차트에 그린 그 S&P 500 으로 다시 계산한 값과 같음',
+      bm.length >= TREND_MA_DAYS && JSON.stringify(again) === JSON.stringify(ov?.trend?.spans),
+      `다시 계산 ${again.length}곳 · API ${ov?.trend?.spans?.length}곳`);
+    // 평균을 낼 날이 모이기 전(첫 200거래일)에는 음영이 없다 — 메우지 않는다
+    check('첫 200거래일에는 음영을 만들지 않음', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
+    check('DEMO 10년 안에 VIX 30 이상인 날이 있음 (띠가 실제로 그려짐)', !fb?.mode || fb.mode !== 'demo' || (ov?.vix?.spans?.length ?? 0) > 0,
+      `${ov?.vix?.spans?.length ?? 0}곳`);
+    const tn = trendNow(bm, TREND_MA_DAYS);
+    const now = d.overlayNow;
+    check('지금 추세(위/아래 · %)가 같은 계열로 다시 계산한 값과 같음',
+      !!now?.trend && now.trend.above === tn.above && now.trend.gapPct === tn.gapPct, JSON.stringify(now?.trend));
+    check('지금 VIX 가 30 이상인지가 값과 맞음',
+      !!now?.vix && Number.isFinite(now.vix.value) && now.vix.high === (now.vix.value >= VIX_HIGH), JSON.stringify(now?.vix));
+    const { body: sb } = await getJson('/api/snapshot');
+    const sNow = sb?.sections?.fng?.data?.find((f) => f.market === 'us')?.overlayNow;
+    check('홈(스냅샷)의 지금 값이 심리 상세와 같음', JSON.stringify(sNow) === JSON.stringify(now), JSON.stringify(sNow));
+    const chips = overlayChips(sNow) ?? [];
+    check('홈 칩 두 개 — 위/아래를 말로 · 사고팔 말 없음',
+      chips.length === 2 && /200일선 (위|아래)/.test(chips[0].value) && /^30 (이상|아래)$/.test(chips[1].sub ?? '') &&
+      !/매수|매도|사세요|파세요|추천/.test(JSON.stringify(chips)), JSON.stringify(chips.map((c) => [c.value, c.sub])));
+    check('칩 값이 없으면 산출 불가 — 0 이나 위로 채우지 않음',
+      overlayChips({ trend: { name: 'S&P 500', maDays: 200, above: null, gapPct: null }, vix: null }).every((c) => c.value === '산출 불가' && c.sub === null));
+
+    const rd = (f) => readFile(f, 'utf8');
+    const [chartSrc, fngPage, homeCard, css, tplO, buildO, liveIdx, snapSrc, route, ovSrv] = await Promise.all([
+      'src/components/charts/InteractiveChart.tsx', 'src/app/fng/[market]/page.tsx', 'src/components/market/HomeMoodCard.tsx',
+      'src/app/home-mood.css', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/server/adapters/live/index.ts',
+      'src/server/snapshot.ts', 'src/app/api/fng/[market]/route.ts', 'src/server/overlays.ts'].map(rd));
+    // 그리는 차례: 음영 → 선 → 표식 → 띠. 띠를 선보다 먼저 그렸더니 같은 날의 위기 표식 점선에 가려 안 보였다
+    const iShade = chartSrc.indexOf("if (sp.kind !== 'shade') return null;");
+    const iSeries = chartSrc.indexOf('{/* 시리즈 */}');
+    const iMarks = chartSrc.indexOf('{/* 시점 표식 — 세로 점선');
+    const iStrip = chartSrc.indexOf("if (sp.kind !== 'strip') return null;");
+    check('차트 — 음영은 선보다 먼저, 띠는 표식 다음에 (앱)', iShade > 0 && iShade < iSeries && iMarks < iStrip, `${iShade}/${iSeries}/${iMarks}/${iStrip}`);
+    check('차트 — 같은 차례 (미리보기)', /'<g class="sel"><\/g>' \+ spanRects \+ paths \+ marks \+ stripRects \+ '<g class="cross">/.test(tplO));
+    check('차트 — 띠는 두 칸 사이(칸 간격 가운데)에 앉음',
+      /geometry\.split\s*\?\s*geometry\.bands\[0\]\.top \+ geometry\.bands\[0\]\.h \+ \(SPLIT_GAP - STRIP_H\) \/ 2/.test(chartSrc) &&
+      /c\.bands\[0\]\.top \+ c\.bands\[0\]\.h \+ \(SPLIT_GAP - STRIP_H\) \/ 2/.test(tplO));
+    check('차트 — 색만으로 말하지 않음 (범례 · 툴팁 · 대체 텍스트에 이름)',
+      /spanKinds\.map\(\(k\) =>/.test(chartSrc) && /cursorSpans\.map\(\(sp\) =>/.test(chartSrc) && /\$\{spanSummary\}`/.test(chartSrc) &&
+      /spanKinds\(spans \|\| \[\]\)\.map/.test(tplO) && /onSpans\.map\(\(sp\) => '<div class="tt-span">/.test(tplO) && /c\.label \+ markerAria \+ spanAria/.test(tplO));
+    check('크게 보기 창에도 같은 구간이 넘어감', /markers=\{markers\}\s*\n\s*spans=\{spans\}\s*\n\s*focusT=\{focusT\}\s*\n\s*maxPoints=\{maxPoints\}\s*\n\s*expandable=\{false\}/.test(chartSrc));
+    check('띠 두께가 앱과 미리보기에서 같음', /const STRIP_H = 6;/.test(chartSrc) && /const STRIP_H = 6;/.test(tplO));
+    check('심리 상세 차트에 구간을 넘기고, 신호가 아니라고 적음',
+      /spans=\{chartSpans\}/.test(fngPage) && /사고팔 때를 알려 주는 신호가 아닙니다/.test(fngPage) &&
+      /' 비교', chartMarks, chartSpans\)/.test(tplO) && /사고팔 때를 알려 주는 신호가 아닙니다/.test(tplO));
+    check('보는 기간 앞에서 시작한 구간은 기간 첫날로 자름 (앱 · 미리보기)',
+      /sp\.to >= cutoff \? \{ from: Math\.max\(sp\.from, cutoff\), to: sp\.to \} : null/.test(fngPage) &&
+      /sp\.to >= cutoff \? \{ from: Math\.max\(sp\.from, cutoff\), to: sp\.to \} : null/.test(tplO));
+    check('홈 칩 — 같은 문구 함수를 앱과 미리보기가 씀',
+      /overlayChips\(score\.overlayNow\)/.test(homeCard) && /overlayChips\(now\)/.test(tplO) && /moodChips\(f\.overlayNow\)/.test(tplO) &&
+      /__OVERLAY_CHIPS_FN__/.test(tplO) && /\.replace\('__OVERLAY_CHIPS_FN__'[\s\S]{0,140}overlayChips\.mjs/.test(buildO));
+    check('홈 칩을 누르면 겹쳐 그린 차트로 (앱 #fng-chart-title · 미리보기 점수 추이)',
+      /CHART_ANCHOR = 'fng-chart-title'/.test(homeCard) && /id="fng-chart-title"/.test(fngPage) &&
+      /data-go-fng="us" data-go-to="chart"/.test(tplO) && /chart: '점수 추이'/.test(tplO));
+    check('홈 칩 줄은 누를 자리 44px 이상 · 단계 색을 입히지 않음',
+      /\.mood-chips \{[^}]*min-height: 44px/.test(css) && !/\.mood-chip[^{]*\{[^}]*var\(--ink\)/.test(css));
+    check('서버 — 미국만 · 상세와 홈이 같은 계산',
+      /market === 'us' \? await overlayInputs\(adapter, ctx, benchmark\) : null/.test(route) &&
+      /if \(m === 'us'\) latest\.overlayNow = overlayNowFrom\(await overlayInputs\(adapter, ctx\)\)/.test(snapSrc) &&
+      /from '@\/lib\/overlays\.mjs'/.test(ovSrv));
+    check('LIVE — VIX 는 FRED VIXCLS, S&P 500 은 10년치 (음영이 10년을 덮게)',
+      /fetchSeries\(fredConfig\(key, envUrl\('MACRO_BASE_URL'\)\), 'vix'/.test(liveIdx) &&
+      /fetchDailySeries\(yahooConfig\(envUrl\(this\.baseUrlEnvFor\(market\)\)\), id, 3650\)/.test(liveIdx));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

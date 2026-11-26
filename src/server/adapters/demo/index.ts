@@ -1466,6 +1466,15 @@ export class DemoAdapter implements MarketAdapter {
     };
   }
 
+  /** DEMO 월드의 VIX — 같은 월드의 S&P 500 과 함께 움직여 급락 때 함께 튄다 */
+  async getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null> {
+    const world = getWorld(ctx.now);
+    const take = Math.min(world.s.vix.length, 2700);
+    const values = world.s.vix.slice(-take);
+    const dates = world.dates.slice(-take);
+    return values.map((v, i) => ({ t: dates[i], v: round(v, 2) }));
+  }
+
   async getFlows(ctx: AdapterContext): Promise<FlowSummary> {
     const world = getWorld(ctx.now);
     const i = world.dates.length - 1;

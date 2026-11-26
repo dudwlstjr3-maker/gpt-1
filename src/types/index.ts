@@ -22,11 +22,17 @@
  */
 export type MarketId = 'us' | 'kr' | 'crypto';
 
-/** 심리 점수를 내고 시장 화면을 갖는 시장. 한국은 여기 없다. */
-export const MARKET_IDS: MarketId[] = ['us', 'crypto'];
+/**
+ * 심리 점수를 내고 시장 화면을 갖는 시장. 한국은 여기 없다.
+ *
+ * 크립토는 뺐다 (2026-11-26 사용자: "크립토는 그냥 빼버리자, 관심없다").
+ * 쫄탐일보는 미국 · 한국 시장 신문이다. 'crypto' 라는 이름은 형(MarketId)에만 남아
+ * 서버 내부 코드가 컴파일되게 할 뿐, 이 두 목록에 없으니 받지도 그리지도 않는다.
+ */
+export const MARKET_IDS: MarketId[] = ['us'];
 
-/** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
-export const INDEX_MARKET_IDS: MarketId[] = ['us', 'kr', 'crypto'];
+/** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. 크립토는 없다. */
+export const INDEX_MARKET_IDS: MarketId[] = ['us', 'kr'];
 
 export const MARKET_LABEL: Record<MarketId, string> = {
   us: '미국',

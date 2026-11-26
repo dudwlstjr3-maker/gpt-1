@@ -8,7 +8,7 @@
  */
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSettings } from '@/components/providers/SettingsProvider';
 import { Gauge, StageLegend } from '@/components/charts/Gauge';
@@ -128,6 +128,12 @@ function WeightBar({
 export default function FngDetailPage() {
   const params = useParams<{ market: string }>();
   const market = (MARKET_IDS.includes(params.market as MarketId) ? params.market : 'us') as MarketId;
+  // 크립토는 앱에서 뺐다 (2026-11-26). 옛 /fng/crypto 링크는 주소까지 미국으로 바꿔 둔다 —
+  // 주소는 크립토인데 화면은 미국이면 무엇을 보고 있는지 헷갈린다.
+  const router = useRouter();
+  useEffect(() => {
+    if (params.market !== market) router.replace(`/fng/${market}${window.location.hash}`);
+  }, [params.market, market, router]);
   const { settings, hydrated } = useSettings();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -264,18 +270,20 @@ export default function FngDetailPage() {
         <ModeBadge mode={data.mode} />
       </div>
 
-      {/* 시장 전환 */}
-      <div className="mt-2 px-3">
-        <SegmentedControl
-          label="시장 선택"
-          full
-          value={market}
-          onChange={(v) => {
-            window.location.href = `/fng/${v}`;
-          }}
-          options={MARKET_IDS.map((m) => ({ value: m, label: MARKET_LABEL[m] }))}
-        />
-      </div>
+      {/* 시장 전환 — 고를 시장이 하나뿐이면 세우지 않는다 (크립토를 뺀 뒤로 미국 하나, 2026-11-26) */}
+      {MARKET_IDS.length > 1 ? (
+        <div className="mt-2 px-3">
+          <SegmentedControl
+            label="시장 선택"
+            full
+            value={market}
+            onChange={(v) => {
+              window.location.href = `/fng/${v}`;
+            }}
+            options={MARKET_IDS.map((m) => ({ value: m, label: MARKET_LABEL[m] }))}
+          />
+        </div>
+      ) : null}
 
       {/* 요약 */}
       <section className="mt-5 px-3" aria-label="점수 요약">

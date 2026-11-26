@@ -161,15 +161,18 @@ export default function IndicatorsPage() {
       ) : null}
 
       <div className="mt-3 space-y-2 px-3">
-        <SegmentedControl
-          label="시장"
-          size="sm"
-          full
-          value={group}
-          onChange={setGroup}
-          // 한국은 시장에서 뺐다. 원/달러처럼 실제로 되는 값은 글로벌로 옮겨 두 곳 모두에서 보인다.
-          options={MARKET_IDS.map((m) => ({ value: m, label: MARKET_LABEL[m] }))}
-        />
+        {/* 고를 시장이 하나뿐이면 단추를 세우지 않는다 — 크립토를 뺀 뒤로 미국 하나다 (2026-11-26) */}
+        {MARKET_IDS.length > 1 ? (
+          <SegmentedControl
+            label="시장"
+            size="sm"
+            full
+            value={group}
+            onChange={setGroup}
+            // 한국은 시장에서 뺐다. 원/달러처럼 실제로 되는 값은 글로벌로 옮겨 두 곳 모두에서 보인다.
+            options={MARKET_IDS.map((m) => ({ value: m, label: MARKET_LABEL[m] }))}
+          />
+        ) : null}
         <SegmentedControl
           label="보기"
           size="xs"

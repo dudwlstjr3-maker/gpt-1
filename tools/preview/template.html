@@ -555,22 +555,10 @@ section.block { padding: 0 12px; margin-top: 20px; }
 
 /* -------------------------------- F&G 카드 -------------------------------- */
 
-/* 1면 — 미국 한 장이 칸을 꽉 채운다. 크립토는 카드가 아니라 아래 한 줄(.mkline)이다.
+/* 1면 — 미국 한 장이 칸을 꽉 채운다. 아래 크립토 한 줄은 2026-11-26 뺐다.
    앱의 FngSection 과 같다. 예전의 옆으로 미는 줄(.fng-scroll)과 점(.fng-dots)은 지웠다. */
 .fng-lead { padding: 0 12px; }
-.mklines { list-style: none; margin: 8px 0 0; padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
-.mkline {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 12px;
-  border: 0; border-radius: var(--box-radius-sm); background: var(--surface-2);
-  color: inherit; text-align: left; cursor: pointer; font-family: inherit;
-}
-.mkline:hover { background: var(--surface-3); }
-.mkline .nm { font-size: 13px; font-weight: 600; color: var(--fg); }
-.mkline .sc { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mkline .st { font-size: 12.5px; font-weight: 600; }
-.mkline .dl { font-size: 12.5px; color: var(--subtle); font-variant-numeric: tabular-nums; }
-.mkline .go { margin-left: auto; flex-shrink: 0; font-size: 12.5px; color: var(--subtle); }
-/* 시세 지면의 시장 소제목 — 미국 → 한국 → 크립토. 앱 HomePrices 와 같다. */
+/* 시세 지면의 시장 소제목 — 미국 → 한국. 앱 HomePrices 와 같다. */
 .price-group + .price-group { margin-top: 16px; }
 .price-group-h { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 
@@ -1006,9 +994,9 @@ __HOME_MOOD_CSS__
   };
 
   const snap = () => (state.scenario === 'partial' ? DATA.partial : DATA.snapshot);
-  const MARKETS = ['us', 'crypto'];
+  const MARKETS = ['us']; /* 크립토는 뺐다 (2026-11-26) — 앱 MARKET_IDS 와 같다 */
   /** 지수 화면이 훑는 묶음. 점수를 내지 않는 한국도 여기에는 들어간다. */
-  const INDEX_MARKETS = ['us', 'kr', 'crypto'];
+  const INDEX_MARKETS = ['us', 'kr'];
   const MARKET_LABEL = { us: '미국', kr: '한국', crypto: '크립토' };
 
   /* ====================================================================== */
@@ -1880,23 +1868,6 @@ __HOME_MOOD_CSS__
          미리보기에서는 화면 전환을 눌러 볼 수 있게 컨트롤 줄에 남겨 둔다. */
       ''
     );
-  }
-
-  /**
-   * 1면 카드 밑의 한 줄 — 크립토 쫄탐. 앱의 FngSection 안 MarketLine 과 같다.
-   * 단계는 색만이 아니라 기호와 이름으로 말한다. 어제 대비는 부호가 방향을 말하므로
-   * 색을 입히지 않는다 — 한국식·해외식 등락 색 설정에 따라 뜻이 엇갈리지 않게.
-   */
-  function marketLine(f) {
-    const st = stageOf(f.score);
-    const body = f.score === null || !st
-      ? '<span class="dl">산출 불가</span>'
-      : '<span class="sc" style="color:' + scoreColor(f.score) + '">' + esc(fmtNum(f.score, 0)) + '</span>' +
-        '<span class="st" style="color:' + scoreColor(f.score) + '"><span aria-hidden="true">' + st.glyph + '</span> ' + esc(st.label) + '</span>' +
-        (isNum(f.deltaDay) ? '<span class="dl">어제 ' + esc(fmtSigned(f.deltaDay, 1)) + '</span>' : '');
-    return '<li><button type="button" class="mkline" data-go-fng="' + f.market + '">' +
-      '<span class="nm">' + esc(MARKET_LABEL[f.market]) + ' 쫄탐</span>' + body +
-      '<span class="go">상세 <span aria-hidden="true">→</span></span></button></li>';
   }
 
   __HOME_MOOD_FN__
@@ -3236,15 +3207,15 @@ __HOME_MOOD_CSS__
     const all = new Map();
     const marketOf = new Map();
     INDEX_MARKETS.forEach((m) => (quotes[m] || []).forEach((q) => { all.set(q.id, q); marketOf.set(q.id, m); }));
-    /* 홈 기본 목록 — src/lib/catalog.ts 의 home:true 와 같다. 미국 10 · 한국 6 · 크립토 1.
+    /* 홈 기본 목록 — src/lib/catalog.ts 의 home:true 와 같다. 미국 10 · 한국 6 (크립토는 2026-11-26 뺐다).
        VKOSPI 는 뺐다 — KRX 유료 데이터라 LIVE 에서는 늘 빈 칸이었다. */
     const homeIds = ['spx', 'ndx', 'dji', 'vix', 'ust10', 'us_spread_10_2', 'dxy', 'nvda', 'aapl', 'tsla',
-      'kospi', 'kosdaq', 'kospi200', 'usdkrw', 'samsung', 'hynix', 'btc'];
+      'kospi', 'kosdaq', 'kospi200', 'usdkrw', 'samsung', 'hynix'];
     const ids = [];
     state.watch.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
     homeIds.forEach((id) => { if (all.has(id) && ids.indexOf(id) < 0) ids.push(id); });
     /* 시장별로 묶고 칸 수를 지킨다 — 앱 HomePrices 의 HOME_SLOTS 와 같은 값 */
-    const HOME_SLOTS = { us: 10, kr: 6, crypto: 2 };
+    const HOME_SLOTS = { us: 10, kr: 6, crypto: 0 };
     const priceGroups = INDEX_MARKETS
       .map((m) => ({ market: m, quotes: ids.filter((id) => marketOf.get(id) === m).slice(0, HOME_SLOTS[m]).map((id) => all.get(id)) }))
       .filter((g) => g.quotes.length > 0);
@@ -3261,14 +3232,12 @@ __HOME_MOOD_CSS__
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국·크립토 투자심리 요약</h1>' +
+      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
       '<section class="block" style="padding-inline:0">' +
       '<h2 class="sr">오늘의 쫄탐</h2>' +
       (() => {
         const lead = fng.find((x) => x.market === 'us');
-        const rest = fng.filter((x) => x !== lead);
-        return '<div class="fng-lead">' + (lead ? homeMoodCard(lead) : '<p class="notice n-neutral">미국 쫄탐지수 · 산출 불가</p>') + '</div>' +
-          (rest.length ? '<ul class="mklines">' + rest.map(marketLine).join('') + '</ul>' : '');
+        return '<div class="fng-lead">' + (lead ? homeMoodCard(lead) : '<p class="notice n-neutral">미국 쫄탐지수 · 산출 불가</p>') + '</div>';
       })() +
       '</section>' +
 
@@ -3605,7 +3574,7 @@ __HOME_MOOD_CSS__
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="indicators">전체 지표 →</button></div>' +
 
       '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+      [['us','미국'],['kr','한국']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-riskscope="' + v + '" aria-pressed="' + (state.riskScope === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
 
@@ -3746,7 +3715,7 @@ __HOME_MOOD_CSS__
           (i === 0 ? 'var(--danger)' : i === 6 ? 'var(--accent)' : 'var(--subtle)') + '">' + w + '</div>';
       }).join('') + cells + '</div>' +
       '<ul style="list-style:none;margin:8px 0 0;padding:8px 0 0;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--subtle)">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토'],['global','글로벌']].map(function (r) {
+      [['us','미국'],['kr','한국'],['global','글로벌']].map(function (r) {
         return '<li style="display:flex;align-items:center;gap:4px"><span aria-hidden="true" style="display:block;width:6px;height:6px;border-radius:99px;background:' + mkColor(r[0]) + '"></span>' + r[1] + '</li>';
       }).join('') +
       '<li style="display:flex;align-items:center;gap:4px"><span aria-hidden="true" style="display:block;width:6px;height:6px;border-radius:99px;background:var(--muted)"></span>' +
@@ -3781,7 +3750,7 @@ __HOME_MOOD_CSS__
       '<div style="padding:12px 12px 0"><h1 style="margin:0;font-size:19px;font-weight:700;color:var(--fg-strong);letter-spacing:-.02em">경제 캘린더</h1>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">모든 시각은 KST 기준입니다. 고른 시장의 일정과, 어느 한 시장에 묶이지 않는 글로벌 일정을 함께 보여줍니다.</p></div>' +
       '<div style="padding:12px 12px 0;display:flex;flex-wrap:wrap;gap:8px"><div class="seg lg" role="group" aria-label="시장">' +
-      [['all', '전체'], ['us', '미국'], ['kr', '한국'], ['crypto', '크립토']].map(([v, l]) =>
+      [['all', '전체'], ['us', '미국'], ['kr', '한국']].map(([v, l]) =>
         '<button type="button" data-cal="' + v + '" aria-pressed="' + (state.calMarket === v) + '">' + l + '</button>').join('') +
       '</div>' +
       '<div class="seg" role="group" aria-label="보기">' +
@@ -3813,7 +3782,7 @@ __HOME_MOOD_CSS__
       '<button type="button" class="linkbtn" style="flex-shrink:0" data-go="basics">생활 속 경제 이야기 →</button></div>' +
       '<p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);word-break:keep-all">고른 시장의 지표와, 어느 한 시장에 묶이지 않는 글로벌 지표를 함께 보여줍니다. 각 지표의 위험 단계는 색상뿐 아니라 기호·텍스트로도 표시됩니다. 1인당 GDP·빅맥지수처럼 시세가 아닌 생활 경제 용어는 “생활” 탭에 따로 모았습니다.</p></div>' +
       '<div style="padding:12px 12px 0"><div class="seg lg" style="width:100%" role="group" aria-label="시장">' +
-      [['us','미국'],['kr','한국'],['crypto','크립토']].map(([v,l]) =>
+      [['us','미국'],['kr','한국']].map(([v,l]) =>
         '<button type="button" style="flex:1" data-macrom="' + v + '" aria-pressed="' + (state.macroMarket === v) + '">' + l + '</button>').join('') +
       '</div></div>' +
       '<div style="padding:8px 12px 0"><div class="seg" style="width:100%" role="group" aria-label="보기">' +

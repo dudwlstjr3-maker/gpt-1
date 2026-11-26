@@ -231,7 +231,8 @@ export function getSession(market: MarketId, now: Date = new Date()): MarketSess
 }
 
 export function getAllSessions(now: Date = new Date()): MarketSession[] {
-  return [getSession('us', now), getSession('kr', now), getSession('crypto', now)];
+  // 크립토는 뺐다 (2026-11-26) — 미국 · 한국 두 시장만 거래 시간을 보인다
+  return [getSession('us', now), getSession('kr', now)];
 }
 
 /** 세션 배지에 쓸 짧은 보조 문구 */

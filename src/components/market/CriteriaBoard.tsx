@@ -83,7 +83,8 @@ function CriterionForm({ onAdd, indicators }: { onAdd: (c: Criterion) => void; i
           </select>
         </label>
 
-        {kind === 'fng' ? (
+        {/* 고를 시장이 하나뿐이면 묻지 않는다 (크립토를 뺀 뒤로 미국 하나) */}
+        {kind === 'fng' && MARKET_IDS.length > 1 ? (
           <label className="block">
             <span className="mb-1 block text-[12.5px] text-muted">어느 시장</span>
             <select className={sel} value={market} onChange={(e) => setMarket(e.target.value as MarketId)}>

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * 시장별 전용 화면 — /market/us, /market/kr, /market/crypto
+ * 시장별 전용 화면 — /market/us (한국은 /indices, 크립토는 2026-11-26 뺐다)
  *
  * 세 시장을 탭으로 겹쳐 두지 않고 각각 독립된 화면으로 분리했다.
  * 각 화면에는 그 시장의 심리 점수 · 위험 지표 · 고유 지표 · 시세 · 일정 · 뉴스만 들어간다.
@@ -63,9 +63,12 @@ export default function MarketRegionPage() {
   // 튀지 않고 지수 화면으로 보낸다 — 거기에 KOSPI·KOSDAQ 이 그대로 있다.
   const router = useRouter();
   const isKorea = params.region === 'kr';
+  // 크립토는 앱에서 뺐다 (2026-11-26). 옛 링크는 미국 화면으로 몰래 바꾸지 않고 홈으로 보낸다.
+  const isCrypto = params.region === 'crypto';
   useEffect(() => {
     if (isKorea) router.replace('/indices');
-  }, [isKorea, router]);
+    else if (isCrypto) router.replace('/');
+  }, [isKorea, isCrypto, router]);
 
   const region = (MARKET_IDS.includes(params.region as MarketId) ? params.region : 'us') as MarketId;
 

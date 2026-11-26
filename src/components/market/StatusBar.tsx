@@ -144,7 +144,7 @@ export function StatusBar() {
             ? sessions.map((s) => <SessionChip key={s.market} session={s} />)
             : /* 뼈대는 진짜 칩과 같은 29px 이어야 한다. 24px 로 두었더니 값이 들어오는
                  순간 sticky 머리말이 5px 자라 화면 전체가 그만큼 밀렸다. */
-              ['us', 'kr', 'crypto'].map((m) => (
+              ['us', 'kr'].map((m) => (
                 <div key={m} className="h-[29px] w-24 shrink-0 skeleton" />
               ))}
           {snapshot && (

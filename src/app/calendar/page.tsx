@@ -1,6 +1,6 @@
 'use client';
 
-/** 경제 캘린더 — 미국·한국·크립토 시장별 + 중요도·카테고리 필터, 날짜별 그룹. */
+/** 경제 캘린더 — 미국·한국 시장별 + 중요도·카테고리 필터, 날짜별 그룹. (크립토는 2026-11-26 뺐다) */
 
 import { BackBar } from '@/components/nav/BackBar';
 import { useMemo, useState } from 'react';
@@ -35,7 +35,6 @@ const MARKET_OPTIONS: { value: MarketFilter; label: string }[] = [
   { value: 'all', label: '전체' },
   { value: 'us', label: MARKET_LABEL.us },
   { value: 'kr', label: MARKET_LABEL.kr },
-  { value: 'crypto', label: MARKET_LABEL.crypto },
 ];
 
 export default function CalendarPage() {
@@ -83,7 +82,8 @@ export default function CalendarPage() {
       .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
   }, [filtered, selected]);
 
-  const categories: (EventCategory | 'all')[] = ['all', ...(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[])];
+  // 크립토 분류는 뺐다 (2026-11-26) — 서버가 크립토 일정을 싣지 않으니 눌러도 늘 빈 목록이다
+  const categories: (EventCategory | 'all')[] = ['all', ...(Object.keys(EVENT_CATEGORY_LABEL) as EventCategory[]).filter((c) => c !== 'crypto')];
 
   return (
     <div className="pt-2">

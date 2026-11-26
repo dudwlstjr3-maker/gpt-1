@@ -25,3 +25,19 @@ export function upgradeDefault(saved, previous, current) {
   const untouched = saved.length === previous.length && saved.every((x, i) => x === previous[i]);
   return untouched ? [...current] : saved;
 }
+
+/**
+ * 앱에서 뺀 항목을 저장된 목록에서 덜어낸다 (2026-11-26 — 크립토를 뺐다).
+ *
+ * 관심목록에 비트코인을 넣어 둔 사람이 있다. 앱이 더는 비트코인 값을 받지 않으니 그대로 두면
+ * 그 자리는 영영 빈 칸이 된다. 그래서 **뺀 것만** 덜어내고, 사용자가 고른 나머지는 순서까지 그대로 둔다.
+ * 앱에 없는 것을 지울 뿐 사용자가 고른 것을 바꾸지는 않는다 — upgradeDefault 와 같은 원칙이다.
+ *
+ * @param {string[]} saved    저장돼 있던 값
+ * @param {readonly string[]} removed  앱에서 뺀 id
+ * @returns {string[]}
+ */
+export function dropRemoved(saved, removed) {
+  const gone = new Set(removed);
+  return saved.filter((x) => !gone.has(x));
+}

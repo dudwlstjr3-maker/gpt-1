@@ -3,7 +3,7 @@
  *
  * 무엇을 담았나
  *   Finviz 의 선물 화면이 다루는 범위를 그대로 옮겼다 — 지수·에너지·금속·농산물·
- *   통화·금리·크립토. 서버 어댑터(값 채우기)와 화면(순서·묶음)이 같은 목록을 본다.
+ *   통화·금리. 서버 어댑터(값 채우기)와 화면(순서·묶음)이 같은 목록을 본다. (크립토는 2026-11-26 뺐다)
  *
  * 왜 'source' 를 항목마다 적어 두나
  *   선물 시세는 대부분 거래소가 파는 데이터다. CME·ICE·KRX 의 실시간·지연 시세는
@@ -40,7 +40,6 @@ export const FUTURES_GROUPS: FuturesGroup[] = [
   { id: 'agri', label: '농산물', note: '곡물·소프트·축산. 식료품 물가의 앞단입니다.' },
   { id: 'currency', label: '통화', note: '달러가 오르면 대체로 원자재와 신흥국 자산이 눌립니다.' },
   { id: 'rate', label: '금리', note: '국채 금리와 선물. 금리가 오르면 채권 선물 가격은 내립니다.' },
-  { id: 'crypto', label: '크립토', note: '무기한선물. 펀딩비·미결제약정은 심리 상세 화면에서 따로 봅니다.' },
 ];
 
 export interface FuturesItem {
@@ -124,9 +123,7 @@ export const FUTURES_ITEMS: FuturesItem[] = [
   { id: 'zn', name: '미국 국채 10년', symbol: 'ZN', group: 'rate', precision: 3, suffix: '%', order: 3, source: 'fred', proxy: '채권 선물 가격이 아니라 국채 10년 금리입니다 (재무부 → FRED).' },
   { id: 'zb', name: '미국 국채 30년', symbol: 'ZB', group: 'rate', precision: 3, suffix: '%', order: 4, source: 'fred', proxy: '채권 선물 가격이 아니라 국채 30년 금리입니다 (재무부 → FRED).' },
 
-  /* ---------------- 크립토 ---------------- */
-  { id: 'btcf', name: '비트코인 무기한', symbol: 'BTCUSDT', group: 'crypto', precision: 0, suffix: '$', order: 1, source: 'binance' },
-  { id: 'ethf', name: '이더리움 무기한', symbol: 'ETHUSDT', group: 'crypto', precision: 2, suffix: '$', order: 2, source: 'binance' },
+  /* 크립토 무기한선물은 뺐다 (2026-11-26 — 크립토는 앱에서 뺐다) */
 ];
 
 export const FUTURES_RANGES = ['1D', '1W', '1M', '3M', 'YTD'] as const;

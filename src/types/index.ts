@@ -500,7 +500,7 @@ export interface FngDetail extends FngScore {
   events: FngEvents;
   /** 구간별 과거 통계 (표본이 부족하면 null) */
   bandStats: FngBandStats | null;
-  /** 추세 · VIX 30 구간 — 차트에 겹쳐 본다 (2026-11-26) */
+  /** 추세 · VIX 35 구간 — 차트에 겹쳐 본다 (2026-11-26) */
   overlays: FngOverlays | null;
   /** 대표 시장 가격 (점수와 겹쳐 보기용) */
   benchmark: {

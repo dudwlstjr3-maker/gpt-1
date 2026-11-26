@@ -233,7 +233,7 @@ export default function FngDetailPage() {
   }, [detail, range]);
 
   /**
-   * 쫄탐지수에 겹쳐 보는 두 가지 (2026-11-26) — 추세가 꺾였던 기간(음영)과 VIX 30 이상인 날(띠).
+   * 쫄탐지수에 겹쳐 보는 두 가지 (2026-11-26) — 추세가 꺾였던 기간(음영)과 VIX 35 이상인 날(띠).
    * 보고 있는 기간에 걸친 구간만 넘기고, 기간 앞에서 시작한 구간은 기간 첫날로 자른다.
    */
   const chartSpans = useMemo<ChartSpan[]>(() => {

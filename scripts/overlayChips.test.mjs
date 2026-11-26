@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { overlayChips } from '../src/lib/overlayChips.mjs';
 
 const trend = (above, gapPct) => ({ name: 'S&P 500', maDays: 200, above, gapPct });
-const vix = (value, high) => ({ threshold: 30, value, high });
+const vix = (value, high) => ({ threshold: 35, value, high });
 
 test('지금 값 묶음이 없으면 칩 줄을 그리지 않는다', () => {
   assert.equal(overlayChips(null), null);
@@ -31,13 +31,13 @@ test('평균선 아래는 음수로 · 말로도 아래', () => {
   assert.match(t.aria, /아래$/);
 });
 
-test('VIX — 값과 기준 30 위아래', () => {
+test('VIX — 값과 기준 35 위아래', () => {
   const [, low] = overlayChips({ trend: null, vix: vix(15.2, false) });
   assert.equal(low.value, '15.2');
-  assert.equal(low.sub, '30 아래');
-  const [, high] = overlayChips({ trend: null, vix: vix(34, true) });
-  assert.equal(high.value, '34.0');
-  assert.equal(high.sub, '30 이상');
+  assert.equal(low.sub, '35 아래');
+  const [, high] = overlayChips({ trend: null, vix: vix(38, true) });
+  assert.equal(high.value, '38.0');
+  assert.equal(high.sub, '35 이상');
 });
 
 test('한쪽이 없으면 그쪽만 산출 불가 — 0 이나 위로 채우지 않는다', () => {

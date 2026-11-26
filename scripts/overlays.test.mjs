@@ -1,6 +1,6 @@
 /**
  * 쫄탐지수에 겹쳐 보는 두 가지 — src/lib/overlays.mjs
- * 추세(200일 평균선 위/아래)와 VIX 30. 둘 다 사실 표시이지 매매 신호가 아니다.
+ * 추세(200일 평균선 위/아래)와 VIX 35. 둘 다 사실 표시이지 매매 신호가 아니다.
  */
 
 import { test } from 'node:test';
@@ -10,9 +10,9 @@ import { movingAverage, belowMaSpans, thresholdSpans, trendNow, vixNow, TREND_MA
 const D = 86_400_000;
 const series = (vals) => vals.map((v, i) => ({ t: i * D, v }));
 
-test('기본값은 200일 평균선 · VIX 30', () => {
+test('기본값은 200일 평균선 · VIX 35', () => {
   assert.equal(TREND_MA_DAYS, 200);
-  assert.equal(VIX_HIGH, 30);
+  assert.equal(VIX_HIGH, 35);
 });
 
 test('이동평균은 n 일이 모인 뒤부터 낸다 — 앞자리를 0 으로 채우지 않는다', () => {
@@ -33,7 +33,7 @@ test('끝까지 아래면 마지막 구간도 닫는다', () => {
   assert.deepEqual(spans, [{ from: 3 * D, to: 4 * D }]);
 });
 
-test('VIX 30 이상인 날들을 구간으로 — 30 은 넘은 것으로 본다', () => {
+test('기준 이상인 날들을 구간으로 — 기준과 같은 값은 넘은 것으로 본다', () => {
   const spans = thresholdSpans(series([18, 31, 35, 29, 30, 22]), 30);
   assert.deepEqual(spans, [{ from: 1 * D, to: 2 * D }, { from: 4 * D, to: 4 * D }]);
 });
@@ -57,8 +57,9 @@ test('날이 모자라면 추세는 모름 (null) — 위라고도 아래라고�
   assert.deepEqual(trendNow([], 3).above, null);
 });
 
-test('지금 VIX — 값과 30을 넘었는지', () => {
-  assert.deepEqual(vixNow(series([20, 31.26]), 30), { value: 31.3, high: true, t: D });
-  assert.equal(vixNow(series([29.99]), 30).high, false);
-  assert.deepEqual(vixNow([], 30), { value: null, high: null, t: null });
+test('지금 VIX — 값과 기준(기본 35)을 넘었는지', () => {
+  assert.deepEqual(vixNow(series([20, 36.26])), { value: 36.3, high: true, t: D });
+  assert.equal(vixNow(series([34.99])).high, false);
+  assert.equal(vixNow(series([35])).high, true);
+  assert.deepEqual(vixNow([]), { value: null, high: null, t: null });
 });

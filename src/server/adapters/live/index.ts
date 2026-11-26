@@ -423,7 +423,7 @@ export class LiveAdapter implements MarketAdapter {
   }
 
   /**
-   * VIX 일별 종가 — FRED VIXCLS (2026-11-26, 쫄탐지수와 겹쳐 보는 'VIX 30 이상' 구간용).
+   * VIX 일별 종가 — FRED VIXCLS (2026-11-26, 쫄탐지수와 겹쳐 보는 'VIX 35 이상' 구간용).
    * 국면 전광판이 이미 같은 계열을 받는다. 키가 없거나 실패하면 null — 그 겹침만 빠진다.
    */
   async getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null> {

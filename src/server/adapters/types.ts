@@ -55,7 +55,7 @@ export interface MarketAdapter {
   getBenchmark(market: MarketId, ctx: AdapterContext): Promise<BenchmarkSeries | null>;
 
   /**
-   * VIX 일별 종가 — 쫄탐지수와 겹쳐 보는 'VIX 30 이상' 구간용 (2026-11-26).
+   * VIX 일별 종가 — 쫄탐지수와 겹쳐 보는 'VIX 35 이상' 구간용 (2026-11-26).
    * 받지 못하면 null. 빈 값을 지어내지 않는다.
    */
   getVix(ctx: AdapterContext): Promise<SeriesPoint[] | null>;

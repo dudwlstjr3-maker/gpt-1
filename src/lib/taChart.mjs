@@ -1,9 +1,9 @@
 /**
- * 종목 차트 그림 (2026-11-27) — 봉 · 이동평균 · 1년선 · 슈퍼트렌드 · 기법 표시(●) · 전환 표시 / RSI · 다이버전스 / OBV 오실레이터.
+ * 종목 차트 그림 (2026-11-27) — 봉 · 이동평균 · 1년선 · 슈퍼트렌드 · 최근 기법 조건(세로 점선) / RSI · 다이버전스 / OBV 오실레이터.
  * 순수 함수로 SVG 글을 만든다. 앱(src/app/chart)과 미리보기(template.html, __TA_CHART__)가 같은 그림을 그린다.
  * import 를 두지 않는다 — 미리보기에 그대로 끼워 넣기 때문이다. 모델은 ta.mjs 의 taModel.
  *
- * 색만으로 뜻을 전하지 않는다(AGENTS.md 4절): 전환은 ▲ / ▼ 모양, 선은 범례 글, 상태는 '지금 상태' 표의 말.
+ * 색만으로 뜻을 전하지 않는다(AGENTS.md 4절): 조건은 꼬리표 글(▲ 상승 / ▼ 하락), 선은 범례 글, 상태는 '지금 상태' 의 말.
  * 글자는 12px 아래로 내리지 않는다.
  */
 
@@ -61,7 +61,8 @@ export function taChartHtml(m, opt) {
   const date = opt.date ?? ((t) => new Date(t).toISOString().slice(5, 10));
 
   // 패널 자리
-  const P = { top: 8, h: 220 };
+  // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리
+  const P = { top: 32, h: 220 };
   const RS = { top: P.top + P.h + 26, h: 84 };
   const OB = { top: RS.top + RS.h + 26, h: 64 };
   const H = OB.top + OB.h + 24;
@@ -137,39 +138,21 @@ export function taChartHtml(m, opt) {
     if (dDn) parts.push(`<path d="${dDn}" class="ta-line ta-st" style="stroke:${down}"/>`);
   }
 
-  // 슈퍼트렌드 전환 ▲ / ▼ — 운영자 기법에서는 후순위라 흐리게. 상승 전환은 봉 아래, 하락 전환은 봉 위
-  let flipCount = 0;
-  for (const f of m.st.flips) {
-    if (f.i < from || f.i > to) continue;
-    flipCount += 1;
-    const xc = r1(x(f.i));
-    if (f.dir === 'up') {
-      const yy = r1(Math.min(P.top + P.h - 2, py(m.l[f.i]) + 26));
-      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip ta-flip-st" style="fill:${up}">▲</text>`);
-    } else {
-      const yy = r1(Math.max(P.top + 12, py(m.h[f.i]) - 17));
-      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip ta-flip-st" style="fill:${down}">▼</text>`);
-    }
-  }
-
-  // 운영자 기법 조건 ● — 상승 쪽은 봉 아래, 하락 쪽은 봉 위. 큰 원(테두리)은 RSI 20 이하 · 90 이상(강함).
-  // 다이버전스는 피벗 봉에 찍는다(오른쪽 5봉 뒤 확인). 같은 봉 · 같은 쪽은 한 번만.
-  let techCount = 0;
+  // 가장 최근 기법 조건 하나만 — 세로 점선 + 글자 꼬리표.
+  // 조건마다 점을 흩뿌리고 슈퍼트렌드 전환마다 ▲▼ 를 찍었더니 읽기 어렵다는 사용자 의견(2026-11-27)으로 하나만 남겼다.
+  // 슈퍼트렌드 전환은 선 색이 바뀌는 자리로 보인다.
+  let marked = false;
   {
-    const seen = new Set();
-    for (const e of opt.tech ?? []) {
-      if (e.i < from || e.i > to) continue;
-      const key = `${e.i}:${e.side}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      techCount += 1;
-      const xc = r1(x(e.i));
-      const col = e.side === 'up' ? up : down;
-      const yy = e.side === 'up' ? Math.min(P.top + P.h - 4, py(m.l[e.i]) + 9) : Math.max(P.top + 4, py(m.h[e.i]) - 9);
-      const strong = (opt.tech ?? []).some((x) => x.i === e.i && x.side === e.side && x.strong);
-      parts.push(strong
-        ? `<circle cx="${xc}" cy="${r1(yy)}" r="5" class="ta-tech ta-tech-strong" style="fill:${col}"/>`
-        : `<circle cx="${xc}" cy="${r1(yy)}" r="3.5" class="ta-tech" style="fill:${col}"/>`);
+    const mk = opt.mark;
+    if (mk && mk.i >= from && mk.i <= to) {
+      marked = true;
+      const xc = r1(x(mk.i));
+      const col = mk.side === 'up' ? up : down;
+      parts.push(`<line x1="${xc}" x2="${xc}" y1="${P.top - 4}" y2="${RS.top + RS.h}" class="ta-mark" style="stroke:${col}"/>`);
+      const tw = 104;
+      const tx = Math.max(L + tw / 2, Math.min(L + plotW - tw / 2, xc));
+      parts.push(`<rect x="${r1(tx - tw / 2)}" y="4" width="${tw}" height="22" rx="11" style="fill:${col}"/>`);
+      parts.push(`<text x="${r1(tx)}" y="19.5" text-anchor="middle" class="ta-mark-tag">${mk.side === 'up' ? '▲ 상승' : '▼ 하락'} 쪽 조건</text>`);
     }
   }
 
@@ -252,7 +235,7 @@ export function taChartHtml(m, opt) {
   // 손가락으로 짚은 자리 — 처음에는 숨긴다
   parts.push(`<line x1="0" x2="0" y1="${P.top}" y2="${OB.top + OB.h}" class="ta-cross" visibility="hidden"/>`);
 
-  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. 기법 조건 ${techCount}번, RSI 다이버전스 ${divCount}번, 슈퍼트렌드 전환 ${flipCount}번. 같은 내용을 '운영자 기법' 과 '지금 상태' 표에서 글로 볼 수 있습니다.`;
+  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}. 같은 내용을 '지금 상태' 에서 글로 볼 수 있습니다.`;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" class="ta-svg">${parts.join('')}</svg>`;
 
   const legend = [
@@ -261,8 +244,7 @@ export function taChartHtml(m, opt) {
     ['ta-k-ma2', `${m.ma[1]?.p ?? 60}선`],
     ['ta-k-trend', '1년선(추세선)'],
     ['ta-k-st', '슈퍼트렌드'],
-    ['ta-k-tech', '기법 조건 (큰 원 = 강함)'],
-    ['ta-k-flip', '흐린 ▲ ▼ 슈퍼트렌드 전환'],
+    ...(marked ? [['ta-k-mark', '세로 점선 = 최근 기법 조건']] : []),
   ].map(([k, t]) => `<li class="${k}"><i aria-hidden="true"></i>${esc(t)}</li>`).join('');
 
   return {

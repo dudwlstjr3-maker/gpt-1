@@ -234,7 +234,7 @@ test('구간 단추 — 일봉 · 4시간봉마다 기본값이 목록에 있다
   }
 });
 
-test('그림 — 보이는 구간의 봉만, 전환 ▲ ▼ 를 그 자리에, 이름은 글로 이스케이프', async () => {
+test('그림 — 보이는 구간의 봉만, 최근 기법 조건 하나만 표시, 이름은 글로 이스케이프', async () => {
   const { taChartHtml, taIndexAt, taXOf } = await import('../src/lib/taChart.mjs');
   const bars = Array.from({ length: 200 }, (_, i) => {
     const c = i < 100 ? 100 + i : 200 - (i - 100) * 1.5;
@@ -245,16 +245,14 @@ test('그림 — 보이는 구간의 봉만, 전환 ▲ ▼ 를 그 자리에, �
   assert.match(html, /^<ul class="ta-legend">/);
   assert.match(html, /<svg viewBox="0 0 360 \d+" width="360"/);
   assert.ok(!html.includes('<b>&'), '제목은 이스케이프');
-  const flips = m.st.flips.filter((f) => f.i >= 50).length;
-  assert.equal((html.match(/class="ta-flip ta-flip-st"[^>]*>[▲▼]</g) ?? []).length, flips, '슈퍼트렌드 전환은 흐린 ▲ ▼');
-  assert.match(html, new RegExp(`슈퍼트렌드 전환 ${flips}번`));
-  // 기법 조건 ● — 상승 쪽은 봉 아래(저가보다 아래), 강함은 큰 원
-  const tech = [{ i: 120, seenAt: 120, side: 'up', kind: 'rsi', strong: false, rsi: 28 }, { i: 150, seenAt: 155, side: 'down', kind: 'div', strong: true, rsi: 91 }];
-  const withTech = taChartHtml(m, { from: 50, to: 199, width: 360, tech }).html;
-  assert.equal((withTech.match(/<circle [^>]*class="ta-tech"/g) ?? []).length, 1);
-  assert.equal((withTech.match(/<circle [^>]*class="ta-tech ta-tech-strong"/g) ?? []).length, 1);
-  assert.match(withTech, /기법 조건 2번/);
-  assert.equal((taChartHtml(m, { from: 130, to: 199, width: 360, tech }).html.match(/<circle /g) ?? []).length, 1, '구간 밖은 그리지 않음');
+  assert.ok(!/ta-flip-st|<circle /.test(html), '흩뿌린 점 · 흐린 슈퍼트렌드 ▲▼ 는 그리지 않는다');
+  assert.match(html, /RSI 다이버전스 \d+번/);
+  // 가장 최근 기법 조건 하나만 — 세로 점선 + 꼬리표
+  const withMark = taChartHtml(m, { from: 50, to: 199, width: 360, mark: { i: 150, side: 'down' } }).html;
+  assert.equal((withMark.match(/class="ta-mark"/g) ?? []).length, 1);
+  assert.match(withMark, /class="ta-mark-tag">▼ 하락 쪽 조건</);
+  assert.match(withMark, /세로 점선 = 최근 기법 조건/);
+  assert.ok(!/ta-mark/.test(taChartHtml(m, { from: 160, to: 199, width: 360, mark: { i: 150, side: 'down' } }).html), '구간 밖이면 그리지 않음');
   // 짚은 자리 ↔ 봉 번호
   assert.equal(taIndexAt(layout, taXOf(layout, 120)), 120);
   assert.equal(taIndexAt(layout, -50), 50);
@@ -376,6 +374,7 @@ test('한눈에 — 결론 한 줄 + 큰 숫자 칸 여섯, 방향은 ▲ ▼ �
   const m = taModel({ tf: '4h', bars });
   const b = taBoard(m);
   assert.deepEqual(b.tiles.map((t) => t.key), ['tdiv', 'trsi', 'st', 'ma', 'trend', 'obv']);
+  assert.deepEqual(b.mark, techNow(m).last ? { i: techNow(m).last.i, side: techNow(m).last.side } : null, '차트 표시는 결론에 쓴 조건과 같은 봉');
   const rsi = b.tiles[1];
   assert.equal(rsi.big, m.rsi[m.n - 1].toFixed(1), 'RSI 는 숫자를 크게');
   assert.deepEqual(rsi.bands, [20, 30, 80, 90]);

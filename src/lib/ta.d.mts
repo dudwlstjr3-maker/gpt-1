@@ -149,5 +149,7 @@ export interface TaTile {
 export interface TaBoardData {
   verdict: { side: TaDir | null; text: string; strong: boolean; sub: string };
   tiles: TaTile[];
+  /** 차트에 세로 점선으로 표시할 가장 최근 기법 조건 */
+  mark: { i: number; side: TaDir } | null;
 }
 export function taBoard(m: TaModel, i?: number): TaBoardData;

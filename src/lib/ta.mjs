@@ -663,7 +663,7 @@ export function taBoard(m, i = m.n - 1) {
       cap: r.dir ? `${r.dir === 'up' ? '오른' : '내린'} 봉 쪽 거래량` : r.note || '0',
     });
   }
-  return { verdict: { ...now.head, sub: now.sub }, tiles };
+  return { verdict: { ...now.head, sub: now.sub }, tiles, mark: now.last ? { i: now.last.i, side: now.last.side } : null };
 }
 
 /* ------------------------------ 종목 찾기 ------------------------------ */
@@ -719,7 +719,7 @@ export const TA_DEFAULT_TF = '4h';
 export const TA_TEXT = {
   title: '종목 차트',
   lede: '종목을 찾아 RSI · 다이버전스 · 슈퍼트렌드 · OBV · 이동평균 · 추세선을 한 화면에서 봅니다. 운영자 기법으로 지금 상태를 함께 적습니다. 지표의 상태를 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
-  markNote: `● 는 운영자 기법 조건이 생긴 봉입니다 — 봉 아래는 상승 쪽(RSI ${TA_RSI_LOW} 이하 · 상승 다이버전스), 봉 위는 하락 쪽(RSI ${TA_RSI_HIGH} 이상 · 하락 다이버전스). 큰 원은 RSI ${TA_RSI_STRONG_LOW} 이하 · ${TA_RSI_STRONG_HIGH} 이상. 흐린 ▲ ▼ 는 슈퍼트렌드 전환(후순위). 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
+  markNote: `세로 점선은 '지금 상태' 결론에 쓴 가장 최근 기법 조건이 생긴 봉입니다. RSI 칸의 비스듬한 점선과 ▲ ▼ 는 다이버전스(두 저점 · 고점을 이은 선)입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
   tallyNote: '지표가 한쪽으로 모였다는 것은 지금 상태일 뿐, 앞으로의 방향을 말하지 않습니다.',
   techTitle: '운영자 기법',
   techSteps: [

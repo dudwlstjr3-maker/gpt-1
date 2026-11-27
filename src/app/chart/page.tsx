@@ -18,7 +18,7 @@ import { SkeletonCard } from '@/components/ui/States';
 import { changeColor } from '@/lib/scale';
 import { taAssets, TA_DEFAULT_ASSET } from '@/lib/taAssets';
 import {
-  taModel, taBoard, taReadout, taParseCode, taBarUnit, taLastChange, techEvents, taSearch,
+  taModel, taBoard, taReadout, taParseCode, taBarUnit, taLastChange, taSearch,
   TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT,
 } from '@/lib/ta.mjs';
 import {
@@ -130,19 +130,19 @@ export default function ChartPage() {
     const to = model.n - 1;
     const from = Math.max(0, to - want + 1);
     const price = taPrice(data.precision);
-    const tech = techEvents(model);
+    const board = taBoard(model);
     const chart = width
       ? taChartHtml(model, {
           from,
           to,
           width,
           price,
-          tech,
+          mark: board.mark,
           date: taAxisDate(data.tf, to - from + 1, data.market),
           title: `${data.name} ${taBarUnit(data.tf)}`,
         })
       : null;
-    return { from, to, price, chart, board: taBoard(model), stamp: taStamp(data.tf, data.market) };
+    return { from, to, price, chart, board, stamp: taStamp(data.tf, data.market) };
   }, [model, data, range, width]);
 
   const moveCross = useCallback(

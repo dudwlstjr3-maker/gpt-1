@@ -4234,8 +4234,13 @@ async function main() {
     check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 지금 상태(큰 숫자 칸) · 차트 · 구간',
       ['ta-search', 'ta-seg', 'ta-chart', 'ta-ranges', 'ta-read', 'ta-fold', 'ta-howto', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
       ['taSuggestHtml(', 'taQuickHtml(', 'taBoardHtml(taBoard('].every((f) => page.includes(f.replace('taBoardHtml(taBoard(', 'taBoardHtml(')) && vr.includes(f)) &&
-      /board: taBoard\(model\)/.test(page) &&
-      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /tech: techEvents\(m\)/.test(tpl) && /\btech,\n/.test(page));
+      /const board = taBoard\(model\)/.test(page) &&
+      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /mark: taBoard\(m\)\.mark/.test(tpl) && /mark: board\.mark/.test(page));
+    // 2026-11-27 사용자: "차트에서 왜 점 같은 거 있지? 너무 가독성이 떨어지는데" — 흩뿌린 점 · 흐린 ▲▼ 를 빼고 가장 최근 조건 하나만
+    const svgNow = (await import('../src/lib/taChart.mjs')).taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360, mark: ta.taBoard(m4).mark }).html;
+    check('차트에 점(●) · 흐린 슈퍼트렌드 ▲▼ 없음 — 최근 기법 조건만 세로 점선 하나와 꼬리표',
+      !/<circle /.test(svgNow) && !/ta-flip-st/.test(svgNow) && (svgNow.match(/class="ta-mark"/g) ?? []).length === (ta.taBoard(m4).mark ? 1 : 0) &&
+      (svgNow.match(/class="ta-mark-tag"/g) ?? []).length === (ta.taBoard(m4).mark ? 1 : 0) && !/opt\.tech/.test(chart));
     check('자주 보는 종목이 앱 · 미리보기에서 같음', /const QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(page) &&
       /const TA_QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(tpl) && /const TA_PREVIEW = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(build));
     const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');

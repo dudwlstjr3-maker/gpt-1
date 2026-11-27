@@ -3391,7 +3391,7 @@ __TA_CSS__
     const m = refModel(d);
     const w = refWindow(d, m);
     const out = taChartHtml(m, {
-      from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), tech: techEvents(m),
+      from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), mark: taBoard(m).mark,
       date: taAxisDate(d.tf, w.to - w.from + 1, d.market), title: d.name + ' ' + taBarUnit(d.tf),
     });
     box.innerHTML = out.html;

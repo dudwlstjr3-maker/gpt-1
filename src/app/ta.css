@@ -67,7 +67,6 @@
 .ta-k-ma2 i { border-top-color: var(--mk-kr); }
 .ta-k-trend i { border-top: 2px dashed var(--fg); }
 .ta-k-st i { border-top: 2px solid var(--ta-up); box-shadow: 7px 0 0 -0px var(--ta-down); width: 7px; }
-.ta-k-flip i { display: none; }
 
 .ta-grid { stroke: var(--border); stroke-width: 1; }
 .ta-axis { fill: var(--muted-fg); font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -134,12 +133,11 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 .ta-howto[open] > summary::after { content: '접기 ▴'; }
 .ta-howto ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; line-height: 1.6; color: var(--fg); word-break: keep-all; }
 
-/* 그림 안 — 기법 표시 · 흐린 전환 · 강함 기준선 */
-.ta-tech { stroke: none; }
-.ta-tech-strong { stroke: var(--fg-strong); stroke-width: 1.5; }
-.ta-flip-st { opacity: .5; }
+/* 그림 안 — 최근 기법 조건(세로 점선 · 꼬리표) · 강함 기준선 */
+.ta-mark { stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .9; }
+.ta-mark-tag { fill: var(--bg); font-size: 13px; font-weight: 800; }
 .ta-ref-strong { stroke: var(--muted-fg); stroke-width: 1; stroke-dasharray: 1 3; opacity: .55; }
-.ta-k-tech i { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ta-up); box-shadow: 10px 0 0 var(--ta-down); margin-right: 10px; }
+.ta-k-mark i { width: 0; height: 12px; border-top: 0; border-left: 2px dashed var(--fg); }
 
 /* 지금 상태 — 결론 한 줄 + 큰 숫자 칸 (2026-11-27 "숫자들은 크게") */
 .ta-board { display: grid; gap: 8px; }

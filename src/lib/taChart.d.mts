@@ -1,4 +1,4 @@
-import type { TaModel, TaTechEvent, TaBoardData } from './ta.mjs';
+import type { TaModel, TaDir, TaBoardData } from './ta.mjs';
 
 export interface TaLayout {
   L: number;
@@ -20,7 +20,8 @@ export function taChartHtml(
     price?: (v: number) => string;
     date?: (t: number) => string;
     title?: string;
-    tech?: TaTechEvent[];
+    /** 가장 최근 기법 조건 — 세로 점선과 꼬리표 하나 */
+    mark?: { i: number; side: TaDir } | null;
     rsiHigh?: number;
     rsiLow?: number;
     rsiStrongHigh?: number;

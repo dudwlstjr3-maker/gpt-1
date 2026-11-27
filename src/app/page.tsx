@@ -1,6 +1,9 @@
 'use client';
 
 import { useData } from '@/components/providers/DataProvider';
+import type { CSSProperties } from 'react';
+import { snapshotMood } from '@/lib/homeMood.mjs';
+import { scoreColor } from '@/lib/scale';
 import { FngSection } from '@/components/market/FngSection';
 import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
@@ -38,8 +41,14 @@ export default function HomePage() {
     );
   }
 
+  const mood = snapshotMood(snapshot);
+  const style = mood ? {
+    '--mood-ink': scoreColor(mood.score),
+    '--mood-position': `${mood.score}%`,
+  } as CSSProperties : undefined;
+
   return (
-    <div className="mood-home pt-2">
+    <div className="mood-home pt-2" style={style}>
       <h1 className="sr-only">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>
       <FngSection />
       <RiskAlertLine />

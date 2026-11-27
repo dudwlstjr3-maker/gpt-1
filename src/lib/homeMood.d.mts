@@ -12,3 +12,5 @@ export function homeMood(value: number | null, delta: number | null): {
   /** 계기판에서 밝힐 칸 0~4 (극단적 공포 · 공포 · 중립 · 탐욕 · 극단적 탐욕) */
   band: 0 | 1 | 2 | 3 | 4;
 } | null;
+
+export function snapshotMood(snapshot: import('@/types').Snapshot | null): ReturnType<typeof homeMood>;

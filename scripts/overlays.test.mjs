@@ -12,6 +12,11 @@ const series = (vals) => vals.map((v, i) => ({ t: i * D, v }));
 
 test('기본값은 1년(252거래일) 평균선 · VIX 35 — 쫄탐지수의 비교 기간과 같은 1년', () => {
   assert.equal(TREND_MA_DAYS, 252);
+  const prices = Array(251).fill(100);
+  assert.equal(trendNow(series(prices)).ma, null);
+  const first = trendNow(series([...prices, 352]));
+  assert.equal(first.ma, 101);
+  assert.equal(first.above, true);
   assert.equal(VIX_HIGH, 35);
 });
 

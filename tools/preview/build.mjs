@@ -296,7 +296,7 @@ async function main() {
     .replace('__TA_CHART__', () => inlineModule('../../src/lib/taChart.mjs'))
     .replace('__PLAZA_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/plazaText.mjs'), 'utf8').replace(/^export /gm, ''))
     .replace('__PRIVACY_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/privacyText.mjs'), 'utf8').replace(/^export /gm, ''))
-    .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace('export function', 'function'))
+    .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace(/^export function/gm, 'function'))
     // 홈 카드 두 칩(추세 · VIX)의 문구 — 앱과 같은 함수를 그대로 쓴다
     .replace('__OVERLAY_CHIPS_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/overlayChips.mjs'), 'utf8').replace('export function', 'function'))
     .replace('__FONT__', `data:font/woff2;base64,${fontB64}`)

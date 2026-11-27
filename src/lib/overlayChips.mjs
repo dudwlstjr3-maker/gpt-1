@@ -16,7 +16,7 @@ export function overlayChips(now) {
   const trend = t && t.above !== null && Number.isFinite(t.gapPct)
     ? {
         id: 'trend',
-        label: '추세',
+        label: `추세 · ${t.maDays}거래일`,
         glyph: t.above ? '▲' : '▼',
         value: `${short(t.maDays)} ${t.above ? '위' : '아래'}`,
         sub: `${signed(t.gapPct)}%`,

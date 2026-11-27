@@ -1,10 +1,15 @@
 .mood-home {
   display: flow-root;
   background:
-    radial-gradient(ellipse at 2% 0, color-mix(in srgb, var(--accent) 12%, transparent), transparent 26rem),
-    repeating-radial-gradient(ellipse at 108% 2rem, transparent 0 22px, color-mix(in srgb, var(--fg) 4%, transparent) 23px, transparent 24px 36px);
-  background-repeat: no-repeat;
-  background-size: 100% 38rem;
+    radial-gradient(ellipse 80% 26rem at var(--mood-position, 50%) 0,
+      color-mix(in srgb, var(--mood-ink, transparent) 24%, transparent), transparent 96%);
+}
+.mood-home .card.mood-cover {
+  border-top: 3px solid var(--mood-ink, var(--border));
+  background:
+    radial-gradient(ellipse 90% 85% at var(--mood-position, 50%) 0,
+      color-mix(in srgb, var(--mood-ink, transparent) 29%, transparent), transparent),
+    linear-gradient(150deg, var(--surface-2), var(--surface) 75%);
 }
 .card.mood-cover {
   position: relative;
@@ -73,7 +78,7 @@
 .mood-needle-line { stroke: var(--ink); }
 .mood-na { margin: 6px 0 0; text-align: center; font-size: 17px; color: var(--muted-fg, var(--muted)); }
 .mood-na-why { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted-fg, var(--muted)); }
-/* 계기판 아래 두 칩 — 추세(200일선) · VIX. 사실 표시라 단계 색을 입히지 않고, 위/아래는 기호와 말로 적는다.
+/* 계기판 아래 두 칩 — 추세(252거래일선) · VIX. 사실 표시라 단계 색을 입히지 않고, 위/아래는 기호와 말로 적는다.
    줄 전체가 하나의 링크(앱은 a, 미리보기는 button — 심리 상세 차트로)라 누를 자리는 44px 이상 */
 .mood-chips {
   margin: 8px 0 0;
@@ -112,6 +117,28 @@
 .mood-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
 .mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
-.mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }
+.mood-cover footer :is(a,button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--ink) 40%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 13%, var(--surface));
+  color: var(--fg-strong);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mood-cover footer :is(a,button):hover {
+  background: color-mix(in srgb, var(--ink) 23%, var(--surface));
+}
+.mood-cover footer :is(a,button):focus-visible, .pz-mood:focus-visible {
+  outline: 2px solid var(--ink, var(--fg-strong));
+  outline-offset: 2px;
+}
 .home-fold { margin: 12px 0 0; border-top: 1px solid var(--border); }
 .home-fold > summary { padding: 14px 12px; color: var(--fg-strong); font-size: 15px; font-weight: 650; cursor: pointer; }

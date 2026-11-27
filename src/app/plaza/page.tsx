@@ -8,7 +8,12 @@
  * 단추 말은 "오른다 / 내린다". 사고팔라는 말을 쓰지 않는다. 상금 · 실제 돈은 없다.
  */
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
+import Link from 'next/link';
+import { useData } from '@/components/providers/DataProvider';
+import { snapshotMood } from '@/lib/homeMood.mjs';
+import { FNG_STAGES } from '@/types';
+import { scoreColor } from '@/lib/scale';
 import { ModeBadge } from '@/components/ui/Badge';
 import { SkeletonCard } from '@/components/ui/States';
 import { usePlaza } from '@/components/plaza/usePlaza';
@@ -53,6 +58,7 @@ export default function PlazaPage() {
         ) : null}
       </div>
 
+      <PlazaMood mode={state.mode} />
       <Account state={state} busy={busy} act={act} demoLogin={demoLogin} logout={logout} />
 
       <section className="pz-sec" aria-labelledby="pz-game-title">
@@ -72,6 +78,25 @@ export default function PlazaPage() {
 
       <p className="pz-foot">{PLAZA_FOOT}</p>
     </div>
+  );
+}
+
+function PlazaMood({ mode }: { mode: PlazaState['mode'] }) {
+  const { snapshot, error } = useData();
+  const sameMode = snapshot?.mode === mode;
+  const mood = snapshotMood(sameMode ? snapshot : null);
+  const stale = sameMode && (snapshot?.sections.fng.status === 'stale' || !!error);
+  const style = mood ? {
+    '--mood-ink': scoreColor(mood.score),
+    '--mood-position': `${mood.score}%`,
+  } as CSSProperties : undefined;
+  return (
+    <Link href="/fng/us" className="pz-mood" style={style}>
+      <span className="pz-mood-label">미국 쫄탐지수{stale && mood ? ' · 이전 값' : ''}</span>
+      <strong>{mood ? `${mood.score}점 · ${FNG_STAGES[mood.band].label}` : !snapshot && !error ? '불러오는 중' : '산출 불가'}</strong>
+      <span className="pz-mood-arrow" aria-hidden="true">↗</span>
+      {mood && <span className="pz-mood-track" aria-hidden="true"><i /></span>}
+    </Link>
   );
 }
 
@@ -119,48 +144,39 @@ function Account({
       </section>
     );
   }
+  const practiceOnly = state.auth.demo && !state.auth.kakao;
+  const practiceForm = (
+    <form
+      className="pz-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void demoLogin(name);
+      }}
+    >
+      <input aria-label="연습용 이름" placeholder="연습용 이름 (2~12자)" value={name} maxLength={12} onChange={(e) => setName(e.target.value)} />
+      <button type="submit" className="pz-btn primary" disabled={busy || name.trim().length < 2}>연습 로그인</button>
+    </form>
+  );
   return (
     <section className="pz-card" aria-labelledby="pz-join-title">
       <h2 id="pz-join-title" style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 750 }}>
-        카카오로 로그인하고 참여
+        {practiceOnly ? '연습으로 참여하기' : '카카오로 로그인하고 참여'}
       </h2>
-      {state.auth.kakao ? (
-        <a className="pz-kakao" href="/api/auth/kakao/login?next=/plaza">
-          카카오 로그인
-        </a>
+      {practiceOnly ? practiceForm : state.auth.kakao ? (
+        <a className="pz-kakao" href="/api/auth/kakao/login?next=/plaza">카카오 로그인</a>
       ) : (
-        <>
-          <button type="button" className="pz-kakao" disabled>
-            카카오 로그인
-          </button>
-          <p className="pz-hint">{PLAZA_KAKAO_OFF}</p>
-        </>
+        <p className="pz-hint">{PLAZA_KAKAO_OFF}</p>
       )}
       <p className="pz-hint">
-        {PLAZA_LOGIN_NOTE}{' '}
-        <a className="pz-link" href="/privacy">
-          개인정보 처리방침
-        </a>
+        {practiceOnly ? 'DEMO에서 쓸 이름을 입력해 주세요.' : PLAZA_LOGIN_NOTE}{' '}
+        <a className="pz-link" href="/privacy">개인정보 처리방침</a>
       </p>
-      {state.auth.demo ? (
+      {state.auth.demo && state.auth.kakao && (
         <details className="pz-more">
           <summary>DEMO 연습 로그인 ▾</summary>
-          <p className="pz-hint">DEMO 모드에서만 열리는 연습용이에요. 실제 서비스(LIVE)에는 없어요.</p>
-          <form
-            className="pz-form"
-            style={{ marginTop: 8 }}
-            onSubmit={(e) => {
-              e.preventDefault();
-              void demoLogin(name);
-            }}
-          >
-            <input aria-label="연습용 이름" placeholder="연습용 이름 (2~12자)" value={name} maxLength={12} onChange={(e) => setName(e.target.value)} />
-            <button type="submit" className="pz-btn" disabled={busy || name.trim().length < 2}>
-              연습 로그인
-            </button>
-          </form>
+          {practiceForm}
         </details>
-      ) : null}
+      )}
     </section>
   );
 }

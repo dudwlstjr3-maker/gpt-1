@@ -18,6 +18,7 @@ test('지금 값 묶음이 없으면 칩 줄을 그리지 않는다', () => {
 test('평균선 위 — 기호와 말 · 떨어진 정도', () => {
   const [t] = overlayChips({ trend: trend(true, 4.2), vix: null });
   assert.equal(t.glyph, '▲');
+  assert.equal(t.label, '추세 · 252거래일');
   assert.equal(t.value, '1년선 위');
   assert.equal(t.sub, '+4.2%');
   assert.match(t.aria, /S&P 500 가격이 1년\(252거래일\) 평균선보다 4\.2% 위/);

@@ -421,8 +421,8 @@ export class LiveAdapter implements MarketAdapter {
     const id = market === 'us' ? 'spx' : 'kospi';
     const name = market === 'us' ? 'S&P 500' : 'KOSPI';
     // 10년(Yahoo range=10y). 1년만 받으면 심리 상세의 3년·10년 비교 칸이 마지막 1년만 그려지고,
-    // 그 위에 겹치는 '200일 평균선 아래' 음영(2026-11-26)도 마지막 몇 달만 남는다.
-    // 첫 200거래일은 평균을 낼 날이 모이지 않아 음영이 없다 — 메우지 않는다.
+    // 그 위에 겹치는 '252거래일 평균선 아래' 음영(2026-11-26)도 마지막 몇 달만 남는다.
+    // 첫 251거래일은 평균을 낼 날이 모이지 않아 음영이 없다 — 메우지 않는다.
     const series = await fetchDailySeries(yahooConfig(envUrl(this.baseUrlEnvFor(market))), id, 3650);
     return series.length ? { id, name, series, precision: 2 } : null;
   }

@@ -43,3 +43,11 @@ export function homeMood(value, delta) {
   const band = Math.min(4, Math.floor(score / 20));
   return { score, word, size, change, glyph, angle, yesterday, band };
 }
+
+/** 홈과 광장은 같은 스냅샷에서 미국 계기판이 표시할 값만 읽는다. */
+export function snapshotMood(snapshot) {
+  const section = snapshot?.sections.fng;
+  if (snapshot?.fatalError || !['ok', 'partial', 'stale'].includes(section?.status)) return null;
+  const us = section.data?.find((item) => item.market === 'us');
+  return homeMood(us?.score, null);
+}

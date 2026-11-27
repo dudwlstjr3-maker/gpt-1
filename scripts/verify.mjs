@@ -3835,8 +3835,8 @@ async function main() {
     check('추세 음영이 차트에 그린 그 S&P 500 으로 다시 계산한 값과 같음',
       bm.length >= TREND_MA_DAYS && JSON.stringify(again) === JSON.stringify(ov?.trend?.spans),
       `다시 계산 ${again.length}곳 · API ${ov?.trend?.spans?.length}곳`);
-    // 평균을 낼 날이 모이기 전(첫 200거래일)에는 음영이 없다 — 메우지 않는다
-    check('첫 252거래일에는 음영을 만들지 않음', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
+    // 평균을 낼 날이 모이기 전(첫 251거래일)에는 음영이 없다 — 메우지 않는다
+    check('252번째 유효 종가부터 음영을 계산', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
     check('DEMO 10년 안에 VIX 35 이상인 날이 있음 (띠가 실제로 그려짐)', !fb?.mode || fb.mode !== 'demo' || (ov?.vix?.spans?.length ?? 0) > 0,
       `${ov?.vix?.spans?.length ?? 0}곳`);
     const tn = trendNow(bm, TREND_MA_DAYS);
@@ -3850,7 +3850,7 @@ async function main() {
     check('홈(스냅샷)의 지금 값이 심리 상세와 같음', JSON.stringify(sNow) === JSON.stringify(now), JSON.stringify(sNow));
     const chips = overlayChips(sNow) ?? [];
     check('홈 칩 두 개 — 위/아래를 말로 · 사고팔 말 없음',
-      chips.length === 2 && /^1년선 (위|아래)$/.test(chips[0].value) && /^35 (이상|아래)$/.test(chips[1].sub ?? '') &&
+      chips.length === 2 && chips[0].label === '추세 · 252거래일' && /^1년선 (위|아래)$/.test(chips[0].value) && /^35 (이상|아래)$/.test(chips[1].sub ?? '') &&
       !/매수|매도|사세요|파세요|추천/.test(JSON.stringify(chips)), JSON.stringify(chips.map((c) => [c.value, c.sub])));
     check('칩 값이 없으면 산출 불가 — 0 이나 위로 채우지 않음',
       overlayChips({ trend: { name: 'S&P 500', maDays: 252, above: null, gapPct: null }, vix: null }).every((c) => c.value === '산출 불가' && c.sub === null));

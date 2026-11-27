@@ -78,7 +78,7 @@
 .mood-needle-line { stroke: var(--ink); }
 .mood-na { margin: 6px 0 0; text-align: center; font-size: 17px; color: var(--muted-fg, var(--muted)); }
 .mood-na-why { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted-fg, var(--muted)); }
-/* 계기판 아래 두 칩 — 추세(200일선) · VIX. 사실 표시라 단계 색을 입히지 않고, 위/아래는 기호와 말로 적는다.
+/* 계기판 아래 두 칩 — 추세(252거래일선) · VIX. 사실 표시라 단계 색을 입히지 않고, 위/아래는 기호와 말로 적는다.
    줄 전체가 하나의 링크(앱은 a, 미리보기는 button — 심리 상세 차트로)라 누를 자리는 44px 이상 */
 .mood-chips {
   margin: 8px 0 0;

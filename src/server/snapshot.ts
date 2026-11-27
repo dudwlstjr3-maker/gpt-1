@@ -227,7 +227,7 @@ export async function buildSnapshot({ scenario, now = new Date(), futuresRange }
           latest.stage = null;
           latest.unavailableReason = '산출된 점수가 허용 범위를 벗어나 표시하지 않습니다.';
         }
-        // 홈 카드에 붙는 두 칩 — 추세(200일선) · VIX. 못 받으면 칩만 빠진다
+        // 홈 카드에 붙는 두 칩 — 추세(252거래일선) · VIX. 못 받으면 칩만 빠진다
         if (m === 'us') latest.overlayNow = overlayNowFrom(await overlayInputs(adapter, ctx));
         scores.push(latest);
       }

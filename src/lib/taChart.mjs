@@ -398,6 +398,7 @@ export function taCrossSvg(m, layout, i, opt = {}) {
   const val = (v) => (fin(v) ? price(v) : none);
   const rows = [
     ['종가', `${val(c)}${chgText}`, chg > 0 ? up : chg < 0 ? down : null],
+    ['시가', val(m.o[i]), null],
     ['고 · 저', `${val(m.h[i])} · ${val(m.l[i])}`, null],
     ['RSI', fin(r) ? r.toFixed(1) : none, null],
     ['슈퍼트렌드', st ? `${st === 'up' ? '▲' : '▼'} ${val(m.st.line[i])}` : none, st === 'up' ? up : st === 'down' ? down : null],

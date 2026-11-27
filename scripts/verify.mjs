@@ -4237,9 +4237,9 @@ async function main() {
       const tc = await import('../src/lib/taChart.mjs');
       const out = tc.taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360 });
       const tip = tc.taCrossSvg(m4, out.layout, m4.n - 3, { price: (v) => v.toFixed(2), stamp: () => '' });
-      check('차트를 누르면 그 봉의 숫자 — 세로선 · 종가 · RSI 꼬리표 · 상자(종가 · 고저 · RSI · 슈퍼트렌드 · 20/60선 · 1년선)',
+      check('차트를 누르면 그 봉의 숫자 — 세로선 · 종가 · RSI 꼬리표 · 상자(종가 · 시가 · 고저 · RSI · 슈퍼트렌드 · 20/60선 · 1년선)',
         /<g class="ta-crossg"><\/g>/.test(out.html) && (tip.match(/class="ta-cross-tag"/g) ?? []).length === 2 &&
-        ['종가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선'].every((k) => tip.includes(`class="ta-tip-l">${k}<`)) &&
+        ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선'].every((k) => tip.includes(`class="ta-tip-l">${k}<`)) &&
         tip.includes(`>${m4.c[m4.n - 3].toFixed(2)}</text>`));
     }
 

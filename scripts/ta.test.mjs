@@ -422,7 +422,7 @@ test('누른 봉의 숫자 — 세로선 · 종가와 RSI 꼬리표 · 숫자 �
   assert.equal((right.match(/class="ta-cross-tag"/g) ?? []).length, 2, '종가 · RSI 꼬리표');
   assert.match(right, new RegExp(`>${m.c[290].toFixed(2)}</text>`));
   assert.match(right, new RegExp(`>${m.rsi[290].toFixed(1)}</text>`));
-  for (const k of ['종가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선']) assert.match(right, new RegExp(`class="ta-tip-l">${k}<`));
+  for (const k of ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선']) assert.match(right, new RegExp(`class="ta-tip-l">${k}<`));
   const boxX = (svg) => Number(svg.match(/<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" height="[\d.]+" rx="8" class="ta-tip"/)[1]);
   assert.ok(boxX(right) < layout.W / 2, '오른쪽을 누르면 상자는 왼쪽');
   assert.ok(boxX(taCrossSvg(m, layout, 175, { price, stamp })) > layout.L + 20, '왼쪽을 누르면 상자는 오른쪽');

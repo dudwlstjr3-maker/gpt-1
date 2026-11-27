@@ -1,6 +1,6 @@
-/* 참고 차트 (2026-11-27) — 앱(src/app/ref/page.tsx)과 미리보기(template.html viewRef)가 같은 마크업 · 같은 CSS.
+/* 종목 차트 (2026-11-27) — 앱(src/app/chart/page.tsx)과 미리보기(template.html viewRef)가 같은 마크업 · 같은 CSS.
    미리보기는 tools/preview/build.mjs 가 이 파일을 그대로 끼워 넣는다(__TA_CSS__).
-   그림(SVG)은 src/lib/taChart.mjs, '지금 상태' 표는 taSummaryHtml 이 만든다.
+   그림(SVG) · 기법 카드 · 지금 상태 표 · 검색 추천은 src/lib/taChart.mjs 가 만든다.
    오름 · 내림 색은 등락 색 설정(한국식 · 해외식)을 따르고, 뜻은 ▲ ▼ 와 말로도 전한다.
    글자는 12px 아래로 내리지 않는다. 누를 자리는 32px 이상. 간격은 4px 격자. */
 
@@ -110,3 +110,51 @@
 .ta-err { margin: 0; padding: 12px; border-radius: var(--box-radius); background: var(--surface); font-size: 13.5px; color: var(--fg); word-break: keep-all; }
 button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; }
 .ta .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* 종목 찾기 */
+.ta-search { display: flex; gap: 8px; }
+.ta-search input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: var(--box-radius); border: 1px solid var(--border-strong, var(--border));
+  background: var(--surface); color: var(--fg-strong); font: inherit; font-size: 16px;
+}
+.ta-search button {
+  min-height: 44px; padding: 0 16px; border-radius: var(--box-radius); border: 1px solid var(--border); background: var(--surface);
+  color: var(--fg-strong); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.ta-search input:focus-visible, .ta-search button:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+.ta-sug { margin: 0; padding: 4px; list-style: none; border-radius: var(--box-radius); background: var(--surface); display: grid; gap: 2px; }
+.ta-sug button {
+  width: 100%; min-height: 40px; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 0; border-radius: calc(var(--box-radius) - 2px); background: transparent; color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; text-align: left;
+}
+.ta-sug button:hover, .ta-sug button:focus-visible { background: var(--surface-2, var(--bg-elevated)); outline: none; }
+.ta-sug b { font-weight: 700; color: var(--fg-strong); }
+.ta-sug span { font-size: 12.5px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
+.ta-quick { display: flex; gap: 4px; flex-wrap: wrap; }
+.ta-quick button {
+  min-height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent;
+  color: var(--fg); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.ta-quick button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg-strong); font-weight: 700; }
+.ta-quick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 운영자 기법 */
+.ta-tech-card { margin-bottom: 8px; padding: 12px; border-radius: var(--box-radius); background: var(--surface); }
+.ta-tech-card[data-side="up"] { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ta-up) 55%, transparent); }
+.ta-tech-card[data-side="down"] { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ta-down) 55%, transparent); }
+.ta-tech-head { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ta-tech-head b { font-size: 17px; font-weight: 800; color: var(--fg-strong); }
+.ta-strong { padding: 0 8px; border-radius: 99px; border: 1px solid currentColor; font-size: 12px; font-weight: 700; color: var(--fg-strong); }
+.ta-tech-sub { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--fg); word-break: keep-all; }
+.ta-howto { margin-top: 8px; }
+.ta-howto > summary { min-height: 32px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--fg); cursor: pointer; }
+.ta-howto > summary::after { content: '펼치기 ▾'; font-size: 12px; font-weight: 500; color: var(--muted-fg); }
+.ta-howto[open] > summary::after { content: '접기 ▴'; }
+.ta-howto ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; line-height: 1.6; color: var(--fg); word-break: keep-all; }
+
+/* 그림 안 — 기법 표시 · 흐린 전환 · 강함 기준선 */
+.ta-tech { stroke: none; }
+.ta-tech-strong { stroke: var(--fg-strong); stroke-width: 1.5; }
+.ta-flip-st { opacity: .5; }
+.ta-ref-strong { stroke: var(--muted-fg); stroke-width: 1; stroke-dasharray: 1 3; opacity: .55; }
+.ta-k-tech i { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ta-up); box-shadow: 10px 0 0 var(--ta-down); margin-right: 10px; }

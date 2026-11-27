@@ -1637,7 +1637,7 @@ export class DemoAdapter implements MarketAdapter {
   }
 
   /**
-   * 참고 차트 — DEMO 세계의 종가에 맞춰 지은 봉 (demo/bars.ts).
+   * 종목 차트 — DEMO 세계의 종가에 맞춰 지은 봉 (demo/bars.ts).
    * 목록에 없는 종목 코드는 DEMO 에 값이 없다. 지어내지 않고 그렇다고 말한다.
    */
   async getBars(req: { assetId: string | null; code: string | null; tf: TaTf }, ctx: AdapterContext): Promise<TaBarsResult> {

@@ -1,6 +1,6 @@
 /**
- * 참고 차트 그림 (2026-11-27) — 봉 · 이동평균 · 1년선 · 슈퍼트렌드 · 전환 표시 / RSI · 다이버전스 / OBV 오실레이터.
- * 순수 함수로 SVG 글을 만든다. 앱(src/app/ref)과 미리보기(template.html, __TA_CHART__)가 같은 그림을 그린다.
+ * 종목 차트 그림 (2026-11-27) — 봉 · 이동평균 · 1년선 · 슈퍼트렌드 · 기법 표시(●) · 전환 표시 / RSI · 다이버전스 / OBV 오실레이터.
+ * 순수 함수로 SVG 글을 만든다. 앱(src/app/chart)과 미리보기(template.html, __TA_CHART__)가 같은 그림을 그린다.
  * import 를 두지 않는다 — 미리보기에 그대로 끼워 넣기 때문이다. 모델은 ta.mjs 의 taModel.
  *
  * 색만으로 뜻을 전하지 않는다(AGENTS.md 4절): 전환은 ▲ / ▼ 모양, 선은 범례 글, 상태는 '지금 상태' 표의 말.
@@ -137,18 +137,39 @@ export function taChartHtml(m, opt) {
     if (dDn) parts.push(`<path d="${dDn}" class="ta-line ta-st" style="stroke:${down}"/>`);
   }
 
-  // 전환 표시 ▲ / ▼ — 상승 전환은 봉 아래, 하락 전환은 봉 위
+  // 슈퍼트렌드 전환 ▲ / ▼ — 운영자 기법에서는 후순위라 흐리게. 상승 전환은 봉 아래, 하락 전환은 봉 위
   let flipCount = 0;
   for (const f of m.st.flips) {
     if (f.i < from || f.i > to) continue;
     flipCount += 1;
     const xc = r1(x(f.i));
     if (f.dir === 'up') {
-      const yy = r1(Math.min(P.top + P.h - 2, py(m.l[f.i]) + 14));
-      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip" style="fill:${up}">▲</text>`);
+      const yy = r1(Math.min(P.top + P.h - 2, py(m.l[f.i]) + 26));
+      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip ta-flip-st" style="fill:${up}">▲</text>`);
     } else {
-      const yy = r1(Math.max(P.top + 12, py(m.h[f.i]) - 5));
-      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip" style="fill:${down}">▼</text>`);
+      const yy = r1(Math.max(P.top + 12, py(m.h[f.i]) - 17));
+      parts.push(`<text x="${xc}" y="${yy}" text-anchor="middle" class="ta-flip ta-flip-st" style="fill:${down}">▼</text>`);
+    }
+  }
+
+  // 운영자 기법 조건 ● — 상승 쪽은 봉 아래, 하락 쪽은 봉 위. 큰 원(테두리)은 RSI 20 이하 · 90 이상(강함).
+  // 다이버전스는 피벗 봉에 찍는다(오른쪽 5봉 뒤 확인). 같은 봉 · 같은 쪽은 한 번만.
+  let techCount = 0;
+  {
+    const seen = new Set();
+    for (const e of opt.tech ?? []) {
+      if (e.i < from || e.i > to) continue;
+      const key = `${e.i}:${e.side}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      techCount += 1;
+      const xc = r1(x(e.i));
+      const col = e.side === 'up' ? up : down;
+      const yy = e.side === 'up' ? Math.min(P.top + P.h - 4, py(m.l[e.i]) + 9) : Math.max(P.top + 4, py(m.h[e.i]) - 9);
+      const strong = (opt.tech ?? []).some((x) => x.i === e.i && x.side === e.side && x.strong);
+      parts.push(strong
+        ? `<circle cx="${xc}" cy="${r1(yy)}" r="5" class="ta-tech ta-tech-strong" style="fill:${col}"/>`
+        : `<circle cx="${xc}" cy="${r1(yy)}" r="3.5" class="ta-tech" style="fill:${col}"/>`);
     }
   }
 
@@ -165,8 +186,14 @@ export function taChartHtml(m, opt) {
   /* ---------- RSI 패널 ---------- */
   const ry = (v) => RS.top + (1 - v / 100) * RS.h;
   parts.push(`<text x="${L}" y="${RS.top - 8}" class="ta-ptitle">RSI 14${fin(m.rsi[to]) ? ` · ${m.rsi[to].toFixed(1)}` : ''}</text>`);
-  parts.push(`<rect x="${L}" y="${r1(ry(70))}" width="${plotW}" height="${r1(ry(30) - ry(70))}" class="ta-band"/>`);
-  for (const v of [70, 30]) {
+  // 운영자 기준 — 80 과열 · 30 침체(글자), 90 · 20 강함(흐린 선)
+  const hiL = opt.rsiHigh ?? 80;
+  const loL = opt.rsiLow ?? 30;
+  parts.push(`<rect x="${L}" y="${r1(ry(hiL))}" width="${plotW}" height="${r1(ry(loL) - ry(hiL))}" class="ta-band"/>`);
+  for (const v of [opt.rsiStrongHigh ?? 90, opt.rsiStrongLow ?? 20]) {
+    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref ta-ref-strong"/>`);
+  }
+  for (const v of [hiL, loL]) {
     parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref"/>`);
     parts.push(`<text x="${W - 4}" y="${r1(ry(v)) + 4}" text-anchor="end" class="ta-axis">${v}</text>`);
   }
@@ -225,7 +252,7 @@ export function taChartHtml(m, opt) {
   // 손가락으로 짚은 자리 — 처음에는 숨긴다
   parts.push(`<line x1="0" x2="0" y1="${P.top}" y2="${OB.top + OB.h}" class="ta-cross" visibility="hidden"/>`);
 
-  const label = `${opt.title ?? '참고 차트'} — 봉 ${count}개. 슈퍼트렌드 전환 ${flipCount}번, RSI 다이버전스 ${divCount}번. 같은 내용을 아래 '지금 상태' 표에서 글로 볼 수 있습니다.`;
+  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. 기법 조건 ${techCount}번, RSI 다이버전스 ${divCount}번, 슈퍼트렌드 전환 ${flipCount}번. 같은 내용을 '운영자 기법' 과 '지금 상태' 표에서 글로 볼 수 있습니다.`;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" class="ta-svg">${parts.join('')}</svg>`;
 
   const legend = [
@@ -234,7 +261,8 @@ export function taChartHtml(m, opt) {
     ['ta-k-ma2', `${m.ma[1]?.p ?? 60}선`],
     ['ta-k-trend', '1년선(추세선)'],
     ['ta-k-st', '슈퍼트렌드'],
-    ['ta-k-flip', '▲ 상승 전환 · ▼ 하락 전환'],
+    ['ta-k-tech', '기법 조건 (큰 원 = 강함)'],
+    ['ta-k-flip', '흐린 ▲ ▼ 슈퍼트렌드 전환'],
   ].map(([k, t]) => `<li class="${k}"><i aria-hidden="true"></i>${esc(t)}</li>`).join('');
 
   return {
@@ -255,7 +283,7 @@ export function taXOf(layout, i) {
 }
 
 /**
- * '지금 상태' 표 — rows 는 ta.mjs 의 taSummary, tally 는 taTallyText.
+ * '지금 상태' 표 — rows 는 ta.mjs 의 taSummary, tally 는 taTallyText(없으면 세기 줄을 뺀다).
  * 방향 있는 줄은 값에 ▲ ▼ 와 말이 같이 있고, 색은 덧붙일 뿐이다.
  */
 export function taSummaryHtml(rows, tally) {
@@ -263,7 +291,7 @@ export function taSummaryHtml(rows, tally) {
     `<li data-k="${esc(r.key)}"><span class="ta-n">${esc(r.name)}</span>` +
     `<span class="ta-v"${r.dir ? ` style="color:var(--ta-${r.dir === 'up' ? 'up' : 'down'})"` : ''}>${esc(r.value)}</span>` +
     (r.note ? `<span class="ta-s">${esc(r.note)}</span>` : '') + '</li>').join('');
-  return `<ul class="ta-sum">${li}</ul><p class="ta-tally">${esc(tally)}</p>`;
+  return `<ul class="ta-sum">${li}</ul>${tally ? `<p class="ta-tally">${esc(tally)}</p>` : ''}`;
 }
 
 /* ------------------------------ 글 모양 ------------------------------ */
@@ -299,4 +327,38 @@ export function taStamp(tf, market) {
     const x = p(t);
     return tf === '1d' ? `${x.year}.${x.month}.${x.day}` : `${x.month}.${x.day} ${x.hour}:${x.minute}`;
   };
+}
+
+/**
+ * '운영자 기법' 카드 — tech 는 ta.mjs 의 techNow. 결론 줄 · 그 까닭 · 보는 순서 세 줄.
+ * 결론은 '조건 충족' 으로만 적는다 — 사고팔라는 말이 아니다.
+ */
+export function taTechHtml(tech) {
+  const side = tech.head.side ?? 'none';
+  const color = tech.head.side ? ` style="color:var(--ta-${tech.head.side})"` : '';
+  const rows = tech.rows.map((r) =>
+    `<li data-k="${esc(r.key)}"><span class="ta-n">${esc(r.name)}</span>` +
+    `<span class="ta-v"${r.dir ? ` style="color:var(--ta-${r.dir === 'up' ? 'up' : 'down'})"` : ''}>${esc(r.value)}</span>` +
+    (r.note ? `<span class="ta-s">${esc(r.note)}</span>` : '') + '</li>').join('');
+  return `<div class="ta-tech-card" data-side="${side}">` +
+    `<p class="ta-tech-head"><b${color}>${esc(tech.head.text)}</b>${tech.head.strong ? '<span class="ta-strong">강함</span>' : ''}</p>` +
+    `<p class="ta-tech-sub">${esc(tech.sub)}</p></div>` +
+    `<ul class="ta-sum">${rows}</ul>`;
+}
+
+/**
+ * 검색 추천 — list 는 ta.mjs 의 taSearch 결과, code 는 목록에 없을 때 코드로 찾기(없으면 null).
+ * 단추마다 data-ta-pick(목록 id) 또는 data-ta-code(코드).
+ */
+export function taSuggestHtml(list, code) {
+  const items = list.map((a) =>
+    `<li><button type="button" data-ta-pick="${esc(a.id)}"><b>${esc(a.name)}</b><span>${esc(a.code ?? '')}</span></button></li>`);
+  if (code) items.push(`<li><button type="button" data-ta-code="${esc(code)}"><b>코드 ${esc(code)} 로 찾기</b><span>목록에 없는 종목</span></button></li>`);
+  return items.length ? `<ul class="ta-sug" role="list">${items.join('')}</ul>` : '';
+}
+
+/** 자주 보는 종목 단추 — items: [{ id, name }], current: 지금 고른 id */
+export function taQuickHtml(items, current) {
+  return `<div class="ta-quick" role="group" aria-label="자주 보는 종목">${items.map((a) =>
+    `<button type="button" data-ta-pick="${esc(a.id)}" aria-pressed="${a.id === current}">${esc(a.name)}</button>`).join('')}</div>`;
 }

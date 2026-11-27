@@ -1,5 +1,5 @@
 /**
- * 참고 차트의 지표 계산 (2026-11-27) — 순수 함수만. 앱(src/app/ref)과 미리보기(template.html)가 같은 파일을 쓴다.
+ * 종목 차트의 지표 계산 (2026-11-27) — 순수 함수만. 앱(src/app/chart)과 미리보기(template.html)가 같은 파일을 쓴다.
  * 미리보기는 tools/preview/build.mjs 가 이 파일을 그대로 끼워 넣는다(__TA_LIB__) — 그래서 import 를 두지 않는다.
  *
  * 무엇을 그리나 — 공식이 공개된 것만
@@ -17,16 +17,20 @@
 
 /** 기본 설정 — 트레이딩뷰 기본값과 같다. TA_TREND_DAYS 는 overlays.mjs 의 TREND_MA_DAYS 와 같아야 한다(테스트). */
 export const TA_RSI = 14;
-export const TA_RSI_HIGH = 70;
+/* RSI 구간 — 운영자 기법의 기준(2026-11-27): 30 이하 침체 · 80 이상 과열, 20 이하 · 90 이상은 더 강하게 본다.
+   흔한 기본값은 70 / 30 이지만, 이 화면은 운영자가 실제로 쓰는 값을 쓴다. */
+export const TA_RSI_HIGH = 80;
 export const TA_RSI_LOW = 30;
+export const TA_RSI_STRONG_HIGH = 90;
+export const TA_RSI_STRONG_LOW = 20;
 export const TA_ST_ATR = 10;
 export const TA_ST_MULT = 3;
 export const TA_OBV_EMA = 20;
 export const TA_MA = [20, 60];
 export const TA_TREND_DAYS = 252;
 export const TA_DIV = { left: 5, right: 5, min: 5, max: 60 };
-/** 요약에서 '최근' 으로 보는 봉 수 — 다이버전스 · 전환 */
-export const TA_RECENT = 20;
+/** 요약에서 '최근' 으로 보는 봉 수 — 다이버전스 · 전환 · 기법 조건 */
+export const TA_RECENT = 30;
 
 const fin = (x) => typeof x === 'number' && Number.isFinite(x);
 
@@ -311,13 +315,23 @@ export function taModel(input) {
 
 const sign = (x, d = 1) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x).toFixed(d)}`;
 
-/** RSI 구간 — 'high' 과열(70 이상) · 'low' 침체(30 이하) · 'mid' */
+/** RSI 구간 — 강한 과열(90 이상) · 과열(80 이상) · 중간 · 침체(30 이하) · 강한 침체(20 이하) */
 export function rsiZone(x) {
   if (!fin(x)) return null;
-  return x >= TA_RSI_HIGH ? 'high' : x <= TA_RSI_LOW ? 'low' : 'mid';
+  if (x >= TA_RSI_STRONG_HIGH) return 'strongHigh';
+  if (x >= TA_RSI_HIGH) return 'high';
+  if (x <= TA_RSI_STRONG_LOW) return 'strongLow';
+  if (x <= TA_RSI_LOW) return 'low';
+  return 'mid';
 }
 
-export const TA_ZONE_TEXT = { high: '과열 (70 이상)', low: '침체 (30 이하)', mid: '중간 (30~70)' };
+export const TA_ZONE_TEXT = {
+  strongHigh: `강한 과열 (${TA_RSI_STRONG_HIGH} 이상)`,
+  high: `과열 (${TA_RSI_HIGH} 이상)`,
+  mid: `중간 (${TA_RSI_LOW}~${TA_RSI_HIGH})`,
+  low: `침체 (${TA_RSI_LOW} 이하)`,
+  strongLow: `강한 침체 (${TA_RSI_STRONG_LOW} 이하)`,
+};
 export const TA_DIR_TEXT = { up: '상승 추세 ▲', down: '하락 추세 ▼' };
 export const TA_FLIP_TEXT = { up: '상승 전환 ▲', down: '하락 전환 ▼' };
 export const TA_DIV_TEXT = { bull: '상승 다이버전스', bear: '하락 다이버전스' };
@@ -446,6 +460,161 @@ export function taReadout(m, i, fmt) {
   return parts.join(' · ');
 }
 
+
+/* ------------------------------ 운영자 기법 (2026-11-27) ------------------------------ */
+
+/*
+ * 운영자가 4시간봉에서 보는 순서를 그대로 계산한다.
+ *   ① RSI 다이버전스가 먼저
+ *   ② RSI 30 이하(침체)면 상승 쪽, 80 이상(과열)이면 하락 쪽 조건
+ *   ③ RSI 20 이하 · 90 이상이면 더 강하게 본다
+ *   ④ 슈퍼트렌드 전환은 그 뒤에 확인하는 후순위
+ * 화면에는 '조건 충족' 이라고만 적는다 — 사고팔라는 말이 아니다(AGENTS.md 1절).
+ */
+
+/**
+ * 기법 조건이 생긴 봉들.
+ *   kind 'rsi' — RSI 가 30 이하(80 이상)로 들어간 첫 봉, 그 안에서 20 이하(90 이상)로 더 들어간 첫 봉(strong)
+ *   kind 'div' — 다이버전스 피벗 봉. 오른쪽 5봉이 지나야 확인되므로 seenAt 이 따로 있다.
+ * side 'up' 상승 쪽 · 'down' 하락 쪽. strong 은 그때 RSI 가 20 이하 · 90 이상.
+ */
+export function techEvents(m) {
+  const ev = [];
+  let low = false;
+  let lowS = false;
+  let high = false;
+  let highS = false;
+  for (let i = 0; i < m.n; i += 1) {
+    const r = m.rsi[i];
+    if (!fin(r)) { low = lowS = high = highS = false; continue; }
+    const nLow = r <= TA_RSI_LOW;
+    const nLowS = r <= TA_RSI_STRONG_LOW;
+    const nHigh = r >= TA_RSI_HIGH;
+    const nHighS = r >= TA_RSI_STRONG_HIGH;
+    if (nLow && !low) ev.push({ i, seenAt: i, side: 'up', kind: 'rsi', strong: nLowS, rsi: r });
+    else if (nLowS && !lowS) ev.push({ i, seenAt: i, side: 'up', kind: 'rsi', strong: true, rsi: r });
+    if (nHigh && !high) ev.push({ i, seenAt: i, side: 'down', kind: 'rsi', strong: nHighS, rsi: r });
+    else if (nHighS && !highS) ev.push({ i, seenAt: i, side: 'down', kind: 'rsi', strong: true, rsi: r });
+    low = nLow; lowS = nLowS; high = nHigh; highS = nHighS;
+  }
+  for (const d of m.div) {
+    const r = m.rsi[d.i];
+    const up = d.kind === 'bull';
+    ev.push({ i: d.i, seenAt: d.seenAt, side: up ? 'up' : 'down', kind: 'div', strong: up ? r <= TA_RSI_STRONG_LOW : r >= TA_RSI_STRONG_HIGH, rsi: r });
+  }
+  return ev.sort((a, b) => a.i - b.i || (a.kind === b.kind ? 0 : a.kind === 'div' ? 1 : -1));
+}
+
+const SIDE_TEXT = { up: '상승 쪽', down: '하락 쪽' };
+const SIDE_GLYPH = { up: '▲', down: '▼' };
+
+/**
+ * 기법으로 본 지금(i 봉 기준, 기본은 마지막 봉).
+ * 최근 TA_RECENT 봉 안에서 확인된 조건 중 가장 늦은 것을 고르고, 같은 쪽 조건이 겹치면 함께 적는다.
+ * 그 뒤 같은 방향 슈퍼트렌드 전환이 있었는지를 후순위로 붙인다.
+ */
+export function techNow(m, i = m.n - 1) {
+  const ev = techEvents(m).filter((e) => e.seenAt <= i && i - e.i <= TA_RECENT);
+  const last = ev[ev.length - 1] ?? null;
+  const ago = (k) => (i - k === 0 ? '이번 봉' : `${i - k}봉 전`);
+  const r = m.rsi[i];
+  const z = rsiZone(r);
+
+  // ① 다이버전스
+  const divs = ev.filter((e) => e.kind === 'div');
+  const dv = divs[divs.length - 1];
+  const rowDiv = {
+    key: 'tdiv',
+    name: '① RSI 다이버전스',
+    value: dv ? `${TA_DIV_TEXT[dv.side === 'up' ? 'bull' : 'bear']} ${SIDE_GLYPH[dv.side]}` : `최근 ${TA_RECENT}봉 안에 없음`,
+    dir: dv ? dv.side : null,
+    note: dv ? `${ago(dv.i)} ${dv.side === 'up' ? '저점' : '고점'} · RSI ${dv.rsi.toFixed(1)} · ${TA_DIV.right}봉 뒤 확인` : '',
+  };
+  // ② RSI 구간
+  const zDir = z === 'low' || z === 'strongLow' ? 'up' : z === 'high' || z === 'strongHigh' ? 'down' : null;
+  const rowRsi = {
+    key: 'trsi',
+    name: `② RSI (${TA_RSI})`,
+    value: z ? `${r.toFixed(1)} · ${TA_ZONE_TEXT[z]}${zDir ? ` ${SIDE_GLYPH[zDir]}` : ''}` : '아직 없음',
+    dir: zDir,
+    note: z ? '' : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야 계산합니다`,
+  };
+  // ③ 슈퍼트렌드 — 후순위
+  const stNow = m.st.dir[i];
+  let stNote = '';
+  let stValue = stNow ? TA_DIR_TEXT[stNow] : '아직 없음';
+  let stDir = null;
+  if (last) {
+    const want = last.side;
+    const f = m.st.flips.find((x) => x.i > last.i && x.i <= i && x.dir === want);
+    if (f) {
+      stValue = `조건 뒤 ${TA_FLIP_TEXT[want]}`;
+      stDir = want;
+      stNote = `조건에서 ${f.i - last.i}봉 뒤 · ${ago(f.i)}`;
+    } else {
+      stValue = `조건 뒤 아직 ${want === 'up' ? '상승' : '하락'} 전환 없음`;
+      stNote = stNow ? `지금 ${TA_DIR_TEXT[stNow]}` : '';
+    }
+  }
+  const rowSt = { key: 'tst', name: '③ 슈퍼트렌드 (후순위)', value: stValue, dir: stDir, note: stNote };
+
+  // 결론 줄
+  let head;
+  let sub;
+  if (last) {
+    const same = ev.filter((e) => e.side === last.side);
+    const kinds = [];
+    if (same.some((e) => e.kind === 'rsi')) kinds.push(last.side === 'up' ? `RSI ${TA_RSI_LOW} 이하` : `RSI ${TA_RSI_HIGH} 이상`);
+    if (same.some((e) => e.kind === 'div')) kinds.push(TA_DIV_TEXT[last.side === 'up' ? 'bull' : 'bear']);
+    const strong = same.some((e) => e.strong);
+    head = { side: last.side, text: `${SIDE_TEXT[last.side]} 조건 충족 ${SIDE_GLYPH[last.side]}`, strong };
+    sub = `${kinds.join(' + ')} · ${ago(last.i)}${strong ? ` · RSI 가 ${last.side === 'up' ? `${TA_RSI_STRONG_LOW} 이하` : `${TA_RSI_STRONG_HIGH} 이상`}까지 가 강함` : ''}`;
+  } else {
+    head = { side: null, text: '기법 조건 없음', strong: false };
+    sub = `최근 ${TA_RECENT}봉 안에 RSI ${TA_RSI_LOW} 이하 · ${TA_RSI_HIGH} 이상 · 다이버전스가 없습니다`;
+  }
+  return { head, sub, rows: [rowDiv, rowRsi, rowSt], last };
+}
+
+/* ------------------------------ 종목 찾기 ------------------------------ */
+
+const CHO = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+function chosung(text) {
+  let out = '';
+  for (const ch of String(text)) {
+    const c = ch.codePointAt(0);
+    out += c >= 0xac00 && c <= 0xd7a3 ? CHO[Math.floor((c - 0xac00) / 588)] : ch;
+  }
+  return out;
+}
+
+/**
+ * 이름 · 초성 · 코드로 찾기. assets: [{ id, name, code }]
+ * 코드가 똑같으면 맨 위, 이름 앞부분 > 코드 앞부분 > 초성 앞부분 > 이름 가운데 > 초성 가운데. 같으면 짧은 이름이 위.
+ */
+export function taSearch(query, assets, limit = 8) {
+  const raw = String(query ?? '').replace(/\s+/g, '');
+  if (!raw) return [];
+  const lc = raw.toLowerCase();
+  const up = raw.toUpperCase();
+  const onlyCho = /^[ㄱ-ㅎ]+$/.test(raw);
+  const out = [];
+  for (const a of assets) {
+    const name = String(a.name).replace(/\s+/g, '').toLowerCase();
+    const ini = chosung(String(a.name).replace(/\s+/g, ''));
+    const code = String(a.code ?? '').toUpperCase();
+    let sc = -1;
+    if (code && code === up) sc = 100;
+    else if (name.startsWith(lc)) sc = 80;
+    else if (code && code.startsWith(up)) sc = 70;
+    else if (onlyCho && ini.startsWith(raw)) sc = 60;
+    else if (name.includes(lc)) sc = 40;
+    else if (onlyCho && ini.includes(raw)) sc = 30;
+    if (sc >= 0) out.push([sc - name.length / 1000, a]);
+  }
+  return out.sort((x, y) => y[0] - x[0]).slice(0, limit).map((x) => x[1]);
+}
+
 /** 보이는 구간 고르기 — [키, 이름, 봉 수] */
 export const TA_RANGES = {
   '1d': [['3m', '3개월', 63], ['6m', '6개월', 126], ['1y', '1년', 252], ['2y', '2년', 504]],
@@ -453,18 +622,31 @@ export const TA_RANGES = {
 };
 export const TA_DEFAULT_RANGE = { '1d': '6m', '4h': '3m' };
 
-/** 참고 화면의 고정 문구 — 앱 · 미리보기가 같은 글을 쓴다 */
+/** 처음 여는 봉 단위 — 운영자는 4시간봉을 많이 본다 */
+export const TA_DEFAULT_TF = '4h';
+
+/** 차트 화면의 고정 문구 — 앱 · 미리보기가 같은 글을 쓴다 */
 export const TA_TEXT = {
-  title: '참고 차트',
-  lede: '쫄탐지수와 함께 RSI · 슈퍼트렌드 · OBV · 이동평균 · 추세선을 한 화면에 모았습니다. 지표가 지금 어떤 상태인지 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
-  markNote: '▲ 상승 전환 · ▼ 하락 전환은 슈퍼트렌드 방향이 바뀐 봉입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.',
+  title: '종목 차트',
+  lede: '종목을 찾아 RSI · 다이버전스 · 슈퍼트렌드 · OBV · 이동평균 · 추세선을 한 화면에서 봅니다. 운영자 기법으로 지금 상태를 함께 적습니다. 지표의 상태를 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
+  markNote: `● 는 운영자 기법 조건이 생긴 봉입니다 — 봉 아래는 상승 쪽(RSI ${TA_RSI_LOW} 이하 · 상승 다이버전스), 봉 위는 하락 쪽(RSI ${TA_RSI_HIGH} 이상 · 하락 다이버전스). 큰 원은 RSI ${TA_RSI_STRONG_LOW} 이하 · ${TA_RSI_STRONG_HIGH} 이상. 흐린 ▲ ▼ 는 슈퍼트렌드 전환(후순위). 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
   tallyNote: '지표가 한쪽으로 모였다는 것은 지금 상태일 뿐, 앞으로의 방향을 말하지 않습니다.',
+  techTitle: '운영자 기법',
+  techSteps: [
+    `4시간봉을 주로 봅니다.`,
+    `① RSI 다이버전스를 먼저 봅니다 — 가격 저점은 낮아졌는데 RSI 저점은 높아지면 상승 쪽, 반대면 하락 쪽.`,
+    `② RSI 가 ${TA_RSI_LOW} 이하(침체)면 상승 쪽, ${TA_RSI_HIGH} 이상(과열)이면 하락 쪽으로 봅니다.`,
+    `③ RSI 가 ${TA_RSI_STRONG_LOW} 아래나 ${TA_RSI_STRONG_HIGH} 위로 가면 더 강하게 봅니다.`,
+    `④ 슈퍼트렌드 전환은 그 뒤에 확인하는 후순위입니다.`,
+  ],
+  techNote: '운영자가 차트를 읽는 순서를 그대로 계산했을 뿐, 사고팔 때를 알려 주거나 결과를 보장하지 않습니다. 조건이 맞아도 반대로 가는 일이 흔합니다.',
+  searchHint: '이름 · 초성 · 코드로 찾습니다 — 테슬라, ㅌㅅㄹ, TSLA, 005930',
   codeHint: '목록에 없는 종목은 코드로 찾습니다 — 미국 TSLA, 한국 005930',
   methods: [
     ['슈퍼트렌드', `ATR(${TA_ST_ATR}) × ${TA_ST_MULT} 띠. 종가가 띠를 넘으면 방향이 바뀝니다. 선이 가격 아래면 상승 추세, 위면 하락 추세.`],
     ['이동평균', `최근 ${TA_MA.join(' · ')}봉 종가의 단순평균.`],
     ['추세선 (1년선)', `일봉 ${TA_TREND_DAYS}개(1년) 종가 평균 — 쫄탐지수가 지표를 견주는 기간과 같은 길이. 4시간봉에서는 전날까지의 1년선을 씁니다.`],
-    ['RSI', `${TA_RSI}봉 동안 오른 폭과 내린 폭의 비율(와일더 방식). ${TA_RSI_HIGH} 이상을 과열, ${TA_RSI_LOW} 이하를 침체로 부릅니다.`],
+    ['RSI', `${TA_RSI}봉 동안 오른 폭과 내린 폭의 비율(와일더 방식). 운영자 기준으로 ${TA_RSI_HIGH} 이상을 과열, ${TA_RSI_LOW} 이하를 침체, ${TA_RSI_STRONG_HIGH} 이상 · ${TA_RSI_STRONG_LOW} 이하를 강한 과열 · 강한 침체로 부릅니다(흔한 기본값은 70 / 30).`],
     ['RSI 다이버전스', `RSI 저점(고점)을 좌우 ${TA_DIV.left}봉으로 찾고, 바로 앞 저점(고점)과 견줍니다(${TA_DIV.min}~${TA_DIV.max}봉 간격). 가격은 더 낮은 저점인데 RSI 는 더 높은 저점이면 상승 다이버전스, 반대면 하락 다이버전스. 오른쪽 ${TA_DIV.right}봉이 지나야 확인됩니다.`],
     ['OBV 오실레이터', `오른 봉의 거래량은 더하고 내린 봉의 거래량은 빼서 쌓은 OBV 에서, 그 ${TA_OBV_EMA}봉 지수평균을 뺀 값. 0 위면 최근 거래량이 오른 봉 쪽에 더 실렸다는 뜻.`],
   ],

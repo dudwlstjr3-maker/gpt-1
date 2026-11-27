@@ -1310,7 +1310,7 @@ export interface PlazaState {
   rules: { postMax: number; minPlayed: number; hideAfter: number; ratingStart: number; k: number };
 }
 
-/* ------------------------------ 참고 차트 (2026-11-27) ------------------------------ */
+/* ------------------------------ 종목 차트 (2026-11-27) ------------------------------ */
 
 export type TaTf = '1d' | '4h';
 

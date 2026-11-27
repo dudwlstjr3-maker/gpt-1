@@ -1,5 +1,5 @@
 /**
- * 참고 차트 지표 — src/lib/ta.mjs
+ * 종목 차트 지표 · 운영자 기법 · 찾기 — src/lib/ta.mjs
  * 공식이 공개된 지표만, 트레이딩뷰 기본값과 같은 계산인지 본다. 매수 · 매도 말이 섞이지 않는지도.
  */
 
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sma, ema, rsi, supertrend, obvOsc, pivots, rsiDivergence, toFourHour, trendForBars,
-  taModel, taSummary, taTally, taTallyText, taReadout, rsiZone, taParseCode,
+  taModel, taSummary, taTally, taTallyText, taReadout, rsiZone, taParseCode, techEvents, techNow, taSearch,
   TA_TREND_DAYS, TA_TEXT, TA_RANGES, TA_DEFAULT_RANGE,
 } from '../src/lib/ta.mjs';
 import { TREND_MA_DAYS } from '../src/lib/overlays.mjs';
@@ -47,8 +47,12 @@ test('RSI 끝값 — 오르기만 하면 100, 내리기만 하면 0, 그대로�
   assert.equal(rsi(up).at(-1), 100);
   assert.equal(rsi([...up].reverse()).at(-1), 0);
   assert.equal(rsi(new Array(20).fill(5)).at(-1), 50);
-  assert.equal(rsiZone(70), 'high');
+  // 운영자 기준 — 80 과열 · 30 침체, 90 · 20 은 강함. 흔한 기본값 70 은 아직 '중간'
+  assert.equal(rsiZone(70), 'mid');
+  assert.equal(rsiZone(80), 'high');
+  assert.equal(rsiZone(90), 'strongHigh');
   assert.equal(rsiZone(30), 'low');
+  assert.equal(rsiZone(20), 'strongLow');
   assert.equal(rsiZone(50), 'mid');
   assert.equal(rsiZone(null), null);
 });
@@ -209,12 +213,17 @@ test('화면 글에 매매를 권하는 말이 없다', () => {
   const banned = /(매수|매도|사세요|파세요|추천|기회|진입|청산|매매 신호|목표가|손절|익절|수익)/;
   const texts = [
     TA_TEXT.title, TA_TEXT.lede, TA_TEXT.markNote, TA_TEXT.tallyNote, TA_TEXT.codeHint, TA_TEXT.notIncluded,
+    TA_TEXT.techTitle, TA_TEXT.techNote, TA_TEXT.searchHint, ...TA_TEXT.techSteps,
     ...TA_TEXT.methods.flat(),
   ];
   const ups = demoBars(300, (i) => 100 + i * 0.5 + Math.sin(i / 5) * 3);
   const downs = demoBars(300, (i) => 300 - i * 0.5 + Math.sin(i / 5) * 3);
   for (const bars of [ups, downs]) {
-    for (const r of taSummary(taModel({ tf: '1d', bars }))) texts.push(r.name, r.value, r.note);
+    const m = taModel({ tf: '1d', bars });
+    for (const r of taSummary(m)) texts.push(r.name, r.value, r.note);
+    const t = techNow(m);
+    texts.push(t.head.text, t.sub);
+    for (const r of t.rows) texts.push(r.name, r.value, r.note);
   }
   for (const s of texts) assert.ok(!banned.test(s), `"${s}"`);
 });
@@ -237,8 +246,15 @@ test('그림 — 보이는 구간의 봉만, 전환 ▲ ▼ 를 그 자리에, �
   assert.match(html, /<svg viewBox="0 0 360 \d+" width="360"/);
   assert.ok(!html.includes('<b>&'), '제목은 이스케이프');
   const flips = m.st.flips.filter((f) => f.i >= 50).length;
-  assert.equal((html.match(/class="ta-flip"[^>]*>▼</g) ?? []).length + (html.match(/class="ta-flip"[^>]*>▲</g) ?? []).length >= flips, true);
+  assert.equal((html.match(/class="ta-flip ta-flip-st"[^>]*>[▲▼]</g) ?? []).length, flips, '슈퍼트렌드 전환은 흐린 ▲ ▼');
   assert.match(html, new RegExp(`슈퍼트렌드 전환 ${flips}번`));
+  // 기법 조건 ● — 상승 쪽은 봉 아래(저가보다 아래), 강함은 큰 원
+  const tech = [{ i: 120, seenAt: 120, side: 'up', kind: 'rsi', strong: false, rsi: 28 }, { i: 150, seenAt: 155, side: 'down', kind: 'div', strong: true, rsi: 91 }];
+  const withTech = taChartHtml(m, { from: 50, to: 199, width: 360, tech }).html;
+  assert.equal((withTech.match(/<circle [^>]*class="ta-tech"/g) ?? []).length, 1);
+  assert.equal((withTech.match(/<circle [^>]*class="ta-tech ta-tech-strong"/g) ?? []).length, 1);
+  assert.match(withTech, /기법 조건 2번/);
+  assert.equal((taChartHtml(m, { from: 130, to: 199, width: 360, tech }).html.match(/<circle /g) ?? []).length, 1, '구간 밖은 그리지 않음');
   // 짚은 자리 ↔ 봉 번호
   assert.equal(taIndexAt(layout, taXOf(layout, 120)), 120);
   assert.equal(taIndexAt(layout, -50), 50);
@@ -267,4 +283,90 @@ test('종목 코드 — 미국 영문, 한국 6자리(코스피 다음 코스닥
   // 가운데 띄어 쓴 것은 붙여 읽는다 ('005 930')
   assert.equal(taParseCode('005 930')?.code, '005930');
   for (const bad of ['', '../x', 'BTC-USD', 'TOOLONG', '12345', '^GSPC', 'TSLA?x=1', null]) assert.equal(taParseCode(bad), null, String(bad));
+});
+
+/** RSI 값을 직접 넣은 가짜 모델 — 기법 규칙만 본다 */
+function fakeModel(rsiVals, extra = {}) {
+  const n = rsiVals.length;
+  return {
+    tf: '4h', n, rsi: rsiVals, div: [], st: { dir: new Array(n).fill('down'), flips: [], line: new Array(n).fill(null) },
+    ...extra,
+  };
+}
+
+test('기법 — RSI 30 이하로 들어간 첫 봉, 그 안에서 20 이하로 더 들어간 첫 봉(강함)', () => {
+  const r = [50, 40, 29, 25, 19, 18, 35, 28, 50];
+  const ev = techEvents(fakeModel(r));
+  assert.deepEqual(ev.map((e) => [e.i, e.side, e.kind, e.strong]), [
+    [2, 'up', 'rsi', false],
+    [4, 'up', 'rsi', true],
+    [7, 'up', 'rsi', false],
+  ]);
+});
+
+test('기법 — RSI 80 이상은 하락 쪽, 90 이상은 강함 · 값이 없으면 끊는다', () => {
+  const r = [50, 81, 85, 92, null, 83, 60];
+  const ev = techEvents(fakeModel(r));
+  assert.deepEqual(ev.map((e) => [e.i, e.side, e.strong]), [[1, 'down', false], [3, 'down', true], [5, 'down', false]]);
+});
+
+test('기법 — 다이버전스는 피벗 봉에, 확인은 5봉 뒤. 확인 전에는 지금 상태에 안 잡힌다', () => {
+  const n = 40;
+  const r = new Array(n).fill(50);
+  r[20] = 35;
+  const m = fakeModel(r, { div: [{ i: 20, from: 8, kind: 'bull', seenAt: 25 }] });
+  assert.deepEqual(techEvents(m).map((e) => [e.i, e.kind, e.side, e.seenAt]), [[20, 'div', 'up', 25]]);
+  assert.equal(techNow(m, 24).head.side, null, '확인 전');
+  const t = techNow(m, 26);
+  assert.equal(t.head.side, 'up');
+  assert.equal(t.head.text, '상승 쪽 조건 충족 ▲');
+  assert.match(t.sub, /^상승 다이버전스 · 6봉 전$/);
+  assert.equal(t.rows[0].dir, 'up');
+});
+
+test('기법 — 같은 쪽 조건이 겹치면 함께 적고, 20 이하까지 갔으면 강함', () => {
+  const r = new Array(40).fill(50);
+  r[10] = 28; r[11] = 18; r[12] = 40;
+  const m = fakeModel(r, { div: [{ i: 11, from: 3, kind: 'bull', seenAt: 16 }] });
+  const t = techNow(m, 20);
+  assert.equal(t.head.strong, true);
+  assert.equal(t.sub, 'RSI 30 이하 + 상승 다이버전스 · 9봉 전 · RSI 가 20 이하까지 가 강함');
+});
+
+test('기법 — 슈퍼트렌드는 조건 뒤 같은 방향 전환만 본다(후순위)', () => {
+  const r = new Array(40).fill(50);
+  r[10] = 25;
+  const dir = new Array(40).fill('down');
+  for (let k = 14; k < 40; k += 1) dir[k] = 'up';
+  const m = fakeModel(r, { st: { dir, flips: [{ i: 5, dir: 'down' }, { i: 14, dir: 'up' }], line: [] } });
+  const st = techNow(m, 20).rows[2];
+  assert.equal(st.value, '조건 뒤 상승 전환 ▲');
+  assert.equal(st.note, '조건에서 4봉 뒤 · 6봉 전');
+  const before = techNow(m, 12).rows[2];
+  assert.equal(before.value, '조건 뒤 아직 상승 전환 없음');
+});
+
+test('기법 — 최근 30봉 안에 아무 조건도 없으면 그렇다고 적는다', () => {
+  const t = techNow(fakeModel(new Array(60).fill(55)));
+  assert.equal(t.head.side, null);
+  assert.equal(t.head.text, '기법 조건 없음');
+  assert.match(t.sub, /최근 30봉 안에 RSI 30 이하 · 80 이상 · 다이버전스가 없습니다/);
+});
+
+test('종목 찾기 — 코드 · 이름 앞부분 · 초성 · 이름 가운데', () => {
+  const list = [
+    { id: 'tsla', name: '테슬라', code: 'TSLA' },
+    { id: 'samsung', name: '삼성전자', code: '005930' },
+    { id: 'kospi', name: '코스피', code: 'KOSPI' },
+    { id: 'kospi200', name: '코스피 200', code: 'KOSPI200' },
+    { id: 'hynix', name: 'SK하이닉스', code: '000660' },
+  ];
+  assert.deepEqual(taSearch('tsla', list).map((a) => a.id), ['tsla']);
+  assert.deepEqual(taSearch('005930', list).map((a) => a.id), ['samsung']);
+  assert.deepEqual(taSearch('ㅌㅅㄹ', list).map((a) => a.id), ['tsla']);
+  assert.deepEqual(taSearch('ㅅㅅ', list).map((a) => a.id), ['samsung']);
+  assert.deepEqual(taSearch('코스피', list).map((a) => a.id), ['kospi', 'kospi200'], '짧은 이름이 위');
+  assert.deepEqual(taSearch('하이닉스', list).map((a) => a.id), ['hynix']);
+  assert.deepEqual(taSearch('  ', list), []);
+  assert.deepEqual(taSearch('없는것', list), []);
 });

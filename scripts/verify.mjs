@@ -4142,11 +4142,13 @@ async function main() {
     check('/privacy 화면이 열림', pp.status === 200 && ppText.includes('개인정보 처리방침') && ppText.includes('가운데를 가려'));
   }
 
-  console.log('\n[8-45] 참고 차트 — RSI · 슈퍼트렌드 · OBV · 이동평균 · 추세선(1년선) · 쫄탐지수');
+  console.log('\n[8-45] 종목 차트 — 종목 찾기 · 운영자 기법(4시간봉 RSI · 다이버전스) · 슈퍼트렌드 · OBV · 이동평균 · 추세선 · 쫄탐지수');
   {
     /*
      * 2026-11-27 사용자: "쫄탐지수 말고도 rsi 나 내가 사용하고 있는 지표들 그리고 추세선 이런 것들을 같이 볼 수 있게 … 참고할 수 있게".
      * 정한 것: 매수 · 매도 대신 '상승 전환 ▲ / 하락 전환 ▼' (규칙 1절 그대로) · 지수 + 종목 코드 찾기 · 일봉 + 4시간봉.
+     * 같은 날 이어서: 이름을 '참고' → '차트'(종목 검색), 운영자 기법 — 4시간봉, ① RSI 다이버전스 ② RSI 30 이하 · 80 이상
+     * ③ 20 이하 · 90 이상은 강함 ④ 슈퍼트렌드는 후순위. 화면에는 '조건 충족' 으로만.
      * 계산은 ta.mjs, 그림 · 표는 taChart.mjs — 앱과 미리보기가 같은 파일을 쓴다.
      */
     const ta = await import('../src/lib/ta.mjs');
@@ -4195,32 +4197,51 @@ async function main() {
     check('방향 있는 줄은 ▲ / ▼ 와 말이 같이 (색만으로 전하지 않음)', rows.filter((r) => r.dir).every((r) => (r.dir === 'up' ? /▲/ : /▼/).test(r.value)));
     check('1년선 길이는 홈 칩 · 심리 상세와 같은 252', ta.TA_TREND_DAYS === 252);
 
+    // 운영자 기법 — 같은 봉으로 계산
+    const m4 = ta.taModel({ tf: '4h', bars: (await getJson('/api/ta?a=tsla&tf=4h')).body?.bars ?? [], daily: null });
+    const ev = ta.techEvents(m4);
+    check('기법 조건 — RSI 30 이하 · 80 이상에 들어간 봉, 20 · 90 은 강함, 다이버전스는 5봉 뒤 확인',
+      ta.TA_RSI_LOW === 30 && ta.TA_RSI_HIGH === 80 && ta.TA_RSI_STRONG_LOW === 20 && ta.TA_RSI_STRONG_HIGH === 90 &&
+      ev.every((e) => e.kind === 'div' ? e.seenAt === e.i + 5 : (e.side === 'up' ? e.rsi <= 30 : e.rsi >= 80) && e.strong === (e.side === 'up' ? e.rsi <= 20 : e.rsi >= 90)),
+      `${ev.length}개`);
+    const now = ta.techNow(m4);
+    check('기법 카드 — 다이버전스 · RSI · 슈퍼트렌드(후순위) 순서, 결론은 \'조건 충족\' 또는 \'없음\'',
+      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
+      now.head.text);
+    check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
+
     const rd = (f) => readFile(f, 'utf8');
     const [page, nav, tpl, build, css, lib, chart, route, live, demoA] = await Promise.all([
-      'src/app/ref/page.tsx', 'src/components/nav/Navigation.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/ta.css',
+      'src/app/chart/page.tsx', 'src/components/nav/Navigation.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/ta.css',
       'src/lib/ta.mjs', 'src/lib/taChart.mjs', 'src/app/api/ta/route.ts', 'src/server/adapters/live/index.ts', 'src/server/adapters/demo/index.ts'].map(rd));
     const vr = tpl.slice(tpl.indexOf('  function viewRef() {'), tpl.indexOf('\n  function drawRef()'));
-    check('하단 탭에 \'참고\' (앱 · 미리보기)', /href: '\/ref', label: '참고'/.test(nav) && /\{ id: 'ref', label: '참고'/.test(tpl) && /ref: viewRef,/.test(tpl));
+    check('하단 탭에 \'차트\' (앱 · 미리보기)', /href: '\/chart', label: '차트'/.test(nav) && /\{ id: 'ref', label: '차트'/.test(tpl) && /ref: viewRef,/.test(tpl) &&
+      !/label: '참고'/.test(nav + tpl));
     check('계산 · 그림 · CSS 는 한 곳 — 미리보기는 같은 파일을 끼워 넣음',
       /__TA_LIB__/.test(tpl) && /__TA_CHART__/.test(tpl) && /__TA_CSS__/.test(tpl) &&
       /inlineModule\('\.\.\/\.\.\/src\/lib\/ta\.mjs'\)/.test(build) && /inlineModule\('\.\.\/\.\.\/src\/lib\/taChart\.mjs'\)/.test(build) &&
       /src\/app\/ta\.css/.test(build) && /from '@\/lib\/ta\.mjs'/.test(page) && /from '@\/lib\/taChart\.mjs'/.test(page) && !/^import /m.test(lib + chart));
-    check('앱 · 미리보기가 같은 마크업 — 차트 · 구간 · 봉 단위 · 코드 찾기 · 지금 상태',
-      ['ta-chart', 'ta-ranges', 'ta-seg', 'ta-code', 'ta-read', 'ta-fold', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
-      /taSummaryHtml\(/.test(page) && /taSummaryHtml\(/.test(vr) && /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl));
+    check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 기법 카드 · 차트 · 구간 · 다른 지표',
+      ['ta-search', 'ta-seg', 'ta-chart', 'ta-ranges', 'ta-read', 'ta-fold', 'ta-howto', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
+      ['taSuggestHtml(', 'taQuickHtml(', 'taTechHtml(', 'taSummaryHtml(', 'techNow('].every((f) => page.includes(f) && vr.includes(f)) &&
+      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /tech: techEvents\(m\)/.test(tpl) && /\btech,\n/.test(page));
+    check('자주 보는 종목이 앱 · 미리보기에서 같음', /const QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(page) &&
+      /const TA_QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(tpl) && /const TA_PREVIEW = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(build));
     const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
-    const words = /(매수|매도|사세요|파세요|추천|매매 신호|진입|청산|목표가|손절|익절|지금이 기회)/;
+    const words = /(매수|매도|사세요|파세요|추천|매매 신호|진입|청산|목표가|손절|익절|지금이 기회|예측)/;
     const hit = [['page', page], ['viewRef', vr], ['ta.mjs', lib], ['taChart.mjs', chart], ['route', route]].filter(([, t]) => words.test(strip(t))).map(([n]) => n);
-    check('매수 · 매도를 권하는 말이 화면 · 계산 어디에도 없음 (규칙 1절)', hit.length === 0, hit.join(','));
-    check('Buy / Sell 표시 대신 상승 전환 ▲ · 하락 전환 ▼', /상승 전환 ▲/.test(lib) && /하락 전환 ▼/.test(lib) && !/\bBuy\b|\bSell\b/.test(strip(lib + chart + page + vr)));
-    check('참고 차트 CSS 에 12px 아래 글자 없음', !/font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/.test(css));
+    check('매수 · 매도를 권하거나 앞날을 말하는 말이 화면 · 계산 어디에도 없음 (규칙 1절)', hit.length === 0, hit.join(','));
+    check('기법은 \'조건 충족\' 으로만 · Buy / Sell 표시 없음', /조건 충족/.test(lib) && /상승 전환 ▲/.test(lib) && !/\bBuy\b|\bSell\b/.test(strip(lib + chart + page + vr)));
+    check('차트 CSS 에 12px 아래 글자 없음', !/font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/.test(css));
     check('목록에 없는 코드는 모양을 거른 뒤에만 바깥 주소에 넣음', /taParseCode\(c\)/.test(route) && /const parsed = taParseCode\(req\.code\)/.test(live));
     check('DEMO 는 목록에 없는 코드를 지어내지 않음', /DEMO 에서는 목록에 있는 지수 · 종목만 볼 수 있습니다/.test(demoA));
     check('거래량이 빠지면 OBV 를 메우지 않고 그리지 않음', /거래량이 빠진 봉이 \$\{missing\}개 있어 OBV 를 그리지 않습니다/.test(lib));
     check('유료 · 비공개 지표는 흉내 내지 않는다고 밝힘', /SignalMaster Pro · AI Moving Average/.test(lib));
-    const pr = await fetch(`${BASE}/ref`);
+    const pr = await fetch(`${BASE}/chart`);
     const prText = await pr.text();
-    check('/ref 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('참고 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
+    check('/chart 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('종목 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
+    const old = await fetch(`${BASE}/ref`, { redirect: 'manual' });
+    check('옛 주소 /ref 는 남기지 않음 (이 PR 안에서 바뀐 이름)', old.status === 404, String(old.status));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

@@ -40,7 +40,7 @@ export interface TaModel {
 }
 
 export interface TaRow {
-  key: 'st' | 'ma' | 'trend' | 'obv' | 'rsi' | 'div';
+  key: 'st' | 'ma' | 'trend' | 'obv' | 'rsi' | 'div' | 'tdiv' | 'trsi' | 'tst';
   name: string;
   value: string;
   dir: TaDir | null;
@@ -50,6 +50,9 @@ export interface TaRow {
 export const TA_RSI: number;
 export const TA_RSI_HIGH: number;
 export const TA_RSI_LOW: number;
+export const TA_RSI_STRONG_HIGH: number;
+export const TA_RSI_STRONG_LOW: number;
+export const TA_DEFAULT_TF: TaTf;
 export const TA_ST_ATR: number;
 export const TA_ST_MULT: number;
 export const TA_OBV_EMA: number;
@@ -87,8 +90,9 @@ export function taModel(input: {
   gmtoffset?: number;
 }): TaModel;
 
-export function rsiZone(x: number | null | undefined): 'high' | 'low' | 'mid' | null;
-export const TA_ZONE_TEXT: Record<'high' | 'low' | 'mid', string>;
+export type TaZone = 'strongHigh' | 'high' | 'mid' | 'low' | 'strongLow';
+export function rsiZone(x: number | null | undefined): TaZone | null;
+export const TA_ZONE_TEXT: Record<TaZone, string>;
 export const TA_DIR_TEXT: Record<TaDir, string>;
 export const TA_FLIP_TEXT: Record<TaDir, string>;
 export const TA_DIV_TEXT: Record<'bull' | 'bear', string>;
@@ -105,7 +109,29 @@ export const TA_TEXT: {
   lede: string;
   markNote: string;
   tallyNote: string;
+  techTitle: string;
+  techSteps: string[];
+  techNote: string;
+  searchHint: string;
   codeHint: string;
   methods: [string, string][];
   notIncluded: string;
 };
+
+export interface TaTechEvent {
+  i: number;
+  seenAt: number;
+  side: TaDir;
+  kind: 'rsi' | 'div';
+  strong: boolean;
+  rsi: number;
+}
+export interface TaTechNow {
+  head: { side: TaDir | null; text: string; strong: boolean };
+  sub: string;
+  rows: TaRow[];
+  last: TaTechEvent | null;
+}
+export function techEvents(m: TaModel): TaTechEvent[];
+export function techNow(m: TaModel, i?: number): TaTechNow;
+export function taSearch<A extends { id: string; name: string; code?: string | null }>(query: string, assets: A[], limit?: number): A[];

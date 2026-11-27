@@ -1,5 +1,5 @@
 /**
- * 참고 차트의 봉 (2026-11-27).
+ * 종목 차트의 봉 (2026-11-27).
  *
  *   GET /api/ta?a=tsla&tf=1d        카탈로그 항목
  *   GET /api/ta?code=TSLA&tf=4h     목록에 없는 종목 — 모양은 taParseCode 가 거른다
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const a = sp.get('a');
   const c = sp.get('code');
   if (a) {
-    if (!taAsset(a)) return NextResponse.json({ error: '참고 차트에서 볼 수 없는 항목입니다.' }, { status: 404 });
+    if (!taAsset(a)) return NextResponse.json({ error: '종목 차트에서 볼 수 없는 항목입니다.' }, { status: 404 });
     assetId = a;
   } else if (c) {
     const parsed = taParseCode(c);

@@ -237,7 +237,7 @@ export async function fetchDailySeries(cfg: YahooConfig, id: string, days: numbe
 }
 
 /* ------------------------------------------------------------------ */
-/* 참고 차트용 봉 (2026-11-27)                                           */
+/* 종목 차트용 봉 (2026-11-27)                                           */
 /* ------------------------------------------------------------------ */
 
 interface BarMeta extends ChartMeta {

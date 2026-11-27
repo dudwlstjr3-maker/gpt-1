@@ -158,8 +158,26 @@ function inlineModule(rel) {
   return `const { ${names.join(', ')} } = (() => {\n${src.replace(/^export /gm, '')}\nreturn { ${names.join(', ')} };\n})();`;
 }
 
-/** 참고 차트 — 미리보기에 담는 항목. 일봉 · 4시간봉 둘 다 */
-const TA_PREVIEW = [['spx', 'index'], ['tsla', 'equity'], ['kospi', 'index'], ['samsung', 'equity']];
+/** 종목 차트 — 미리보기에 봉을 담는 항목(앱의 '자주 보는 종목' 과 같다). 일봉 · 4시간봉 둘 다 */
+const TA_PREVIEW = ['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'];
+
+/** 종목 차트에서 찾을 수 있는 목록 — src/lib/taAssets.ts 와 같은 규칙(미국 · 한국의 지수와 종목) */
+function readTaList() {
+  const src = fs.readFileSync(path.join(HERE, '../../src/lib/catalog.ts'), 'utf8');
+  const out = [];
+  for (const line of src.split('\n')) {
+    const id = line.match(/\{\s*id:\s*'([^']+)'/);
+    const name = line.match(/\bname:\s*'((?:[^'\\]|\\.)*)'/);
+    const symbol = line.match(/\bsymbol:\s*'([^']+)'/);
+    const market = line.match(/\bmarket:\s*'([^']+)'/);
+    const kind = line.match(/\bkind:\s*'([^']+)'/);
+    if (!id || !name || !symbol || !market || !kind) continue;
+    if (!['us', 'kr'].includes(market[1]) || !['index', 'equity'].includes(kind[1])) continue;
+    out.push({ id: id[1], name: name[1], code: symbol[1] });
+  }
+  if (out.length < 20) throw new Error(`종목 차트 목록이 너무 짧습니다: ${out.length}`);
+  return out;
+}
 
 async function j(url) {
   const res = await fetch(BASE + url);
@@ -179,14 +197,14 @@ async function main() {
   for (const m of ['us']) details[m] = (await j(`/api/fng/${m}`)).detail;
   // 쫄탐광장 — 회원 없이 본 모습(DEMO 예시 회원 · 예시 글). 미리보기에서는 참여하지 않는다.
   const plaza = await j('/api/plaza');
-  // 참고 차트 — DEMO 봉. 담지 못한 항목이 있으면 조용히 넘기지 않는다
-  const ta = { assets: [], bars: {} };
-  for (const [id, kind] of TA_PREVIEW) {
+  // 종목 차트 — DEMO 봉. 담지 못한 항목이 있으면 조용히 넘기지 않는다
+  const ta = { list: readTaList(), assets: [], bars: {} };
+  for (const id of TA_PREVIEW) {
     for (const tf of ['1d', '4h']) {
       const r = await j(`/api/ta?a=${id}&tf=${tf}`);
-      if (!r?.bars?.length) throw new Error(`참고 차트 봉이 비었습니다: ${id} ${tf}`);
+      if (!r?.bars?.length) throw new Error(`종목 차트 봉이 비었습니다: ${id} ${tf}`);
       ta.bars[`${id}:${tf}`] = r;
-      if (tf === '1d') ta.assets.push({ id, kind, name: r.name, market: r.market, code: r.code });
+      if (tf === '1d') ta.assets.push({ id, name: r.name, market: r.market, code: r.code });
     }
   }
 

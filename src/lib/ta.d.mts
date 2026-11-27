@@ -135,3 +135,19 @@ export interface TaTechNow {
 export function techEvents(m: TaModel): TaTechEvent[];
 export function techNow(m: TaModel, i?: number): TaTechNow;
 export function taSearch<A extends { id: string; name: string; code?: string | null }>(query: string, assets: A[], limit?: number): A[];
+
+export interface TaTile {
+  key: 'tdiv' | 'trsi' | 'st' | 'ma' | 'trend' | 'obv';
+  label: string;
+  big: string;
+  dir: TaDir | null;
+  cap: string;
+  rsi?: number | null;
+  /** RSI 막대 경계 — 강한 침체 · 침체 · 과열 · 강한 과열 */
+  bands?: [number, number, number, number];
+}
+export interface TaBoardData {
+  verdict: { side: TaDir | null; text: string; strong: boolean; sub: string };
+  tiles: TaTile[];
+}
+export function taBoard(m: TaModel, i?: number): TaBoardData;

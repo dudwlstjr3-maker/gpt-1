@@ -3350,7 +3350,6 @@ __TA_CSS__
     const w = refWindow(d, m);
     const price = taPrice(d.precision);
     const change = taLastChange(m);
-    const rows = taSummary(m).filter((r) => r.key !== 'rsi' && r.key !== 'div');
     const unit = taBarUnit(d.tf);
     const fngList = (DATA.snapshot.sections.fng && DATA.snapshot.sections.fng.data) || [];
     const own = fngList.find((f) => f.market === d.market && f.score !== null);
@@ -3368,9 +3367,9 @@ __TA_CSS__
       html += '<button type="button" class="ta-mood" data-go="fng"><span>' + (mood.market === 'us' ? '미국' : '한국') + ' 쫄탐지수 <b>' + Math.round(mood.score) + '</b> · ' + esc(mood.stage ? mood.stage.label : '') +
         (!own && d.market === 'kr' ? '<small> 한국 쫄탐지수는 내지 않아 미국 것을 봅니다</small>' : '') + '</span><span aria-hidden="true">→</span></button>';
     }
-    html += '<section class="ta-sec" aria-labelledby="ta-tech-title"><h2 id="ta-tech-title">' + esc(TA_TEXT.techTitle) + ' <small>마지막 ' + unit + ' 기준</small></h2>' +
-      '<div>' + taTechHtml(techNow(m)) + '</div>' +
-      '<details class="ta-howto"><summary>보는 순서</summary><ol>' + TA_TEXT.techSteps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>' +
+    html += '<section class="ta-sec" aria-labelledby="ta-now-title"><h2 id="ta-now-title">지금 상태 <small>마지막 ' + unit + ' 기준</small></h2>' +
+      '<div>' + taBoardHtml(taBoard(m)) + '</div>' +
+      '<details class="ta-howto"><summary>' + esc(TA_TEXT.techTitle) + ' — 보는 순서</summary><ol>' + TA_TEXT.techSteps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>' +
       '<p class="ta-note">' + esc(TA_TEXT.techNote) + '</p></section>' +
       '<section class="ta-sec" aria-labelledby="ta-chart-title"><h2 id="ta-chart-title">차트 <small>' + unit + ' · 봉 ' + (w.to - w.from + 1) + '개</small></h2>' +
       '<div class="ta-ranges" role="group" aria-label="보이는 구간">' + TA_RANGES[d.tf].map((r) =>
@@ -3378,8 +3377,6 @@ __TA_CSS__
       '<p class="ta-read" aria-live="polite">' + esc(stamp(m.t[shown]) + ' · ' + taReadout(m, shown, price)) + '</p>' +
       '<div class="ta-chart" id="ta-chart" tabindex="0" aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."></div>' +
       '<p class="ta-note">' + esc(TA_TEXT.markNote) + '</p></section>' +
-      '<section class="ta-sec" aria-labelledby="ta-sum-title"><h2 id="ta-sum-title">다른 지표 <small>마지막 ' + unit + ' 기준</small></h2>' +
-      '<div>' + taSummaryHtml(rows, null) + '</div></section>' +
       '<details class="ta-fold"><summary>산출 방법</summary><dl>' + TA_TEXT.methods.map((x) => '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') +
       '</dl><p class="ta-note">' + esc(TA_TEXT.notIncluded) + '</p></details></div>';
     return html;

@@ -47,7 +47,7 @@ function linePath(vals, from, to, x, y) {
 export function taChartHtml(m, opt) {
   const W = Math.max(280, Math.round(opt.width));
   const L = 8;
-  const R = 62;
+  const R = 68;
   const plotW = W - L - R;
   const from = Math.max(0, opt.from);
   const to = Math.min(m.n - 1, opt.to);
@@ -179,8 +179,8 @@ export function taChartHtml(m, opt) {
     const yy = r1(Math.min(P.top + P.h - 8, Math.max(P.top + 8, py(last))));
     const col = m.c[to] >= m.o[to] ? up : down;
     parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${yy}" y2="${yy}" class="ta-lastline" style="stroke:${col}"/>`);
-    parts.push(`<rect x="${L + plotW + 2}" y="${yy - 9}" width="${R - 4}" height="18" rx="3" style="fill:${col}"/>`);
-    parts.push(`<text x="${W - 4}" y="${yy + 4}" text-anchor="end" class="ta-lastval">${esc(price(last))}</text>`);
+    parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" style="fill:${col}"/>`);
+    parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-lastval">${esc(price(last))}</text>`);
   }
 
   /* ---------- RSI 패널 ---------- */
@@ -282,17 +282,6 @@ export function taXOf(layout, i) {
   return layout.L + (i - layout.from + 0.5) * layout.step;
 }
 
-/**
- * '지금 상태' 표 — rows 는 ta.mjs 의 taSummary, tally 는 taTallyText(없으면 세기 줄을 뺀다).
- * 방향 있는 줄은 값에 ▲ ▼ 와 말이 같이 있고, 색은 덧붙일 뿐이다.
- */
-export function taSummaryHtml(rows, tally) {
-  const li = rows.map((r) =>
-    `<li data-k="${esc(r.key)}"><span class="ta-n">${esc(r.name)}</span>` +
-    `<span class="ta-v"${r.dir ? ` style="color:var(--ta-${r.dir === 'up' ? 'up' : 'down'})"` : ''}>${esc(r.value)}</span>` +
-    (r.note ? `<span class="ta-s">${esc(r.note)}</span>` : '') + '</li>').join('');
-  return `<ul class="ta-sum">${li}</ul>${tally ? `<p class="ta-tally">${esc(tally)}</p>` : ''}`;
-}
 
 /* ------------------------------ 글 모양 ------------------------------ */
 
@@ -329,22 +318,6 @@ export function taStamp(tf, market) {
   };
 }
 
-/**
- * '운영자 기법' 카드 — tech 는 ta.mjs 의 techNow. 결론 줄 · 그 까닭 · 보는 순서 세 줄.
- * 결론은 '조건 충족' 으로만 적는다 — 사고팔라는 말이 아니다.
- */
-export function taTechHtml(tech) {
-  const side = tech.head.side ?? 'none';
-  const color = tech.head.side ? ` style="color:var(--ta-${tech.head.side})"` : '';
-  const rows = tech.rows.map((r) =>
-    `<li data-k="${esc(r.key)}"><span class="ta-n">${esc(r.name)}</span>` +
-    `<span class="ta-v"${r.dir ? ` style="color:var(--ta-${r.dir === 'up' ? 'up' : 'down'})"` : ''}>${esc(r.value)}</span>` +
-    (r.note ? `<span class="ta-s">${esc(r.note)}</span>` : '') + '</li>').join('');
-  return `<div class="ta-tech-card" data-side="${side}">` +
-    `<p class="ta-tech-head"><b${color}>${esc(tech.head.text)}</b>${tech.head.strong ? '<span class="ta-strong">강함</span>' : ''}</p>` +
-    `<p class="ta-tech-sub">${esc(tech.sub)}</p></div>` +
-    `<ul class="ta-sum">${rows}</ul>`;
-}
 
 /**
  * 검색 추천 — list 는 ta.mjs 의 taSearch 결과, code 는 목록에 없을 때 코드로 찾기(없으면 null).
@@ -361,4 +334,33 @@ export function taSuggestHtml(list, code) {
 export function taQuickHtml(items, current) {
   return `<div class="ta-quick" role="group" aria-label="자주 보는 종목">${items.map((a) =>
     `<button type="button" data-ta-pick="${esc(a.id)}" aria-pressed="${a.id === current}">${esc(a.name)}</button>`).join('')}</div>`;
+}
+
+/**
+ * '지금 상태' 판 — board 는 ta.mjs 의 taBoard. 결론 한 줄과 큰 숫자 칸 여섯(2열).
+ * 결론은 '조건 충족' 으로만 적는다 — 사고팔라는 말이 아니다. 칸마다 ▲ ▼ 와 말이 같이 있고, 색은 덧붙일 뿐이다.
+ */
+export function taBoardHtml(board) {
+  const v = board.verdict;
+  const vc = v.side ? ` style="color:var(--ta-${v.side === 'up' ? 'up' : 'down'})"` : '';
+  const tile = (t) => {
+    const col = t.dir ? ` style="color:var(--ta-${t.dir === 'up' ? 'up' : 'down'})"` : '';
+    return `<div class="ta-tile" data-k="${esc(t.key)}" role="group" aria-label="${esc(`${t.label}: ${t.big}, ${t.cap}`)}">` +
+      `<span class="ta-tl">${esc(t.label)}</span><b class="ta-big"${col}>${esc(t.big)}</b>` +
+      (t.key === 'trsi' && fin(t.rsi) && t.bands ? rsiBar(t.rsi, t.bands) : '') +
+      `<span class="ta-cap">${esc(t.cap)}</span></div>`;
+  };
+  return `<div class="ta-board"><div class="ta-verdict" data-side="${v.side ?? 'none'}">` +
+    `<p class="ta-vhead"><b${vc}>${esc(v.text)}</b>${v.strong ? '<span class="ta-strong">강함</span>' : ''}</p>` +
+    `<p class="ta-vsub">${esc(v.sub)}</p></div>` +
+    `<div class="ta-tiles">${board.tiles.map(tile).join('')}</div></div>`;
+}
+
+/** RSI 막대 — 0 · 강한 침체 · 침체 · 중간 · 과열 · 강한 과열 · 100, 지금 값에 눈금 */
+function rsiBar(r, bands) {
+  const [sl, l, h, sh] = bands;
+  const seg = [['sl', sl], ['l', l - sl], ['m', h - l], ['h', sh - h], ['sh', 100 - sh]];
+  const pos = Math.max(0, Math.min(100, r));
+  return `<div class="ta-rsibar" aria-hidden="true">${seg.map(([c, w]) => `<i class="${c}" style="width:${w}%"></i>`).join('')}` +
+    `<em style="left:${r1(pos)}%"></em></div>`;
 }

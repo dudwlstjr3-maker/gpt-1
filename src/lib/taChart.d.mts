@@ -1,4 +1,4 @@
-import type { TaModel, TaRow, TaTechEvent, TaTechNow } from './ta.mjs';
+import type { TaModel, TaTechEvent, TaBoardData } from './ta.mjs';
 
 export interface TaLayout {
   L: number;
@@ -29,10 +29,9 @@ export function taChartHtml(
 ): { html: string; layout: TaLayout };
 export function taIndexAt(layout: TaLayout, px: number): number;
 export function taXOf(layout: TaLayout, i: number): number;
-export function taSummaryHtml(rows: TaRow[], tally: string | null): string;
 export function taPrice(precision: number): (v: number | null | undefined) => string;
 export function taAxisDate(tf: '1d' | '4h', spanBars: number, market: 'us' | 'kr'): (t: number) => string;
 export function taStamp(tf: '1d' | '4h', market: 'us' | 'kr'): (t: number) => string;
-export function taTechHtml(tech: TaTechNow): string;
 export function taSuggestHtml(list: { id: string; name: string; code?: string | null }[], code: string | null): string;
 export function taQuickHtml(items: { id: string; name: string }[], current: string | null): string;
+export function taBoardHtml(board: TaBoardData): string;

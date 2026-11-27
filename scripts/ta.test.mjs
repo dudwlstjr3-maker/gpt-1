@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sma, ema, rsi, supertrend, obvOsc, pivots, rsiDivergence, toFourHour, trendForBars,
-  taModel, taSummary, taTally, taTallyText, taReadout, rsiZone, taParseCode, techEvents, techNow, taSearch,
+  taModel, taSummary, taTally, taTallyText, taReadout, rsiZone, taParseCode, techEvents, techNow, taSearch, taBoard,
   TA_TREND_DAYS, TA_TEXT, TA_RANGES, TA_DEFAULT_RANGE,
 } from '../src/lib/ta.mjs';
 import { TREND_MA_DAYS } from '../src/lib/overlays.mjs';
@@ -235,7 +235,7 @@ test('구간 단추 — 일봉 · 4시간봉마다 기본값이 목록에 있다
 });
 
 test('그림 — 보이는 구간의 봉만, 전환 ▲ ▼ 를 그 자리에, 이름은 글로 이스케이프', async () => {
-  const { taChartHtml, taIndexAt, taXOf, taSummaryHtml } = await import('../src/lib/taChart.mjs');
+  const { taChartHtml, taIndexAt, taXOf } = await import('../src/lib/taChart.mjs');
   const bars = Array.from({ length: 200 }, (_, i) => {
     const c = i < 100 ? 100 + i : 200 - (i - 100) * 1.5;
     return { t: i * 86_400_000, o: c - 0.5, h: c + 1, l: c - 1, c, v: 1000 };
@@ -262,10 +262,6 @@ test('그림 — 보이는 구간의 봉만, 전환 ▲ ▼ 를 그 자리에, �
   // 거래량이 없으면 OBV 칸에 까닭을 적는다
   const noVol = taModel({ tf: '1d', bars: bars.map((b) => ({ ...b, v: 0 })) });
   assert.match(taChartHtml(noVol, { from: 0, to: 199, width: 360 }).html, /제공처가 거래량을 주지 않습니다/);
-  // 표
-  const sum = taSummaryHtml(taSummary(m), '5개 중 상승 쪽 1 · 하락 쪽 4');
-  assert.match(sum, /^<ul class="ta-sum"><li data-k="st">/);
-  assert.match(sum, /<p class="ta-tally">5개 중 상승 쪽 1 · 하락 쪽 4<\/p>$/);
 });
 
 test('미리보기에 끼워 넣을 수 있게 — 두 파일 모두 import 가 없다', async () => {
@@ -369,4 +365,40 @@ test('종목 찾기 — 코드 · 이름 앞부분 · 초성 · 이름 가운데
   assert.deepEqual(taSearch('하이닉스', list).map((a) => a.id), ['hynix']);
   assert.deepEqual(taSearch('  ', list), []);
   assert.deepEqual(taSearch('없는것', list), []);
+});
+
+test('한눈에 — 결론 한 줄 + 큰 숫자 칸 여섯, 방향은 ▲ ▼ 와 말로', async () => {
+  const { taBoardHtml } = await import('../src/lib/taChart.mjs');
+  const bars = Array.from({ length: 300 }, (_, i) => {
+    const c = 100 + i * 0.3 + Math.sin(i / 6) * 6;
+    return { t: i * 86_400_000, o: c - 0.5, h: c + 1, l: c - 1, c, v: 1000 + i };
+  });
+  const m = taModel({ tf: '4h', bars });
+  const b = taBoard(m);
+  assert.deepEqual(b.tiles.map((t) => t.key), ['tdiv', 'trsi', 'st', 'ma', 'trend', 'obv']);
+  const rsi = b.tiles[1];
+  assert.equal(rsi.big, m.rsi[m.n - 1].toFixed(1), 'RSI 는 숫자를 크게');
+  assert.deepEqual(rsi.bands, [20, 30, 80, 90]);
+  for (const t of b.tiles) {
+    if (t.dir) assert.match(t.big + t.cap, t.dir === 'up' ? /▲|＋/ : /▼|－/, `${t.key}: ${t.big} ${t.cap}`);
+    assert.ok(t.big.length <= 8, `큰 값은 짧게 — ${t.key}: ${t.big}`);
+  }
+  assert.match(b.tiles[4].big, /^[+−]?\d+\.\d%$/);
+  const html = taBoardHtml(b);
+  assert.match(html, /^<div class="ta-board"><div class="ta-verdict" data-side="(up|down|none)">/);
+  assert.equal((html.match(/class="ta-tile"/g) ?? []).length, 6);
+  assert.match(html, /<div class="ta-rsibar" aria-hidden="true">(<i class="(sl|l|m|h|sh)" style="width:\d+%"><\/i>){5}<em style="left:[\d.]+%"><\/em><\/div>/);
+  assert.match(html, /aria-label="② RSI 14: [\d.]+, /);
+});
+
+test('한눈에 — 값이 모자라면 "없음" 과 까닭, 지어내지 않는다', () => {
+  const bars = Array.from({ length: 12 }, (_, i) => ({ t: i * 864e5, o: 10, h: 11, l: 9, c: 10 + i * 0.1, v: 0 }));
+  const b = taBoard(taModel({ tf: '1d', bars }));
+  const by = Object.fromEntries(b.tiles.map((t) => [t.key, t]));
+  assert.equal(by.trsi.big, '없음');
+  assert.equal(by.trsi.rsi, null);
+  assert.equal(by.trend.big, '없음');
+  assert.match(by.trend.cap, /252개/);
+  assert.equal(by.obv.big, '없음');
+  assert.match(by.obv.cap, /거래량/);
 });

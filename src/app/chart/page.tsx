@@ -18,11 +18,11 @@ import { SkeletonCard } from '@/components/ui/States';
 import { changeColor } from '@/lib/scale';
 import { taAssets, TA_DEFAULT_ASSET } from '@/lib/taAssets';
 import {
-  taModel, taSummary, taReadout, taParseCode, taBarUnit, taLastChange, techEvents, techNow, taSearch,
+  taModel, taBoard, taReadout, taParseCode, taBarUnit, taLastChange, techEvents, taSearch,
   TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT,
 } from '@/lib/ta.mjs';
 import {
-  taChartHtml, taIndexAt, taXOf, taSummaryHtml, taTechHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
+  taChartHtml, taIndexAt, taXOf, taBoardHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
 } from '@/lib/taChart.mjs';
 import type { TaBarsResult, TaTf } from '@/types';
 
@@ -142,9 +142,7 @@ export default function ChartPage() {
           title: `${data.name} ${taBarUnit(data.tf)}`,
         })
       : null;
-    // 기법 카드에 RSI · 다이버전스가 있으니 아래 표에는 나머지 지표만
-    const rows = taSummary(model).filter((r) => r.key !== 'rsi' && r.key !== 'div');
-    return { from, to, price, chart, rows, now: techNow(model), stamp: taStamp(data.tf, data.market) };
+    return { from, to, price, chart, board: taBoard(model), stamp: taStamp(data.tf, data.market) };
   }, [model, data, range, width]);
 
   const moveCross = useCallback(
@@ -296,13 +294,13 @@ export default function ChartPage() {
             </Link>
           ) : null}
 
-          <section className="ta-sec" aria-labelledby="ta-tech-title">
-            <h2 id="ta-tech-title">
-              {TA_TEXT.techTitle} <small>마지막 {unit} 기준</small>
+          <section className="ta-sec" aria-labelledby="ta-now-title">
+            <h2 id="ta-now-title">
+              지금 상태 <small>마지막 {unit} 기준</small>
             </h2>
-            <div dangerouslySetInnerHTML={{ __html: taTechHtml(view.now) }} />
+            <div dangerouslySetInnerHTML={{ __html: taBoardHtml(view.board) }} />
             <details className="ta-howto">
-              <summary>보는 순서</summary>
+              <summary>{TA_TEXT.techTitle} — 보는 순서</summary>
               <ol>
                 {TA_TEXT.techSteps.map((s) => (
                   <li key={s}>{s}</li>
@@ -337,13 +335,6 @@ export default function ChartPage() {
               dangerouslySetInnerHTML={view.chart ? { __html: view.chart.html } : undefined}
             />
             <p className="ta-note">{TA_TEXT.markNote}</p>
-          </section>
-
-          <section className="ta-sec" aria-labelledby="ta-sum-title">
-            <h2 id="ta-sum-title">
-              다른 지표 <small>마지막 {unit} 기준</small>
-            </h2>
-            <div dangerouslySetInnerHTML={{ __html: taSummaryHtml(view.rows, null) }} />
           </section>
 
           <details className="ta-fold">

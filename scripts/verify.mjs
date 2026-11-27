@@ -4209,6 +4209,16 @@ async function main() {
       now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
       now.head.text);
     check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
+    // 2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게" — 결론 한 줄 + 큰 숫자 칸 여섯
+    const board = ta.taBoard(m4);
+    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 여섯 (다이버전스 · RSI · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
+      board.tiles.map((t) => t.key).join(',') === 'tdiv,trsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8),
+      board.tiles.map((t) => t.big).join(' | '));
+    const cssBig = await readFile('src/app/ta.css', 'utf8');
+    const px = (sel) => Number((cssBig.match(new RegExp(sel.replace(/[.[\]"=]/g, (c) => '\\' + c) + '\\s*\\{[^}]*font-size:\\s*([\\d.]+)px')) ?? [])[1]);
+    check('숫자는 크게 — 칸 값 28px 이상 · RSI 36px · 결론 22px · 가격 24px · 차트 축 13px',
+      px('.ta-big') >= 28 && px('.ta-tile[data-k="trsi"] .ta-big') >= 36 && px('.ta-vhead b') >= 22 && px('.ta-title .ta-last') >= 24 && px('.ta-axis') >= 13,
+      ['.ta-big', '.ta-tile[data-k="trsi"] .ta-big', '.ta-vhead b', '.ta-title .ta-last', '.ta-axis'].map(px).join(','));
 
     const rd = (f) => readFile(f, 'utf8');
     const [page, nav, tpl, build, css, lib, chart, route, live, demoA] = await Promise.all([
@@ -4221,9 +4231,10 @@ async function main() {
       /__TA_LIB__/.test(tpl) && /__TA_CHART__/.test(tpl) && /__TA_CSS__/.test(tpl) &&
       /inlineModule\('\.\.\/\.\.\/src\/lib\/ta\.mjs'\)/.test(build) && /inlineModule\('\.\.\/\.\.\/src\/lib\/taChart\.mjs'\)/.test(build) &&
       /src\/app\/ta\.css/.test(build) && /from '@\/lib\/ta\.mjs'/.test(page) && /from '@\/lib\/taChart\.mjs'/.test(page) && !/^import /m.test(lib + chart));
-    check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 기법 카드 · 차트 · 구간 · 다른 지표',
+    check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 지금 상태(큰 숫자 칸) · 차트 · 구간',
       ['ta-search', 'ta-seg', 'ta-chart', 'ta-ranges', 'ta-read', 'ta-fold', 'ta-howto', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
-      ['taSuggestHtml(', 'taQuickHtml(', 'taTechHtml(', 'taSummaryHtml(', 'techNow('].every((f) => page.includes(f) && vr.includes(f)) &&
+      ['taSuggestHtml(', 'taQuickHtml(', 'taBoardHtml(taBoard('].every((f) => page.includes(f.replace('taBoardHtml(taBoard(', 'taBoardHtml(')) && vr.includes(f)) &&
+      /board: taBoard\(model\)/.test(page) &&
       /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /tech: techEvents\(m\)/.test(tpl) && /\btech,\n/.test(page));
     check('자주 보는 종목이 앱 · 미리보기에서 같음', /const QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(page) &&
       /const TA_QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(tpl) && /const TA_PREVIEW = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(build));

@@ -576,6 +576,96 @@ export function techNow(m, i = m.n - 1) {
   return { head, sub, rows: [rowDiv, rowRsi, rowSt], last };
 }
 
+/* ------------------------------ 한눈에 (큰 숫자 칸) ------------------------------ */
+
+/**
+ * '지금 상태' 판 — 결론 한 줄 + 큰 숫자 칸 여섯 (2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게").
+ * 칸: { key, label, big, dir, cap, rsi? } — big 은 크게 쓰는 짧은 값, cap 은 그 아래 한 줄.
+ * 방향은 ▲ ▼ 와 말(상승 · 하락 · 위 · 아래)로도 적는다 — 색만으로 전하지 않는다.
+ */
+export function taBoard(m, i = m.n - 1) {
+  const now = techNow(m, i);
+  const rows = Object.fromEntries(taSummary(m, i).map((r) => [r.key, r]));
+  const ago = (k) => (i - k === 0 ? '이번 봉' : `${i - k}봉 전`);
+  const tiles = [];
+
+  // ① 다이버전스
+  {
+    const dv = now.rows[0];
+    tiles.push({
+      key: 'tdiv',
+      label: '① RSI 다이버전스',
+      big: dv.dir ? `${SIDE_GLYPH[dv.dir]} ${dv.dir === 'up' ? '상승' : '하락'}` : '없음',
+      dir: dv.dir,
+      cap: dv.dir ? dv.note.replace(/ · RSI [\d.]+/, '') : `최근 ${TA_RECENT}봉 안에`,
+    });
+  }
+  // ② RSI — 숫자가 가장 크다
+  {
+    const r = m.rsi[i];
+    const z = rsiZone(r);
+    const dir = z === 'low' || z === 'strongLow' ? 'up' : z === 'high' || z === 'strongHigh' ? 'down' : null;
+    tiles.push({
+      key: 'trsi',
+      label: `② RSI ${TA_RSI}`,
+      big: z ? r.toFixed(1) : '없음',
+      dir,
+      cap: z ? `${TA_ZONE_TEXT[z]}${dir ? ` ${SIDE_GLYPH[dir]}` : ''}` : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야`,
+      rsi: z ? r : null,
+      bands: [TA_RSI_STRONG_LOW, TA_RSI_LOW, TA_RSI_HIGH, TA_RSI_STRONG_HIGH],
+    });
+  }
+  // ③ 슈퍼트렌드 — 지금 방향을 크게, 조건 뒤 전환은 아래 줄에
+  {
+    const d = m.st.dir[i];
+    const flip = [...m.st.flips].reverse().find((f) => f.i <= i);
+    tiles.push({
+      key: 'st',
+      label: '③ 슈퍼트렌드 (후순위)',
+      big: d ? `${SIDE_GLYPH[d]} ${d === 'up' ? '상승' : '하락'}` : '없음',
+      dir: d,
+      cap: now.last ? now.rows[2].value : d && flip ? `${ago(flip.i)} 전환` : `${taBarUnit(m.tf)} ${TA_ST_ATR}개가 모여야`,
+    });
+  }
+  // 20 · 60
+  {
+    const r = rows.ma;
+    tiles.push({
+      key: 'ma',
+      label: `${m.ma[0].p} · ${m.ma[1].p}선`,
+      big: r.dir ? `${SIDE_GLYPH[r.dir]} ${r.dir === 'up' ? '위' : '아래'}` : '없음',
+      dir: r.dir,
+      cap: r.dir ? `${m.ma[0].p}선이 ${m.ma[1].p}선보다` : r.note || '두 선이 같음',
+    });
+  }
+  // 1년선
+  {
+    const ma = m.trend[i];
+    const px = m.c[i];
+    const ok = fin(ma) && fin(px) && ma > 0;
+    const dir = ok ? (px >= ma ? 'up' : 'down') : null;
+    tiles.push({
+      key: 'trend',
+      label: '추세선 (1년선)',
+      big: ok ? `${sign(((px - ma) / ma) * 100)}%` : '없음',
+      dir,
+      cap: ok ? `1년선 ${dir === 'up' ? '위 ▲' : '아래 ▼'}` : `일봉 ${TA_TREND_DAYS}개(1년)가 모여야`,
+    });
+  }
+  // OBV
+  {
+    const r = rows.obv;
+    tiles.push({
+      key: 'obv',
+      label: 'OBV 오실레이터',
+      big: r.dir ? (r.dir === 'up' ? '＋ 우세' : '－ 우세') : '없음',
+      dir: r.dir,
+      cap: r.dir ? `${r.dir === 'up' ? '오른' : '내린'} 봉 쪽 거래량` : r.note || '0',
+    });
+  }
+  return { verdict: { ...now.head, sub: now.sub }, tiles };
+}
+
 /* ------------------------------ 종목 찾기 ------------------------------ */
 
 const CHO = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];

@@ -128,10 +128,10 @@ npm run build         # 마지막
 (Windows 와 Node 20 에서도 같은 명령으로 돌게 하려는 것이다 — 그 파일 머리말).
 단위 검사는 208건이고, 검증기는 그걸 파일 단위로 묶어 19건으로 센다.
 
-세어 본 값 (2026-11-26, DEMO 모드):
+세어 본 값 (2026-11-27, DEMO 모드):
 
 - `npm test` — 208건 통과, 0건 실패
-- `npm run verify` — 1,333건 통과, 0건 실패
+- `npm run verify` — 1,334건 통과, 0건 실패
 
 숫자가 바뀌면 여기와 `README.md` 를 같이 고친다. `docs/CHANGELOG.md` 는 지난 기록이라 고치지 않고 새 항목에 새 숫자를 적는다.
 **직접 돌려 센 값만 적는다.** 서버를 띄울 수 없어 검증기를 돌리지 못했으면
@@ -279,7 +279,7 @@ public/         아이콘·글꼴 등 정적 파일
 | `npm start` | 빌드 결과 실행 (:3000) | — |
 | `npm run typecheck` | `tsc --noEmit` | 아니오 |
 | `npm test` | `scripts/*.test.mjs` 를 `node --test` 로 — 208건 | 아니오 |
-| `npm run verify` | 검증기 1,333건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
+| `npm run verify` | 검증기 1,334건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
 | `npm run preview` | 그날 스냅샷을 박은 자립형 HTML | **예 (:3000)** |
 | `npm run icons` | PWA 아이콘 PNG 생성 (`public/icons`) | 아니오 |
 | `npm run check:parse` | 로컬 대역 서버로 LIVE 파싱 점검 — 키·네트워크 없이 | 아니오 |

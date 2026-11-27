@@ -17,6 +17,46 @@
 .pz-card { border-radius: var(--box-radius); background: var(--surface); padding: 12px; }
 .pz-stack { display: grid; gap: 12px; }
 
+/* 미국 심리의 위치를 색, 구간 이름, 눈금 위 표식으로 함께 읽는다. */
+.pz-mood {
+  --mood-ink: var(--muted-fg, var(--muted));
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--mood-ink) 36%, var(--border));
+  border-radius: var(--box-radius);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--mood-ink) 16%, var(--surface)), var(--surface));
+  color: var(--fg-strong);
+  font: inherit;
+  text-decoration: none;
+  text-align: start;
+  cursor: pointer;
+}
+.pz-mood-label { font-size: 13px; font-weight: 600; }
+.pz-mood strong { grid-column: 1; font-size: 20px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.pz-mood-arrow { grid-column: 2; grid-row: 1 / 3; font-size: 20px; }
+.pz-mood-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 5px;
+  margin: 8px 4px 2px;
+  background: repeating-linear-gradient(to right,
+    color-mix(in srgb, var(--mood-ink) 38%, var(--surface)) 0 calc(20% - 2px), transparent calc(20% - 2px) 20%);
+}
+.pz-mood-track i {
+  position: absolute;
+  left: var(--mood-position);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--fg-strong);
+  border-radius: 50%;
+  background: var(--mood-ink);
+}
+
 /* 계정 */
 .pz-me { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .pz-me b { font-size: 16px; color: var(--fg-strong); }

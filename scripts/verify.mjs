@@ -2751,12 +2751,22 @@ async function main() {
     const homeSrc = await readFile('src/app/page.tsx', 'utf8');
     check('미국 심리 카드가 오늘의 한 줄보다 먼저 보임',
       homeSrc.includes('<FngSection />') && homeSrc.indexOf('<FngSection />') < homeSrc.indexOf('<TodayLine />'));
-    const { homeMood } = await import('../src/lib/homeMood.mjs');
+    const { homeMood, snapshotMood } = await import('../src/lib/homeMood.mjs');
     const scores = Array.from({ length: 101 }, (_, score) => homeMood(score, 0));
     check('공포·탐욕 양쪽 끝에서 글자가 커짐', scores.every((m, n) =>
       m.word === (n < 20 ? '쫄?' : n >= 80 ? '탐?' : null) &&
       (n >= 19 || m.size > scores[n + 1].size) && (n <= 80 || m.size > scores[n - 1].size)) &&
       scores[0].size === scores[100].size && homeMood(null, 0) === null);
+    const moodSnapshot = (score, status = 'ok') => ({ sections: { fng: { status, data: [{ market: 'us', score }] } } });
+    const plazaView = await readFile('src/app/plaza/page.tsx', 'utf8');
+    check('홈 배경과 광장 눈금은 미국 계기판의 다섯 구간을 따르고 산출 불가 상태를 구분함',
+      scores.every((m, n) => snapshotMood(moodSnapshot(n)).band === m.band) &&
+      [null, -1, 101].every((n) => snapshotMood(moodSnapshot(n)) === null) &&
+      ['loading', 'empty', 'error'].every((status) => snapshotMood(moodSnapshot(50, status)) === null) &&
+      ['partial', 'stale'].every((status) => snapshotMood(moodSnapshot(0, status)).score === 0) &&
+      [homeSrc, plazaView, tpl16].every((src) => src.includes('snapshotMood(') && src.includes('--mood-position')) &&
+      [plazaView, tpl16].every((src) => src.includes('pz-mood-track') && src.includes('이전 값')));
+
     check('계기판 왼쪽·정상·오른쪽과 모든 중간 각도', scores.every((m, n) =>
       Math.abs(m.angle - (n * 1.8 - 90)) < 0.000001) &&
       scores[0].angle === -90 && scores[50].angle === 0 && scores[100].angle === 90);

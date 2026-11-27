@@ -1,10 +1,15 @@
 .mood-home {
   display: flow-root;
   background:
-    radial-gradient(ellipse at 2% 0, color-mix(in srgb, var(--accent) 12%, transparent), transparent 26rem),
-    repeating-radial-gradient(ellipse at 108% 2rem, transparent 0 22px, color-mix(in srgb, var(--fg) 4%, transparent) 23px, transparent 24px 36px);
-  background-repeat: no-repeat;
-  background-size: 100% 38rem;
+    radial-gradient(ellipse 80% 26rem at var(--mood-position, 50%) 0,
+      color-mix(in srgb, var(--mood-ink, transparent) 24%, transparent), transparent 96%);
+}
+.mood-home .card.mood-cover {
+  border-top: 3px solid var(--mood-ink, var(--border));
+  background:
+    radial-gradient(ellipse 90% 85% at var(--mood-position, 50%) 0,
+      color-mix(in srgb, var(--mood-ink, transparent) 29%, transparent), transparent),
+    linear-gradient(150deg, var(--surface-2), var(--surface) 75%);
 }
 .card.mood-cover {
   position: relative;
@@ -112,6 +117,28 @@
 .mood-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .mood-cover footer { font-size: 12px; color: var(--muted-fg, var(--muted)); }
 .mood-cover footer { margin-top: 12px; border-top: 1px solid var(--border); }
-.mood-cover footer :is(a,button) { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg-strong); font-size: 14px; font-weight: 650; background: transparent; border: 0; cursor: pointer; }
+.mood-cover footer :is(a,button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--ink) 40%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 13%, var(--surface));
+  color: var(--fg-strong);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mood-cover footer :is(a,button):hover {
+  background: color-mix(in srgb, var(--ink) 23%, var(--surface));
+}
+.mood-cover footer :is(a,button):focus-visible, .pz-mood:focus-visible {
+  outline: 2px solid var(--ink, var(--fg-strong));
+  outline-offset: 2px;
+}
 .home-fold { margin: 12px 0 0; border-top: 1px solid var(--border); }
 .home-fold > summary { padding: 14px 12px; color: var(--fg-strong); font-size: 15px; font-weight: 650; cursor: pointer; }

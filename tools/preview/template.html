@@ -3287,6 +3287,15 @@ __PLAZA_CSS__
   function viewPlaza() {
     const st = DATA.plaza;
     if (!st) return '<p style="padding:20px">광장 자료가 없습니다.</p>';
+    const snapshot = snap();
+    const mood = snapshotMood(snapshot.mode === st.mode ? snapshot : null);
+    const stale = mood && snapshot.sections.fng.status === 'stale';
+    const moodPanel = '<button type="button" data-go-fng="us" class="pz-mood"' +
+      (mood ? ' style="--mood-ink:' + scoreColor(mood.score) + ';--mood-position:' + mood.score + '%"' : '') + '>' +
+      '<span class="pz-mood-label">미국 쫄탐지수' + (stale ? ' · 이전 값' : '') + '</span>' +
+      '<strong>' + (mood ? mood.score + '점 · ' + esc(STAGES[mood.band].label) : '산출 불가') + '</strong>' +
+      '<span class="pz-mood-arrow" aria-hidden="true">↗</span>' +
+      (mood ? '<span class="pz-mood-track" aria-hidden="true"><i></i></span>' : '') + '</button>';
     const now = Date.parse(st.asOf);
     const round = (m) => {
       const o = m.open;
@@ -3325,7 +3334,7 @@ __PLAZA_CSS__
     return '<div class="plaza">' +
       '<div><div class="pz-head"><h1>쫄탐광장</h1>' + modeBadge() + '</div>' +
       '<p class="pz-lede">' + esc(PLAZA_LEDE) + '</p>' +
-      '<p class="pz-note">' + esc(PLAZA_PREVIEW_NOTE) + '</p></div>' +
+      '<p class="pz-note">' + esc(PLAZA_PREVIEW_NOTE) + '</p></div>' + moodPanel +
       /* 로그인은 카카오만 (앱 Account 와 같은 문구). 미리보기에는 서버가 없어 단추를 잠근다 */
       '<section class="pz-card" aria-labelledby="pz-join-title"><h2 id="pz-join-title" style="margin:0 0 8px;font-size:15px;font-weight:750">카카오로 로그인하고 참여</h2>' +
       '<button type="button" class="pz-kakao" disabled>카카오 로그인</button>' +
@@ -3344,6 +3353,8 @@ __PLAZA_CSS__
   function viewHome() {
     const s = snap();
     const fng = s.sections.fng.data || [];
+    const mood = snapshotMood(s);
+    const moodStyle = mood ? ' style="--mood-ink:' + scoreColor(mood.score) + ';--mood-position:' + mood.score + '%"' : '';
     const quotes = s.sections.quotes.data || {};
     const all = new Map();
     const marketOf = new Map();
@@ -3373,7 +3384,7 @@ __PLAZA_CSS__
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
+      '<div class="mood-home"' + moodStyle + '><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
       '<section class="block" style="padding-inline:0">' +
       '<h2 class="sr">오늘의 쫄탐</h2>' +
       (() => {

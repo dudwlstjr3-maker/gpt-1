@@ -3399,31 +3399,31 @@ __TA_CSS__
     if (state.ref.cursor !== null) refCross(state.ref.cursor, false);
   }
 
+  /* 누른 봉의 숫자 — 앱과 같은 taCrossSvg 를 그림 안 '.ta-crossg' 에 넣는다 */
   function refCross(i, update) {
     const box = document.getElementById('ta-chart');
-    const line = box && box.querySelector('.ta-cross');
-    if (!line || !refLayout) return;
-    if (i === null) line.setAttribute('visibility', 'hidden');
-    else {
-      const x = String(Math.round(taXOf(refLayout, i) * 10) / 10);
-      line.setAttribute('x1', x); line.setAttribute('x2', x); line.setAttribute('visibility', 'visible');
-    }
-    state.ref.cursor = i;
-    if (update === false) return;
+    const g = box && box.querySelector('.ta-crossg');
+    if (!g || !refLayout) return;
     const d = refData();
     const m = refModel(d);
+    g.innerHTML = i === null ? '' : taCrossSvg(m, refLayout, i, { price: taPrice(d.precision), stamp: taStamp(d.tf, d.market) });
+    state.ref.cursor = i;
+    if (update === false) return;
     const shown = i === null ? refLayout.to : i;
     const read = document.querySelector('.ta-read');
     if (read) read.textContent = taStamp(d.tf, d.market)(m.t[shown]) + ' · ' + taReadout(m, shown, taPrice(d.precision));
   }
 
-  function refPointer(e) {
+  function refPointer(e, down) {
     const box = e.target.closest && e.target.closest('#ta-chart');
     if (!box || !refLayout) return;
     const svg = box.querySelector('svg');
     if (!svg) return;
     const r = svg.getBoundingClientRect();
-    refCross(taIndexAt(refLayout, ((e.clientX - r.left) * refLayout.W) / r.width));
+    const i = taIndexAt(refLayout, ((e.clientX - r.left) * refLayout.W) / r.width);
+    // 손가락으로 같은 봉을 한 번 더 누르면 숫자 상자를 닫는다. 마우스는 올리면 보이고 차트 밖으로 나가면 닫힌다
+    if (down) refCross(e.pointerType !== 'mouse' && i === state.ref.cursor ? null : i);
+    else if (i !== state.ref.cursor) refCross(i);
   }
 
   function homePlazaCard() {
@@ -5464,8 +5464,13 @@ __TA_CSS__
     state.ref.err = '찾는 종목이 없습니다. 미국은 TSLA, 한국은 005930 처럼 코드로도 찾을 수 있습니다.';
     render();
   });
-  document.addEventListener('pointerdown', refPointer);
-  document.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'mouse') refPointer(e); });
+  document.addEventListener('pointerdown', (e) => refPointer(e, true));
+  document.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'mouse') refPointer(e, false); });
+  document.addEventListener('pointerout', (e) => {
+    if (e.pointerType !== 'mouse' || state.ref.cursor === null || !e.target.closest) return;
+    const box = e.target.closest('#ta-chart');
+    if (box && !box.contains(e.relatedTarget)) refCross(null);
+  });
   document.addEventListener('keydown', (e) => {
     if (!e.target.closest || !e.target.closest('#ta-chart') || !refLayout) return;
     const cur = state.ref.cursor === null ? refLayout.to : state.ref.cursor;

@@ -579,8 +579,9 @@ export function techNow(m, i = m.n - 1) {
 /* ------------------------------ 한눈에 (큰 숫자 칸) ------------------------------ */
 
 /**
- * '지금 상태' 판 — 결론 한 줄 + 큰 숫자 칸 여섯 (2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게").
- * 칸: { key, label, big, dir, cap, rsi? } — big 은 크게 쓰는 짧은 값, cap 은 그 아래 한 줄.
+ * '지금 상태' 판 — 결론 한 줄 + 큰 숫자 칸 (2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게").
+ * 칸 다섯: RSI · 다이버전스(넓게, 한 칸) · 슈퍼트렌드 · 20/60선 · 1년선 · OBV.
+ * 칸: { key, label, big, dir, cap, rsi?, bands?, sub? } — big 은 크게 쓰는 짧은 값, cap 은 그 아래 한 줄, sub 는 같은 칸의 둘째 값.
  * 방향은 ▲ ▼ 와 말(상승 · 하락 · 위 · 아래)로도 적는다 — 색만으로 전하지 않는다.
  */
 export function taBoard(m, i = m.n - 1) {
@@ -589,30 +590,25 @@ export function taBoard(m, i = m.n - 1) {
   const ago = (k) => (i - k === 0 ? '이번 봉' : `${i - k}봉 전`);
   const tiles = [];
 
-  // ① 다이버전스
-  {
-    const dv = now.rows[0];
-    tiles.push({
-      key: 'tdiv',
-      label: '① RSI 다이버전스',
-      big: dv.dir ? `${SIDE_GLYPH[dv.dir]} ${dv.dir === 'up' ? '상승' : '하락'}` : '없음',
-      dir: dv.dir,
-      cap: dv.dir ? dv.note.replace(/ · RSI [\d.]+/, '') : `최근 ${TA_RECENT}봉 안에`,
-    });
-  }
-  // ② RSI — 숫자가 가장 크다
+  // ① RSI · 다이버전스 — 한 칸에 (2026-11-27 사용자: "rsi 는 다이버전스랑 같이 합쳐서"). RSI 숫자가 가장 크고, 그 아래 다이버전스
   {
     const r = m.rsi[i];
     const z = rsiZone(r);
     const dir = z === 'low' || z === 'strongLow' ? 'up' : z === 'high' || z === 'strongHigh' ? 'down' : null;
+    const dv = now.rows[0];
     tiles.push({
-      key: 'trsi',
-      label: `② RSI ${TA_RSI}`,
+      key: 'rsi',
+      label: `① RSI ${TA_RSI} · 다이버전스`,
       big: z ? r.toFixed(1) : '없음',
       dir,
       cap: z ? `${TA_ZONE_TEXT[z]}${dir ? ` ${SIDE_GLYPH[dir]}` : ''}` : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야`,
       rsi: z ? r : null,
       bands: [TA_RSI_STRONG_LOW, TA_RSI_LOW, TA_RSI_HIGH, TA_RSI_STRONG_HIGH],
+      sub: {
+        big: dv.dir ? `${SIDE_GLYPH[dv.dir]} ${dv.dir === 'up' ? '상승' : '하락'} 다이버전스` : '다이버전스 없음',
+        dir: dv.dir,
+        cap: dv.dir ? dv.note.replace(/ · RSI [\d.]+/, '') : `최근 ${TA_RECENT}봉 안에`,
+      },
     });
   }
   // ③ 슈퍼트렌드 — 지금 방향을 크게, 조건 뒤 전환은 아래 줄에
@@ -621,7 +617,7 @@ export function taBoard(m, i = m.n - 1) {
     const flip = [...m.st.flips].reverse().find((f) => f.i <= i);
     tiles.push({
       key: 'st',
-      label: '③ 슈퍼트렌드 (후순위)',
+      label: '② 슈퍼트렌드 (후순위)',
       big: d ? `${SIDE_GLYPH[d]} ${d === 'up' ? '상승' : '하락'}` : '없음',
       dir: d,
       cap: now.last ? now.rows[2].value : d && flip ? `${ago(flip.i)} 전환` : `${taBarUnit(m.tf)} ${TA_ST_ATR}개가 모여야`,
@@ -719,7 +715,7 @@ export const TA_DEFAULT_TF = '4h';
 export const TA_TEXT = {
   title: '종목 차트',
   lede: '종목을 찾아 RSI · 다이버전스 · 슈퍼트렌드 · OBV · 이동평균 · 추세선을 한 화면에서 봅니다. 운영자 기법으로 지금 상태를 함께 적습니다. 지표의 상태를 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
-  markNote: `세로 점선은 '지금 상태' 결론에 쓴 가장 최근 기법 조건이 생긴 봉입니다. RSI 칸의 비스듬한 점선과 ▲ ▼ 는 다이버전스(두 저점 · 고점을 이은 선)입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
+  markNote: `차트를 누르면 그 봉의 숫자(종가 · 고가 · 저가 · RSI · 슈퍼트렌드 · 이동평균)가 상자로 나오고, 같은 봉을 한 번 더 누르면 닫힙니다. 세로 점선은 '지금 상태' 결론에 쓴 가장 최근 기법 조건이 생긴 봉입니다. RSI 칸의 비스듬한 점선과 ▲ ▼ 는 다이버전스(두 저점 · 고점을 이은 선)입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
   tallyNote: '지표가 한쪽으로 모였다는 것은 지금 상태일 뿐, 앞으로의 방향을 말하지 않습니다.',
   techTitle: '운영자 기법',
   techSteps: [

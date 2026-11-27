@@ -137,7 +137,7 @@ export function techNow(m: TaModel, i?: number): TaTechNow;
 export function taSearch<A extends { id: string; name: string; code?: string | null }>(query: string, assets: A[], limit?: number): A[];
 
 export interface TaTile {
-  key: 'tdiv' | 'trsi' | 'st' | 'ma' | 'trend' | 'obv';
+  key: 'rsi' | 'st' | 'ma' | 'trend' | 'obv';
   label: string;
   big: string;
   dir: TaDir | null;
@@ -145,6 +145,8 @@ export interface TaTile {
   rsi?: number | null;
   /** RSI 막대 경계 — 강한 침체 · 침체 · 과열 · 강한 과열 */
   bands?: [number, number, number, number];
+  /** 같은 칸의 둘째 값 — RSI 칸의 다이버전스 */
+  sub?: { big: string; dir: TaDir | null; cap: string };
 }
 export interface TaBoardData {
   verdict: { side: TaDir | null; text: string; strong: boolean; sub: string };

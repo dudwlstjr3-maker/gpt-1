@@ -1,4 +1,4 @@
-// 홈 쫄탐 카드의 계기판 아래 두 칩 — 추세(대표 지수 200일 평균선)와 VIX.
+// 홈 쫄탐 카드의 계기판 아래 두 칩 — 추세(대표 지수 1년 평균선)와 VIX.
 // 앱(HomeMoodCard)과 미리보기(template homeMoodCard)가 **같은 말**을 쓰도록 문구는 여기 한 곳에 둔다.
 // 미리보기는 이 파일을 그대로 끼워 넣는다(tools/preview/build.mjs) — 그래서 내보내는 함수는 하나, import 는 없다.
 //
@@ -9,15 +9,18 @@
 export function overlayChips(now) {
   if (!now) return null;
   const signed = (v) => (v > 0 ? '+' : v < 0 ? '-' : '') + Math.abs(v).toFixed(1);
+  // 252거래일 = 1년. 칩에는 짧게 '1년선', 읽어 주는 말에는 '1년(252거래일)'
+  const short = (d) => (d % 252 === 0 ? `${d / 252}년선` : `${d}일선`);
+  const long = (d) => (d % 252 === 0 ? `${d / 252}년(${d}거래일)` : `${d}거래일`);
   const t = now.trend;
   const trend = t && t.above !== null && Number.isFinite(t.gapPct)
     ? {
         id: 'trend',
         label: '추세',
         glyph: t.above ? '▲' : '▼',
-        value: `${t.maDays}일선 ${t.above ? '위' : '아래'}`,
+        value: `${short(t.maDays)} ${t.above ? '위' : '아래'}`,
         sub: `${signed(t.gapPct)}%`,
-        aria: `추세: ${t.name} 가격이 ${t.maDays}일 평균선보다 ${Math.abs(t.gapPct).toFixed(1)}% ${t.above ? '위' : '아래'}`,
+        aria: `추세: ${t.name} 가격이 ${long(t.maDays)} 평균선보다 ${Math.abs(t.gapPct).toFixed(1)}% ${t.above ? '위' : '아래'}`,
       }
     : { id: 'trend', label: '추세', glyph: null, value: '산출 불가', sub: null, aria: '추세: 평균선을 계산할 자료가 부족해 산출하지 못했습니다' };
   const v = now.vix;

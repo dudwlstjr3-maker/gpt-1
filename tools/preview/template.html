@@ -4031,7 +4031,7 @@ __PLAZA_CSS__
     const ov = d.overlays || null;
     const clip = (sp) => (sp.to >= cutoff ? { from: Math.max(sp.from, cutoff), to: sp.to } : null);
     const chartSpans = [];
-    if (ov && ov.trend) ov.trend.spans.forEach((sp, i) => { const c = clip(sp); if (c) chartSpans.push(Object.assign({ id: 'trend-' + i }, c, { kind: 'shade', color: 'var(--muted)', label: ov.trend.name + ' ' + ov.trend.maDays + '일 평균선 아래' })); });
+    if (ov && ov.trend) ov.trend.spans.forEach((sp, i) => { const c = clip(sp); if (c) chartSpans.push(Object.assign({ id: 'trend-' + i }, c, { kind: 'shade', color: 'var(--muted)', label: ov.trend.name + ' ' + (ov.trend.maDays % 252 === 0 ? (ov.trend.maDays / 252) + '년' : ov.trend.maDays + '일') + ' 평균선 아래' })); });
     if (ov && ov.vix) ov.vix.spans.forEach((sp, i) => { const c = clip(sp); if (c) chartSpans.push(Object.assign({ id: 'vix-' + i }, c, { kind: 'strip', color: 'var(--series-4)', label: 'VIX ' + ov.vix.threshold + ' 이상' })); });
 
     const contribs = f.components.map((c) => c.contributionDay).filter((v) => v !== null && v !== 0);
@@ -4118,7 +4118,7 @@ __PLAZA_CSS__
       (ov
         ? '<p style="margin:8px 0 0;font-size:12px;color:var(--subtle);word-break:keep-all" data-overlay-note>' +
           (ov.trend
-            ? '회색 칸은 ' + esc(ov.trend.name) + ' 가격이 ' + ov.trend.maDays + '일(약 10개월) 평균선 아래에 있던 기간입니다. '
+            ? '회색 칸은 ' + esc(ov.trend.name) + ' 가격이 ' + (ov.trend.maDays % 252 === 0 ? (ov.trend.maDays / 252) + '년(' + ov.trend.maDays + '거래일)' : ov.trend.maDays + '거래일') + ' 평균선 아래에 있던 기간입니다 — 쫄탐지수가 지표를 견주는 기간(최근 1년)과 같은 길이. '
             : esc(d.benchmark ? d.benchmark.name : '대표 지수') + ' 평균선은 지금 받지 못해 그리지 않았습니다. ') +
           (ov.vix
             ? (d.benchmark ? '두 칸 사이' : '맨 위') + '의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ' + ov.vix.threshold + ' 이상이던 날입니다. '

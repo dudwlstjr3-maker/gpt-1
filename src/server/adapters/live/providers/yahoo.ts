@@ -236,6 +236,82 @@ export async function fetchDailySeries(cfg: YahooConfig, id: string, days: numbe
   return out.sort((a, b) => a.t - b.t);
 }
 
+/* ------------------------------------------------------------------ */
+/* 종목 차트용 봉 (2026-11-27)                                           */
+/* ------------------------------------------------------------------ */
+
+interface BarMeta extends ChartMeta {
+  gmtoffset?: number;
+  currency?: string;
+  longName?: string;
+  shortName?: string;
+  instrumentType?: string;
+}
+
+interface BarResponse {
+  chart?: {
+    result?: {
+      meta?: BarMeta;
+      timestamp?: number[];
+      indicators?: {
+        quote?: {
+          open?: (number | null)[];
+          high?: (number | null)[];
+          low?: (number | null)[];
+          close?: (number | null)[];
+          volume?: (number | null)[];
+        }[];
+      };
+    }[];
+    error?: { code?: string; description?: string } | null;
+  };
+}
+
+export interface YahooBars {
+  symbol: string;
+  name: string | null;
+  currency: string | null;
+  /** 거래소 시간대(초). 날짜를 가르는 데만 쓴다 */
+  gmtoffset: number;
+  bars: { t: number; o: number; h: number; l: number; c: number; v: number | null }[];
+}
+
+/**
+ * 시가 · 고가 · 저가 · 종가 · 거래량.
+ *   '1d' — 일봉 5년 (1년선을 그리려면 앞에 1년이 더 있어야 한다)
+ *   '1h' — 1시간봉 1년 (4시간봉으로 묶는다. Yahoo 는 1시간봉을 최근 730일까지만 준다)
+ * 시가 · 고가 · 저가 · 종가 중 하나라도 빠진 봉은 버린다 — 메우지 않는다. 거래량만 빠지면 null 로 둔다.
+ */
+export async function fetchBars(cfg: YahooConfig, symbol: string, interval: '1d' | '1h'): Promise<YahooBars | null> {
+  const range = interval === '1d' ? '5y' : '1y';
+  const url =
+    `${cfg.base}/v8/finance/chart/${encodeURIComponent(symbol)}` +
+    `?range=${range}&interval=${interval}&includePrePost=false`;
+  const raw = await fetchJson<BarResponse>(url);
+  const result = raw.chart?.result?.[0];
+  if (!result) return null;
+  const meta = result.meta ?? {};
+  const ts = result.timestamp ?? [];
+  const q = result.indicators?.quote?.[0] ?? {};
+  const bars: YahooBars['bars'] = [];
+  for (let i = 0; i < ts.length; i += 1) {
+    const o = num(q.open?.[i]);
+    const h = num(q.high?.[i]);
+    const l = num(q.low?.[i]);
+    const c = num(q.close?.[i]);
+    if (o === null || h === null || l === null || c === null) continue;
+    bars.push({ t: ts[i] * 1000, o, h, l, c, v: num(q.volume?.[i]) });
+  }
+  bars.sort((a, b) => a.t - b.t);
+  return {
+    symbol,
+    name: meta.longName ?? meta.shortName ?? null,
+    currency: meta.currency ?? null,
+    gmtoffset: num(meta.gmtoffset) ?? 0,
+    bars,
+  };
+}
+
 export const YAHOO_SOURCE = {
   name: 'Yahoo Finance',
   url: 'https://finance.yahoo.com',

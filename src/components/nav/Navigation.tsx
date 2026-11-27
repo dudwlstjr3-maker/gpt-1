@@ -49,6 +49,8 @@ const I = ({ d }: { d: string }) => (
 const NAV: NavItem[] = [
   { href: '/', label: '홈', icon: <I d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
   { href: '/indices', label: '지수', icon: <I d="M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6" /> },
+  // 종목 차트 (2026-11-27) — 봉 두 개 모양. 처음 이름 '참고' 를 같은 날 '차트' 로 바꿨다
+  { href: '/chart', label: '차트', icon: <I d="M7 3v18M17 3v18M5 7h4v8H5zM15 9h4v6h-4z" /> },
   { href: '/basics', label: '생활', icon: <I d="M4 8h16l-1.3 11.1a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9zM9 8V5.5a3 3 0 0 1 6 0V8" /> },
   { href: '/indicators', label: '경제지표', icon: <I d="M4 20V11M10 20V4M16 20v-7M22 20V8" /> },
   { href: '/calendar', label: '캘린더', icon: <I d="M4 6h16v15H4zM4 10h16M8 3v4M16 3v4" /> },

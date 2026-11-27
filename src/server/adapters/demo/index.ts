@@ -32,8 +32,13 @@ import type {
   SeriesPoint,
   FuturesBoard,
   Fundamentals,
+  TaBarsResult,
+  TaTf,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
+import { SeriesUnavailableError } from '@/server/http';
+import { taAsset } from '@/lib/taAssets';
+import { demoDailyBars, demoFourHourBars } from './bars';
 import { COMPONENTS } from '@/server/fng/definitions';
 import type { RegimeSeriesPoint } from '@/lib/regimeRules.d.mts';
 import type { RegimeSeries } from '@/server/regime';
@@ -1629,6 +1634,41 @@ export class DemoAdapter implements MarketAdapter {
   async getUsdKrw(ctx: AdapterContext): Promise<number | null> {
     const world = getWorld(ctx.now);
     return round(world.s.usdkrw[world.s.usdkrw.length - 1], 2);
+  }
+
+  /**
+   * 종목 차트 — DEMO 세계의 종가에 맞춰 지은 봉 (demo/bars.ts).
+   * 목록에 없는 종목 코드는 DEMO 에 값이 없다. 지어내지 않고 그렇다고 말한다.
+   */
+  async getBars(req: { assetId: string | null; code: string | null; tf: TaTf }, ctx: AdapterContext): Promise<TaBarsResult> {
+    const item = taAsset(req.assetId);
+    if (!item) {
+      throw new SeriesUnavailableError('DEMO 에서는 목록에 있는 지수 · 종목만 볼 수 있습니다. 코드로 찾기는 실데이터(LIVE)에서 됩니다.');
+    }
+    const world = getWorld(ctx.now);
+    const ref = seriesFor(world, item);
+    if (!ref) throw new SeriesUnavailableError(`${item.name} 의 DEMO 시계열이 없습니다.`);
+    const market = item.market as 'us' | 'kr';
+    const keep = 800;
+    const dates = ref.dates.slice(-keep);
+    const closes = ref.values.slice(-keep).map((v) => round(v, item.precision));
+    const daily = demoDailyBars(item.id, dates, closes, item.precision);
+    const bars = req.tf === '1d' ? daily : demoFourHourBars(item.id, daily.slice(-300), market, item.precision);
+    return {
+      name: item.name,
+      code: item.symbol,
+      assetId: item.id,
+      market,
+      currency: item.currency === 'KRW' || item.currency === 'USD' ? item.currency : null,
+      precision: item.precision,
+      tf: req.tf,
+      bars,
+      daily: req.tf === '4h' ? daily.map((b) => ({ t: b.t, c: b.c })) : null,
+      gmtoffset: market === 'us' ? -5 * 3600 : 9 * 3600,
+      source: { name: 'DEMO (지어낸 값)', delayMinutes: null, terms: '실제 시세가 아닙니다. 화면을 미리 보는 용도입니다.' },
+      mode: 'DEMO',
+      fetchedAt: ctx.now.toISOString(),
+    };
   }
 }
 

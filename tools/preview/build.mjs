@@ -146,6 +146,21 @@ function readIndexCatalog() {
   return out;
 }
 
+/**
+ * 순수 모듈 하나를 미리보기에 끼워 넣는다 — 바깥에는 export 한 이름만 보이게 함수 하나로 감싼다.
+ * 감싸지 않으면 모듈 안의 작은 도우미(esc · fin …)가 미리보기의 같은 이름과 부딪친다.
+ */
+function inlineModule(rel) {
+  const src = fs.readFileSync(path.join(HERE, rel), 'utf8');
+  if (/^import /m.test(src)) throw new Error(`${rel} 에 import 가 있어 미리보기에 끼워 넣을 수 없습니다.`);
+  const names = [...src.matchAll(/^export (?:async )?(?:function|const|let) (\w+)/gm)].map((m) => m[1]);
+  if (!names.length) throw new Error(`${rel} 에서 export 를 찾지 못했습니다.`);
+  return `const { ${names.join(', ')} } = (() => {\n${src.replace(/^export /gm, '')}\nreturn { ${names.join(', ')} };\n})();`;
+}
+
+/** 참고 차트 — 미리보기에 담는 항목. 일봉 · 4시간봉 둘 다 */
+const TA_PREVIEW = [['spx', 'index'], ['tsla', 'equity'], ['kospi', 'index'], ['samsung', 'equity']];
+
 async function j(url) {
   const res = await fetch(BASE + url);
   if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
@@ -164,6 +179,16 @@ async function main() {
   for (const m of ['us']) details[m] = (await j(`/api/fng/${m}`)).detail;
   // 쫄탐광장 — 회원 없이 본 모습(DEMO 예시 회원 · 예시 글). 미리보기에서는 참여하지 않는다.
   const plaza = await j('/api/plaza');
+  // 참고 차트 — DEMO 봉. 담지 못한 항목이 있으면 조용히 넘기지 않는다
+  const ta = { assets: [], bars: {} };
+  for (const [id, kind] of TA_PREVIEW) {
+    for (const tf of ['1d', '4h']) {
+      const r = await j(`/api/ta?a=${id}&tf=${tf}`);
+      if (!r?.bars?.length) throw new Error(`참고 차트 봉이 비었습니다: ${id} ${tf}`);
+      ta.bars[`${id}:${tf}`] = r;
+      if (tf === '1d') ta.assets.push({ id, kind, name: r.name, market: r.market, code: r.code });
+    }
+  }
 
   const assets = {};
   for (const id of ASSET_IDS) {
@@ -225,7 +250,7 @@ async function main() {
     if (noCurve.length) throw new Error(`인도월 곡선이 없는 EIA 항목: ${noCurve.join(', ')}`);
   }
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence, plaza };
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence, plaza, ta };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
@@ -248,6 +273,9 @@ async function main() {
     .replace('__HOME_MOOD_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/home-mood.css'), 'utf8'))
     // 쫄탐광장 — 앱과 같은 CSS · 같은 문구 함수 (2026-11-26)
     .replace('__PLAZA_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/plaza.css'), 'utf8'))
+    .replace('__TA_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/ta.css'), 'utf8'))
+    .replace('__TA_LIB__', () => inlineModule('../../src/lib/ta.mjs'))
+    .replace('__TA_CHART__', () => inlineModule('../../src/lib/taChart.mjs'))
     .replace('__PLAZA_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/plazaText.mjs'), 'utf8').replace(/^export /gm, ''))
     .replace('__PRIVACY_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/privacyText.mjs'), 'utf8').replace(/^export /gm, ''))
     .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace('export function', 'function'))

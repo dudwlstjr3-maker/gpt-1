@@ -1,0 +1,17 @@
+export function plazaDay(dateKey: string): string;
+export function plazaKst(iso: string): string;
+export function plazaPick(pick: 'up' | 'down'): string;
+export function plazaResult(result: 'up' | 'down' | 'flat' | 'void'): string;
+export function plazaSigned(v: number): string;
+export function plazaChange(pct: number): string;
+export function plazaCrowd(ups: number, downs: number): { up: number; down: number; n: number };
+export function plazaAccuracy(correct: number, played: number): string;
+export function plazaAgo(iso: string, nowMs: number): string;
+export function plazaRatingHelp(rules: { ratingStart: number; k: number; minPlayed: number }): string[];
+export const PLAZA_LEDE: string;
+export const PLAZA_POST_NOTE: string;
+export const PLAZA_FOOT: string;
+export const PLAZA_MEMORY_NOTE: string;
+export const PLAZA_LOGIN_NOTE: string;
+export const PLAZA_KAKAO_OFF: string;
+export const PLAZA_REAL_TAG: string;

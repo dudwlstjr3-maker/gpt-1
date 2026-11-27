@@ -110,7 +110,7 @@
 
 ```bash
 npm run typecheck     # 타입
-npm test              # 단위 검사 187건, 서버 필요 없음
+npm test              # 단위 검사 209건, 서버 필요 없음
 npm run dev           # (다른 창에서 띄워 둔다 — :3000)
 npm run verify        # 검증기, 위 서버를 상대로 돈다
 npm run build         # 마지막
@@ -126,12 +126,12 @@ npm run build         # 마지막
 `npm test` 는 그 단계만 서버 없이 떼어 돌리는 입구다.
 `npm test` 는 `scripts/run-tests.mjs` 가 `scripts/` 의 `*.test.mjs` 를 찾아 `node --test` 에 넘긴다
 (Windows 와 Node 20 에서도 같은 명령으로 돌게 하려는 것이다 — 그 파일 머리말).
-단위 검사는 187건이고, 검증기는 그걸 파일 단위로 묶어 16건으로 센다.
+단위 검사는 209건이고, 검증기는 그걸 파일 단위로 묶어 19건으로 센다.
 
 세어 본 값 (2026-11-26, DEMO 모드):
 
-- `npm test` — 187건 통과, 0건 실패
-- `npm run verify` — 1,262건 통과, 0건 실패
+- `npm test` — 209건 통과, 0건 실패
+- `npm run verify` — 1,333건 통과, 0건 실패
 
 숫자가 바뀌면 여기와 `README.md` 를 같이 고친다. `docs/CHANGELOG.md` 는 지난 기록이라 고치지 않고 새 항목에 새 숫자를 적는다.
 **직접 돌려 센 값만 적는다.** 서버를 띄울 수 없어 검증기를 돌리지 못했으면
@@ -278,8 +278,8 @@ public/         아이콘·글꼴 등 정적 파일
 | `npm run build` | 아이콘 생성 후 `next build` | 아니오 |
 | `npm start` | 빌드 결과 실행 (:3000) | — |
 | `npm run typecheck` | `tsc --noEmit` | 아니오 |
-| `npm test` | `scripts/*.test.mjs` 를 `node --test` 로 — 187건 | 아니오 |
-| `npm run verify` | 검증기 1,262건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
+| `npm test` | `scripts/*.test.mjs` 를 `node --test` 로 — 209건 | 아니오 |
+| `npm run verify` | 검증기 1,333건 (단위 검사를 `[0]` 단계로 포함) | **예 (:3000)** |
 | `npm run preview` | 그날 스냅샷을 박은 자립형 HTML | **예 (:3000)** |
 | `npm run icons` | PWA 아이콘 PNG 생성 (`public/icons`) | 아니오 |
 | `npm run check:parse` | 로컬 대역 서버로 LIVE 파싱 점검 — 키·네트워크 없이 | 아니오 |

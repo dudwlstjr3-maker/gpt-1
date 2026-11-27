@@ -51,7 +51,7 @@ function DeltaBox({ label, value }: { label: string; value: number | null }) {
   const c = useChangeColor();
   return (
     <div className="flex-1 rounded-lg bg-surface-2 px-2 py-2 text-center">
-      <p className="text-[11.5px] text-muted">{label}</p>
+      <p className="text-[12px] text-muted">{label}</p>
       <p className="tnum mt-0.5 flex items-center justify-center gap-0.5 text-[13px] font-bold" style={{ color: c.color(value) }}>
         <span aria-hidden="true">{c.glyph(value)}</span>
         {value === null ? NO_VALUE : formatSigned(value, 1)}
@@ -105,7 +105,7 @@ function WeightBar({
       {/* 오른쪽 맞춤 + 최소 너비 36px. '7%' 와 '20%' 의 글자 폭이 달라서
           그냥 두면 줄마다 막대가 다른 자리에서 시작한다 — 길이를 견주라고 그린
           막대가 시작점부터 어긋나면 견줄 수가 없다. */}
-      <span className="tnum min-w-9 shrink-0 text-right text-[11.5px] text-muted">
+      <span className="tnum min-w-9 shrink-0 text-right text-[12px] text-muted">
         {formatNumber(weight, 0)}%
         {shifted ? <span className="text-accent"> → {formatNumber(effective, 1)}%</span> : null}
       </span>
@@ -245,7 +245,7 @@ export default function FngDetailPage() {
     if (ov.trend) {
       ov.trend.spans.forEach((sp, i) => {
         const c = clip(sp);
-        if (c) out.push({ id: `trend-${i}`, ...c, kind: 'shade', color: 'var(--muted-fg)', label: `${ov.trend!.name} ${ov.trend!.maDays}일 평균선 아래` });
+        if (c) out.push({ id: `trend-${i}`, ...c, kind: 'shade', color: 'var(--muted-fg)', label: `${ov.trend!.name} ${ov.trend!.maDays % 252 === 0 ? `${ov.trend!.maDays / 252}년` : `${ov.trend!.maDays}일`} 평균선 아래` });
       });
     }
     if (ov.vix) {
@@ -346,7 +346,7 @@ export default function FngDetailPage() {
                 </Badge>
                 <span className="text-[12.5px] break-keep text-subtle">{detail.confidenceReason}</span>
               </div>
-              <p className="tnum mt-2 text-[11.5px] text-subtle">
+              <p className="tnum mt-2 text-[12px] text-subtle">
                 최근 {detail.lookbackDays}일 분포 기준 · 산식 {detail.formulaVersion} ·{' '}
                 {formatKstFull(detail.computedAt)} 산출
               </p>
@@ -354,6 +354,39 @@ export default function FngDetailPage() {
           </div>
           <div className="mt-3 border-t border-border pt-2">
             <StageLegend score={detail.score} />
+          </div>
+        </div>
+      </section>
+
+      {/* 기여도 — '오늘 왜 움직였나'. 홈의 '이유 보기' 가 오는 곳이라 요약 바로 아래에 둔다 (2026-11-26) */}
+      <section className="mt-5 px-3" aria-labelledby="fng-contrib-title">
+        <h2 id="fng-contrib-title" className="mb-2 text-base font-bold text-fg-strong">
+          점수 상승·하락 기여도
+        </h2>
+        <div className="card p-3">
+          <ContributionBars
+            caption={`${MARKET_LABEL[market]} 구성요소별 전일 대비 기여도`}
+            items={detail.components.map((c) => ({
+              id: c.id,
+              label: c.label,
+              value: c.contributionDay,
+            }))}
+          />
+          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-2 @min-[640px]:grid-cols-2">
+            <div className="rounded-lg bg-surface-2 p-2">
+              <p className="text-[12px] text-muted">가장 큰 상승 요인</p>
+              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
+                {detail.topPositive?.label ?? '해당 없음'}
+              </p>
+              {detail.topPositive ? <p className="text-[12px] text-subtle">{detail.topPositive.detail}</p> : null}
+            </div>
+            <div className="rounded-lg bg-surface-2 p-2">
+              <p className="text-[12px] text-muted">가장 큰 하락 요인</p>
+              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
+                {detail.topNegative?.label ?? '해당 없음'}
+              </p>
+              {detail.topNegative ? <p className="text-[12px] text-subtle">{detail.topNegative.detail}</p> : null}
+            </div>
           </div>
         </div>
       </section>
@@ -388,7 +421,12 @@ export default function FngDetailPage() {
             spans={chartSpans}
             focusT={focusT}
           />
-          <p className="mt-2 text-[11.5px] break-keep text-subtle">
+          {/* 길게 이어지던 설명 세 줄은 접는다 — 차트를 처음 보는 사람만 펼치면 된다 (2026-11-26) */}
+          <details className="mt-2" data-chart-howto>
+            <summary className="tap flex min-h-6 cursor-pointer list-none items-center text-[12.5px] font-semibold text-muted">
+              차트 읽는 법 ▾
+            </summary>
+          <p className="mt-1 text-[12px] break-keep text-subtle">
             {detail.benchmark
               ? `위 칸은 0~100 심리 점수, 아래 칸은 ${detail.benchmark.name} 가격입니다. 단위가 다른 두 값이라 눈금을 겹치지 않고 시간축만 맞춰 두었습니다 — 한 눈금에 겹쳐 그리면 눈금을 어디에 두느냐에 따라 없던 상관관계가 보입니다.`
               : '세로축은 0~100 심리 점수입니다.'}{' '}
@@ -400,10 +438,11 @@ export default function FngDetailPage() {
               ? ` 이 구간의 선은 하루치 점수를 ${SMOOTH_DAYS}일로 평균한 값입니다. 하루 단위 점수는 진폭이 커서 몇 년을 한 화면에 그리면 흐름이 보이지 않기 때문입니다. 아래 목록의 숫자는 평균이 아니라 그날의 실제 점수입니다.`
               : ''}
           </p>
+          </details>
           {detail.overlays ? (
-            <p className="mt-2 text-[11.5px] break-keep text-subtle" data-overlay-note>
+            <p className="mt-2 text-[12px] break-keep text-subtle" data-overlay-note>
               {detail.overlays.trend
-                ? `회색 칸은 ${detail.overlays.trend.name} 가격이 ${detail.overlays.trend.maDays}일(약 10개월) 평균선 아래에 있던 기간입니다. `
+                ? `회색 칸은 ${detail.overlays.trend.name} 가격이 ${detail.overlays.trend.maDays % 252 === 0 ? `${detail.overlays.trend.maDays / 252}년(${detail.overlays.trend.maDays}거래일)` : `${detail.overlays.trend.maDays}거래일`} 평균선 아래에 있던 기간입니다 — 쫄탐지수가 지표를 견주는 기간(최근 1년)과 같은 길이. `
                 : `${detail.benchmark?.name ?? '대표 지수'} 평균선은 지금 받지 못해 그리지 않았습니다. `}
               {detail.overlays.vix
                 ? `${detail.benchmark ? '두 칸 사이' : '맨 위'}의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ${detail.overlays.vix.threshold} 이상이던 날입니다. `
@@ -433,7 +472,12 @@ export default function FngDetailPage() {
         <h2 id="fng-cycle-title" className="mb-2 text-base font-bold text-fg-strong">
           사이클과 구간 통계
         </h2>
-        <div className="grid grid-cols-1 gap-2 @min-[1024px]:grid-cols-2">
+        {/* 두 카드를 합치면 화면 한 장 반이었다. 제목 아래 한 줄로 접어 둔다 (2026-11-26) */}
+        <details className="fng-fold">
+          <summary className="tap flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-surface px-3 text-[13px] font-semibold text-fg">
+            지금 국면 · 과거 같은 점수 구간 뒤 6개월 <span aria-hidden="true">▾</span>
+          </summary>
+        <div className="mt-2 grid grid-cols-1 gap-2 @min-[1024px]:grid-cols-2">
           <FngCycleView cycle={detail.cycle} />
           {detail.bandStats ? (
             <BandStatsView stats={detail.bandStats} />
@@ -446,39 +490,7 @@ export default function FngDetailPage() {
             </div>
           )}
         </div>
-      </section>
-
-      {/* 기여도 */}
-      <section className="mt-5 px-3" aria-labelledby="fng-contrib-title">
-        <h2 id="fng-contrib-title" className="mb-2 text-base font-bold text-fg-strong">
-          점수 상승·하락 기여도
-        </h2>
-        <div className="card p-3">
-          <ContributionBars
-            caption={`${MARKET_LABEL[market]} 구성요소별 전일 대비 기여도`}
-            items={detail.components.map((c) => ({
-              id: c.id,
-              label: c.label,
-              value: c.contributionDay,
-            }))}
-          />
-          <div className="mt-3 grid grid-cols-1 gap-2 border-t border-border pt-2 @min-[640px]:grid-cols-2">
-            <div className="rounded-lg bg-surface-2 p-2">
-              <p className="text-[11.5px] text-muted">가장 큰 상승 요인</p>
-              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
-                {detail.topPositive?.label ?? '해당 없음'}
-              </p>
-              {detail.topPositive ? <p className="text-[11.5px] text-subtle">{detail.topPositive.detail}</p> : null}
-            </div>
-            <div className="rounded-lg bg-surface-2 p-2">
-              <p className="text-[11.5px] text-muted">가장 큰 하락 요인</p>
-              <p className="mt-0.5 text-[13px] font-semibold break-keep text-fg">
-                {detail.topNegative?.label ?? '해당 없음'}
-              </p>
-              {detail.topNegative ? <p className="text-[11.5px] text-subtle">{detail.topNegative.detail}</p> : null}
-            </div>
-          </div>
-        </div>
+        </details>
       </section>
 
       {/* 구성요소 */}
@@ -553,7 +565,7 @@ export default function FngDetailPage() {
                         <p className="tnum text-[15px] font-bold" style={{ color: scoreColor(c.score) }}>
                           {c.score === null ? NO_VALUE : formatNumber(c.score, 1)}
                         </p>
-                        <p className="tnum text-[11.5px] text-muted">
+                        <p className="tnum text-[12px] text-muted">
                           전일 {c.deltaDay === null ? NO_VALUE : formatSigned(c.deltaDay, 1)}
                         </p>
                       </div>
@@ -591,12 +603,12 @@ export default function FngDetailPage() {
                                 <th scope="row" className="font-normal">
                                   <span className="text-fg">{s.label}</span>
                                   {s.inverted ? (
-                                    <span className="ml-1 text-[11.5px] text-subtle" title="값이 클수록 공포 → 점수 반전">
+                                    <span className="ml-1 text-[12px] text-subtle" title="값이 클수록 공포 → 점수 반전">
                                       (반전)
                                     </span>
                                   ) : null}
                                   {s.missingReason ? (
-                                    <span className="block text-[11.5px]" style={{ color: 'var(--warn)' }}>
+                                    <span className="block text-[12px]" style={{ color: 'var(--warn)' }}>
                                       {s.missingReason}
                                     </span>
                                   ) : null}
@@ -612,7 +624,7 @@ export default function FngDetailPage() {
                         </table>
                       </div>
 
-                      <p className="mt-2 text-[11.5px] text-subtle">
+                      <p className="mt-2 text-[12px] text-subtle">
                         출처: {c.sources.map((s) => s.name).join(', ') || '알 수 없음'}
                         {c.asOf ? ` · 기준 ${formatKstFull(c.asOf)}` : ''}
                       </p>
@@ -630,7 +642,11 @@ export default function FngDetailPage() {
         <h2 id="fng-method-title" className="mb-2 text-base font-bold text-fg-strong">
           산출 방법
         </h2>
-        <div className="card space-y-2 p-3">
+        <details className="fng-fold">
+          <summary className="tap flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-surface px-3 text-[13px] font-semibold text-fg">
+            점수를 어떻게 내나요 — 단계별 설명 <span aria-hidden="true">▾</span>
+          </summary>
+        <div className="card mt-2 space-y-2 p-3">
           <p className="text-[13px] leading-relaxed break-keep text-fg">{detail.methodology.summary}</p>
           {/*
             * <ol> 인데 번호가 안 보였다.
@@ -646,7 +662,7 @@ export default function FngDetailPage() {
               <li key={i} className="flex items-start gap-2">
                 <span
                   aria-hidden="true"
-                  className="tnum mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[11.5px] font-bold text-fg"
+                  className="tnum mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[12px] font-bold text-fg"
                 >
                   {i + 1}
                 </span>
@@ -666,6 +682,7 @@ export default function FngDetailPage() {
           </div>
           <Notice tone="neutral">{detail.methodology.scaleWarning}</Notice>
         </div>
+        </details>
       </section>
 
       {/* 출처 */}
@@ -678,7 +695,7 @@ export default function FngDetailPage() {
             {detail.meta.sources.map((s, i) => (
               <li key={i} className="text-[13px]">
                 <p className="font-semibold text-fg">{s.name}</p>
-                <p className="text-[11.5px] break-keep text-subtle">
+                <p className="text-[12px] break-keep text-subtle">
                   {s.delayMinutes === null ? '지연 정보 없음' : s.delayMinutes === 0 ? '실시간' : `${s.delayMinutes}분 지연`}
                   {s.terms ? ` · ${s.terms}` : ''}
                 </p>
@@ -686,7 +703,7 @@ export default function FngDetailPage() {
                     읽는 사람에게 필요한 건 '어디' 라서 호스트만 남기고, 새 창으로 열린다는
                     것은 기호(↗)와 화면 낭독용 글자로 함께 알린다 — 기호 하나만으로 두지 않는다. */}
                 {s.url ? (
-                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[11.5px] text-accent hover:underline">
+                  <a href={s.url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-accent hover:underline">
                     {s.url.replace(/^https?:\/\//, '').replace(/\/+$/, '')}
                     <span aria-hidden="true"> ↗</span>
                     <span className="sr-only"> (새 창에서 열림)</span>
@@ -695,7 +712,7 @@ export default function FngDetailPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-2 border-t border-border pt-2 text-[11.5px] text-subtle">
+          <p className="mt-2 border-t border-border pt-2 text-[12px] text-subtle">
             데이터 기준 시각 {formatKstFull(detail.meta.asOf)} · 수집 {formatKstFull(detail.meta.fetchedAt)}
           </p>
         </div>

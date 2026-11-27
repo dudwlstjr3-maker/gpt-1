@@ -103,7 +103,7 @@ export function ContributionBars({ items, caption }: { items: ContributionItem[]
                       {v === null ? '결측' : `${GLYPH[row.dir]} ${row.text}`.trim()}
                     </span>
                     {v !== null ? (
-                      <span className="tnum text-[11.5px] text-subtle">{formatSigned(v, 1)}점</span>
+                      <span className="tnum text-[12px] text-subtle">{formatSigned(v, 1)}점</span>
                     ) : null}
                   </span>
                 </div>
@@ -126,7 +126,7 @@ export function ContributionBars({ items, caption }: { items: ContributionItem[]
           })}
         </ul>
       )}
-      <p className="mt-2 text-[11.5px] leading-relaxed text-subtle break-keep">
+      <p className="mt-2 text-[12px] leading-relaxed text-subtle break-keep">
         %는 오늘 움직인 크기 가운데 그 지표가 맡은 몫입니다. 올린 쪽(▲)과 내린 쪽(▼)을 합쳐 100%.
         옆의 '점'은 100점 만점 점수가 그 지표 때문에 움직인 만큼입니다.
       </p>

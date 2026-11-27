@@ -162,6 +162,8 @@ async function main() {
   // 점수를 내는 시장만. 한국은 무료 소스로 확보 가중치가 약 33% 라 시장에서 뺐고, 크립토는 2026-11-26 뺐다.
   const details = {};
   for (const m of ['us']) details[m] = (await j(`/api/fng/${m}`)).detail;
+  // 쫄탐광장 — 회원 없이 본 모습(DEMO 예시 회원 · 예시 글). 미리보기에서는 참여하지 않는다.
+  const plaza = await j('/api/plaza');
 
   const assets = {};
   for (const id of ASSET_IDS) {
@@ -223,7 +225,7 @@ async function main() {
     if (noCurve.length) throw new Error(`인도월 곡선이 없는 EIA 항목: ${noCurve.join(', ')}`);
   }
 
-  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence };
+  const bundle = { capturedAt: new Date().toISOString(), snapshot, partial, details, assets, indices, futures, regimeEvidence, plaza };
 
   const tpl = fs.readFileSync(path.join(HERE, 'template.html'), 'utf8');
   if (!tpl.includes('__DATA__')) throw new Error('template.html 에 __DATA__ 자리표시자가 없습니다.');
@@ -244,6 +246,10 @@ async function main() {
     .replace('__HOME_DIAL_IMAGE__', () => 'data:image/svg+xml;base64,' +
       fs.readFileSync(path.join(HERE, '../../public/mood-dial.svg')).toString('base64'))
     .replace('__HOME_MOOD_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/home-mood.css'), 'utf8'))
+    // 쫄탐광장 — 앱과 같은 CSS · 같은 문구 함수 (2026-11-26)
+    .replace('__PLAZA_CSS__', () => fs.readFileSync(path.join(HERE, '../../src/app/plaza.css'), 'utf8'))
+    .replace('__PLAZA_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/plazaText.mjs'), 'utf8').replace(/^export /gm, ''))
+    .replace('__PRIVACY_TEXT__', () => fs.readFileSync(path.join(HERE, '../../src/lib/privacyText.mjs'), 'utf8').replace(/^export /gm, ''))
     .replace('__HOME_MOOD_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/homeMood.mjs'), 'utf8').replace('export function', 'function'))
     // 홈 카드 두 칩(추세 · VIX)의 문구 — 앱과 같은 함수를 그대로 쓴다
     .replace('__OVERLAY_CHIPS_FN__', () => fs.readFileSync(path.join(HERE, '../../src/lib/overlayChips.mjs'), 'utf8').replace('export function', 'function'))

@@ -6,6 +6,7 @@ import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
 import { HeatBoard } from '@/components/market/HeatBoard';
 import { TodayLine } from '@/components/market/TodayLine';
+import { HomePlazaCard } from '@/components/plaza/HomePlazaCard';
 import { SummaryCard } from '@/components/market/SummaryCard';
 import { RiskAlertLine } from '@/components/market/RiskAlertLine';
 import { HomeLower } from '@/components/market/HomeLower';
@@ -43,6 +44,8 @@ export default function HomePage() {
       <FngSection />
       <RiskAlertLine />
       <TodayLine />
+      {/* 쫄탐광장 들어가는 문 (2026-11-26) — 다음 거래일 맞히기 */}
+      <HomePlazaCard />
       <details className="home-fold">
         <summary>시세와 시장 흐름</summary>
         <RegimeBoardCard />

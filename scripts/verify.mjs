@@ -4142,6 +4142,124 @@ async function main() {
     check('/privacy 화면이 열림', pp.status === 200 && ppText.includes('개인정보 처리방침') && ppText.includes('가운데를 가려'));
   }
 
+  console.log('\n[8-45] 종목 차트 — 종목 찾기 · 운영자 기법(4시간봉 RSI · 다이버전스) · 슈퍼트렌드 · OBV · 이동평균 · 추세선 · 쫄탐지수');
+  {
+    /*
+     * 2026-11-27 사용자: "쫄탐지수 말고도 rsi 나 내가 사용하고 있는 지표들 그리고 추세선 이런 것들을 같이 볼 수 있게 … 참고할 수 있게".
+     * 정한 것: 매수 · 매도 대신 '상승 전환 ▲ / 하락 전환 ▼' (규칙 1절 그대로) · 지수 + 종목 코드 찾기 · 일봉 + 4시간봉.
+     * 같은 날 이어서: 이름을 '참고' → '차트'(종목 검색), 운영자 기법 — 4시간봉, ① RSI 다이버전스 ② RSI 30 이하 · 80 이상
+     * ③ 20 이하 · 90 이상은 강함 ④ 슈퍼트렌드는 후순위. 화면에는 '조건 충족' 으로만.
+     * 계산은 ta.mjs, 그림 · 표는 taChart.mjs — 앱과 미리보기가 같은 파일을 쓴다.
+     */
+    const ta = await import('../src/lib/ta.mjs');
+    const mode = (await getJson('/api/health')).body?.mode;
+    const okBar = (b) => [b.o, b.h, b.l, b.c].every((x) => typeof x === 'number' && Number.isFinite(x)) &&
+      b.l <= Math.min(b.o, b.c) + 1e-9 && Math.max(b.o, b.c) <= b.h + 1e-9;
+
+    const d1 = await getJson('/api/ta?a=tsla&tf=1d');
+    const r1 = d1.body ?? {};
+    check('일봉 200 · 모드가 서버 모드와 같음(DEMO · LIVE 섞지 않음)', d1.status === 200 && r1.mode === mode && r1.tf === '1d' && r1.daily === null,
+      `${d1.status} ${r1.mode}/${mode}`);
+    check('일봉 — 1년선을 그릴 만큼(252 + 1년) · 시고저종이 말이 됨(저가 ≤ 시가·종가 ≤ 고가)',
+      (r1.bars ?? []).length >= 504 && r1.bars.every(okBar), `${(r1.bars ?? []).length}개`);
+    check('봉은 시간 순서 · 같은 시각이 두 번 없음', (r1.bars ?? []).every((b, i, a) => i === 0 || a[i - 1].t < b.t));
+
+    const d4 = await getJson('/api/ta?a=samsung&tf=4h');
+    const r4 = d4.body ?? {};
+    const kstDay = (t) => new Date(t + 9 * 3600_000).toISOString().slice(0, 10);
+    const perDay = new Map();
+    for (const b of r4.bars ?? []) perDay.set(kstDay(b.t), (perDay.get(kstDay(b.t)) ?? 0) + 1);
+    const hours = new Set((r4.bars ?? []).map((b) => new Date(b.t + 9 * 3600_000).toISOString().slice(11, 16)));
+    check('4시간봉 — 한국은 하루 두 개(9:00 · 13:00 서울), 1년선용 일봉을 같이 보냄',
+      d4.status === 200 && (r4.bars ?? []).length >= 200 && [...perDay.values()].every((n) => n <= 2) &&
+      [...hours].every((h) => h === '09:00' || h === '13:00') && (r4.daily ?? []).length >= 252 && r4.bars.every(okBar),
+      `${(r4.bars ?? []).length}개 · ${[...hours].join(',')} · 일봉 ${(r4.daily ?? []).length}`);
+    const s4 = await getJson('/api/ta?a=spx&tf=4h');
+    const etHours = new Set((s4.body?.bars ?? []).map((b) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(b.t))));
+    check('4시간봉 — 미국은 9:30 · 13:30 (동부)', s4.status === 200 && [...etHours].every((h) => h === '09:30' || h === '13:30'), [...etHours].join(','));
+
+    const bad = await Promise.all(['/api/ta?a=vix&tf=1d', '/api/ta?a=tsla&tf=15m', '/api/ta?code=../x&tf=1d', '/api/ta?tf=1d']
+      .map((u) => getJson(u).then((r) => r.status)));
+    check('고를 수 없는 것은 거절 — 변동성지수 404 · 이상한 봉 단위 400 · 코드 모양이 아님 400 · 빈 요청 400',
+      bad.join(',') === '404,400,400,400', bad.join(','));
+    const viaCode = await getJson('/api/ta?code=tsla&tf=1d');
+    check('목록에 있는 종목은 코드로 찾아도 목록 항목으로 (이름 · 소수 자리)', viaCode.status === 200 && viaCode.body?.assetId === 'tsla' && viaCode.body?.name === '테슬라');
+    if (mode === 'DEMO') {
+      const plug = await getJson('/api/ta?code=PLUG&tf=1d');
+      check('DEMO 에서 목록에 없는 코드는 지어내지 않고 까닭을 말함', plug.status === 404 && /DEMO/.test(plug.body?.error ?? '') && !plug.body?.bars,
+        `${plug.status} ${plug.body?.error ?? ''}`);
+    }
+
+    // 같은 봉으로 계산 — 요약 줄 여섯, 방향은 기호와 말로
+    const m = ta.taModel({ tf: '1d', bars: r1.bars ?? [], daily: null });
+    const rows = ta.taSummary(m);
+    check('지금 상태 — 슈퍼트렌드 · 이동평균 · 1년선 · OBV · RSI · 다이버전스', rows.map((r) => r.key).join(',') === 'st,ma,trend,obv,rsi,div', rows.map((r) => r.key).join(','));
+    check('방향 있는 줄은 ▲ / ▼ 와 말이 같이 (색만으로 전하지 않음)', rows.filter((r) => r.dir).every((r) => (r.dir === 'up' ? /▲/ : /▼/).test(r.value)));
+    check('1년선 길이는 홈 칩 · 심리 상세와 같은 252', ta.TA_TREND_DAYS === 252);
+
+    // 운영자 기법 — 같은 봉으로 계산
+    const m4 = ta.taModel({ tf: '4h', bars: (await getJson('/api/ta?a=tsla&tf=4h')).body?.bars ?? [], daily: null });
+    const ev = ta.techEvents(m4);
+    check('기법 조건 — RSI 30 이하 · 80 이상에 들어간 봉, 20 · 90 은 강함, 다이버전스는 5봉 뒤 확인',
+      ta.TA_RSI_LOW === 30 && ta.TA_RSI_HIGH === 80 && ta.TA_RSI_STRONG_LOW === 20 && ta.TA_RSI_STRONG_HIGH === 90 &&
+      ev.every((e) => e.kind === 'div' ? e.seenAt === e.i + 5 : (e.side === 'up' ? e.rsi <= 30 : e.rsi >= 80) && e.strong === (e.side === 'up' ? e.rsi <= 20 : e.rsi >= 90)),
+      `${ev.length}개`);
+    const now = ta.techNow(m4);
+    check('기법 카드 — 다이버전스 · RSI · 슈퍼트렌드(후순위) 순서, 결론은 \'조건 충족\' 또는 \'없음\'',
+      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
+      now.head.text);
+    check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
+    // 2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게" — 결론 한 줄 + 큰 숫자 칸 여섯
+    const board = ta.taBoard(m4);
+    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 여섯 (다이버전스 · RSI · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
+      board.tiles.map((t) => t.key).join(',') === 'tdiv,trsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8),
+      board.tiles.map((t) => t.big).join(' | '));
+    const cssBig = await readFile('src/app/ta.css', 'utf8');
+    const px = (sel) => Number((cssBig.match(new RegExp(sel.replace(/[.[\]"=]/g, (c) => '\\' + c) + '\\s*\\{[^}]*font-size:\\s*([\\d.]+)px')) ?? [])[1]);
+    check('숫자는 크게 — 칸 값 28px 이상 · RSI 36px · 결론 22px · 가격 24px · 차트 축 13px',
+      px('.ta-big') >= 28 && px('.ta-tile[data-k="trsi"] .ta-big') >= 36 && px('.ta-vhead b') >= 22 && px('.ta-title .ta-last') >= 24 && px('.ta-axis') >= 13,
+      ['.ta-big', '.ta-tile[data-k="trsi"] .ta-big', '.ta-vhead b', '.ta-title .ta-last', '.ta-axis'].map(px).join(','));
+
+    const rd = (f) => readFile(f, 'utf8');
+    const [page, nav, tpl, build, css, lib, chart, route, live, demoA] = await Promise.all([
+      'src/app/chart/page.tsx', 'src/components/nav/Navigation.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/ta.css',
+      'src/lib/ta.mjs', 'src/lib/taChart.mjs', 'src/app/api/ta/route.ts', 'src/server/adapters/live/index.ts', 'src/server/adapters/demo/index.ts'].map(rd));
+    const vr = tpl.slice(tpl.indexOf('  function viewRef() {'), tpl.indexOf('\n  function drawRef()'));
+    check('하단 탭에 \'차트\' (앱 · 미리보기)', /href: '\/chart', label: '차트'/.test(nav) && /\{ id: 'ref', label: '차트'/.test(tpl) && /ref: viewRef,/.test(tpl) &&
+      !/label: '참고'/.test(nav + tpl));
+    check('계산 · 그림 · CSS 는 한 곳 — 미리보기는 같은 파일을 끼워 넣음',
+      /__TA_LIB__/.test(tpl) && /__TA_CHART__/.test(tpl) && /__TA_CSS__/.test(tpl) &&
+      /inlineModule\('\.\.\/\.\.\/src\/lib\/ta\.mjs'\)/.test(build) && /inlineModule\('\.\.\/\.\.\/src\/lib\/taChart\.mjs'\)/.test(build) &&
+      /src\/app\/ta\.css/.test(build) && /from '@\/lib\/ta\.mjs'/.test(page) && /from '@\/lib\/taChart\.mjs'/.test(page) && !/^import /m.test(lib + chart));
+    check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 지금 상태(큰 숫자 칸) · 차트 · 구간',
+      ['ta-search', 'ta-seg', 'ta-chart', 'ta-ranges', 'ta-read', 'ta-fold', 'ta-howto', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
+      ['taSuggestHtml(', 'taQuickHtml(', 'taBoardHtml(taBoard('].every((f) => page.includes(f.replace('taBoardHtml(taBoard(', 'taBoardHtml(')) && vr.includes(f)) &&
+      /const board = taBoard\(model\)/.test(page) &&
+      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /mark: taBoard\(m\)\.mark/.test(tpl) && /mark: board\.mark/.test(page));
+    // 2026-11-27 사용자: "차트에서 왜 점 같은 거 있지? 너무 가독성이 떨어지는데" — 흩뿌린 점 · 흐린 ▲▼ 를 빼고 가장 최근 조건 하나만
+    const svgNow = (await import('../src/lib/taChart.mjs')).taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360, mark: ta.taBoard(m4).mark }).html;
+    check('차트에 점(●) · 흐린 슈퍼트렌드 ▲▼ 없음 — 최근 기법 조건만 세로 점선 하나와 꼬리표',
+      !/<circle /.test(svgNow) && !/ta-flip-st/.test(svgNow) && (svgNow.match(/class="ta-mark"/g) ?? []).length === (ta.taBoard(m4).mark ? 1 : 0) &&
+      (svgNow.match(/class="ta-mark-tag"/g) ?? []).length === (ta.taBoard(m4).mark ? 1 : 0) && !/opt\.tech/.test(chart));
+    check('자주 보는 종목이 앱 · 미리보기에서 같음', /const QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(page) &&
+      /const TA_QUICK = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(tpl) && /const TA_PREVIEW = \['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'\]/.test(build));
+    const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    const words = /(매수|매도|사세요|파세요|추천|매매 신호|진입|청산|목표가|손절|익절|지금이 기회|예측)/;
+    const hit = [['page', page], ['viewRef', vr], ['ta.mjs', lib], ['taChart.mjs', chart], ['route', route]].filter(([, t]) => words.test(strip(t))).map(([n]) => n);
+    check('매수 · 매도를 권하거나 앞날을 말하는 말이 화면 · 계산 어디에도 없음 (규칙 1절)', hit.length === 0, hit.join(','));
+    check('기법은 \'조건 충족\' 으로만 · Buy / Sell 표시 없음', /조건 충족/.test(lib) && /상승 전환 ▲/.test(lib) && !/\bBuy\b|\bSell\b/.test(strip(lib + chart + page + vr)));
+    check('차트 CSS 에 12px 아래 글자 없음', !/font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/.test(css));
+    check('목록에 없는 코드는 모양을 거른 뒤에만 바깥 주소에 넣음', /taParseCode\(c\)/.test(route) && /const parsed = taParseCode\(req\.code\)/.test(live));
+    check('DEMO 는 목록에 없는 코드를 지어내지 않음', /DEMO 에서는 목록에 있는 지수 · 종목만 볼 수 있습니다/.test(demoA));
+    check('거래량이 빠지면 OBV 를 메우지 않고 그리지 않음', /거래량이 빠진 봉이 \$\{missing\}개 있어 OBV 를 그리지 않습니다/.test(lib));
+    check('유료 · 비공개 지표는 흉내 내지 않는다고 밝힘', /SignalMaster Pro · AI Moving Average/.test(lib));
+    const pr = await fetch(`${BASE}/chart`);
+    const prText = await pr.text();
+    check('/chart 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('종목 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
+    const old = await fetch(`${BASE}/ref`, { redirect: 'manual' });
+    check('옛 주소 /ref 는 남기지 않음 (이 PR 안에서 바뀐 이름)', old.status === 404, String(old.status));
+  }
+
   const { status: hs, body: health } = await getJson('/api/health');
   check('health 200', hs === 200);
   check('health 에 키 값이 노출되지 않음', !JSON.stringify(health).match(/API_KEY"\s*:\s*"[^"]+"/));

@@ -883,6 +883,7 @@ details.howto > summary { list-style: none; display: flex; align-items: center; 
 }
 __HOME_MOOD_CSS__
 __PLAZA_CSS__
+__TA_CSS__
 </style>
 
 <div class="preview">
@@ -969,6 +970,8 @@ __PLAZA_CSS__
   /* ====================================================================== */
 
   const state = {
+    /* 종목 차트 (2026-11-27) — 고른 항목 · 봉 단위 · 보이는 구간 · 짚은 봉 */
+    ref: { a: 'spx', tf: '4h', range: '3m', cursor: null, err: null, q: '' }, /* 처음은 4시간봉 — ta.mjs TA_DEFAULT_TF 와 같게 */
     /* 지표 화면 안에서 위험 신호등을 볼지 전체 지표를 볼지 */
     indView: 'risk',
     /* 캘린더: 달력으로 볼지 목록으로 볼지, 어느 달을 보고 있는지, 어느 날을 골랐는지 */
@@ -3274,6 +3277,155 @@ __PLAZA_CSS__
         s.body.map((b) => '<li>' + esc(b) + '</li>').join('') + '</ul></div></section>').join('') + '</div>';
   }
 
+  /* ---------------- 종목 차트 (2026-11-27, 처음 이름 '참고') ----------------
+     계산은 src/lib/ta.mjs, 그림 · 표는 src/lib/taChart.mjs 를 그대로 끼워 넣는다(build.mjs). CSS 는 src/app/ta.css.
+     봉은 미리보기를 구울 때 DEMO 서버의 /api/ta 에서 받은 것 — 담은 항목만 고를 수 있다. */
+  __TA_LIB__
+  __TA_CHART__
+
+  /** 자주 보는 종목 — 앱(src/app/chart/page.tsx QUICK)과 같은 목록 */
+  const TA_QUICK = ['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'];
+
+  function refData() {
+    const st = state.ref;
+    return (DATA.ta && DATA.ta.bars[st.a + ':' + st.tf]) || null;
+  }
+
+  function refModel(d) {
+    if (!d) return null;
+    if (d._model) return d._model;
+    d._model = taModel({ tf: d.tf, bars: d.bars, daily: d.daily, gmtoffset: d.gmtoffset });
+    return d._model;
+  }
+
+  function refWindow(d, m) {
+    const list = TA_RANGES[d.tf];
+    const want = (list.find((r) => r[0] === state.ref.range) || list[1])[2];
+    const to = m.n - 1;
+    return { from: Math.max(0, to - want + 1), to };
+  }
+
+  /** 찾기 — 앱과 같은 목록(카탈로그의 미국 · 한국 지수와 종목). 미리보기에는 그중 몇 개의 봉만 담았다 */
+  function refHits() {
+    const q = state.ref.q || '';
+    const hits = taSearch(q, DATA.ta.list);
+    const p = taParseCode(q);
+    const codeOpt = p && !hits.some((h) => String(h.code).toUpperCase() === p.code) ? p.code : null;
+    return { hits, codeOpt };
+  }
+
+  function refPick(id) {
+    const st = state.ref;
+    if (!DATA.ta.bars[id + ':' + st.tf]) {
+      st.err = '미리보기에는 ' + DATA.ta.assets.map((x) => x.name).join(' · ') + '만 담았습니다. 앱에서는 목록의 모든 종목을 볼 수 있습니다.';
+      return render();
+    }
+    st.a = id; st.q = ''; st.err = null; st.cursor = null;
+    render();
+  }
+
+  function viewRef() {
+    const st = state.ref;
+    const ta = DATA.ta;
+    if (!ta) return '<p style="padding:20px">차트 자료가 없습니다.</p>';
+    const d = refData();
+    const quick = TA_QUICK.map((id) => ta.list.find((x) => x.id === id)).filter(Boolean);
+    const sug = st.q && st.q.trim() ? (() => { const h = refHits(); return taSuggestHtml(h.hits, h.codeOpt); })() : '';
+    let html = '<div class="ta" style="--ta-up:var(--up);--ta-down:var(--down)">' +
+      '<div><div class="ta-head"><h1>' + esc(TA_TEXT.title) + '</h1>' + modeBadge() + '</div>' +
+      '<p class="ta-lede">' + esc(TA_TEXT.lede) + '</p></div>' +
+      '<div class="ta-pick">' +
+      '<form class="ta-search" role="search" aria-label="종목 찾기"><label class="sr-only" for="ta-q">종목 이름 · 초성 · 코드</label>' +
+      '<input id="ta-q" type="search" value="' + esc(st.q || '') + '" placeholder="종목 찾기 (테슬라, ㅌㅅㄹ, TSLA, 005930)" autocomplete="off" spellcheck="false" maxlength="20">' +
+      '<button type="submit">찾기</button></form>' +
+      '<div id="ta-sug">' + sug + '</div>' +
+      (st.err ? '<p class="ta-err" role="alert">' + esc(st.err) + '</p>' : '') +
+      '<div>' + taQuickHtml(quick, st.a) + '</div>' +
+      '<div class="ta-row"><div class="ta-seg" role="group" aria-label="봉 단위">' + ['4h', '1d'].map((k) =>
+        '<button type="button" data-ta-tf="' + k + '" aria-pressed="' + (st.tf === k) + '">' + taBarUnit(k) + '</button>').join('') + '</div>' +
+      '<p class="ta-hint">' + esc(TA_TEXT.searchHint) + '</p></div></div>';
+    if (!d) return html + '<p class="ta-err" role="alert">이 항목의 봉을 담지 않았습니다.</p></div>';
+
+    const m = refModel(d);
+    const w = refWindow(d, m);
+    const price = taPrice(d.precision);
+    const change = taLastChange(m);
+    const unit = taBarUnit(d.tf);
+    const fngList = (DATA.snapshot.sections.fng && DATA.snapshot.sections.fng.data) || [];
+    const own = fngList.find((f) => f.market === d.market && f.score !== null);
+    const us = fngList.find((f) => f.market === 'us' && f.score !== null);
+    const mood = own || us || null;
+    const shown = st.cursor === null ? w.to : st.cursor;
+    const stamp = taStamp(d.tf, d.market);
+
+    html += '<div><div class="ta-title"><b>' + esc(d.name) + '</b><span class="ta-code-tag">' + esc(d.code) + ' · ' + unit + '</span>' +
+      '<span class="ta-last">' + price(m.c[m.n - 1]) + '</span>' +
+      (change ? '<span class="ta-chg" style="color:' + (change.abs > 0 ? 'var(--ta-up)' : change.abs < 0 ? 'var(--ta-down)' : 'var(--flat-fg)') + '">' +
+        (change.abs > 0 ? '▲' : change.abs < 0 ? '▼' : '–') + ' ' + Math.abs(change.pct).toFixed(2) + '% <small>' + esc(change.label) + '</small></span>' : '') +
+      '</div><p class="ta-src">' + (d.mode === 'DEMO' ? 'DEMO — 지어낸 값입니다. 실제 시세가 아닙니다.' : '출처 ' + esc(d.source.name) + ' · ' + d.source.delayMinutes + '분 지연 · 개인적·비상업적 범위에서 씁니다') + '</p></div>';
+    if (mood) {
+      html += '<button type="button" class="ta-mood" data-go="fng"><span>' + (mood.market === 'us' ? '미국' : '한국') + ' 쫄탐지수 <b>' + Math.round(mood.score) + '</b> · ' + esc(mood.stage ? mood.stage.label : '') +
+        (!own && d.market === 'kr' ? '<small> 한국 쫄탐지수는 내지 않아 미국 것을 봅니다</small>' : '') + '</span><span aria-hidden="true">→</span></button>';
+    }
+    html += '<section class="ta-sec" aria-labelledby="ta-now-title"><h2 id="ta-now-title">지금 상태 <small>마지막 ' + unit + ' 기준</small></h2>' +
+      '<div>' + taBoardHtml(taBoard(m)) + '</div>' +
+      '<details class="ta-howto"><summary>' + esc(TA_TEXT.techTitle) + ' — 보는 순서</summary><ol>' + TA_TEXT.techSteps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>' +
+      '<p class="ta-note">' + esc(TA_TEXT.techNote) + '</p></section>' +
+      '<section class="ta-sec" aria-labelledby="ta-chart-title"><h2 id="ta-chart-title">차트 <small>' + unit + ' · 봉 ' + (w.to - w.from + 1) + '개</small></h2>' +
+      '<div class="ta-ranges" role="group" aria-label="보이는 구간">' + TA_RANGES[d.tf].map((r) =>
+        '<button type="button" data-ta-range="' + r[0] + '" aria-pressed="' + (st.range === r[0]) + '">' + r[1] + '</button>').join('') + '</div>' +
+      '<p class="ta-read" aria-live="polite">' + esc(stamp(m.t[shown]) + ' · ' + taReadout(m, shown, price)) + '</p>' +
+      '<div class="ta-chart" id="ta-chart" tabindex="0" aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."></div>' +
+      '<p class="ta-note">' + esc(TA_TEXT.markNote) + '</p></section>' +
+      '<details class="ta-fold"><summary>산출 방법</summary><dl>' + TA_TEXT.methods.map((x) => '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') +
+      '</dl><p class="ta-note">' + esc(TA_TEXT.notIncluded) + '</p></details></div>';
+    return html;
+  }
+
+  /** 그림은 칸 폭을 잰 뒤에 그린다 — 늘이거나 줄이지 않아야 글자가 12px 그대로다 */
+  let refLayout = null;
+  function drawRef() {
+    const box = document.getElementById('ta-chart');
+    const d = refData();
+    if (!box || !d) { refLayout = null; return; }
+    const m = refModel(d);
+    const w = refWindow(d, m);
+    const out = taChartHtml(m, {
+      from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), mark: taBoard(m).mark,
+      date: taAxisDate(d.tf, w.to - w.from + 1, d.market), title: d.name + ' ' + taBarUnit(d.tf),
+    });
+    box.innerHTML = out.html;
+    refLayout = out.layout;
+    if (state.ref.cursor !== null) refCross(state.ref.cursor, false);
+  }
+
+  function refCross(i, update) {
+    const box = document.getElementById('ta-chart');
+    const line = box && box.querySelector('.ta-cross');
+    if (!line || !refLayout) return;
+    if (i === null) line.setAttribute('visibility', 'hidden');
+    else {
+      const x = String(Math.round(taXOf(refLayout, i) * 10) / 10);
+      line.setAttribute('x1', x); line.setAttribute('x2', x); line.setAttribute('visibility', 'visible');
+    }
+    state.ref.cursor = i;
+    if (update === false) return;
+    const d = refData();
+    const m = refModel(d);
+    const shown = i === null ? refLayout.to : i;
+    const read = document.querySelector('.ta-read');
+    if (read) read.textContent = taStamp(d.tf, d.market)(m.t[shown]) + ' · ' + taReadout(m, shown, taPrice(d.precision));
+  }
+
+  function refPointer(e) {
+    const box = e.target.closest && e.target.closest('#ta-chart');
+    if (!box || !refLayout) return;
+    const svg = box.querySelector('svg');
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    refCross(taIndexAt(refLayout, ((e.clientX - r.left) * refLayout.W) / r.width));
+  }
+
   function homePlazaCard() {
     const st = DATA.plaza;
     if (!st) return '';
@@ -4803,6 +4955,7 @@ __PLAZA_CSS__
   const NAV = [
     { id: 'home', label: '홈', icon: icon('M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z') },
     { id: 'indices', label: '지수', icon: icon('M3 17.5 9 11l4 4 8-8.5M15 6.5h6v6') },
+    { id: 'ref', label: '차트', icon: icon('M7 3v18M17 3v18M5 7h4v8H5zM15 9h4v6h-4z') },
     { id: 'basics', label: '생활', icon: icon('M4 8h16l-1.3 11.1a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9zM9 8V5.5a3 3 0 0 1 6 0V8') },
     { id: 'calendar', label: '캘린더', icon: icon('M4 6h16v15H4zM4 10h16M8 3v4M16 3v4') },
     { id: 'indicators', label: '경제지표', icon: icon('M4 20V11M10 20V4M16 20v-7M22 20V8') },
@@ -4869,7 +5022,7 @@ __PLAZA_CSS__
     document.documentElement.setAttribute('data-cm', state.colorMode);
     document.getElementById('statusbar').innerHTML = statusBar();
     /* 하단 탭으로 갈 수 있는 화면은 길을 잃지 않는다. 나머지에만 붙인다. */
-    const TAB_VIEWS = ['home', 'indices', 'basics', 'calendar', 'fng', 'plaza'];
+    const TAB_VIEWS = ['home', 'indices', 'ref', 'basics', 'calendar', 'fng', 'plaza'];
     const needsBack = TAB_VIEWS.indexOf(state.view) < 0;
     const v = {
       home: viewHome,
@@ -4883,6 +5036,7 @@ __PLAZA_CSS__
       regime: viewRegime,
       plaza: viewPlaza,
       privacy: viewPrivacy,
+      ref: viewRef,
     }[state.view];
     /*
      * 새 내용이 살짝 아래에서 올라오며 나타난다.
@@ -4917,6 +5071,7 @@ __PLAZA_CSS__
     }
     renderNav();
     Object.keys(CHARTS).forEach((id) => { if (document.getElementById(id)) drawChart(id); else delete CHARTS[id]; });
+    if (state.view === 'ref') drawRef();
     document.querySelectorAll('.preview [data-scenario]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scenario === state.scenario)));
   }
 
@@ -4964,6 +5119,15 @@ __PLAZA_CSS__
       }
       return;
     }
+    if (d.taTf) { state.ref.tf = d.taTf; state.ref.range = TA_DEFAULT_RANGE[d.taTf]; state.ref.cursor = null; return render(); }
+    if (d.taPick) return refPick(d.taPick);
+    if (d.taCode) {
+      const hit = DATA.ta.list.find((x) => String(x.code).toUpperCase() === d.taCode);
+      if (hit) return refPick(hit.id);
+      state.ref.err = 'DEMO 에서는 목록에 있는 지수 · 종목만 볼 수 있습니다. 코드로 찾기는 실데이터(LIVE)에서 됩니다.';
+      return render();
+    }
+    if (d.taRange) { state.ref.range = d.taRange; state.ref.cursor = null; return render(); }
     if (d.goRegion !== undefined) { state.region = d.goRegion; state.view = 'marketRegion'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.region) { state.region = d.region; return render(); }
     if (d.goRisk !== undefined) { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
@@ -5260,7 +5424,43 @@ __PLAZA_CSS__
   let rt;
   window.addEventListener('resize', () => {
     clearTimeout(rt);
-    rt = setTimeout(() => Object.keys(CHARTS).forEach((id) => document.getElementById(id) && drawChart(id)), 150);
+    rt = setTimeout(() => {
+      Object.keys(CHARTS).forEach((id) => document.getElementById(id) && drawChart(id));
+      if (state.view === 'ref') drawRef();
+    }, 150);
+  });
+
+  /* 종목 차트 — 찾기 · 봉 짚기. 글자를 칠 때는 추천 목록만 다시 그린다(입력칸이 포커스를 잃지 않게) */
+  document.addEventListener('input', (e) => {
+    if (e.target.id !== 'ta-q') return;
+    state.ref.q = e.target.value;
+    const box = document.getElementById('ta-sug');
+    if (!box) return;
+    if (!state.ref.q.trim()) { box.innerHTML = ''; return; }
+    const h = refHits();
+    box.innerHTML = taSuggestHtml(h.hits, h.codeOpt);
+  });
+  document.addEventListener('submit', (e) => {
+    if (!e.target.classList || !e.target.classList.contains('ta-search')) return;
+    e.preventDefault();
+    state.ref.q = e.target.querySelector('input').value;
+    const h = refHits();
+    if (h.hits[0]) return refPick(h.hits[0].id);
+    if (h.codeOpt) {
+      state.ref.err = 'DEMO 에서는 목록에 있는 지수 · 종목만 볼 수 있습니다. 코드로 찾기는 실데이터(LIVE)에서 됩니다.';
+      return render();
+    }
+    state.ref.err = '찾는 종목이 없습니다. 미국은 TSLA, 한국은 005930 처럼 코드로도 찾을 수 있습니다.';
+    render();
+  });
+  document.addEventListener('pointerdown', refPointer);
+  document.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'mouse') refPointer(e); });
+  document.addEventListener('keydown', (e) => {
+    if (!e.target.closest || !e.target.closest('#ta-chart') || !refLayout) return;
+    const cur = state.ref.cursor === null ? refLayout.to : state.ref.cursor;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); refCross(Math.max(refLayout.from, cur - 1)); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); refCross(Math.min(refLayout.to, cur + 1)); }
+    else if (e.key === 'Escape') refCross(null);
   });
 
   setInterval(() => {

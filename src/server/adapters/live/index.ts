@@ -37,6 +37,7 @@ import {
   YAHOO_SOURCE,
   YAHOO_SYMBOL,
   yahooConfig,
+  fetchBars,
   fetchDailySeries,
   fetchQuotes as fetchYahooQuotes,
   type YahooQuote,
@@ -67,8 +68,12 @@ import type {
   FuturesBoard,
   FuturesQuote,
   Fundamentals,
+  TaBarsResult,
+  TaTf,
 } from '@/types';
 import type { AdapterContext, BenchmarkSeries, MarketAdapter } from '../types';
+import { taAsset } from '@/lib/taAssets';
+import { taParseCode, toFourHour } from '@/lib/ta.mjs';
 
 /**
  * 선물 판의 항목을 FRED 계열에 잇는다.
@@ -887,6 +892,75 @@ export class LiveAdapter implements MarketAdapter {
     if (!key) throw new AdapterNotConfiguredError('환율(FRED)', ['MACRO_API_KEY']);
     const last = await fetchLatest(fredConfig(key, envUrl('MACRO_BASE_URL')), 'usdkrw');
     return last ? last.v : null;
+  }
+
+  /* --------------------------- 종목 차트 --------------------------- */
+
+  /**
+   * 종목 차트의 봉 — Yahoo (2026-11-27).
+   * 일봉은 5년을 받아 끝 800개를 쓴다(앞 1년은 1년선을 내는 데 쓰인다).
+   * 4시간봉은 1시간봉 1년을 받아 거래소 날짜마다 장 시작부터 4개씩 묶고, 1년선용 일봉을 따로 받는다.
+   * 목록에 없는 종목은 taParseCode 를 지난 코드만 주소에 넣는다. 한국 6자리는 코스피에 없으면 코스닥.
+   */
+  async getBars(req: { assetId: string | null; code: string | null; tf: TaTf }, ctx: AdapterContext): Promise<TaBarsResult> {
+    const item = taAsset(req.assetId);
+    let candidates: string[];
+    let market: 'us' | 'kr';
+    if (item) {
+      const sym = YAHOO_SYMBOL[item.id];
+      if (!sym) throw new SeriesUnavailableError(`${item.name} 는 Yahoo 기호가 없습니다.`);
+      candidates = [sym];
+      market = item.market as 'us' | 'kr';
+    } else {
+      const parsed = taParseCode(req.code);
+      if (!parsed) throw new SeriesUnavailableError('코드 모양이 아닙니다. 미국은 TSLA, 한국은 005930 처럼 적어 주세요.');
+      candidates = parsed.candidates;
+      market = parsed.market;
+    }
+
+    // 시세 목록과 같은 주소를 쓴다 — 대역 서버로 파싱을 점검할 때 같은 곳을 본다
+    const cfg = yahooConfig(envUrl(this.baseUrlEnvFor(market)));
+    const interval = req.tf === '1d' ? '1d' : '1h';
+    let got: Awaited<ReturnType<typeof fetchBars>> = null;
+    let lastError: unknown = null;
+    for (const sym of candidates) {
+      try {
+        got = await fetchBars(cfg, sym, interval);
+        if (got && got.bars.length) break;
+        got = null;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (!got) {
+      if (item && lastError) throw lastError;
+      throw new SeriesUnavailableError('그 코드로 시세를 찾지 못했습니다. 상장 폐지됐거나 코드가 다를 수 있습니다.');
+    }
+
+    const keep = 800;
+    let bars = got.bars;
+    let daily: { t: number; c: number }[] | null = null;
+    if (req.tf === '4h') {
+      bars = toFourHour(got.bars, got.gmtoffset);
+      const d = await fetchBars(cfg, got.symbol, '1d');
+      daily = d ? d.bars.slice(-keep).map((b) => ({ t: b.t, c: b.c })) : null;
+    }
+    const currency = got.currency === 'USD' || got.currency === 'KRW' ? got.currency : null;
+    return {
+      name: item?.name ?? got.name ?? got.symbol.replace(/\.(KS|KQ)$/, ''),
+      code: item?.symbol ?? got.symbol.replace(/\.(KS|KQ)$/, ''),
+      assetId: item?.id ?? null,
+      market,
+      currency,
+      precision: item?.precision ?? (currency === 'KRW' ? 0 : 2),
+      tf: req.tf,
+      bars: bars.slice(-keep),
+      daily,
+      gmtoffset: got.gmtoffset,
+      source: { name: YAHOO_SOURCE.name, url: YAHOO_SOURCE.url, delayMinutes: YAHOO_SOURCE.delayMinutes, terms: YAHOO_SOURCE.terms },
+      mode: 'LIVE',
+      fetchedAt: ctx.now.toISOString(),
+    };
   }
 
   /* ---------------------------- 내부 ---------------------------- */

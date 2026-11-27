@@ -1309,3 +1309,39 @@ export interface PlazaState {
   auth: { kakao: boolean; demo: boolean };
   rules: { postMax: number; minPlayed: number; hideAfter: number; ratingStart: number; k: number };
 }
+
+/* ------------------------------ 종목 차트 (2026-11-27) ------------------------------ */
+
+export type TaTf = '1d' | '4h';
+
+/** 봉 하나. 시가 · 고가 · 저가 · 종가는 빠진 봉을 버리고 보낸다. 거래량만 null 일 수 있다 */
+export interface TaBarPoint {
+  t: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number | null;
+}
+
+export interface TaBarsResult {
+  /** 화면에 쓰는 이름 */
+  name: string;
+  /** 거래소 코드 — TSLA, 005930, 지수는 카탈로그 기호 */
+  code: string;
+  /** 카탈로그에 있는 항목이면 그 id */
+  assetId: string | null;
+  market: 'us' | 'kr';
+  currency: 'USD' | 'KRW' | null;
+  /** 가격 소수 자리 */
+  precision: number;
+  tf: TaTf;
+  bars: TaBarPoint[];
+  /** 4시간봉일 때 1년선을 내는 일봉 종가. 일봉이면 null (bars 로 낸다) */
+  daily: { t: number; c: number }[] | null;
+  /** 거래소 시간대(초) — 날짜를 가르는 데만 쓴다 */
+  gmtoffset: number;
+  source: DataSource;
+  mode: DataMode;
+  fetchedAt: string;
+}

@@ -21,6 +21,8 @@ import type {
   RangeKey,
   SeriesPoint,
   Fundamentals,
+  TaBarsResult,
+  TaTf,
 } from '@/types';
 import type { EngineInput } from '@/server/fng/engine';
 import type { RegimeSeries } from '@/server/regime';
@@ -112,4 +114,11 @@ export interface MarketAdapter {
 
   /** 통화 전환용 환율 */
   getUsdKrw(ctx: AdapterContext): Promise<number | null>;
+
+  /**
+   * 종목 차트의 봉 (2026-11-27).
+   * assetId 는 카탈로그 항목, code 는 목록에 없는 종목(모양은 ta.mjs 의 taParseCode 가 미리 거른다).
+   * 못 주면 SeriesUnavailableError 로 까닭을 올린다 — 지어낸 봉을 주지 않는다.
+   */
+  getBars(req: { assetId: string | null; code: string | null; tf: TaTf }, ctx: AdapterContext): Promise<TaBarsResult>;
 }

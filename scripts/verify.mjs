@@ -3811,11 +3811,11 @@ async function main() {
       /for \(const m of \['us', 'kr'\]\) \{\n\s*if \(!ids\[m\]\?\.length\)/.test(build));
   }
 
-  console.log('\n[8-41] 쫄탐지수 + 추세(200일선) + VIX 35 — 한눈에');
+  console.log('\n[8-41] 쫄탐지수 + 추세(1년선) + VIX 35 — 한눈에');
   {
     /*
      * 2026-11-26 사용자: "쫄탐지수에 겹쳐서 볼 수 있는 방법이 있을까? 한눈에 세 가지 다 볼 수 있게".
-     * 홈 카드: 계기판 아래 칩 두 개(추세 · VIX). 심리 상세 차트: S&P 500 이 200일 평균선 아래였던 기간은 음영,
+     * 홈 카드: 계기판 아래 칩 두 개(추세 · VIX). 심리 상세 차트: S&P 500 이 1년(252거래일) 평균선 아래였던 기간은 음영(처음 200일 → 2026-11-27 1년으로),
      * VIX 35 이상인 날은 두 칸 사이의 띠(처음 30 → 사용자 요청으로 35, 근거는 overlays.mjs 머리말). 둘 다 지금 상태를 적는 사실이지 사고팔 신호가 아니다.
      * 계산은 src/lib/overlays.mjs 한 곳 — 여기서 API 값을 그 계산으로 다시 내 맞춰 본다.
      */
@@ -3826,8 +3826,8 @@ async function main() {
     const ov = d.overlays;
     const sane = (spans) => Array.isArray(spans) && spans.every((sp, i) =>
       Number.isFinite(sp.from) && Number.isFinite(sp.to) && sp.from <= sp.to && (i === 0 || spans[i - 1].to < sp.from));
-    check('심리 상세 API 에 겹침 구간이 있음 (추세 200일 · VIX 35)',
-      !!ov && ov.trend?.maDays === TREND_MA_DAYS && TREND_MA_DAYS === 200 && ov.vix?.threshold === VIX_HIGH && VIX_HIGH === 35,
+    check('심리 상세 API 에 겹침 구간이 있음 (추세 1년=252거래일 · VIX 35)',
+      !!ov && ov.trend?.maDays === TREND_MA_DAYS && TREND_MA_DAYS === 252 && ov.vix?.threshold === VIX_HIGH && VIX_HIGH === 35,
       JSON.stringify(ov && { trend: ov.trend && { ...ov.trend, spans: ov.trend.spans.length }, vix: ov.vix && { ...ov.vix, spans: ov.vix.spans.length } }));
     check('구간이 시간 순 · 겹치지 않음 · 시작 ≤ 끝', sane(ov?.trend?.spans) && sane(ov?.vix?.spans));
     const bm = d.benchmark?.series ?? [];
@@ -3836,7 +3836,7 @@ async function main() {
       bm.length >= TREND_MA_DAYS && JSON.stringify(again) === JSON.stringify(ov?.trend?.spans),
       `다시 계산 ${again.length}곳 · API ${ov?.trend?.spans?.length}곳`);
     // 평균을 낼 날이 모이기 전(첫 200거래일)에는 음영이 없다 — 메우지 않는다
-    check('첫 200거래일에는 음영을 만들지 않음', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
+    check('첫 252거래일에는 음영을 만들지 않음', (ov?.trend?.spans ?? []).every((sp) => sp.from >= bm[TREND_MA_DAYS - 1]?.t));
     check('DEMO 10년 안에 VIX 35 이상인 날이 있음 (띠가 실제로 그려짐)', !fb?.mode || fb.mode !== 'demo' || (ov?.vix?.spans?.length ?? 0) > 0,
       `${ov?.vix?.spans?.length ?? 0}곳`);
     const tn = trendNow(bm, TREND_MA_DAYS);
@@ -3850,10 +3850,10 @@ async function main() {
     check('홈(스냅샷)의 지금 값이 심리 상세와 같음', JSON.stringify(sNow) === JSON.stringify(now), JSON.stringify(sNow));
     const chips = overlayChips(sNow) ?? [];
     check('홈 칩 두 개 — 위/아래를 말로 · 사고팔 말 없음',
-      chips.length === 2 && /200일선 (위|아래)/.test(chips[0].value) && /^35 (이상|아래)$/.test(chips[1].sub ?? '') &&
+      chips.length === 2 && /^1년선 (위|아래)$/.test(chips[0].value) && /^35 (이상|아래)$/.test(chips[1].sub ?? '') &&
       !/매수|매도|사세요|파세요|추천/.test(JSON.stringify(chips)), JSON.stringify(chips.map((c) => [c.value, c.sub])));
     check('칩 값이 없으면 산출 불가 — 0 이나 위로 채우지 않음',
-      overlayChips({ trend: { name: 'S&P 500', maDays: 200, above: null, gapPct: null }, vix: null }).every((c) => c.value === '산출 불가' && c.sub === null));
+      overlayChips({ trend: { name: 'S&P 500', maDays: 252, above: null, gapPct: null }, vix: null }).every((c) => c.value === '산출 불가' && c.sub === null));
 
     const rd = (f) => readFile(f, 'utf8');
     const [chartSrc, fngPage, homeCard, css, tplO, buildO, liveIdx, snapSrc, route, ovSrv] = await Promise.all([

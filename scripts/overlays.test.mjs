@@ -1,6 +1,6 @@
 /**
  * 쫄탐지수에 겹쳐 보는 두 가지 — src/lib/overlays.mjs
- * 추세(200일 평균선 위/아래)와 VIX 35. 둘 다 사실 표시이지 매매 신호가 아니다.
+ * 추세(1년 평균선 위/아래)와 VIX 35. 둘 다 사실 표시이지 매매 신호가 아니다.
  */
 
 import { test } from 'node:test';
@@ -10,8 +10,8 @@ import { movingAverage, belowMaSpans, thresholdSpans, trendNow, vixNow, TREND_MA
 const D = 86_400_000;
 const series = (vals) => vals.map((v, i) => ({ t: i * D, v }));
 
-test('기본값은 200일 평균선 · VIX 35', () => {
-  assert.equal(TREND_MA_DAYS, 200);
+test('기본값은 1년(252거래일) 평균선 · VIX 35 — 쫄탐지수의 비교 기간과 같은 1년', () => {
+  assert.equal(TREND_MA_DAYS, 252);
   assert.equal(VIX_HIGH, 35);
 });
 

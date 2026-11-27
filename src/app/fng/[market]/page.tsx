@@ -245,7 +245,7 @@ export default function FngDetailPage() {
     if (ov.trend) {
       ov.trend.spans.forEach((sp, i) => {
         const c = clip(sp);
-        if (c) out.push({ id: `trend-${i}`, ...c, kind: 'shade', color: 'var(--muted-fg)', label: `${ov.trend!.name} ${ov.trend!.maDays}일 평균선 아래` });
+        if (c) out.push({ id: `trend-${i}`, ...c, kind: 'shade', color: 'var(--muted-fg)', label: `${ov.trend!.name} ${ov.trend!.maDays % 252 === 0 ? `${ov.trend!.maDays / 252}년` : `${ov.trend!.maDays}일`} 평균선 아래` });
       });
     }
     if (ov.vix) {
@@ -442,7 +442,7 @@ export default function FngDetailPage() {
           {detail.overlays ? (
             <p className="mt-2 text-[12px] break-keep text-subtle" data-overlay-note>
               {detail.overlays.trend
-                ? `회색 칸은 ${detail.overlays.trend.name} 가격이 ${detail.overlays.trend.maDays}일(약 10개월) 평균선 아래에 있던 기간입니다. `
+                ? `회색 칸은 ${detail.overlays.trend.name} 가격이 ${detail.overlays.trend.maDays % 252 === 0 ? `${detail.overlays.trend.maDays / 252}년(${detail.overlays.trend.maDays}거래일)` : `${detail.overlays.trend.maDays}거래일`} 평균선 아래에 있던 기간입니다 — 쫄탐지수가 지표를 견주는 기간(최근 1년)과 같은 길이. `
                 : `${detail.benchmark?.name ?? '대표 지수'} 평균선은 지금 받지 못해 그리지 않았습니다. `}
               {detail.overlays.vix
                 ? `${detail.benchmark ? '두 칸 사이' : '맨 위'}의 주황 띠는 VIX(앞으로 30일 출렁임 예상치)가 ${detail.overlays.vix.threshold} 이상이던 날입니다. `

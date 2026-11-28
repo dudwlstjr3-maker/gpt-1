@@ -61,10 +61,9 @@ export function taChartHtml(m, opt) {
   const date = opt.date ?? ((t) => new Date(t).toISOString().slice(5, 10));
 
   // 패널 자리
-  // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리. 가격 아래 종목 쫄탐(2026-11-28) → RSI → OBV
+  // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리
   const P = { top: 32, h: 220 };
-  const SC = { top: P.top + P.h + 26, h: 72 };
-  const RS = { top: SC.top + SC.h + 26, h: 84 };
+  const RS = { top: P.top + P.h + 26, h: 84 };
   const OB = { top: RS.top + RS.h + 26, h: 64 };
   const H = OB.top + OB.h + 24;
 
@@ -139,20 +138,8 @@ export function taChartHtml(m, opt) {
     if (dDn) parts.push(`<path d="${dDn}" class="ta-line ta-st" style="stroke:${down}"/>`);
   }
 
-  // 고른 성향(방어적 · 공격적)의 기법 조건 봉 — 상승 쪽은 봉 아래 ▲, 하락 쪽은 봉 위 ▼ (2026-11-28).
-  // 점(●)은 읽기 어렵다는 의견(2026-11-27)이 있어 쓰지 않는다. 강함(RSI 20 이하 · 90 이상)은 테두리를 두른다.
-  const counts = { up: 0, down: 0 };
-  for (const sg of opt.signals ?? []) {
-    if (sg.i < from || sg.i > to || !fin(m.l[sg.i]) || !fin(m.h[sg.i])) continue;
-    counts[sg.side] += 1;
-    const xc = r1(x(sg.i));
-    const isUp = sg.side === 'up';
-    const yy = r1(isUp ? Math.min(P.top + P.h + 10, py(m.l[sg.i]) + 6) : Math.max(P.top - 2, py(m.h[sg.i]) - 6));
-    const d = isUp ? `M${xc} ${yy}l5 9h-10Z` : `M${xc} ${yy}l5 -9h-10Z`;
-    parts.push(`<path d="${d}" class="ta-sig${sg.strong ? ' ta-sig-strong' : ''}" style="fill:${isUp ? up : down}"/>`);
-  }
-
-  // 가장 최근 기법 조건 — 세로 점선 + 글자 꼬리표.
+  // 가장 최근 기법 조건 하나만 — 세로 점선 + 글자 꼬리표.
+  // 조건마다 점을 흩뿌리고 슈퍼트렌드 전환마다 ▲▼ 를 찍었더니 읽기 어렵다는 사용자 의견(2026-11-27)으로 하나만 남겼다.
   // 슈퍼트렌드 전환은 선 색이 바뀌는 자리로 보인다.
   let marked = false;
   {
@@ -177,26 +164,6 @@ export function taChartHtml(m, opt) {
     parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${yy}" y2="${yy}" class="ta-lastline" style="stroke:${col}"/>`);
     parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" style="fill:${col}"/>`);
     parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-lastval">${esc(price(last))}</text>`);
-  }
-
-  /* ---------- 종목 쫄탐 패널 (2026-11-28) ---------- */
-  // 0 공포 ~ 100 탐욕. 20 이하 · 80 이상이 기법 기준 — 글자 붙은 선. 점수가 없으면 까닭을 적는다(0 으로 그리지 않는다)
-  const sy = (v) => SC.top + (1 - v / 100) * SC.h;
-  {
-    const sv = m.score?.v ?? [];
-    const now = sv[to];
-    parts.push(`<text x="${L}" y="${SC.top - 8}" class="ta-ptitle">종목 쫄탐${fin(now) ? ` · ${Math.round(now)}` : ' · 없음'}</text>`);
-    const sLo = opt.scoreLow ?? 20;
-    const sHi = opt.scoreHigh ?? 80;
-    parts.push(`<rect x="${L}" y="${r1(sy(sLo))}" width="${plotW}" height="${r1(sy(0) - sy(sLo))}" class="ta-zone" style="fill:${up}"/>`);
-    parts.push(`<rect x="${L}" y="${r1(sy(100))}" width="${plotW}" height="${r1(sy(sHi) - sy(100))}" class="ta-zone" style="fill:${down}"/>`);
-    for (const v of [sHi, sLo]) {
-      parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(sy(v))}" y2="${r1(sy(v))}" class="ta-ref"/>`);
-      parts.push(`<text x="${W - 4}" y="${r1(sy(v)) + 4}" text-anchor="end" class="ta-axis">${v}</text>`);
-    }
-    const d = linePath(sv, from, to, x, sy);
-    if (d) parts.push(`<path d="${d}" class="ta-line ta-score"/>`);
-    else parts.push(`<text x="${L}" y="${r1(SC.top + SC.h / 2 + 4)}" class="ta-axis">${esc(opt.scoreNote ?? '시장 쫄탐지수가 없어 낼 수 없습니다')}</text>`);
   }
 
   /* ---------- RSI 패널 ---------- */
@@ -269,7 +236,7 @@ export function taChartHtml(m, opt) {
   // 누른 자리 — 세로선 · 숫자 상자 · 축 꼬리표가 여기 들어간다(taCrossSvg). 처음에는 비어 있다
   parts.push('<g class="ta-crossg"></g>');
 
-  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. 기법 조건 상승 쪽 ${counts.up}번 · 하락 쪽 ${counts.down}번. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}. 같은 내용을 '지금 상태' 에서 글로 볼 수 있습니다.`;
+  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}. 같은 내용을 '지금 상태' 에서 글로 볼 수 있습니다.`;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" class="ta-svg">${parts.join('')}</svg>`;
 
   const legend = [
@@ -278,15 +245,12 @@ export function taChartHtml(m, opt) {
     ['ta-k-ma2', `${m.ma[1]?.p ?? 60}선`],
     ['ta-k-trend', '1년선(추세선)'],
     ['ta-k-st', '슈퍼트렌드'],
-    ...(counts.up + counts.down ? [['ta-k-sig', `▲▼ = 기법 조건${opt.profileText ? ` (${opt.profileText})` : ''}`]] : []),
     ...(marked ? [['ta-k-mark', '세로 점선 = 최근 기법 조건']] : []),
   ].map(([k, t]) => `<li class="${k}"><i aria-hidden="true"></i>${esc(t)}</li>`).join('');
-  const countLine = `<p class="ta-count">보이는 구간${opt.profileText ? ` · ${esc(opt.profileText)}` : ''} · 상승 쪽 조건 ${counts.up}번 · 하락 쪽 조건 ${counts.down}번</p>`;
 
   return {
-    html: `<ul class="ta-legend">${legend}</ul>${svg}${countLine}`,
-    layout: { L, R, step, from, to, W, H, P, SC, RS, OB, lo, hi },
-    counts,
+    html: `<ul class="ta-legend">${legend}</ul>${svg}`,
+    layout: { L, R, step, from, to, W, H, P, RS, OB, lo, hi },
   };
 }
 
@@ -366,13 +330,12 @@ export function taBoardHtml(board) {
     const col = t.dir ? ` style="color:var(--ta-${t.dir === 'up' ? 'up' : 'down'})"` : '';
     const sub = t.sub;
     const scol = sub && sub.dir ? ` style="color:var(--ta-${sub.dir === 'up' ? 'up' : 'down'})"` : '';
-    const aria = `${t.label}: ${t.big}, ${t.cap}${sub ? `. ${sub.big}, ${sub.cap}` : ''}${t.note ? `. 재료 ${t.note}` : ''}`;
+    const aria = `${t.label}: ${t.big}, ${t.cap}${sub ? `. ${sub.big}, ${sub.cap}` : ''}`;
     return `<div class="ta-tile" data-k="${esc(t.key)}" role="group" aria-label="${esc(aria)}">` +
       `<span class="ta-tl">${esc(t.label)}</span><b class="ta-big"${col}>${esc(t.big)}</b>` +
       (fin(t.rsi) && t.bands ? rsiBar(t.rsi, t.bands) : '') +
       `<span class="ta-cap">${esc(t.cap)}</span>` +
-      (sub ? `<b class="ta-sub"${scol}>${esc(sub.big)}</b><span class="ta-cap">${esc(sub.cap)}</span>` : '') +
-      (t.note ? `<span class="ta-parts">${esc(t.note)}</span>` : '') + '</div>';
+      (sub ? `<b class="ta-sub"${scol}>${esc(sub.big)}</b><span class="ta-cap">${esc(sub.cap)}</span>` : '') + '</div>';
   };
   return `<div class="ta-board"><div class="ta-verdict" data-side="${v.side ?? 'none'}">` +
     `<p class="ta-vhead"><b${vc}>${esc(v.text)}</b>${v.strong ? '<span class="ta-strong">강함</span>' : ''}</p>` +
@@ -380,7 +343,7 @@ export function taBoardHtml(board) {
     `<div class="ta-tiles">${board.tiles.map(tile).join('')}</div></div>`;
 }
 
-/** RSI 막대 — 0 · 강한 침체 · 침체 · 중간 · 과열 · 강한 과열 · 100, 지금 값에 눈금. 종목 쫄탐은 20 · 80 두 경계만 쓴다 */
+/** RSI 막대 — 0 · 강한 침체 · 침체 · 중간 · 과열 · 강한 과열 · 100, 지금 값에 눈금 */
 function rsiBar(r, bands) {
   const [sl, l, h, sh] = bands;
   const seg = [['sl', sl], ['l', l - sl], ['m', h - l], ['h', sh - h], ['sh', 100 - sh]];
@@ -390,13 +353,13 @@ function rsiBar(r, bands) {
 }
 
 /**
- * 누른 봉의 숫자 — 세로선, 종가 · 종목 쫄탐 · RSI 자리의 작은 점과 오른쪽 축 꼬리표, 숫자 상자(손가락 반대쪽).
+ * 누른 봉의 숫자 — 세로선, 종가 · RSI 자리의 작은 점과 오른쪽 축 꼬리표, 숫자 상자(손가락 반대쪽).
  * 2026-11-27 사용자: "차트에서 그래프나 누르는 곳에 숫자 나오게". 앱 · 미리보기가 '.ta-crossg' 에 그대로 넣는다.
  * 값이 없으면 0 이 아니라 '없음'.
  */
 export function taCrossSvg(m, layout, i, opt = {}) {
   if (!layout || !(i >= layout.from && i <= layout.to && i >= 0 && i < m.n)) return '';
-  const { L, R, step, from, W, P, SC, RS, OB, lo, hi } = layout;
+  const { L, R, step, from, W, P, RS, OB, lo, hi } = layout;
   const plotW = W - L - R;
   const x = r1(L + (i - from + 0.5) * step);
   const py = (v) => P.top + (1 - (v - lo) / (hi - lo)) * P.h;
@@ -418,15 +381,6 @@ export function taCrossSvg(m, layout, i, opt = {}) {
     parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" class="ta-cross-tag"/>`);
     parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-cross-tagt">${esc(price(c))}</text>`);
   }
-  // 종목 쫄탐 — 점과 꼬리표
-  const sc = m.score?.v[i];
-  if (SC && fin(sc)) {
-    const sy = (v) => SC.top + (1 - v / 100) * SC.h;
-    parts.push(`<circle cx="${x}" cy="${r1(sy(sc))}" r="3.5" class="ta-cross-dot"/>`);
-    const yy = r1(clampY(sy(sc), SC.top, SC.h));
-    parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" class="ta-cross-tag"/>`);
-    parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-cross-tagt">${Math.round(sc)}</text>`);
-  }
   // RSI — 점과 꼬리표
   const r = m.rsi[i];
   if (fin(r)) {
@@ -446,7 +400,6 @@ export function taCrossSvg(m, layout, i, opt = {}) {
     ['종가', `${val(c)}${chgText}`, chg > 0 ? up : chg < 0 ? down : null],
     ['시가', val(m.o[i]), null],
     ['고 · 저', `${val(m.h[i])} · ${val(m.l[i])}`, null],
-    ['종목 쫄탐', fin(sc) ? String(Math.round(sc)) : none, null],
     ['RSI', fin(r) ? r.toFixed(1) : none, null],
     ['슈퍼트렌드', st ? `${st === 'up' ? '▲' : '▼'} ${val(m.st.line[i])}` : none, st === 'up' ? up : st === 'down' ? down : null],
     [`${m.ma[0]?.p ?? 20}선`, val(m.ma[0]?.v[i]), null],

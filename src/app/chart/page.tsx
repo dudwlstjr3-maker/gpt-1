@@ -19,8 +19,7 @@ import { changeColor } from '@/lib/scale';
 import { taAssets, TA_DEFAULT_ASSET } from '@/lib/taAssets';
 import {
   taModel, taBoard, taReadout, taParseCode, taBarUnit, taLastChange, taSearch,
-  TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT, TA_PROFILES, TA_PROFILE_TEXT, TA_DEFAULT_PROFILE,
-  type TaProfile,
+  TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT,
 } from '@/lib/ta.mjs';
 import {
   taChartHtml, taIndexAt, taCrossSvg, taBoardHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
@@ -35,7 +34,7 @@ interface Sel {
 /** 자주 보는 종목 — 검색 없이 한 번에 */
 const QUICK = ['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'];
 
-function readQuery(): { sel: Sel; tf: TaTf; range: string | null; profile: TaProfile } {
+function readQuery(): { sel: Sel; tf: TaTf; range: string | null } {
   const sp = new URLSearchParams(window.location.search);
   const t = sp.get('tf');
   const tf: TaTf = t === '1d' || t === '4h' ? t : TA_DEFAULT_TF;
@@ -47,7 +46,6 @@ function readQuery(): { sel: Sel; tf: TaTf; range: string | null; profile: TaPro
     sel: parsed ? { a: null, code: parsed.code } : { a: ok ? a : TA_DEFAULT_ASSET, code: null },
     tf,
     range: sp.get('r'),
-    profile: (TA_PROFILES as string[]).includes(sp.get('p') ?? '') ? (sp.get('p') as TaProfile) : TA_DEFAULT_PROFILE,
   };
 }
 
@@ -57,8 +55,6 @@ export default function ChartPage() {
   const [sel, setSel] = useState<Sel | null>(null);
   const [tf, setTf] = useState<TaTf>(TA_DEFAULT_TF);
   const [range, setRange] = useState<string>(TA_DEFAULT_RANGE[TA_DEFAULT_TF]);
-  // 기법 성향 — 방어적(둘 다 + 슈퍼트렌드 확인) · 공격적(하나만 닿아도). 2026-11-28
-  const [profile, setProfile] = useState<TaProfile>(TA_DEFAULT_PROFILE);
   const [data, setData] = useState<TaBarsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,7 +73,6 @@ export default function ChartPage() {
     setSel(r.sel);
     setTf(r.tf);
     setRange(r.range && TA_RANGES[r.tf].some(([k]) => k === r.range) ? r.range : TA_DEFAULT_RANGE[r.tf]);
-    setProfile(r.profile);
   }, []);
 
   useEffect(() => {
@@ -87,9 +82,8 @@ export default function ChartPage() {
     if (sel.code) qs.set('code', sel.code);
     qs.set('tf', tf);
     qs.set('r', range);
-    qs.set('p', profile);
     window.history.replaceState(null, '', `/chart?${qs.toString()}`);
-  }, [sel, tf, range, profile]);
+  }, [sel, tf, range]);
 
   useEffect(() => {
     if (!sel) return;
@@ -126,10 +120,7 @@ export default function ChartPage() {
   }, [data]);
 
   const model = useMemo(
-    () =>
-      data
-        ? taModel({ tf: data.tf, bars: data.bars, daily: data.daily, gmtoffset: data.gmtoffset, market: data.market, mood: data.mood ?? null })
-        : null,
+    () => (data ? taModel({ tf: data.tf, bars: data.bars, daily: data.daily, gmtoffset: data.gmtoffset }) : null),
     [data],
   );
 
@@ -139,7 +130,7 @@ export default function ChartPage() {
     const to = model.n - 1;
     const from = Math.max(0, to - want + 1);
     const price = taPrice(data.precision);
-    const board = taBoard(model, undefined, profile);
+    const board = taBoard(model);
     const chart = width
       ? taChartHtml(model, {
           from,
@@ -147,9 +138,6 @@ export default function ChartPage() {
           width,
           price,
           mark: board.mark,
-          signals: board.signals,
-          profileText: TA_PROFILE_TEXT[profile],
-          scoreNote: data.moodNote ?? undefined,
           date: taAxisDate(data.tf, to - from + 1, data.market),
           title: `${data.name} ${taBarUnit(data.tf)}`,
         })
@@ -166,7 +154,7 @@ export default function ChartPage() {
       chartInner: chart ? { __html: chart.html } : undefined,
       boardInner: { __html: taBoardHtml(board) },
     };
-  }, [model, data, range, width, profile]);
+  }, [model, data, range, width]);
 
   // 누른 봉의 숫자 — 세로선 · 숫자 상자 · 오른쪽 축 꼬리표를 그림 안 '.ta-crossg' 에 넣는다(taCrossSvg)
   const moveCross = useCallback(
@@ -337,16 +325,6 @@ export default function ChartPage() {
             <h2 id="ta-now-title">
               지금 상태 <small>마지막 {unit} 기준</small>
             </h2>
-            <div className="ta-row">
-              <div className="ta-seg" role="group" aria-label="기법 성향">
-                {TA_PROFILES.map((k) => (
-                  <button key={k} type="button" aria-pressed={profile === k} onClick={() => setProfile(k)}>
-                    {TA_PROFILE_TEXT[k]}
-                  </button>
-                ))}
-              </div>
-              <p className="ta-hint">{TA_TEXT.profileHint}</p>
-            </div>
             <div dangerouslySetInnerHTML={view.boardInner} />
             <details className="ta-howto">
               <summary>{TA_TEXT.techTitle} — 보는 순서</summary>

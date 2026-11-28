@@ -263,102 +263,6 @@ export function trendForBars(bars, daily, n = TA_TREND_DAYS, gmtoffsetSec = 0) {
   return out;
 }
 
-/* ------------------------------ 종목 쫄탐 (2026-11-28) ------------------------------ */
-
-/*
- * 종목 쫄탐 — 종목마다, 봉마다 내는 0~100 종합 점수.
- * 2026-11-28 사용자: 쫄탐지수와 보조지표 4가지를 모두 고려해 "지수를 다시 짜기" → 종목별 종합 점수로.
- *   0 = 극단적 공포(바닥 쪽) · 100 = 극단적 탐욕(과열 쪽). 홈의 미국 쫄탐지수는 그대로 두고 재료 하나로 쓴다.
- *   재료와 비중: 시장 쫄탐지수 40 · RSI 14 30 · 1년선 괴리 15 · OBV 오실레이터 15
- *     - 시장 쫄탐지수 — 미국 쫄탐지수 그대로. 한국은 쫄탐지수를 내지 않아 한국 종목도 미국 것을 쓴다.
- *       그 봉이 끝날 때 이미 나와 있던 값만 쓴다(미국 일봉은 같은 날, 그 밖에는 전날까지).
- *     - RSI — 그대로 0~100.
- *     - 1년선 괴리 · OBV 오실레이터 — 지난 252봉 안에서 지금 값의 백분위(가장 낮으면 0, 가장 높으면 100).
- *   다이버전스 · 슈퍼트렌드는 점수에 넣지 않고 표시 조건(taSignals)에 쓴다.
- *   시장 쫄탐 · RSI 중 하나라도 없으면 점수를 내지 않는다 — 0 으로 채우지 않는다.
- *   1년선 · OBV 가 없으면(일봉이 1년 안 됨 · 거래량 없음) 남은 재료의 비중을 키워 내고, 몇 개로 냈는지 함께 돌려준다.
- */
-export const TA_SCORE_W = { mood: 40, rsi: 30, gap: 15, obv: 15 };
-export const TA_SCORE_LOW = 20;
-export const TA_SCORE_HIGH = 80;
-/** 백분위를 재는 창 · 최소 표본 */
-export const TA_PCT_WIN = 252;
-export const TA_PCT_MIN = 60;
-/** 방어적 — 조건이 생긴 뒤 슈퍼트렌드 확인을 기다리는 봉 수 */
-export const TA_CONFIRM = 20;
-/** 시장 쫄탐 값이 이보다 오래(달력일) 비면 쓰지 않는다 */
-const MOOD_MAX_GAP_DAYS = 5;
-
-/**
- * 하루 한 번 나오는 시장 쫄탐지수를 봉에 붙인다.
- * mood: { t: epoch ms[], v: (number|null)[] } — t 는 그날(UTC 날짜)을 가리킨다.
- * sameDay 가 참이면(미국 일봉) 같은 날 값까지, 아니면 전날까지의 값만 쓴다 — 봉이 끝날 때 아직 없던 값을 당겨 쓰지 않는다.
- * 그날 값이 산출 불가(null)면 그 봉도 없음. 0 으로 채우지 않는다.
- */
-export function moodForBars(bars, mood, sameDay = false, gmtoffsetSec = 0) {
-  const out = new Array(bars.length).fill(null);
-  if (!mood || !Array.isArray(mood.t) || !Array.isArray(mood.v) || !mood.t.length) return out;
-  const pts = mood.t
-    .map((t, k) => ({ d: Math.floor(t / 86400000), v: fin(mood.v[k]) ? mood.v[k] : null }))
-    .filter((p) => Number.isFinite(p.d))
-    .sort((a, b) => a.d - b.d);
-  const dayOf = (t) => Math.floor((t / 1000 + gmtoffsetSec) / 86400);
-  let j = -1;
-  for (let i = 0; i < bars.length; i += 1) {
-    const d = dayOf(bars[i].t);
-    while (j + 1 < pts.length && (sameDay ? pts[j + 1].d <= d : pts[j + 1].d < d)) j += 1;
-    out[i] = j >= 0 && d - pts[j].d <= MOOD_MAX_GAP_DAYS ? pts[j].v : null;
-  }
-  return out;
-}
-
-/**
- * 지난 win 봉(자기 포함) 안에서의 백분위 0~100 — 가장 낮으면 0, 가장 높으면 100, 같은 값은 가운데.
- * 표본이 min 개보다 적으면 null.
- */
-export function pctRank(values, win = TA_PCT_WIN, min = TA_PCT_MIN) {
-  const out = new Array(values.length).fill(null);
-  for (let i = 0; i < values.length; i += 1) {
-    const x = values[i];
-    if (!fin(x)) continue;
-    let n = 0;
-    let below = 0;
-    let eq = 0;
-    for (let k = Math.max(0, i - win + 1); k <= i; k += 1) {
-      const y = values[k];
-      if (!fin(y)) continue;
-      n += 1;
-      if (y < x) below += 1;
-      else if (y === x) eq += 1;
-    }
-    if (n >= Math.max(2, min)) out[i] = ((below + (eq - 1) / 2) / (n - 1)) * 100;
-  }
-  return out;
-}
-
-/** 재료 네 줄 → 점수. { v: 점수[], used: 쓴 재료 수[] } */
-export function taScore(parts) {
-  const n = parts.rsi.length;
-  const v = new Array(n).fill(null);
-  const used = new Array(n).fill(0);
-  const W = TA_SCORE_W;
-  for (let i = 0; i < n; i += 1) {
-    const md = parts.mood?.[i];
-    const r = parts.rsi[i];
-    if (!fin(md) || !fin(r)) continue;
-    let sum = md * W.mood + r * W.rsi;
-    let w = W.mood + W.rsi;
-    let u = 2;
-    for (const k of ['gap', 'obv']) {
-      const x = parts[k]?.[i];
-      if (fin(x)) { sum += x * W[k]; w += W[k]; u += 1; }
-    }
-    v[i] = sum / w;
-    used[i] = u;
-  }
-  return { v, used };
-}
-
 /* ------------------------------ 종목 코드 ------------------------------ */
 
 /**
@@ -383,8 +287,7 @@ export function taParseCode(raw) {
 
 /**
  * 화면이 쓰는 모든 값을 한 번에.
- * input: { tf: '1d' | '4h', bars: [{t,o,h,l,c,v}], daily?: [{t,c}], gmtoffset?: 초,
- *          market?: 'us' | 'kr', mood?: { t[], v[] } (미국 쫄탐지수 일별 — 없으면 종목 쫄탐을 내지 않는다) }
+ * input: { tf: '1d' | '4h', bars: [{t,o,h,l,c,v}], daily?: [{t,c}], gmtoffset?: 초 }
  */
 export function taModel(input) {
   const bars = (input.bars ?? []).filter((b) => [b.t, b.o, b.h, b.l, b.c].every(fin));
@@ -395,26 +298,16 @@ export function taModel(input) {
   const c = bars.map((b) => b.c);
   const v = bars.map((b) => (fin(b.v) ? b.v : null));
   const r = rsi(c);
-  const trend = trendForBars(bars, input.tf === '4h' ? input.daily ?? null : null, TA_TREND_DAYS, input.gmtoffset ?? 0);
-  const obv = obvOsc(c, v);
-  // 종목 쫄탐의 재료 — 미국 일봉만 같은 날 시장 쫄탐을 쓴다(둘 다 그날 종가로 낸다)
-  const parts = {
-    mood: moodForBars(bars, input.mood ?? null, input.tf === '1d' && input.market === 'us', input.gmtoffset ?? 0),
-    rsi: r,
-    gap: pctRank(c.map((x, i) => (fin(trend[i]) && trend[i] > 0 ? (x - trend[i]) / trend[i] : null))),
-    obv: obv.ok ? pctRank(obv.osc) : new Array(bars.length).fill(null),
-  };
   return {
     tf: input.tf,
     n: bars.length,
     t, o, h, l, c, v,
     ma: TA_MA.map((p) => ({ p, v: sma(c, p) })),
-    trend,
+    trend: trendForBars(bars, input.tf === '4h' ? input.daily ?? null : null, TA_TREND_DAYS, input.gmtoffset ?? 0),
     st: supertrend(h, l, c),
     rsi: r,
     div: rsiDivergence(r, l, h),
-    obv,
-    score: { ...taScore(parts), parts },
+    obv: obvOsc(c, v),
   };
 }
 
@@ -562,7 +455,6 @@ export function taReadout(m, i, fmt) {
   if (i < 0 || i >= m.n) return '';
   const f = fmt ?? ((x) => String(x));
   const parts = [`시 ${f(m.o[i])}`, `고 ${f(m.h[i])}`, `저 ${f(m.l[i])}`, `종 ${f(m.c[i])}`];
-  if (fin(m.score?.v[i])) parts.push(`종목 쫄탐 ${Math.round(m.score.v[i])}`);
   if (fin(m.rsi[i])) parts.push(`RSI ${m.rsi[i].toFixed(1)}`);
   if (m.st.dir[i]) parts.push(`슈퍼트렌드 ${m.st.dir[i] === 'up' ? '상승 ▲' : '하락 ▼'}`);
   return parts.join(' · ');
@@ -616,107 +508,27 @@ export function techEvents(m) {
 const SIDE_TEXT = { up: '상승 쪽', down: '하락 쪽' };
 const SIDE_GLYPH = { up: '▲', down: '▼' };
 
-/* ------------------------------ 표시 조건 — 방어적 · 공격적 (2026-11-28) ------------------------------ */
-
-/*
- * 2026-11-28 사용자: "RSI 30 이하 · 80 이상, 쫄탐지수 20 이하 · 80 이상을 기준으로 방어적 · 공격적으로".
- * 고른 것: 공격적은 둘 중 하나만, 방어적은 둘 다 + 슈퍼트렌드 확인. 다이버전스는 두 성향 모두 조건.
- * 화면에는 '상승 쪽 조건 · 하락 쪽 조건' 이라고만 적는다 — 사고팔라는 말이 아니다(AGENTS.md 1절).
- */
-export const TA_PROFILES = ['defensive', 'aggressive'];
-export const TA_PROFILE_TEXT = { defensive: '방어적', aggressive: '공격적' };
-export const TA_DEFAULT_PROFILE = 'defensive';
-const WHY_TEXT = {
-  up: { score: `종목 쫄탐 ${TA_SCORE_LOW} 이하`, rsi: `RSI ${TA_RSI_LOW} 이하`, div: '상승 다이버전스' },
-  down: { score: `종목 쫄탐 ${TA_SCORE_HIGH} 이상`, rsi: `RSI ${TA_RSI_HIGH} 이상`, div: '하락 다이버전스' },
-};
-
-/**
- * 차트에 ▲ ▼ 를 붙일 봉.
- *   공격적 — 종목 쫄탐 20 이하 또는 RSI 30 이하가 시작된 봉(하락 쪽은 80 이상), 다이버전스가 확인된 봉. 그 봉에 바로.
- *   방어적 — 종목 쫄탐 20 이하와 RSI 30 이하가 함께인 첫 봉(또는 다이버전스가 확인된 봉)이 생긴 뒤,
- *            TA_CONFIRM 봉 안에서 슈퍼트렌드가 같은 쪽인 첫 봉. 그 안에 없으면 표시하지 않는다.
- * 돌려주는 것: { list: [{ i 표시 봉, setup 조건이 생긴 봉, side, why[], strong, score, rsi }], pending: 확인을 기다리는 조건 | null }
- * strong — 조건이 생긴 봉의 RSI 가 20 이하 · 90 이상(운영자 기준).
- */
-export function taSignals(m, profile = TA_DEFAULT_PROFILE) {
-  const S = m.score?.v ?? new Array(m.n).fill(null);
-  const aggressive = profile === 'aggressive';
-  const setups = [];
-  const tests = {
-    up: (i) => ({ score: fin(S[i]) && S[i] <= TA_SCORE_LOW, rsi: fin(m.rsi[i]) && m.rsi[i] <= TA_RSI_LOW }),
-    down: (i) => ({ score: fin(S[i]) && S[i] >= TA_SCORE_HIGH, rsi: fin(m.rsi[i]) && m.rsi[i] >= TA_RSI_HIGH }),
-  };
-  for (const side of ['up', 'down']) {
-    let was = false;
-    for (let i = 0; i < m.n; i += 1) {
-      const t = tests[side](i);
-      const on = aggressive ? t.score || t.rsi : t.score && t.rsi;
-      if (on && !was) setups.push({ setup: i, rsiAt: i, side, why: ['score', 'rsi'].filter((k) => t[k]) });
-      was = on;
-    }
-  }
-  // 다이버전스는 확인된 봉(seenAt)에 조건이 생기고, 강함은 피벗 봉의 RSI 로 본다
-  for (const d of m.div) setups.push({ setup: d.seenAt, rsiAt: d.i, side: d.kind === 'bull' ? 'up' : 'down', why: ['div'] });
-  setups.sort((a, b) => a.setup - b.setup);
-
-  const byKey = new Map();
-  let pending = null;
-  for (const st of setups) {
-    let at = st.setup;
-    if (!aggressive) {
-      at = -1;
-      const last = Math.min(m.n - 1, st.setup + TA_CONFIRM);
-      for (let k = st.setup; k <= last; k += 1) {
-        if (m.st.dir[k] === st.side) { at = k; break; }
-      }
-      if (at < 0) {
-        // 창이 아직 열려 있으면(마지막 봉까지 TA_CONFIRM 봉이 다 안 지남) 확인을 기다리는 중
-        if (st.setup + TA_CONFIRM > m.n - 1 && (!pending || st.setup >= pending.setup)) pending = { setup: st.setup, side: st.side, why: [...st.why] };
-        continue;
-      }
-    }
-    const r = m.rsi[st.rsiAt];
-    const strong = fin(r) && (st.side === 'up' ? r <= TA_RSI_STRONG_LOW : r >= TA_RSI_STRONG_HIGH);
-    const key = `${at}:${st.side}`;
-    const prev = byKey.get(key);
-    if (prev) {
-      for (const w of st.why) if (!prev.why.includes(w)) prev.why.push(w);
-      prev.strong = prev.strong || strong;
-    } else {
-      byKey.set(key, { i: at, setup: st.setup, side: st.side, why: [...st.why], strong, score: fin(S[st.setup]) ? S[st.setup] : null, rsi: fin(r) ? r : null });
-    }
-  }
-  const list = [...byKey.values()].sort((a, b) => a.i - b.i);
-  // 기다리던 조건 뒤에 반대쪽 표시가 이미 나왔으면 기다림은 지운다
-  if (pending && list.some((e) => e.i >= pending.setup)) pending = null;
-  return { list, pending };
-}
-
-const whyText = (e) => ['score', 'rsi', 'div'].filter((k) => e.why.includes(k)).map((k) => WHY_TEXT[e.side][k]).join(' + ');
-
 /**
  * 기법으로 본 지금(i 봉 기준, 기본은 마지막 봉).
- * 고른 성향(방어적 · 공격적)으로 최근 TA_RECENT 봉 안의 가장 늦은 표시를 결론으로 쓴다.
+ * 최근 TA_RECENT 봉 안에서 확인된 조건 중 가장 늦은 것을 고르고, 같은 쪽 조건이 겹치면 함께 적는다.
+ * 그 뒤 같은 방향 슈퍼트렌드 전환이 있었는지를 후순위로 붙인다.
  */
-export function techNow(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
-  const sig = taSignals(m, profile);
-  const ev = sig.list.filter((e) => e.i <= i && i - e.i <= TA_RECENT);
+export function techNow(m, i = m.n - 1) {
+  const ev = techEvents(m).filter((e) => e.seenAt <= i && i - e.i <= TA_RECENT);
   const last = ev[ev.length - 1] ?? null;
   const ago = (k) => (i - k === 0 ? '이번 봉' : `${i - k}봉 전`);
   const r = m.rsi[i];
   const z = rsiZone(r);
-  const ptext = TA_PROFILE_TEXT[profile] ?? TA_PROFILE_TEXT[TA_DEFAULT_PROFILE];
 
-  // ① 다이버전스 — 최근 TA_RECENT 봉 안에서 확인된 것
-  const dv = [...m.div].filter((d) => d.seenAt <= i && i - d.i <= TA_RECENT).pop();
-  const dvSide = dv ? (dv.kind === 'bull' ? 'up' : 'down') : null;
+  // ① 다이버전스
+  const divs = ev.filter((e) => e.kind === 'div');
+  const dv = divs[divs.length - 1];
   const rowDiv = {
     key: 'tdiv',
     name: '① RSI 다이버전스',
-    value: dv ? `${TA_DIV_TEXT[dv.kind]} ${SIDE_GLYPH[dvSide]}` : `최근 ${TA_RECENT}봉 안에 없음`,
-    dir: dvSide,
-    note: dv ? `${ago(dv.i)} ${dvSide === 'up' ? '저점' : '고점'} · RSI ${m.rsi[dv.i].toFixed(1)} · ${TA_DIV.right}봉 뒤 확인` : '',
+    value: dv ? `${TA_DIV_TEXT[dv.side === 'up' ? 'bull' : 'bear']} ${SIDE_GLYPH[dv.side]}` : `최근 ${TA_RECENT}봉 안에 없음`,
+    dir: dv ? dv.side : null,
+    note: dv ? `${ago(dv.i)} ${dv.side === 'up' ? '저점' : '고점'} · RSI ${dv.rsi.toFixed(1)} · ${TA_DIV.right}봉 뒤 확인` : '',
   };
   // ② RSI 구간
   const zDir = z === 'low' || z === 'strongLow' ? 'up' : z === 'high' || z === 'strongHigh' ? 'down' : null;
@@ -727,19 +539,18 @@ export function techNow(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
     dir: zDir,
     note: z ? '' : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야 계산합니다`,
   };
-  // ③ 슈퍼트렌드 — 조건이 생긴 뒤 같은 쪽이 되었는지
+  // ③ 슈퍼트렌드 — 후순위
   const stNow = m.st.dir[i];
+  let stNote = '';
   let stValue = stNow ? TA_DIR_TEXT[stNow] : '아직 없음';
   let stDir = null;
-  let stNote = '';
   if (last) {
     const want = last.side;
-    let k = -1;
-    for (let x = last.setup; x <= i; x += 1) if (m.st.dir[x] === want) { k = x; break; }
-    if (k >= 0) {
-      stValue = `조건 뒤 ${want === 'up' ? '상승' : '하락'} 확인 ${SIDE_GLYPH[want]}`;
+    const f = m.st.flips.find((x) => x.i > last.i && x.i <= i && x.dir === want);
+    if (f) {
+      stValue = `조건 뒤 ${TA_FLIP_TEXT[want]}`;
       stDir = want;
-      stNote = `조건에서 ${k - last.setup}봉 뒤 · ${ago(k)}`;
+      stNote = `조건에서 ${f.i - last.i}봉 뒤 · ${ago(f.i)}`;
     } else {
       stValue = `조건 뒤 아직 ${want === 'up' ? '상승' : '하락'} 전환 없음`;
       stNote = stNow ? `지금 ${TA_DIR_TEXT[stNow]}` : '';
@@ -750,62 +561,36 @@ export function techNow(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
   // 결론 줄
   let head;
   let sub;
-  const pending = i === m.n - 1 ? sig.pending : null;
   if (last) {
     const same = ev.filter((e) => e.side === last.side);
+    const kinds = [];
+    if (same.some((e) => e.kind === 'rsi')) kinds.push(last.side === 'up' ? `RSI ${TA_RSI_LOW} 이하` : `RSI ${TA_RSI_HIGH} 이상`);
+    if (same.some((e) => e.kind === 'div')) kinds.push(TA_DIV_TEXT[last.side === 'up' ? 'bull' : 'bear']);
     const strong = same.some((e) => e.strong);
-    const why = { side: last.side, why: [...new Set(same.flatMap((e) => e.why))] };
-    const confirm = profile === 'defensive' ? ` → 슈퍼트렌드 ${last.side === 'up' ? '상승' : '하락'} 확인` : '';
     head = { side: last.side, text: `${SIDE_TEXT[last.side]} 조건 충족 ${SIDE_GLYPH[last.side]}`, strong };
-    sub = `${ptext} · ${whyText(why)}${confirm} · ${ago(last.i)}${strong ? ` · RSI 가 ${last.side === 'up' ? `${TA_RSI_STRONG_LOW} 이하` : `${TA_RSI_STRONG_HIGH} 이상`}까지 가 강함` : ''}`;
-  } else if (pending) {
-    head = { side: null, text: `${SIDE_TEXT[pending.side]} 조건 · 추세 확인 전`, strong: false };
-    sub = `${ptext} · ${whyText(pending)} ${ago(pending.setup)} · 슈퍼트렌드가 ${pending.side === 'up' ? '상승' : '하락'}이 되면 표시합니다`;
+    sub = `${kinds.join(' + ')} · ${ago(last.i)}${strong ? ` · RSI 가 ${last.side === 'up' ? `${TA_RSI_STRONG_LOW} 이하` : `${TA_RSI_STRONG_HIGH} 이상`}까지 가 강함` : ''}`;
   } else {
     head = { side: null, text: '기법 조건 없음', strong: false };
-    sub = profile === 'aggressive'
-      ? `${ptext} · 최근 ${TA_RECENT}봉 안에 종목 쫄탐 ${TA_SCORE_LOW} 이하 · ${TA_SCORE_HIGH} 이상, RSI ${TA_RSI_LOW} 이하 · ${TA_RSI_HIGH} 이상, 다이버전스가 없습니다`
-      : `${ptext} · 최근 ${TA_RECENT}봉 안에 종목 쫄탐과 RSI 가 함께 닿은 뒤(또는 다이버전스 뒤) 슈퍼트렌드까지 같은 쪽이 된 봉이 없습니다`;
+    sub = `최근 ${TA_RECENT}봉 안에 RSI ${TA_RSI_LOW} 이하 · ${TA_RSI_HIGH} 이상 · 다이버전스가 없습니다`;
   }
-  return { head, sub, rows: [rowDiv, rowRsi, rowSt], last, signals: sig.list, pending };
+  return { head, sub, rows: [rowDiv, rowRsi, rowSt], last };
 }
 
 /* ------------------------------ 한눈에 (큰 숫자 칸) ------------------------------ */
 
 /**
  * '지금 상태' 판 — 결론 한 줄 + 큰 숫자 칸 (2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게").
- * 칸 여섯: 종목 쫄탐(넓게) · RSI · 다이버전스(넓게, 한 칸) · 슈퍼트렌드 · 20/60선 · 1년선 · OBV.
- * 칸: { key, label, big, dir, cap, rsi?, bands?, sub?, note? } — big 은 크게 쓰는 짧은 값, cap 은 그 아래 한 줄,
- *     sub 는 같은 칸의 둘째 값, note 는 맨 아래 작은 줄(종목 쫄탐의 재료).
+ * 칸 다섯: RSI · 다이버전스(넓게, 한 칸) · 슈퍼트렌드 · 20/60선 · 1년선 · OBV.
+ * 칸: { key, label, big, dir, cap, rsi?, bands?, sub? } — big 은 크게 쓰는 짧은 값, cap 은 그 아래 한 줄, sub 는 같은 칸의 둘째 값.
  * 방향은 ▲ ▼ 와 말(상승 · 하락 · 위 · 아래)로도 적는다 — 색만으로 전하지 않는다.
  */
-export function taBoard(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
-  const now = techNow(m, i, profile);
+export function taBoard(m, i = m.n - 1) {
+  const now = techNow(m, i);
   const rows = Object.fromEntries(taSummary(m, i).map((r) => [r.key, r]));
   const ago = (k) => (i - k === 0 ? '이번 봉' : `${i - k}봉 전`);
   const tiles = [];
 
-  // ① 종목 쫄탐 — 0 공포 ~ 100 탐욕. 막대는 20 · 80 에서 나뉜다
-  {
-    const sc = m.score?.v[i];
-    const p = m.score?.parts;
-    const ok = fin(sc);
-    const dir = ok ? (sc <= TA_SCORE_LOW ? 'up' : sc >= TA_SCORE_HIGH ? 'down' : null) : null;
-    const part = (x) => (fin(x) ? String(Math.round(x)) : '없음');
-    tiles.push({
-      key: 'score',
-      label: '① 종목 쫄탐',
-      big: ok ? String(Math.round(sc)) : '없음',
-      dir,
-      cap: ok
-        ? dir === 'up' ? `공포 쪽 (${TA_SCORE_LOW} 이하) ▲` : dir === 'down' ? `탐욕 쪽 (${TA_SCORE_HIGH} 이상) ▼` : `중간 (${TA_SCORE_LOW}~${TA_SCORE_HIGH})`
-        : p && !fin(p.mood[i]) ? '시장 쫄탐지수를 받지 못해 낼 수 없습니다' : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야`,
-      rsi: ok ? sc : null,
-      bands: [TA_SCORE_LOW, TA_SCORE_LOW, TA_SCORE_HIGH, TA_SCORE_HIGH],
-      note: p ? `시장 ${part(p.mood[i])} · RSI ${part(p.rsi[i])} · 1년선 ${part(p.gap[i])} · OBV ${part(p.obv[i])}` : '',
-    });
-  }
-  // ② RSI · 다이버전스 — 한 칸에 (2026-11-27 사용자: "rsi 는 다이버전스랑 같이 합쳐서"). RSI 숫자가 가장 크고, 그 아래 다이버전스
+  // ① RSI · 다이버전스 — 한 칸에 (2026-11-27 사용자: "rsi 는 다이버전스랑 같이 합쳐서"). RSI 숫자가 가장 크고, 그 아래 다이버전스
   {
     const r = m.rsi[i];
     const z = rsiZone(r);
@@ -813,7 +598,7 @@ export function taBoard(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
     const dv = now.rows[0];
     tiles.push({
       key: 'rsi',
-      label: `② RSI ${TA_RSI} · 다이버전스`,
+      label: `① RSI ${TA_RSI} · 다이버전스`,
       big: z ? r.toFixed(1) : '없음',
       dir,
       cap: z ? `${TA_ZONE_TEXT[z]}${dir ? ` ${SIDE_GLYPH[dir]}` : ''}` : `${taBarUnit(m.tf)} ${TA_RSI + 1}개가 모여야`,
@@ -826,13 +611,13 @@ export function taBoard(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
       },
     });
   }
-  // ③ 슈퍼트렌드 — 지금 방향을 크게, 조건 뒤 확인은 아래 줄에
+  // ③ 슈퍼트렌드 — 지금 방향을 크게, 조건 뒤 전환은 아래 줄에
   {
     const d = m.st.dir[i];
     const flip = [...m.st.flips].reverse().find((f) => f.i <= i);
     tiles.push({
       key: 'st',
-      label: '③ 슈퍼트렌드 (후순위)',
+      label: '② 슈퍼트렌드 (후순위)',
       big: d ? `${SIDE_GLYPH[d]} ${d === 'up' ? '상승' : '하락'}` : '없음',
       dir: d,
       cap: now.last ? now.rows[2].value : d && flip ? `${ago(flip.i)} 전환` : `${taBarUnit(m.tf)} ${TA_ST_ATR}개가 모여야`,
@@ -874,13 +659,7 @@ export function taBoard(m, i = m.n - 1, profile = TA_DEFAULT_PROFILE) {
       cap: r.dir ? `${r.dir === 'up' ? '오른' : '내린'} 봉 쪽 거래량` : r.note || '0',
     });
   }
-  return {
-    verdict: { ...now.head, sub: now.sub },
-    tiles,
-    mark: now.last ? { i: now.last.i, side: now.last.side } : null,
-    signals: now.signals.map((e) => ({ i: e.i, side: e.side, strong: e.strong })),
-    profile: TA_PROFILES.includes(profile) ? profile : TA_DEFAULT_PROFILE,
-  };
+  return { verdict: { ...now.head, sub: now.sub }, tiles, mark: now.last ? { i: now.last.i, side: now.last.side } : null };
 }
 
 /* ------------------------------ 종목 찾기 ------------------------------ */
@@ -935,25 +714,21 @@ export const TA_DEFAULT_TF = '4h';
 /** 차트 화면의 고정 문구 — 앱 · 미리보기가 같은 글을 쓴다 */
 export const TA_TEXT = {
   title: '종목 차트',
-  lede: '종목을 찾아 종목 쫄탐(시장 쫄탐지수 + RSI · 1년선 · OBV 를 모은 0~100 점수)과 RSI · 다이버전스 · 슈퍼트렌드를 한 화면에서 봅니다. 운영자 기법으로 지금 상태를 함께 적습니다. 지표의 상태를 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
-  markNote: `차트를 누르면 그 봉의 숫자(종가 · 시가 · 고가 · 저가 · 종목 쫄탐 · RSI · 슈퍼트렌드 · 이동평균)가 상자로 나오고, 같은 봉을 한 번 더 누르면 닫힙니다. 봉 아래 ▲ · 위 ▼ 는 고른 성향(방어적 · 공격적)의 기법 조건이 표시된 봉이고, 세로 점선은 그중 '지금 상태' 결론에 쓴 가장 최근 것입니다. RSI 칸의 비스듬한 점선과 ▲ ▼ 는 다이버전스(두 저점 · 고점을 이은 선)입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
+  lede: '종목을 찾아 RSI · 다이버전스 · 슈퍼트렌드 · OBV · 이동평균 · 추세선을 한 화면에서 봅니다. 운영자 기법으로 지금 상태를 함께 적습니다. 지표의 상태를 보여 줄 뿐, 사고팔 때를 알려 주지 않습니다.',
+  markNote: `차트를 누르면 그 봉의 숫자(종가 · 시가 · 고가 · 저가 · RSI · 슈퍼트렌드 · 이동평균)가 상자로 나오고, 같은 봉을 한 번 더 누르면 닫힙니다. 세로 점선은 '지금 상태' 결론에 쓴 가장 최근 기법 조건이 생긴 봉입니다. RSI 칸의 비스듬한 점선과 ▲ ▼ 는 다이버전스(두 저점 · 고점을 이은 선)입니다. 지난 값으로 계산한 것이라 앞날을 말하지 않습니다.`,
   tallyNote: '지표가 한쪽으로 모였다는 것은 지금 상태일 뿐, 앞으로의 방향을 말하지 않습니다.',
   techTitle: '운영자 기법',
   techSteps: [
     `4시간봉을 주로 봅니다.`,
-    `① 종목 쫄탐이 ${TA_SCORE_LOW} 이하면 상승 쪽, ${TA_SCORE_HIGH} 이상이면 하락 쪽으로 봅니다.`,
-    `② RSI 가 ${TA_RSI_LOW} 이하(침체)면 상승 쪽, ${TA_RSI_HIGH} 이상(과열)이면 하락 쪽으로 봅니다. ${TA_RSI_STRONG_LOW} 아래나 ${TA_RSI_STRONG_HIGH} 위면 더 강하게 봅니다.`,
-    `③ RSI 다이버전스 — 가격 저점은 낮아졌는데 RSI 저점은 높아지면 상승 쪽, 반대면 하락 쪽. 두 성향 모두 조건입니다.`,
-    `공격적: ①이나 ② 중 하나만 닿아도 그 봉에 표시합니다.`,
-    `방어적: ①과 ②가 함께 닿은 뒤 ${TA_CONFIRM}봉 안에 슈퍼트렌드가 같은 쪽이 된 봉에 표시합니다. 슈퍼트렌드는 그 뒤에 확인하는 후순위입니다.`,
+    `① RSI 다이버전스를 먼저 봅니다 — 가격 저점은 낮아졌는데 RSI 저점은 높아지면 상승 쪽, 반대면 하락 쪽.`,
+    `② RSI 가 ${TA_RSI_LOW} 이하(침체)면 상승 쪽, ${TA_RSI_HIGH} 이상(과열)이면 하락 쪽으로 봅니다.`,
+    `③ RSI 가 ${TA_RSI_STRONG_LOW} 아래나 ${TA_RSI_STRONG_HIGH} 위로 가면 더 강하게 봅니다.`,
+    `④ 슈퍼트렌드 전환은 그 뒤에 확인하는 후순위입니다.`,
   ],
   techNote: '운영자가 차트를 읽는 순서를 그대로 계산했을 뿐, 사고팔 때를 알려 주거나 결과를 보장하지 않습니다. 조건이 맞아도 반대로 가는 일이 흔합니다.',
-  profileHint: `공격적은 종목 쫄탐 · RSI 중 하나만 닿아도, 방어적은 둘 다 닿은 뒤 슈퍼트렌드까지 같은 쪽일 때 표시합니다.`,
   searchHint: '이름 · 초성 · 코드로 찾습니다 — 테슬라, ㅌㅅㄹ, TSLA, 005930',
   codeHint: '목록에 없는 종목은 코드로 찾습니다 — 미국 TSLA, 한국 005930',
   methods: [
-    ['종목 쫄탐', `종목마다 봉마다 내는 0~100 점수. 시장 쫄탐지수 ${TA_SCORE_W.mood} · RSI ${TA_SCORE_W.rsi} · 1년선 괴리 ${TA_SCORE_W.gap} · OBV 오실레이터 ${TA_SCORE_W.obv} 의 가중평균입니다. 1년선 괴리와 OBV 는 지난 ${TA_PCT_WIN}봉 안에서 지금 값의 백분위(가장 낮으면 0, 가장 높으면 100)로 바꿔 넣습니다. 시장 쫄탐지수는 미국 것을 씁니다(한국은 쫄탐지수를 내지 않음). 그 봉이 끝날 때 이미 나와 있던 값만 써서, 미국 일봉은 같은 날, 그 밖에는 전날까지의 값입니다. 시장 쫄탐 · RSI 중 하나라도 없으면 점수를 내지 않고, 1년선 · OBV 가 없으면 남은 재료의 비중을 키워 냅니다.`],
-    ['방어적 · 공격적', `공격적은 종목 쫄탐 ${TA_SCORE_LOW} 이하 · RSI ${TA_RSI_LOW} 이하(하락 쪽은 ${TA_SCORE_HIGH} 이상 · ${TA_RSI_HIGH} 이상) 중 하나가 시작된 봉, 방어적은 둘이 함께인 봉이 생긴 뒤 ${TA_CONFIRM}봉 안에 슈퍼트렌드가 같은 쪽이 된 봉입니다. 다이버전스는 두 성향 모두 조건에 넣습니다.`],
     ['슈퍼트렌드', `ATR(${TA_ST_ATR}) × ${TA_ST_MULT} 띠. 종가가 띠를 넘으면 방향이 바뀝니다. 선이 가격 아래면 상승 추세, 위면 하락 추세.`],
     ['이동평균', `최근 ${TA_MA.join(' · ')}봉 종가의 단순평균.`],
     ['추세선 (1년선)', `일봉 ${TA_TREND_DAYS}개(1년) 종가 평균 — 쫄탐지수가 지표를 견주는 기간과 같은 길이. 4시간봉에서는 전날까지의 1년선을 씁니다.`],

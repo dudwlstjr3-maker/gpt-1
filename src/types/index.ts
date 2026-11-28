@@ -1344,10 +1344,4 @@ export interface TaBarsResult {
   source: DataSource;
   mode: DataMode;
   fetchedAt: string;
-  /**
-   * 종목 쫄탐의 재료 — 미국 쫄탐지수 일별 값 (2026-11-28). 봉과 같은 어댑터에서 받는다(DEMO · LIVE 를 섞지 않음).
-   * 받지 못하면 null 이고 moodNote 에 까닭. 그때 종목 쫄탐은 내지 않는다.
-   */
-  mood?: { market: 'us'; t: number[]; v: (number | null)[] } | null;
-  moodNote?: string | null;
 }

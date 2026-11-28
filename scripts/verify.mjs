@@ -4216,17 +4216,15 @@ async function main() {
       `${ev.length}개`);
     const now = ta.techNow(m4);
     check('기법 카드 — 다이버전스 · RSI · 슈퍼트렌드(후순위) 순서, 결론은 \'조건 충족\' 또는 \'없음\'',
-      // 2026-11-28 방어적은 조건 뒤 슈퍼트렌드를 기다리는 동안 '추세 확인 전' 이라고 적는다 ([8-47])
-      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|(상승|하락) 쪽 조건 · 추세 확인 전|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
+      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
       now.head.text);
     check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
     // 2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게" — 결론 한 줄 + 큰 숫자 칸 여섯
     const board = ta.taBoard(m4);
     // 이어서 사용자: "rsi 는 다이버전스랑 같이 합쳐서" — RSI 칸 하나에 다이버전스를 둘째 값으로
-    // 2026-11-28 맨 앞에 종목 쫄탐 칸 ([8-47])
-    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 여섯 (종목 쫄탐 · RSI · 다이버전스 한 칸 · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
-      board.tiles.map((t) => t.key).join(',') === 'score,rsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8) &&
-      /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/.test(board.tiles[1].sub?.big ?? ''),
+    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 다섯 (RSI · 다이버전스 한 칸 · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
+      board.tiles.map((t) => t.key).join(',') === 'rsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8) &&
+      /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/.test(board.tiles[0].sub?.big ?? ''),
       board.tiles.map((t) => t.big).join(' | '));
     const cssBig = await readFile('src/app/ta.css', 'utf8');
     const px = (sel) => Number((cssBig.match(new RegExp(sel.replace(/[.[\]"=]/g, (c) => '\\' + c) + '\\s*\\{[^}]*font-size:\\s*([\\d.]+)px')) ?? [])[1]);
@@ -4262,9 +4260,8 @@ async function main() {
       // 그림은 한 번 만든 innerHTML 객체를 다시 쓴다 — 렌더마다 새 객체면 누른 봉의 숫자 상자가 지워진다
       /chartInner: chart \? \{ __html: chart\.html \}/.test(page) && /dangerouslySetInnerHTML=\{view\.chartInner\}/.test(page) &&
       /taCrossSvg\(model, view\.chart\.layout, i/.test(page) && /taCrossSvg\(m, refLayout, i/.test(tpl) &&
-      /const board = taBoard\(model, undefined, profile\)/.test(page) &&
-      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /const board = taBoard\(m, undefined, state\.ref\.profile\)/.test(tpl) &&
-      /mark: board\.mark/.test(tpl) && /mark: board\.mark/.test(page));
+      /const board = taBoard\(model\)/.test(page) &&
+      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /mark: taBoard\(m\)\.mark/.test(tpl) && /mark: board\.mark/.test(page));
     // 2026-11-27 사용자: "차트에서 왜 점 같은 거 있지? 너무 가독성이 떨어지는데" — 흩뿌린 점 · 흐린 ▲▼ 를 빼고 가장 최근 조건 하나만
     const svgNow = (await import('../src/lib/taChart.mjs')).taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360, mark: ta.taBoard(m4).mark }).html;
     check('차트에 점(●) · 흐린 슈퍼트렌드 ▲▼ 없음 — 최근 기법 조건만 세로 점선 하나와 꼬리표',
@@ -4287,128 +4284,6 @@ async function main() {
     check('/chart 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('종목 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
     const old = await fetch(`${BASE}/ref`, { redirect: 'manual' });
     check('옛 주소 /ref 는 남기지 않음 (이 PR 안에서 바뀐 이름)', old.status === 404, String(old.status));
-  }
-
-  console.log('\n[8-47] 종목 쫄탐 — 시장 쫄탐지수 + RSI · 1년선 · OBV 를 모은 0~100 · 방어적 / 공격적');
-  {
-    /*
-     * 2026-11-28 사용자: "매매기준은 기본적으로 쫄탐지수를 참고해서 차트에 표기해라, 내가 올려준 지표 4가지는 보조지표고,
-     * 아니면 그 모든 걸 고려해서 지수를 다시 짤까?" → 고른 것: 종목별 종합 점수(홈 쫄탐지수는 그대로, 재료 하나로),
-     * 문구는 '상승 쪽 조건'(규칙 1절 그대로), 기준은 RSI 30 · 80 · 쫄탐 20 · 80, 공격적은 하나만 · 방어적은 둘 다 + 슈퍼트렌드 확인.
-     */
-    const ta = await import('../src/lib/ta.mjs');
-    const tc = await import('../src/lib/taChart.mjs');
-    const mode = (await getJson('/api/health')).body?.mode;
-    const fng = (await getJson('/api/fng/us')).body?.detail;
-    const hist = fng?.history ?? [];
-    const dayKey = (t) => Math.floor(t / 86_400_000);
-    const moodByDay = new Map(hist.map((p) => [dayKey(p.t), p.v]));
-    const assets = [['spx', '1d'], ['spx', '4h'], ['tsla', '4h'], ['samsung', '4h'], ['kospi', '1d'], ['nvda', '1d']];
-    const got = [];
-    for (const [a, tf] of assets) got.push([a, tf, (await getJson(`/api/ta?a=${a}&tf=${tf}`)).body ?? {}]);
-
-    check('차트 응답에 미국 쫄탐지수 일별 값 — 같은 모드(섞지 않음) · 봉 범위만 · 오름차순',
-      got.every(([, , r]) => r.mode === mode && r.mood?.market === 'us' && r.mood.t.length > 20 && r.mood.t.length === r.mood.v.length &&
-        r.mood.t.every((t, i, arr) => i === 0 || arr[i - 1] < t) && r.mood.t[0] >= r.bars[0].t - 8 * 86_400_000 && r.moodNote === null),
-      got.map(([a, tf, r]) => `${a}:${tf} ${r.mood?.t?.length ?? '없음'}`).join(' · '));
-    check('차트의 시장 쫄탐 = 심리 상세의 쫄탐지수 (같은 엔진 · 같은 날 같은 값)',
-      got.every(([, , r]) => r.mood.t.every((t, i) => !moodByDay.has(dayKey(t)) || moodByDay.get(dayKey(t)) === r.mood.v[i])) &&
-      got[0][2].mood.v.at(-1) === hist.at(-1)?.v, `마지막 ${got[0][2].mood?.v?.at(-1)} / ${hist.at(-1)?.v}`);
-
-    const models = got.map(([a, tf, r]) => [a, tf, r, ta.taModel({ tf, bars: r.bars, daily: r.daily, gmtoffset: r.gmtoffset, market: r.market, mood: r.mood })]);
-    check('비중은 시장 쫄탐 40 · RSI 30 · 1년선 괴리 15 · OBV 15, 기준은 20 · 80',
-      JSON.stringify(ta.TA_SCORE_W) === '{"mood":40,"rsi":30,"gap":15,"obv":15}' && ta.TA_SCORE_LOW === 20 && ta.TA_SCORE_HIGH === 80 &&
-      ta.TA_RSI_LOW === 30 && ta.TA_RSI_HIGH === 80);
-    {
-      let bad = 0;
-      let seen = 0;
-      for (const [, , , m] of models) {
-        const p = m.score.parts;
-        for (let i = 0; i < m.n; i += 1) {
-          const v = m.score.v[i];
-          if (v === null) { if (Number.isFinite(p.mood[i]) && Number.isFinite(p.rsi[i])) bad += 1; continue; }
-          seen += 1;
-          let sum = p.mood[i] * 40 + p.rsi[i] * 30;
-          let w = 70;
-          for (const [k, wt] of [['gap', 15], ['obv', 15]]) if (Number.isFinite(p[k][i])) { sum += p[k][i] * wt; w += wt; }
-          if (!(v >= 0 && v <= 100) || Math.abs(v - sum / w) > 1e-9) bad += 1;
-        }
-      }
-      check('종목 쫄탐 = 재료의 가중평균(0~100), 시장 쫄탐 · RSI 가 있으면 반드시 냄', bad === 0 && seen > 1000, `${seen}봉 · 어긋남 ${bad}`);
-    }
-    {
-      // 미리 당겨 쓰지 않는다 — 미국 일봉은 그날 값, 4시간봉 · 한국은 전날까지의 값
-      const dayOf = (t, off) => Math.floor((t / 1000 + off) / 86400);
-      const prevVal = (d, same) => { let best = null; let bd = -Infinity; for (const p of hist) { const k = dayKey(p.t); if ((same ? k <= d : k < d) && k > bd) { bd = k; best = p.v; } } return d - bd <= 5 ? best : null; };
-      let bad = 0;
-      for (const [, tf, r, m] of models) {
-        const same = tf === '1d' && r.market === 'us';
-        for (const i of [m.n - 1, m.n - 2, m.n - 7, Math.floor(m.n / 2)]) {
-          if (m.score.parts.mood[i] !== prevVal(dayOf(m.t[i], r.gmtoffset), same)) bad += 1;
-        }
-      }
-      check('시장 쫄탐은 봉이 끝날 때 이미 나온 값만 — 미국 일봉은 같은 날, 4시간봉 · 한국은 전날까지', bad === 0, `어긋남 ${bad}`);
-    }
-    {
-      let bad = 0;
-      let agg = 0;
-      let def = 0;
-      for (const [, , , m] of models) {
-        const A = ta.taSignals(m, 'aggressive').list;
-        const D = ta.taSignals(m, 'defensive').list;
-        agg += A.length; def += D.length;
-        for (const e of A) {
-          const r = m.rsi[e.setup];
-          const s = m.score.v[e.setup];
-          const ok = e.i === e.setup && (e.why.includes('div') ||
-            (e.side === 'up' ? (s !== null && s <= 20) || r <= 30 : (s !== null && s >= 80) || r >= 80));
-          if (!ok) bad += 1;
-        }
-        for (const e of D) {
-          const r = m.rsi[e.setup];
-          const s = m.score.v[e.setup];
-          const both = e.side === 'up' ? s !== null && s <= 20 && r <= 30 : s !== null && s >= 80 && r >= 80;
-          const ok = m.st.dir[e.i] === e.side && e.i >= e.setup && e.i <= e.setup + ta.TA_CONFIRM && (both || e.why.includes('div'));
-          if (!ok) bad += 1;
-        }
-      }
-      check('공격적 — 둘 중 하나가 시작된 봉에 바로 / 방어적 — 둘 다 닿은 뒤 슈퍼트렌드가 같은 쪽인 봉', bad === 0 && agg > def && def > 0,
-        `공격적 ${agg} · 방어적 ${def} · 어긋남 ${bad}`);
-    }
-    {
-      const texts = [];
-      for (const [, , , m] of models) for (const p of ta.TA_PROFILES) {
-        const b = ta.taBoard(m, undefined, p);
-        texts.push(b.verdict.text, b.verdict.sub, ...b.tiles.map((t) => `${t.label} ${t.big} ${t.cap} ${t.note ?? ''}`));
-      }
-      const pushy = texts.filter((t) => /매수|매도|사세요|파세요|진입|청산|목표가|손절|익절|추천/.test(t));
-      check('결론 · 칸 문구는 \'상승 쪽 · 하락 쪽 조건\' — 매수 · 매도 말 없음 (규칙 1절)', pushy.length === 0 &&
-        texts.some((t) => /^(상승|하락) 쪽 조건/.test(t)), `${texts.length}줄 중 ${pushy.length}`);
-    }
-    {
-      const [, , , m] = models[2];
-      const b = ta.taBoard(m, undefined, 'aggressive');
-      const out = tc.taChartHtml(m, { from: m.n - 130, to: m.n - 1, width: 360, signals: b.signals, mark: b.mark, profileText: '공격적' });
-      const inView = b.signals.filter((e) => e.i >= m.n - 130).length;
-      check('차트 — 표시 봉마다 ▲ ▼ (점 없음) · 개수 줄 · 종목 쫄탐 칸(20 · 80 선)',
-        (out.html.match(/class="ta-sig( ta-sig-strong)?"/g) ?? []).length === inView && !/<circle /.test(out.html) &&
-        /<p class="ta-count">보이는 구간 · 공격적 · 상승 쪽 조건 \d+번 · 하락 쪽 조건 \d+번<\/p>/.test(out.html) &&
-        /class="ta-ptitle">종목 쫄탐 · \d+</.test(out.html) && b.tiles[0].key === 'score' && /^\d+$/.test(b.tiles[0].big),
-        `표시 ${inView}`);
-      const tip = tc.taCrossSvg(m, out.layout, m.n - 3, { price: (v) => v.toFixed(2), stamp: () => '' });
-      check('누른 봉의 숫자 상자에 종목 쫄탐 줄 · 오른쪽 꼬리표', /class="ta-tip-l">종목 쫄탐</.test(tip) &&
-        (tip.match(/class="ta-cross-tag"/g) ?? []).length === 3 && tip.includes(`>${Math.round(m.score.v[m.n - 3])}</text>`));
-    }
-    const [page, tpl, build, css] = await Promise.all(['src/app/chart/page.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/ta.css'].map((f) => readFile(f, 'utf8')));
-    const vr = tpl.slice(tpl.indexOf('  function viewRef() {'), tpl.indexOf('\n  function drawRef()'));
-    check('앱 · 미리보기 같은 성향 고르기 — 방어적이 처음, 주소 ?p= 로 이어짐',
-      ta.TA_DEFAULT_PROFILE === 'defensive' && /aria-label="기법 성향"/.test(page) && /aria-label="기법 성향"/.test(vr) &&
-      /TA_PROFILES\.map/.test(page) && /data-ta-profile="/.test(vr) && /qs\.set\('p', profile\)/.test(page) &&
-      /profile: 'defensive'/.test(tpl) && /if \(d\.taProfile\)/.test(tpl) && /TA_TEXT\.profileHint/.test(page) && /TA_TEXT\.profileHint/.test(vr) &&
-      /signals: board\.signals/.test(page) && /signals: board\.signals/.test(tpl) &&
-      /mood: data\.mood \?\? null/.test(page) && /mood: d\.mood \|\| null/.test(tpl));
-    check('미리보기 빌드는 시장 쫄탐이 빠지면 멈춤 (조용히 비우지 않음)', /종목 차트에 시장 쫄탐지수가 없습니다/.test(build));
-    check('종목 쫄탐 숫자도 크게 (36px 이상)', Number((css.match(/\.ta-tile\[data-k="score"\] \.ta-big \{ font-size: (\d+)px/) ?? [])[1]) >= 36);
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

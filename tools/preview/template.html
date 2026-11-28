@@ -971,7 +971,7 @@ __TA_CSS__
 
   const state = {
     /* 종목 차트 (2026-11-27) — 고른 항목 · 봉 단위 · 보이는 구간 · 짚은 봉 */
-    ref: { a: 'spx', tf: '4h', range: '3m', cursor: null, err: null, q: '' }, /* 처음은 4시간봉 — ta.mjs TA_DEFAULT_TF 와 같게 */
+    ref: { a: 'spx', tf: '4h', range: '3m', cursor: null, err: null, q: '', profile: 'defensive' }, /* 처음은 4시간봉 — ta.mjs TA_DEFAULT_TF 와 같게. 성향은 TA_DEFAULT_PROFILE */
     /* 지표 화면 안에서 위험 신호등을 볼지 전체 지표를 볼지 */
     indView: 'risk',
     /* 캘린더: 달력으로 볼지 목록으로 볼지, 어느 달을 보고 있는지, 어느 날을 골랐는지 */
@@ -3294,7 +3294,7 @@ __TA_CSS__
   function refModel(d) {
     if (!d) return null;
     if (d._model) return d._model;
-    d._model = taModel({ tf: d.tf, bars: d.bars, daily: d.daily, gmtoffset: d.gmtoffset });
+    d._model = taModel({ tf: d.tf, bars: d.bars, daily: d.daily, gmtoffset: d.gmtoffset, market: d.market, mood: d.mood || null });
     return d._model;
   }
 
@@ -3368,7 +3368,11 @@ __TA_CSS__
         (!own && d.market === 'kr' ? '<small> 한국 쫄탐지수는 내지 않아 미국 것을 봅니다</small>' : '') + '</span><span aria-hidden="true">→</span></button>';
     }
     html += '<section class="ta-sec" aria-labelledby="ta-now-title"><h2 id="ta-now-title">지금 상태 <small>마지막 ' + unit + ' 기준</small></h2>' +
-      '<div>' + taBoardHtml(taBoard(m)) + '</div>' +
+      /* 기법 성향 — 방어적(둘 다 + 슈퍼트렌드 확인) · 공격적(하나만 닿아도). 앱과 같은 마크업 */
+      '<div class="ta-row"><div class="ta-seg" role="group" aria-label="기법 성향">' + TA_PROFILES.map((k) =>
+        '<button type="button" data-ta-profile="' + k + '" aria-pressed="' + (st.profile === k) + '">' + esc(TA_PROFILE_TEXT[k]) + '</button>').join('') +
+      '</div><p class="ta-hint">' + esc(TA_TEXT.profileHint) + '</p></div>' +
+      '<div>' + taBoardHtml(taBoard(m, undefined, st.profile)) + '</div>' +
       '<details class="ta-howto"><summary>' + esc(TA_TEXT.techTitle) + ' — 보는 순서</summary><ol>' + TA_TEXT.techSteps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>' +
       '<p class="ta-note">' + esc(TA_TEXT.techNote) + '</p></section>' +
       '<section class="ta-sec" aria-labelledby="ta-chart-title"><h2 id="ta-chart-title">차트 <small>' + unit + ' · 봉 ' + (w.to - w.from + 1) + '개</small></h2>' +
@@ -3390,8 +3394,10 @@ __TA_CSS__
     if (!box || !d) { refLayout = null; return; }
     const m = refModel(d);
     const w = refWindow(d, m);
+    const board = taBoard(m, undefined, state.ref.profile);
     const out = taChartHtml(m, {
-      from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), mark: taBoard(m).mark,
+      from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), mark: board.mark,
+      signals: board.signals, profileText: TA_PROFILE_TEXT[state.ref.profile], scoreNote: d.moodNote || undefined,
       date: taAxisDate(d.tf, w.to - w.from + 1, d.market), title: d.name + ' ' + taBarUnit(d.tf),
     });
     box.innerHTML = out.html;
@@ -5139,6 +5145,7 @@ __TA_CSS__
       return render();
     }
     if (d.taRange) { state.ref.range = d.taRange; state.ref.cursor = null; return render(); }
+    if (d.taProfile) { state.ref.profile = TA_PROFILES.includes(d.taProfile) ? d.taProfile : TA_DEFAULT_PROFILE; return render(); }
     if (d.goRegion !== undefined) { state.region = d.goRegion; state.view = 'marketRegion'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }
     if (d.region) { state.region = d.region; return render(); }
     if (d.goRisk !== undefined) { state.view = 'indicators'; state.indView = 'risk'; window.scrollTo({ top: 0, behavior: 'instant' }); return render(); }

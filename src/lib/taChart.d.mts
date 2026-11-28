@@ -9,6 +9,8 @@ export interface TaLayout {
   W: number;
   H: number;
   P: { top: number; h: number };
+  /** 종목 쫄탐 칸 (2026-11-28) */
+  SC: { top: number; h: number };
   RS: { top: number; h: number };
   OB: { top: number; h: number };
   lo: number;
@@ -28,12 +30,20 @@ export function taChartHtml(
     title?: string;
     /** 가장 최근 기법 조건 — 세로 점선과 꼬리표 하나 */
     mark?: { i: number; side: TaDir } | null;
+    /** 고른 성향의 기법 조건 봉 전부 — 봉 아래 ▲ · 위 ▼ */
+    signals?: { i: number; side: TaDir; strong: boolean }[];
+    /** '방어적' · '공격적' — 범례와 개수 줄에 */
+    profileText?: string;
+    /** 종목 쫄탐을 못 낼 때 칸에 적는 까닭 */
+    scoreNote?: string;
+    scoreLow?: number;
+    scoreHigh?: number;
     rsiHigh?: number;
     rsiLow?: number;
     rsiStrongHigh?: number;
     rsiStrongLow?: number;
   },
-): { html: string; layout: TaLayout };
+): { html: string; layout: TaLayout; counts: { up: number; down: number } };
 export function taIndexAt(layout: TaLayout, px: number): number;
 export function taXOf(layout: TaLayout, i: number): number;
 export function taPrice(precision: number): (v: number | null | undefined) => string;

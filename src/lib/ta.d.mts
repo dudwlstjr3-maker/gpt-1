@@ -37,6 +37,12 @@ export interface TaModel {
   rsi: (number | null)[];
   div: TaDivergence[];
   obv: TaObv;
+  /** 종목 쫄탐 — 0 공포 ~ 100 탐욕. used 는 쓴 재료 수(2~4), parts 는 재료별 값(0~100) */
+  score: {
+    v: (number | null)[];
+    used: number[];
+    parts: { mood: (number | null)[]; rsi: (number | null)[]; gap: (number | null)[]; obv: (number | null)[] };
+  };
 }
 
 export interface TaRow {
@@ -60,6 +66,43 @@ export const TA_MA: number[];
 export const TA_TREND_DAYS: number;
 export const TA_DIV: { left: number; right: number; min: number; max: number };
 export const TA_RECENT: number;
+export const TA_SCORE_W: { mood: number; rsi: number; gap: number; obv: number };
+export const TA_SCORE_LOW: number;
+export const TA_SCORE_HIGH: number;
+export const TA_PCT_WIN: number;
+export const TA_PCT_MIN: number;
+export const TA_CONFIRM: number;
+export type TaProfile = 'defensive' | 'aggressive';
+export const TA_PROFILES: TaProfile[];
+export const TA_PROFILE_TEXT: Record<TaProfile, string>;
+export const TA_DEFAULT_PROFILE: TaProfile;
+export interface TaMood {
+  t: number[];
+  v: ReadonlyArray<number | null>;
+}
+export function moodForBars(bars: ReadonlyArray<{ t: number }>, mood: TaMood | null, sameDay?: boolean, gmtoffsetSec?: number): (number | null)[];
+export function pctRank(values: ReadonlyArray<number | null>, win?: number, min?: number): (number | null)[];
+export function taScore(parts: {
+  mood: ReadonlyArray<number | null> | null;
+  rsi: ReadonlyArray<number | null>;
+  gap?: ReadonlyArray<number | null> | null;
+  obv?: ReadonlyArray<number | null> | null;
+}): { v: (number | null)[]; used: number[] };
+export interface TaSignal {
+  /** 표시 봉 */
+  i: number;
+  /** 조건이 생긴 봉 */
+  setup: number;
+  side: TaDir;
+  why: ('score' | 'rsi' | 'div')[];
+  strong: boolean;
+  score: number | null;
+  rsi: number | null;
+}
+export function taSignals(m: TaModel, profile?: TaProfile): {
+  list: TaSignal[];
+  pending: { setup: number; side: TaDir; why: ('score' | 'rsi' | 'div')[] } | null;
+};
 
 export function sma(values: ReadonlyArray<number | null>, n: number): (number | null)[];
 export function ema(values: ReadonlyArray<number | null>, n: number): (number | null)[];
@@ -88,6 +131,8 @@ export function taModel(input: {
   bars: TaBar[];
   daily?: { t: number; c: number }[] | null;
   gmtoffset?: number;
+  market?: 'us' | 'kr';
+  mood?: TaMood | null;
 }): TaModel;
 
 export type TaZone = 'strongHigh' | 'high' | 'mid' | 'low' | 'strongLow';
@@ -112,6 +157,7 @@ export const TA_TEXT: {
   techTitle: string;
   techSteps: string[];
   techNote: string;
+  profileHint: string;
   searchHint: string;
   codeHint: string;
   methods: [string, string][];
@@ -130,14 +176,16 @@ export interface TaTechNow {
   head: { side: TaDir | null; text: string; strong: boolean };
   sub: string;
   rows: TaRow[];
-  last: TaTechEvent | null;
+  last: TaSignal | null;
+  signals: TaSignal[];
+  pending: { setup: number; side: TaDir; why: ('score' | 'rsi' | 'div')[] } | null;
 }
 export function techEvents(m: TaModel): TaTechEvent[];
-export function techNow(m: TaModel, i?: number): TaTechNow;
+export function techNow(m: TaModel, i?: number, profile?: TaProfile): TaTechNow;
 export function taSearch<A extends { id: string; name: string; code?: string | null }>(query: string, assets: A[], limit?: number): A[];
 
 export interface TaTile {
-  key: 'rsi' | 'st' | 'ma' | 'trend' | 'obv';
+  key: 'score' | 'rsi' | 'st' | 'ma' | 'trend' | 'obv';
   label: string;
   big: string;
   dir: TaDir | null;
@@ -147,11 +195,16 @@ export interface TaTile {
   bands?: [number, number, number, number];
   /** 같은 칸의 둘째 값 — RSI 칸의 다이버전스 */
   sub?: { big: string; dir: TaDir | null; cap: string };
+  /** 맨 아래 작은 줄 — 종목 쫄탐의 재료 */
+  note?: string;
 }
 export interface TaBoardData {
   verdict: { side: TaDir | null; text: string; strong: boolean; sub: string };
   tiles: TaTile[];
   /** 차트에 세로 점선으로 표시할 가장 최근 기법 조건 */
   mark: { i: number; side: TaDir } | null;
+  /** 고른 성향으로 표시할 봉 전부 — 차트의 ▲ ▼ */
+  signals: { i: number; side: TaDir; strong: boolean }[];
+  profile: TaProfile;
 }
-export function taBoard(m: TaModel, i?: number): TaBoardData;
+export function taBoard(m: TaModel, i?: number, profile?: TaProfile): TaBoardData;

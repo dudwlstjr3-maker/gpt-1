@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import {
   sma, ema, rsi, supertrend, obvOsc, pivots, rsiDivergence, toFourHour, trendForBars,
   taModel, taSummary, taTally, taTallyText, taReadout, rsiZone, taParseCode, techEvents, techNow, taSearch, taBoard,
-  TA_TREND_DAYS, TA_TEXT, TA_RANGES, TA_DEFAULT_RANGE,
+  moodForBars, pctRank, taScore, taSignals,
+  TA_TREND_DAYS, TA_TEXT, TA_RANGES, TA_DEFAULT_RANGE, TA_SCORE_W, TA_CONFIRM, TA_DEFAULT_PROFILE, TA_PROFILE_TEXT,
 } from '../src/lib/ta.mjs';
 import { TREND_MA_DAYS } from '../src/lib/overlays.mjs';
 
@@ -310,11 +311,11 @@ test('기법 — 다이버전스는 피벗 봉에, 확인은 5봉 뒤. 확인 �
   r[20] = 35;
   const m = fakeModel(r, { div: [{ i: 20, from: 8, kind: 'bull', seenAt: 25 }] });
   assert.deepEqual(techEvents(m).map((e) => [e.i, e.kind, e.side, e.seenAt]), [[20, 'div', 'up', 25]]);
-  assert.equal(techNow(m, 24).head.side, null, '확인 전');
-  const t = techNow(m, 26);
+  assert.equal(techNow(m, 24, 'aggressive').head.side, null, '확인 전');
+  const t = techNow(m, 26, 'aggressive');
   assert.equal(t.head.side, 'up');
   assert.equal(t.head.text, '상승 쪽 조건 충족 ▲');
-  assert.match(t.sub, /^상승 다이버전스 · 6봉 전$/);
+  assert.equal(t.sub, '공격적 · 상승 다이버전스 · 1봉 전', '공격적은 확인된 봉(seenAt)에 바로 표시');
   assert.equal(t.rows[0].dir, 'up');
 });
 
@@ -322,9 +323,9 @@ test('기법 — 같은 쪽 조건이 겹치면 함께 적고, 20 이하까지 �
   const r = new Array(40).fill(50);
   r[10] = 28; r[11] = 18; r[12] = 40;
   const m = fakeModel(r, { div: [{ i: 11, from: 3, kind: 'bull', seenAt: 16 }] });
-  const t = techNow(m, 20);
-  assert.equal(t.head.strong, true);
-  assert.equal(t.sub, 'RSI 30 이하 + 상승 다이버전스 · 9봉 전 · RSI 가 20 이하까지 가 강함');
+  const t = techNow(m, 20, 'aggressive');
+  assert.equal(t.head.strong, true, '다이버전스 피벗 봉의 RSI 18');
+  assert.equal(t.sub, '공격적 · RSI 30 이하 + 상승 다이버전스 · 4봉 전 · RSI 가 20 이하까지 가 강함');
 });
 
 test('기법 — 슈퍼트렌드는 조건 뒤 같은 방향 전환만 본다(후순위)', () => {
@@ -333,18 +334,19 @@ test('기법 — 슈퍼트렌드는 조건 뒤 같은 방향 전환만 본다(�
   const dir = new Array(40).fill('down');
   for (let k = 14; k < 40; k += 1) dir[k] = 'up';
   const m = fakeModel(r, { st: { dir, flips: [{ i: 5, dir: 'down' }, { i: 14, dir: 'up' }], line: [] } });
-  const st = techNow(m, 20).rows[2];
-  assert.equal(st.value, '조건 뒤 상승 전환 ▲');
+  const st = techNow(m, 20, 'aggressive').rows[2];
+  assert.equal(st.value, '조건 뒤 상승 확인 ▲');
   assert.equal(st.note, '조건에서 4봉 뒤 · 6봉 전');
-  const before = techNow(m, 12).rows[2];
+  const before = techNow(m, 12, 'aggressive').rows[2];
   assert.equal(before.value, '조건 뒤 아직 상승 전환 없음');
 });
 
 test('기법 — 최근 30봉 안에 아무 조건도 없으면 그렇다고 적는다', () => {
-  const t = techNow(fakeModel(new Array(60).fill(55)));
+  const t = techNow(fakeModel(new Array(60).fill(55)), undefined, 'aggressive');
   assert.equal(t.head.side, null);
   assert.equal(t.head.text, '기법 조건 없음');
-  assert.match(t.sub, /최근 30봉 안에 RSI 30 이하 · 80 이상 · 다이버전스가 없습니다/);
+  assert.equal(t.sub, '공격적 · 최근 30봉 안에 종목 쫄탐 20 이하 · 80 이상, RSI 30 이하 · 80 이상, 다이버전스가 없습니다');
+  assert.match(techNow(fakeModel(new Array(60).fill(55))).sub, /^방어적 · /, '기본은 방어적');
 });
 
 test('종목 찾기 — 코드 · 이름 앞부분 · 초성 · 이름 가운데', () => {
@@ -365,7 +367,7 @@ test('종목 찾기 — 코드 · 이름 앞부분 · 초성 · 이름 가운데
   assert.deepEqual(taSearch('없는것', list), []);
 });
 
-test('한눈에 — 결론 한 줄 + 큰 숫자 칸 다섯(RSI · 다이버전스 한 칸), 방향은 ▲ ▼ 와 말로', async () => {
+test('한눈에 — 결론 한 줄 + 큰 숫자 칸 여섯(종목 쫄탐 · RSI · 다이버전스 한 칸), 방향은 ▲ ▼ 와 말로', async () => {
   const { taBoardHtml } = await import('../src/lib/taChart.mjs');
   const bars = Array.from({ length: 300 }, (_, i) => {
     const c = 100 + i * 0.3 + Math.sin(i / 6) * 6;
@@ -373,9 +375,12 @@ test('한눈에 — 결론 한 줄 + 큰 숫자 칸 다섯(RSI · 다이버전�
   });
   const m = taModel({ tf: '4h', bars });
   const b = taBoard(m);
-  assert.deepEqual(b.tiles.map((t) => t.key), ['rsi', 'st', 'ma', 'trend', 'obv'], 'RSI 와 다이버전스는 한 칸');
+  assert.deepEqual(b.tiles.map((t) => t.key), ['score', 'rsi', 'st', 'ma', 'trend', 'obv'], 'RSI 와 다이버전스는 한 칸');
   assert.deepEqual(b.mark, techNow(m).last ? { i: techNow(m).last.i, side: techNow(m).last.side } : null, '차트 표시는 결론에 쓴 조건과 같은 봉');
-  const rsi = b.tiles[0];
+  // 시장 쫄탐을 안 주면 종목 쫄탐은 '없음' 과 까닭 — 0 으로 채우지 않는다
+  assert.equal(b.tiles[0].big, '없음');
+  assert.equal(b.tiles[0].cap, '시장 쫄탐지수를 받지 못해 낼 수 없습니다');
+  const rsi = b.tiles[1];
   assert.equal(rsi.big, m.rsi[m.n - 1].toFixed(1), 'RSI 는 숫자를 크게');
   assert.deepEqual(rsi.bands, [20, 30, 80, 90]);
   assert.match(rsi.sub.big, /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/, '같은 칸 둘째 값이 다이버전스');
@@ -383,13 +388,13 @@ test('한눈에 — 결론 한 줄 + 큰 숫자 칸 다섯(RSI · 다이버전�
     if (t.dir) assert.match(t.big + t.cap, t.dir === 'up' ? /▲|＋/ : /▼|－/, `${t.key}: ${t.big} ${t.cap}`);
     assert.ok(t.big.length <= 8, `큰 값은 짧게 — ${t.key}: ${t.big}`);
   }
-  assert.match(b.tiles[3].big, /^[+−]?\d+\.\d%$/);
+  assert.match(b.tiles[4].big, /^[+−]?\d+\.\d%$/);
   const html = taBoardHtml(b);
   assert.match(html, /^<div class="ta-board"><div class="ta-verdict" data-side="(up|down|none)">/);
-  assert.equal((html.match(/class="ta-tile"/g) ?? []).length, 5);
+  assert.equal((html.match(/class="ta-tile"/g) ?? []).length, 6);
   assert.match(html, /<div class="ta-tile" data-k="rsi"[^>]*>.*<b class="ta-sub"[^>]*>(▲ 상승|▼ 하락|다이버전스 없음)/);
   assert.match(html, /<div class="ta-rsibar" aria-hidden="true">(<i class="(sl|l|m|h|sh)" style="width:\d+%"><\/i>){5}<em style="left:[\d.]+%"><\/em><\/div>/);
-  assert.match(html, /aria-label="① RSI 14 · 다이버전스: [\d.]+, [^"]*\. (▲ 상승|▼ 하락|다이버전스 없음)/);
+  assert.match(html, /aria-label="② RSI 14 · 다이버전스: [\d.]+, [^"]*\. (▲ 상승|▼ 하락|다이버전스 없음)/);
 });
 
 test('한눈에 — 값이 모자라면 "없음" 과 까닭, 지어내지 않는다', () => {
@@ -422,7 +427,8 @@ test('누른 봉의 숫자 — 세로선 · 종가와 RSI 꼬리표 · 숫자 �
   assert.equal((right.match(/class="ta-cross-tag"/g) ?? []).length, 2, '종가 · RSI 꼬리표');
   assert.match(right, new RegExp(`>${m.c[290].toFixed(2)}</text>`));
   assert.match(right, new RegExp(`>${m.rsi[290].toFixed(1)}</text>`));
-  for (const k of ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선']) assert.match(right, new RegExp(`class="ta-tip-l">${k}<`));
+  for (const k of ['종가', '시가', '고 · 저', '종목 쫄탐', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선']) assert.match(right, new RegExp(`class="ta-tip-l">${k}<`));
+  assert.match(right, /class="ta-tip-l">종목 쫄탐<\/text><text [^>]*class="ta-tip-v">없음</, '시장 쫄탐이 없으면 없음');
   const boxX = (svg) => Number(svg.match(/<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" height="[\d.]+" rx="8" class="ta-tip"/)[1]);
   assert.ok(boxX(right) < layout.W / 2, '오른쪽을 누르면 상자는 왼쪽');
   assert.ok(boxX(taCrossSvg(m, layout, 175, { price, stamp })) > layout.L + 20, '왼쪽을 누르면 상자는 오른쪽');
@@ -431,4 +437,124 @@ test('누른 봉의 숫자 — 세로선 · 종가와 RSI 꼬리표 · 숫자 �
   const short = taModel({ tf: '1d', bars: bars.slice(0, 80) });
   const s2 = taChartHtml(short, { from: 0, to: 79, width: 360 });
   assert.match(taCrossSvg(short, s2.layout, 70, { price, stamp }), /class="ta-tip-l">1년선<\/text><text [^>]*class="ta-tip-v">없음</);
+});
+
+/* ------------------------------ 종목 쫄탐 · 방어적 / 공격적 (2026-11-28) ------------------------------ */
+
+const DAY = 86_400_000;
+
+test('시장 쫄탐을 봉에 붙임 — 미국 일봉은 같은 날, 그 밖에는 전날까지(미리 당겨 쓰지 않음)', () => {
+  const mood = { t: [Date.UTC(2026, 0, 5, 6), Date.UTC(2026, 0, 6, 6), Date.UTC(2026, 0, 7, 6)], v: [10, null, 30] };
+  const bars = [Date.UTC(2026, 0, 6, 14, 30), Date.UTC(2026, 0, 7, 14, 30), Date.UTC(2026, 0, 8, 14, 30)].map((t) => ({ t }));
+  const off = -5 * 3600;
+  assert.deepEqual(moodForBars(bars, mood, true, off), [null, 30, 30], '같은 날: 6일은 산출 불가(null) 그대로, 7일은 30');
+  assert.deepEqual(moodForBars(bars, mood, false, off), [10, null, 30], '전날까지: 6일 봉은 5일 값, 7일 봉은 6일(산출 불가)');
+  // 5일보다 오래 비면 쓰지 않는다
+  assert.deepEqual(moodForBars([{ t: Date.UTC(2026, 0, 20, 14) }], mood, false, off), [null]);
+  assert.deepEqual(moodForBars(bars, null), [null, null, null], '시장 쫄탐이 없으면 모두 없음');
+});
+
+test('백분위 — 창 안에서 가장 낮으면 0, 가장 높으면 100, 같은 값은 가운데, 표본이 모자라면 없음', () => {
+  assert.deepEqual(pctRank([1, 2, 3], 3, 2), [null, 100, 100]);
+  assert.deepEqual(pctRank([3, 2, 1], 3, 2), [null, 0, 0]);
+  assert.deepEqual(pctRank([5, 5, 5], 3, 2), [null, 50, 50]);
+  assert.deepEqual(pctRank([1, 2, 3, 0], 2, 2), [null, 100, 100, 0], '창 밖 값은 보지 않음');
+  assert.deepEqual(pctRank([1, null, 3], 3, 3), [null, null, null]);
+});
+
+test('종목 쫄탐 — 시장 40 · RSI 30 · 1년선 15 · OBV 15, 시장 · RSI 가 없으면 내지 않음', () => {
+  assert.deepEqual(TA_SCORE_W, { mood: 40, rsi: 30, gap: 15, obv: 15 });
+  const s = taScore({ mood: [10, 10, null, 50], rsi: [30, 30, 30, null], gap: [100, null, 100, 50], obv: [0, null, 0, 50] });
+  assert.ok(close(s.v[0], (10 * 40 + 30 * 30 + 100 * 15 + 0 * 15) / 100, 1e-9));
+  assert.ok(close(s.v[1], (10 * 40 + 30 * 30) / 70, 1e-9), '1년선 · OBV 가 없으면 남은 비중으로');
+  assert.equal(s.v[2], null, '시장 쫄탐 없음');
+  assert.equal(s.v[3], null, 'RSI 없음');
+  assert.deepEqual(s.used, [4, 2, 0, 0]);
+});
+
+/** 종목 쫄탐 · RSI · 슈퍼트렌드를 직접 넣은 가짜 모델 */
+function scoreModel({ score, rsi: r, st }) {
+  const n = score.length;
+  return {
+    tf: '4h', n, rsi: r, div: [], score: { v: score },
+    st: { dir: st ?? new Array(n).fill('down'), flips: [], line: new Array(n).fill(null) },
+  };
+}
+
+test('공격적 — 종목 쫄탐 20 이하 또는 RSI 30 이하가 시작된 봉에 바로', () => {
+  const score = [50, 18, 18, 50, 50, 50, 85, 50];
+  const r = [50, 50, 50, 50, 28, 50, 50, 50];
+  const sig = taSignals(scoreModel({ score, rsi: r }), 'aggressive');
+  assert.deepEqual(sig.list.map((e) => [e.i, e.side, e.why.join('+')]), [[1, 'up', 'score'], [4, 'up', 'rsi'], [6, 'down', 'score']]);
+  assert.equal(sig.pending, null);
+});
+
+test('방어적 — 둘 다 닿은 뒤 슈퍼트렌드가 같은 쪽인 첫 봉에, 창 안에 없으면 표시하지 않음', () => {
+  const n = 60;
+  const score = new Array(n).fill(50);
+  const r = new Array(n).fill(50);
+  score[5] = 15; r[5] = 25; // 둘 다
+  score[30] = 15; // 하나만 — 방어적에서는 조건이 아님
+  const st = new Array(n).fill('down');
+  for (let k = 9; k < n; k += 1) st[k] = 'up';
+  const m = scoreModel({ score, rsi: r, st });
+  const def = taSignals(m, 'defensive');
+  assert.deepEqual(def.list.map((e) => [e.i, e.setup, e.side]), [[9, 5, 'up']], '조건은 5봉, 표시는 슈퍼트렌드가 상승인 9봉');
+  assert.equal(taSignals(m, 'aggressive').list.length, 2, '공격적은 하나만 닿아도');
+  // 슈퍼트렌드가 창(TA_CONFIRM 봉) 안에 같은 쪽이 안 되면 표시하지 않는다
+  const never = taSignals(scoreModel({ score, rsi: r }), 'defensive');
+  assert.deepEqual(never.list, []);
+  assert.equal(never.pending, null, '창이 이미 지났으면 기다리지도 않는다');
+});
+
+test('방어적 — 마지막 봉 가까이 생긴 조건은 "추세 확인 전" 으로 적고 차트에 붙이지 않음', () => {
+  const n = 40;
+  const score = new Array(n).fill(50);
+  const r = new Array(n).fill(50);
+  score[n - 3] = 12; r[n - 3] = 22;
+  const m = scoreModel({ score, rsi: r });
+  const sig = taSignals(m, 'defensive');
+  assert.deepEqual(sig.list, []);
+  assert.deepEqual(sig.pending, { setup: n - 3, side: 'up', why: ['score', 'rsi'] });
+  const t = techNow(m, n - 1, 'defensive');
+  assert.equal(t.head.side, null);
+  assert.equal(t.head.text, '상승 쪽 조건 · 추세 확인 전');
+  assert.equal(t.sub, '방어적 · 종목 쫄탐 20 이하 + RSI 30 이하 2봉 전 · 슈퍼트렌드가 상승이 되면 표시합니다');
+  assert.ok(TA_CONFIRM >= 10);
+});
+
+test('실제 모델 — 시장 쫄탐을 주면 종목 쫄탐 칸 · 재료 줄이 채워지고, 방어적 표시는 공격적보다 적다', async () => {
+  const { taChartHtml, taBoardHtml } = await import('../src/lib/taChart.mjs');
+  const n = 420;
+  const bars = Array.from({ length: n }, (_, i) => {
+    const c = 100 + Math.sin(i / 9) * 14 + i * 0.05;
+    return { t: Date.UTC(2025, 0, 1, 14) + i * DAY, o: c - 0.4, h: c + 1.2, l: c - 1.2, c, v: 1000 + (i % 7) * 50 };
+  });
+  const mood = { t: bars.map((b) => b.t - 8 * 3600_000), v: bars.map((_, i) => 50 + Math.sin(i / 20) * 45) };
+  const m = taModel({ tf: '1d', bars, gmtoffset: -5 * 3600, market: 'us', mood });
+  const last = m.n - 1;
+  assert.ok(Number.isFinite(m.score.v[last]));
+  assert.ok(m.score.v.every((x) => x === null || (x >= 0 && x <= 100)), '0~100 안');
+  const agg = taSignals(m, 'aggressive').list.length;
+  const def = taSignals(m, 'defensive').list.length;
+  assert.ok(agg > 0 && def <= agg, `공격적 ${agg} · 방어적 ${def}`);
+  const b = taBoard(m, undefined, 'aggressive');
+  assert.equal(b.tiles[0].big, String(Math.round(m.score.v[last])));
+  assert.match(b.tiles[0].note, /^시장 \d+ · RSI \d+ · 1년선 (\d+|없음) · OBV (\d+|없음)$/);
+  assert.equal(b.profile, 'aggressive');
+  assert.match(taBoardHtml(b), /<span class="ta-parts">시장 \d+/);
+  // 차트 — 표시 봉마다 ▲ ▼ (점이 아니라 삼각형), 개수 줄, 종목 쫄탐 칸
+  const out = taChartHtml(m, { from: n - 200, to: last, width: 360, signals: b.signals, mark: b.mark, profileText: TA_PROFILE_TEXT.aggressive });
+  const inView = b.signals.filter((e) => e.i >= n - 200).length;
+  assert.equal((out.html.match(/class="ta-sig( ta-sig-strong)?"/g) ?? []).length, inView);
+  assert.equal(out.counts.up + out.counts.down, inView);
+  assert.ok(!/<circle /.test(out.html), '점(●) 없음');
+  assert.match(out.html, new RegExp(`<p class="ta-count">보이는 구간 · 공격적 · 상승 쪽 조건 ${out.counts.up}번 · 하락 쪽 조건 ${out.counts.down}번</p>`));
+  assert.match(out.html, /class="ta-ptitle">종목 쫄탐 · \d+</);
+  assert.equal(TA_DEFAULT_PROFILE, 'defensive');
+});
+
+test('종목 쫄탐 · 성향 문구에 매수 · 매도 말이 없음', () => {
+  const said = JSON.stringify([TA_TEXT.techSteps, TA_TEXT.methods, TA_TEXT.profileHint, TA_TEXT.markNote, TA_TEXT.lede, TA_PROFILE_TEXT]);
+  assert.ok(!/매수|매도|사세요|파세요|진입|청산|목표가|손절|익절/.test(said));
 });

@@ -27,7 +27,7 @@ export function HomeMoodCard({ score, mode }: { score: FngScore; mode: DataMode 
   const style = { '--ink': scoreColor(mood?.score) } as CSSProperties;
   const chips = overlayChips(score.overlayNow);
   return (
-    <article className="card mood-cover p-3" style={style} aria-label="미국 쫄탐지수">
+    <article className="card mood-cover" style={style} aria-label="미국 쫄탐지수">
       <header><h3>미국 쫄탐지수</h3><ModeBadge mode={mode} size="xs" /></header>
       <MoodGauge score={score.score} deltaDay={score.deltaDay} />
       {!mood && <p className="mood-na-why">{score.unavailableReason ?? '점수를 계산할 데이터가 부족합니다.'}</p>}

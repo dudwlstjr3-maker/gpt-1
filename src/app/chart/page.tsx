@@ -341,13 +341,6 @@ export default function ChartPage() {
             <h2 id="ta-chart-title">
               차트 <small>{unit} · 봉 {view.to - view.from + 1}개</small>
             </h2>
-            <div className="ta-ranges" role="group" aria-label="보이는 구간">
-              {TA_RANGES[data.tf].map(([k, label]) => (
-                <button key={k} type="button" aria-pressed={range === k} onClick={() => { setRange(k); moveCross(null); }}>
-                  {label}
-                </button>
-              ))}
-            </div>
             <p className="ta-read" aria-live="polite">
               {shown !== null ? `${view.stamp(model.t[shown])} · ${taReadout(model, shown, view.price)}` : ''}
             </p>
@@ -362,6 +355,14 @@ export default function ChartPage() {
               onKeyDown={onKey}
               dangerouslySetInnerHTML={view.chartInner}
             />
+            {/* 보이는 구간은 차트 바로 아래 (2026-11-28 토스증권 느낌) */}
+            <div className="ta-ranges" role="group" aria-label="보이는 구간">
+              {TA_RANGES[data.tf].map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={range === k} onClick={() => { setRange(k); moveCross(null); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <p className="ta-note">{TA_TEXT.markNote}</p>
           </section>
 

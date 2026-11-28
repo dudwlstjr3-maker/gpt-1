@@ -1,10 +1,6 @@
-.mood-home {
-  display: flow-root;
-  background:
-    radial-gradient(ellipse 80% 26rem at var(--mood-position, 50%) 0,
-      color-mix(in srgb, var(--mood-ink, transparent) 24%, transparent), transparent 96%);
-}
-.mood-home .card.mood-cover {
+/* 홈 바탕 — 2026-11-28 토스증권 느낌으로 바꾸며 단계 색 빛 번짐을 걷었다. 색은 계기판과 '쫄?' 글자에만 남긴다 */
+.mood-home { display: flow-root; }
+.card.mood-cover {
   border-top: 3px solid var(--mood-ink, var(--border));
   background:
     radial-gradient(ellipse 90% 85% at var(--mood-position, 50%) 0,
@@ -140,5 +136,56 @@
   outline: 2px solid var(--ink, var(--fg-strong));
   outline-offset: 2px;
 }
-.home-fold { margin: 12px 0 0; border-top: 1px solid var(--border); }
-.home-fold > summary { padding: 14px 12px; color: var(--fg-strong); font-size: 15px; font-weight: 650; cursor: pointer; }
+
+/* ---- 홈 1면 — 토스증권 느낌 (2026-11-28 "다른 공탐지수나 주식 거래 사이트 참고해서 디자인 바꿔보자")
+   평평한 카드 하나: 빛 번짐 · 그러데이션 · 테두리 없이, 큰 숫자 하나를 맨 위에, 함께 보는 두 가지는 목록 줄로.
+   심리 상세의 요약 카드(mood-cover)는 그대로 두려고 .mood-home 아래로만 건다. ---- */
+.mood-home .card.mood-cover { border: 0; background: var(--surface); padding: 20px 20px 16px; }
+.mood-home .mood-cover::before { content: none; }
+.mood-home .mood-cover header h3 { font-size: 17px; font-weight: 700; color: var(--fg); }
+/* 홈에서만 숫자를 계기판 위로 — 지수 탭 · 심리 상세는 계기판이 먼저인 그대로 */
+.mood-home .mood-gauge { max-width: none; display: flex; flex-direction: column; }
+.mood-home .mood-reading { order: -2; min-height: 0; margin-top: 12px; justify-content: flex-start; gap: 4px 16px; }
+.mood-home .mood-score { order: -1; font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--fg-strong); }
+.mood-home .mood-score small { font-size: 16px; font-weight: 600; color: var(--muted-fg, var(--muted)); }
+.mood-home .mood-change { order: -1; margin-top: 8px; gap: 4px 8px; font-size: 16px; }
+.mood-home .mood-change b { font-weight: 750; }
+.mood-home .mood-delta { padding: 0; border: 0; border-radius: 0; background: none; color: var(--fg); font-size: 16px; font-weight: 600; }
+.mood-home .mood-dial { width: min(100%, 280px); margin: 20px auto 0; }
+/* 함께 보는 두 가지 — 이름은 왼쪽, 값은 오른쪽. 줄 전체가 한 링크라 › 하나를 두 줄 가운데에 */
+.mood-home .mood-chips { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; margin-top: 16px; border-top: 1px solid var(--border); }
+.mood-home .mood-chip { grid-column: 1; align-items: baseline; gap: 2px 8px; padding: 14px 0; border: 0; border-radius: 0; background: none; }
+.mood-home .mood-chip + .mood-chip { border-top: 1px solid var(--border); }
+.mood-home .mood-chip small { flex: 1 1 auto; font-size: 15px; color: var(--muted-fg, var(--muted)); }
+.mood-home .mood-chip b { font-size: 17px; }
+.mood-home .mood-chip-sub { font-size: 14px; }
+.mood-home .mood-chips-go { grid-column: 2; grid-row: 1 / span 2; font-size: 24px; }
+.mood-home .mood-chips:focus-visible { border-radius: var(--box-radius-sm); }
+/* 이유 보기 — 카드 폭 그대로의 낮은 버튼, 산출 시각은 그 아래 작게 */
+.mood-home .mood-cover footer { margin-top: 8px; padding: 0; border-top: 0; flex-direction: column-reverse; align-items: stretch; gap: 8px; text-align: center; }
+.mood-home .mood-cover footer :is(a,button) { justify-content: center; min-height: 52px; margin: 0; border: 0; border-radius: var(--box-radius); background: var(--surface-2); font-size: 16px; }
+.mood-home .mood-cover footer :is(a,button):hover { background: var(--surface-3); }
+
+/* 접힌 두 절 — 눌러서 펼치는 넓은 줄 */
+.home-fold { margin: 12px 0 0; }
+.home-fold > summary {
+  min-height: 56px;
+  margin: 0 12px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: var(--box-radius);
+  background: var(--surface);
+  color: var(--fg-strong);
+  font-size: 17px;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+.home-fold > summary::-webkit-details-marker { display: none; }
+.home-fold > summary::after { content: '펼치기 ▾'; font-size: 13px; font-weight: 500; color: var(--muted-fg, var(--muted)); }
+.home-fold[open] > summary::after { content: '접기 ▴'; }
+.home-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home-fold[open] > summary { margin-bottom: 4px; }

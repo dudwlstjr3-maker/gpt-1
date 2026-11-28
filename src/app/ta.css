@@ -2,22 +2,24 @@
    미리보기는 tools/preview/build.mjs 가 이 파일을 그대로 끼워 넣는다(__TA_CSS__).
    그림(SVG) · 기법 카드 · 지금 상태 표 · 검색 추천은 src/lib/taChart.mjs 가 만든다.
    오름 · 내림 색은 등락 색 설정(한국식 · 해외식)을 따르고, 뜻은 ▲ ▼ 와 말로도 전한다.
-   글자는 12px 아래로 내리지 않는다. 누를 자리는 32px 이상. 간격은 4px 격자. */
+   글자는 12px 아래로 내리지 않는다. 누를 자리는 32px 이상. 간격은 4px 격자.
+   2026-11-28 토스증권 느낌: 테두리 대신 채움, 고른 것은 뒤집은 색(진한 바탕 · 밝은 글자), 가격은 크게 한 줄,
+   보이는 구간은 차트 바로 아래. 표시가 달라졌을 뿐 계산 · 문구는 그대로다. */
 
-.ta { padding: 8px 12px 0; display: grid; gap: 16px; }
+.ta { padding: 8px 12px 0; display: grid; gap: 24px; }
 .ta-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ta-head h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--fg-strong); }
+.ta-head h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--fg-strong); }
 .ta-lede { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--muted-fg); word-break: keep-all; }
 
 /* 고르기 */
-.ta-pick { display: grid; gap: 8px; }
+.ta-pick { display: grid; gap: 12px; }
 .ta-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.ta-seg { display: inline-flex; border-radius: var(--box-radius); background: var(--surface); padding: 4px; gap: 4px; }
+.ta-seg { display: inline-flex; border-radius: 99px; background: var(--surface); padding: 4px; gap: 4px; }
 .ta-seg button {
-  min-height: 32px; padding: 0 12px; border: 0; border-radius: calc(var(--box-radius) - 2px); background: transparent;
-  color: var(--muted-fg); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  min-height: 36px; padding: 0 16px; border: 0; border-radius: 99px; background: transparent;
+  color: var(--muted-fg); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
-.ta-seg button[aria-pressed="true"] { background: var(--surface-2, var(--bg-elevated)); color: var(--fg-strong); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.ta-seg button[aria-pressed="true"] { background: var(--fg-strong); color: var(--bg); }
 .ta-select, .ta-code input {
   min-height: 40px; padding: 0 12px; border-radius: var(--box-radius); border: 1px solid var(--border); background: var(--surface);
   color: var(--fg-strong); font: inherit; font-size: 15px;
@@ -34,27 +36,29 @@
 .ta-chart:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
 
 /* 이름 · 값 · 출처 */
+/* 이름 한 줄 → 가격 크게 한 줄 → 등락 한 줄 */
 .ta-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-.ta-title b { font-size: 20px; color: var(--fg-strong); }
-.ta-title .ta-code-tag { font-size: 12.5px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
-.ta-title .ta-last { margin-left: auto; font-size: 24px; font-weight: 800; color: var(--fg-strong); font-variant-numeric: tabular-nums; }
-.ta-title .ta-chg { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.ta-title .ta-chg small { font-size: 12px; font-weight: 500; color: var(--muted-fg); }
+.ta-title b { font-size: 18px; font-weight: 700; color: var(--fg); }
+.ta-title .ta-code-tag { font-size: 13px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
+.ta-title .ta-last { flex-basis: 100%; margin-top: 2px; font-size: 36px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; color: var(--fg-strong); font-variant-numeric: tabular-nums; }
+.ta-title .ta-chg { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ta-title .ta-chg small { font-size: 13px; font-weight: 500; color: var(--muted-fg); }
 .ta-src { margin: 4px 0 0; font-size: 12px; color: var(--muted-fg); word-break: keep-all; }
 .ta-mood {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 8px 12px;
-  border-radius: var(--box-radius); background: var(--surface); color: var(--fg); font-size: 13.5px; text-decoration: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; padding: 8px 16px;
+  border-radius: var(--box-radius); background: var(--surface); color: var(--fg); font-size: 15px; text-decoration: none;
 }
 .ta-mood b { font-variant-numeric: tabular-nums; color: var(--fg-strong); }
 .ta-mood small { display: block; font-size: 12px; color: var(--muted-fg); }
 
 /* 차트 */
-.ta-ranges { display: flex; gap: 4px; flex-wrap: wrap; }
+/* 보이는 구간 — 차트 바로 아래, 폭을 나눠 가진 낮은 버튼 */
+.ta-ranges { display: flex; gap: 4px; }
 .ta-ranges button {
-  min-height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent;
-  color: var(--fg); font: inherit; font-size: 12.5px; cursor: pointer;
+  flex: 1 1 0; min-height: 36px; padding: 0 8px; border-radius: 99px; border: 0; background: transparent;
+  color: var(--muted-fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
-.ta-ranges button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg-strong); font-weight: 700; }
+.ta-ranges button[aria-pressed="true"] { background: var(--fg-strong); color: var(--bg); font-weight: 700; }
 .ta-ranges button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ta-chart { position: relative; touch-action: pan-y; border-radius: var(--box-radius); background: var(--surface); padding: 8px 0 4px; }
 .ta-svg { display: block; max-width: 100%; height: auto; }
@@ -87,6 +91,11 @@
 .ta-obv { opacity: .85; }
 .ta-cross { stroke: var(--fg); stroke-width: 1; opacity: .7; }
 .ta-note { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted-fg); word-break: keep-all; }
+/* 절 제목 — 크게, 곁말은 옅게 */
+.ta-sec { display: grid; gap: 12px; }
+.ta-sec > h2 { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: var(--fg-strong); }
+.ta-sec > h2 small { font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--muted-fg); }
+.ta-sec > .ta-ranges { margin-top: -4px; }
 
 /* 산출 방법 */
 .ta-fold > summary { min-height: 40px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 750; color: var(--fg-strong); cursor: pointer; }
@@ -102,12 +111,13 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 /* 종목 찾기 */
 .ta-search { display: flex; gap: 8px; }
 .ta-search input {
-  flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: var(--box-radius); border: 1px solid var(--border-strong, var(--border));
+  flex: 1; min-width: 0; min-height: 48px; padding: 0 20px; border-radius: 99px; border: 1px solid var(--border);
   background: var(--surface); color: var(--fg-strong); font: inherit; font-size: 16px;
 }
+.ta-search input::placeholder { color: var(--muted-fg); }
 .ta-search button {
-  min-height: 44px; padding: 0 16px; border-radius: var(--box-radius); border: 1px solid var(--border); background: var(--surface);
-  color: var(--fg-strong); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  min-height: 48px; padding: 0 20px; border-radius: 99px; border: 0; background: var(--fg-strong);
+  color: var(--bg); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .ta-search input:focus-visible, .ta-search button:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
 .ta-sug { margin: 0; padding: 4px; list-style: none; border-radius: var(--box-radius); background: var(--surface); display: grid; gap: 2px; }
@@ -118,12 +128,12 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 .ta-sug button:hover, .ta-sug button:focus-visible { background: var(--surface-2, var(--bg-elevated)); outline: none; }
 .ta-sug b { font-weight: 700; color: var(--fg-strong); }
 .ta-sug span { font-size: 12.5px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
-.ta-quick { display: flex; gap: 4px; flex-wrap: wrap; }
+.ta-quick { display: flex; gap: 8px; flex-wrap: wrap; }
 .ta-quick button {
-  min-height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--border); background: transparent;
-  color: var(--fg); font: inherit; font-size: 12.5px; cursor: pointer;
+  min-height: 36px; padding: 0 14px; border-radius: 99px; border: 0; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
 }
-.ta-quick button[aria-pressed="true"] { border-color: var(--accent); color: var(--fg-strong); font-weight: 700; }
+.ta-quick button[aria-pressed="true"] { background: var(--fg-strong); color: var(--bg); font-weight: 700; }
 .ta-quick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 운영자 기법 — 보는 순서 */
@@ -141,19 +151,18 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 
 /* 지금 상태 — 결론 한 줄 + 큰 숫자 칸 (2026-11-27 "숫자들은 크게") */
 .ta-board { display: grid; gap: 8px; }
-.ta-verdict { padding: 12px; border-radius: var(--box-radius); background: var(--surface); }
-.ta-verdict[data-side="up"] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ta-up) 60%, transparent); }
-.ta-verdict[data-side="down"] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ta-down) 60%, transparent); }
+/* 결론 — 테두리 없이 글자색 · ▲▼ · 말로 (색만으로 전하지 않는다) */
+.ta-verdict { padding: 20px 16px; border-radius: var(--box-radius); background: var(--surface); }
 .ta-vhead { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ta-vhead b { font-size: 22px; font-weight: 800; line-height: 1.25; color: var(--fg-strong); }
+.ta-vhead b { font-size: 24px; font-weight: 800; line-height: 1.25; letter-spacing: -.01em; color: var(--fg-strong); }
 .ta-strong { padding: 0 8px; border-radius: 99px; border: 1px solid currentColor; font-size: 13px; font-weight: 800; color: var(--fg-strong); }
-.ta-vsub { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--fg); word-break: keep-all; }
+.ta-vsub { margin: 6px 0 0; font-size: 15px; line-height: 1.5; color: var(--fg); word-break: keep-all; }
 .ta-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.ta-tile { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: var(--box-radius); background: var(--surface); }
-.ta-tl { font-size: 12.5px; font-weight: 600; color: var(--muted-fg); }
+.ta-tile { min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: var(--box-radius); background: var(--surface); }
+.ta-tl { font-size: 13px; font-weight: 600; color: var(--muted-fg); }
 .ta-big { font-size: 28px; line-height: 1.1; font-weight: 800; color: var(--fg-strong); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
 .ta-tile[data-k="rsi"] .ta-big { font-size: 40px; }
-.ta-cap { font-size: 12.5px; line-height: 1.45; color: var(--fg); word-break: keep-all; }
+.ta-cap { font-size: 13px; line-height: 1.45; color: var(--fg); word-break: keep-all; }
 .ta-rsibar { position: relative; display: flex; height: 8px; margin: 4px 0 2px; }
 .ta-rsibar i { display: block; height: 100%; }
 .ta-rsibar .sl { border-radius: 99px 0 0 99px; background: color-mix(in srgb, var(--ta-up) 80%, transparent); }

@@ -4907,9 +4907,10 @@ function taChartHtml(m, opt) {
   // 패널 자리
   // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리
   const P = { top: 32, h: 220 };
-  const RS = { top: P.top + P.h + 26, h: 84 };
-  const OB = { top: RS.top + RS.h + 26, h: 64 };
-  const H = OB.top + OB.h + 24;
+  // 2026-11-28 사용자: "밑에 보조 지표가 너무 꼴보기 싫은데 … 아래에는 한칸에다가 신호 표시만"
+  // → 종목 쫄탐 · RSI · OBV 칸을 걷고, 가격 아래 신호 줄 하나만. 숫자는 줄 제목 · 누른 봉 줄 · '지금' 줄에 글로
+  const SG = { top: P.top + P.h + 26, h: 30 };
+  const H = SG.top + SG.h + 24;
 
   /* ---------- 가격 패널 ---------- */
   let lo = Infinity;
@@ -4928,9 +4929,9 @@ function taChartHtml(m, opt) {
   const parts = [];
   for(let j=0;j<4;j++){
     const gx=x(Math.round(from+(count-1)*(j+.5)/4));
-    parts.push(`<line x1="${gx}" x2="${gx}" y1="${P.top}" y2="${OB.top+OB.h}" class="session-grid"/>`);
+    parts.push(`<line x1="${gx}" x2="${gx}" y1="${P.top}" y2="${SG.top+SG.h}" class="session-grid"/>`);
   }
-  for(const y of [RS.top-24,OB.top-24]){
+  for(const y of [SG.top-24]){
     parts.push(`<line x1="0" x2="${W}" y1="${y}" y2="${y}" class="pane-edge"/>`);
   }
   parts.push(`<line x1="${L+plotW+1}" x2="${L+plotW+1}" y1="0" y2="${H-20}" class="pane-edge"/>`);
@@ -4999,19 +5000,19 @@ function taChartHtml(m, opt) {
     for(const signal of opt.signals.slice(0,-1)){
       const buy=signal.side==='up';
       const y=py(buy?m.l[signal.seenAt]:m.h[signal.seenAt])+(buy?5:-5);
-      parts.push(`<path transform="translate(${x(signal.seenAt)} ${y})" d="${buy?'M0 -3l3 6h-6Z':'M0 3l3 -6h-6Z'}" fill="${buy?up:down}"><title>${buy?'매수':'매도'}</title></path>`);
+      parts.push(`<path transform="translate(${x(signal.seenAt)} ${y})" d="${buy?'M0 -4l4 8h-8Z':'M0 4l4 -8h-8Z'}" fill="${buy?up:down}" class="ta-sig"><title>${buy?'상승 쪽 조건':'하락 쪽 조건'}</title></path>`);
     }
     if (mk && mk.seenAt >= from && mk.seenAt <= to) {
       marked = true;
       const xc = r1(x(mk.seenAt));
       const col = mk.side === 'up' ? up : down;
-      parts.push(`<line x1="${xc}" x2="${xc}" y1="${P.top - 4}" y2="${RS.top + RS.h}" class="ta-mark" style="stroke:${col}"/>`);
-      const tw = 50;
+      parts.push(`<line x1="${xc}" x2="${xc}" y1="${P.top - 4}" y2="${SG.top + SG.h}" class="ta-mark" style="stroke:${col}"/>`);
+      const tw = 92;
       const tx = Math.max(L + tw / 2, Math.min(L + plotW - tw / 2, xc));
       parts.push(`<rect x="${r1(tx - tw / 2)}" y="4" width="${tw}" height="22" rx="11" style="fill:${col}"/>`);
-      parts.push(`<text x="${r1(tx)}" y="19.5" text-anchor="middle" class="ta-mark-tag">${mk.side === 'up' ? '매수' : '매도'}</text>`);
+      parts.push(`<text x="${r1(tx)}" y="19.5" text-anchor="middle" class="ta-mark-tag">${mk.side === 'up' ? '▲ 상승 쪽' : '▼ 하락 쪽'}</text>`);
     } else {
-      parts.push(`<text x="${L}" y="19" class="ta-axis">신호 없음</text>`);
+      parts.push(`<text x="${L}" y="19" class="ta-axis">기법 조건 없음</text>`);
     }
   }
 
@@ -5025,61 +5026,40 @@ function taChartHtml(m, opt) {
     parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-lastval">${esc(price(last))}</text>`);
   }
 
-  /* ---------- RSI 패널 ---------- */
-  const ry = (v) => RS.top + (1 - v / 100) * RS.h;
-  parts.push(`<text x="${L}" y="${RS.top - 8}" class="ta-ptitle" data-ref-rsi>RSI 14${fin(m.rsi[to]) ? ` · ${m.rsi[to].toFixed(1)}` : ''}</text>`);
-  // 운영자 기준 — 80 과열 · 30 침체(글자), 90 · 20 강함(흐린 선)
-  const hiL = opt.rsiHigh ?? 80;
-  const loL = opt.rsiLow ?? 30;
-  parts.push(`<rect x="${L}" y="${r1(ry(hiL))}" width="${plotW}" height="${r1(ry(loL) - ry(hiL))}" class="ta-band"/>`);
-  for (const v of [opt.rsiStrongHigh ?? 90, opt.rsiStrongLow ?? 20]) {
-    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref ta-ref-strong"/>`);
-  }
-  for (const v of [hiL, loL]) {
-    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref"/>`);
-    parts.push(`<text x="${W - 4}" y="${r1(ry(v)) + 4}" text-anchor="end" class="ta-axis">${v}</text>`);
-  }
+  /* ---------- 신호 줄 (2026-11-28) ---------- */
+  // 칠한 곳: 종목 쫄탐 20 이하 · RSI 30 이하(상승 쪽 색), 종목 쫄탐 80 이상 · RSI 80 이상(하락 쪽 색).
+  // 하나만이면 옅게, 둘 다면 진하게. ▲ ▼ 는 다이버전스(피벗 봉). 값이 없는 봉은 칠하지 않는다(0 으로 보지 않음).
+  const sv = opt.score ?? [];
+  const obvSign = (v) => (fin(v) ? (v > 0 ? '＋' : v < 0 ? '－' : '0') : '—');
+  parts.push(`<text x="${L}" y="${SG.top - 8}" class="ta-ptitle" data-ref-sig>신호 · 쫄탐 ${fin(sv[to]) ? Math.round(sv[to]) : '—'} · RSI ${fin(m.rsi[to]) ? m.rsi[to].toFixed(1) : '—'} · OBV ${obvSign(m.obv.ok ? m.obv.osc[to] : null)}</text>`);
+  parts.push(`<rect x="${L}" y="${SG.top}" width="${plotW}" height="${SG.h}" class="ta-strip"/>`);
   {
-    const d = linePath(m.rsi, from, to, x, ry);
-    if (d) parts.push(`<path d="${d}" class="ta-line ta-rsi"/>`);
+    const level = (i) => {
+      const sc = sv[i], r = m.rsi[i];
+      const u = (fin(sc) && sc <= 20 ? 1 : 0) + (fin(r) && r <= 30 ? 1 : 0);
+      const dn = (fin(sc) && sc >= 80 ? 1 : 0) + (fin(r) && r >= 80 ? 1 : 0);
+      return u > 0 ? 'up' + u : dn > 0 ? 'down' + dn : '';
+    };
+    let runStart = null, runKey = '';
+    const flush = (endIdx) => {
+      if (!runKey) return;
+      const side = runKey.startsWith('up') ? 'up' : 'down';
+      const both = runKey.endsWith('2');
+      const x0 = Math.max(L, x(runStart) - step / 2), x1 = Math.min(L + plotW, x(endIdx) + step / 2);
+      parts.push(`<rect x="${r1(x0)}" y="${SG.top}" width="${r1(Math.max(1, x1 - x0))}" height="${SG.h}" class="ta-strip-on${both ? ' both' : ''}" style="fill:${side === 'up' ? up : down}"/>`);
+    };
+    for (let i = from; i <= to; i += 1) {
+      const k = level(i);
+      if (k !== runKey) { flush(i - 1); runStart = i; runKey = k; }
+    }
+    flush(to);
   }
-  // 다이버전스 — 두 피벗을 잇는 점선과 ▲ / ▼
   let divCount = 0;
   for (const dv of m.div) {
-    if (dv.i < from || dv.from < from || dv.i > to) continue;
+    if (dv.i < from || dv.i > to) continue;
     divCount += 1;
     const col = dv.kind === 'bull' ? up : down;
-    parts.push(`<line x1="${r1(x(dv.from))}" y1="${r1(ry(m.rsi[dv.from]))}" x2="${r1(x(dv.i))}" y2="${r1(ry(m.rsi[dv.i]))}" class="ta-div" style="stroke:${col}"/>`);
-    const yy = dv.kind === 'bull' ? Math.min(RS.top + RS.h + 12, ry(m.rsi[dv.i]) + 14) : Math.max(RS.top - 1, ry(m.rsi[dv.i]) - 5);
-    parts.push(`<text x="${r1(x(dv.i))}" y="${r1(yy)}" text-anchor="middle" class="ta-flip" style="fill:${col}">${dv.kind === 'bull' ? '▲' : '▼'}</text>`);
-  }
-
-  /* ---------- OBV 패널 ---------- */
-  if (m.obv.ok) {
-    let amax = 0;
-    for (let i = from; i <= to; i += 1) { const v = m.obv.osc[i]; if (fin(v)) amax = Math.max(amax, Math.abs(v)); }
-    const oy = (v) => OB.top + OB.h / 2 - (amax ? (v / amax) * (OB.h / 2) : 0);
-    const now = m.obv.osc[to];
-    parts.push(`<text x="${L}" y="${OB.top - 8}" class="ta-ptitle" data-ref-obv>OBV 오실레이터${fin(now) ? ` · ${now > 0 ? '＋' : now < 0 ? '－' : '0'}` : ''}</text>`);
-    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(oy(0))}" y2="${r1(oy(0))}" class="ta-ref"/>`);
-    parts.push(`<text x="${W - 4}" y="${r1(oy(0)) + 4}" text-anchor="end" class="ta-axis">0</text>`);
-    // 0 위 · 아래를 막대로 — 위는 오름 색, 아래는 내림 색. 부호는 제목의 ＋ / － 로도 적는다.
-    let pos = '';
-    let neg = '';
-    const ow = Math.max(1, step * 0.8);
-    for (let i = from; i <= to; i += 1) {
-      const v = m.obv.osc[i];
-      if (!fin(v) || v === 0) continue;
-      const y0 = oy(0);
-      const y1 = oy(v);
-      const seg = `M${r1(x(i) - ow / 2)} ${r1(Math.min(y0, y1))}h${r1(ow)}v${r1(Math.max(0.5, Math.abs(y1 - y0)))}h${r1(-ow)}Z`;
-      if (v > 0) pos += seg; else neg += seg;
-    }
-    if (pos) parts.push(`<path d="${pos}" style="fill:${up}" class="ta-obv"/>`);
-    if (neg) parts.push(`<path d="${neg}" style="fill:${down}" class="ta-obv"/>`);
-  } else {
-    parts.push(`<text x="${L}" y="${OB.top - 8}" class="ta-ptitle" data-ref-obv>OBV 오실레이터</text>`);
-    parts.push(`<text x="${L}" y="${OB.top + OB.h / 2 + 4}" class="ta-axis">${esc(m.obv.reason)}</text>`);
+    parts.push(`<text x="${r1(x(dv.i))}" y="${r1(SG.top + SG.h / 2 + 5)}" text-anchor="middle" class="ta-flip" style="fill:${col}">${dv.kind === 'bull' ? '▲' : '▼'}</text>`);
   }
 
   /* ---------- 날짜 ---------- */
@@ -5092,14 +5072,15 @@ function taChartHtml(m, opt) {
   }
 
   // 손가락으로 짚은 자리 — 처음에는 숨긴다
-  parts.push(`<line x1="0" x2="0" y1="${P.top}" y2="${OB.top + OB.h}" class="ta-cross" visibility="hidden"/>`);
+  parts.push(`<line x1="0" x2="0" y1="${P.top}" y2="${SG.top + SG.h}" class="ta-cross" visibility="hidden"/>`);
 
   parts.push(`<line class="ta-horizontal" x1="${L}" x2="${L+plotW}" visibility="hidden"/>`);
-  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}.`;
+  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. 가격 아래 신호 줄: 종목 쫄탐 · RSI 가 기준(20 · 30 이하, 80 이상)에 닿은 구간을 칠함. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}.`;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" class="ta-svg">${parts.join('')}</svg>`;
 
   return {
-    html: svg + '<p class="ta-zones">표시 구간 · 매수 '+opt.signals.filter(e=>e.side==='up').length+'회 · 매도 '+opt.signals.filter(e=>e.side==='down').length+'회</p>',
+    html: svg + '<p class="ta-zones">보이는 구간'+(opt.profileText?' · '+opt.profileText:'')+' · 상승 쪽 조건 '+opt.signals.filter(e=>e.side==='up').length+'번 · 하락 쪽 조건 '+opt.signals.filter(e=>e.side==='down').length+'번</p>'+
+      '<p class="ta-zones">신호 줄 — 옅게: 종목 쫄탐 20 이하 · 80 이상 또는 RSI 30 이하 · 80 이상 하나, 진하게: 둘 다 · ▲▼ 다이버전스</p>',
     layout: { L, step, start, span, from, to, W, H, py },
   };
 }
@@ -5247,7 +5228,10 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
   }
 
   function candleQuote(m,i,price,stamp){
-    return '<time>'+esc(stamp(m.t[i]))+'</time><dl>'+[['시가',m.o],['고가',m.h],['저가',m.l],['종가',m.c]].map(([label,values])=>
+    const sc = scoreOf(m, refData()).v[i];
+    const r = m.rsi[i], ob = m.obv.ok ? m.obv.osc[i] : null;
+    return '<time>'+esc(stamp(m.t[i]))+' · 종목 쫄탐 '+(Number.isFinite(sc)?Math.round(sc):'없음')+' · RSI '+(Number.isFinite(r)?r.toFixed(1):'없음')+
+      ' · OBV '+(Number.isFinite(ob)?obvNumber.format(ob):'없음')+'</time><dl>'+[['시가',m.o],['고가',m.h],['저가',m.l],['종가',m.c]].map(([label,values])=>
       '<div><dt>'+label+'</dt><dd>'+esc(price(values[i]))+'</dd></div>').join('')+'</dl>';
   }
 
@@ -5296,8 +5280,11 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
         (!own && d.market === 'kr' ? '<small> 한국 쫄탐지수는 내지 않아 미국 것을 봅니다</small>' : '') + '</span><span aria-hidden="true">→</span></button>';
     }
     html += '<section class="ta-sec" aria-labelledby="ta-chart-title"><h2 id="ta-chart-title">차트 <small>' + unit + ' · 봉 ' + (w.to - w.from + 1) + '개</small></h2>' +
-      '<div class="ta-seg" role="group" aria-label="매매 신호 성향">'+[['defensive','방어적'],['aggressive','공격적']].map(([id,label])=>'<button type="button" data-profile="'+id+'" aria-pressed="'+(st.profile===id)+'">'+label+'</button>').join('')+'</div>'+
-      '<p class="ta-zones">'+(defensive?'후보 발생 뒤 6봉 안에 추세가 일치하고 종가가 직전 고가(매수)·저가(매도)를 돌파하면 표시합니다.':'RSI가 40 이하로 처음 내려오면 조기 매수합니다. 기존 RSI·다이버전스 신호도 즉시 표시합니다.')+'</p>'+
+      '<div class="ta-seg" role="group" aria-label="기법 성향">'+[['defensive','방어적'],['aggressive','공격적']].map(([id,label])=>'<button type="button" data-profile="'+id+'" aria-pressed="'+(st.profile===id)+'">'+label+'</button>').join('')+'</div>'+
+      '<p class="ta-zones">'+(defensive
+        ?'방어적: 종목 쫄탐 20 이하와 RSI 30 이하가 함께 닿은 뒤(하락 쪽은 80 이상), 20봉 안에 슈퍼트렌드가 같은 쪽이 된 봉에 표시합니다. 다이버전스도 조건입니다.'
+        :'공격적: 종목 쫄탐 20 이하 또는 RSI 30 이하 중 하나만 닿아도(하락 쪽은 80 이상) 그 봉에 바로 표시합니다. 다이버전스도 조건입니다.')+'</p>'+
+      '<p class="ta-zones ta-now">'+nowLines(m,d,st.profile)+'</p>'+
       '<div class="ta-pan"><button type="button" data-zoom-step="-1" aria-label="차트 축소">−</button><button type="button" data-zoom-step="1" aria-label="차트 확대">＋</button><small>휠로 확대·축소 · 드래그로 이동</small></div>'+
       '<div class="ta-read" aria-live="polite">' + candleQuote(m,shown,price,stamp) + '</div>' +
       '<div class="ta-chart" id="ta-chart" tabindex="0" aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."></div>' +
@@ -5309,28 +5296,172 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
   /** 그림은 칸 폭을 잰 뒤에 그린다 — 늘이거나 줄이지 않아야 글자가 12px 그대로다 */
   let refLayout = null;
   const obvNumber=new Intl.NumberFormat('ko-KR',{notation:'compact',maximumFractionDigits:1,signDisplay:'exceptZero'});
-  const signalCache=new WeakMap();
-  function tradeSignals(m,profile){
-    if(!signalCache.has(m)){
-      const setups=techEvents(m);
-      const early=setups.slice(), confirmed=[];
-      for(let i=1;i<m.n;i++){
-        if(m.rsi[i-1]>40 && Number.isFinite(m.rsi[i]) && m.rsi[i]<=40)
-          early.push({side:'up',seenAt:i});
+  /*
+   * 종목 쫄탐 · 방어적 / 공격적 (2026-11-28, Claude — 사용자 결정을 GPT 시안 위에)
+   * 사용자: "매매기준은 기본적으로 쫄탐지수를 참고해서 차트에 표기해라, 내가 올려준 지표4가지는 보조지표고,
+   *         아니면 그 모든걸 고려해서 지수를 다시 짤까?" → 종목별 종합 점수, 문구는 '상승 쪽 조건'(매수 · 매도 지시 금지 규칙 그대로),
+   *         기준 RSI 30 이하 · 80 이상, 쫄탐 20 이하 · 80 이상, 공격적은 하나만 · 방어적은 둘 다 + 슈퍼트렌드 확인.
+   * 종목 쫄탐 0~100 = 시장 쫄탐지수(미국) 50 · 1년선 괴리 25 · OBV 오실레이터 25.
+   *   RSI 는 점수에 넣지 않는다 — 사용자: "쫄탐과 rsi 가 거의 비슷하네?" 넣으면 점수가 RSI 를 따라 움직여(DEMO 상관 0.77~0.94)
+   *   '둘 다' 조건이 사실상 하나가 된다. 빼면 0.65~0.89. RSI 는 조건으로만 쓴다.
+   *   1년선 괴리 · OBV 는 지난 252봉 안에서 지금 값의 백분위. 시장 쫄탐은 봉이 끝날 때 이미 나온 값만
+   *   (미국 일봉은 같은 날, 4시간봉 · 한국은 전날까지). 시장 쫄탐이 없거나 1년선 · OBV 가 둘 다 없으면 점수를 내지 않는다(0 으로 채우지 않음).
+   *   1년선 · OBV 중 하나만 있으면 시장과 그것을 반씩.
+   *   OBV 는 그 봉까지의 거래량만으로 낸다 — 뒤에 거래량이 빠진 봉이 생겨도 앞 점수가 바뀌지 않는다.
+   */
+  const SCORE_W = { mood: 50, gap: 25, obv: 25 };
+  const SCORE_LOW = 20, SCORE_HIGH = 80, PCT_WIN = 252, PCT_MIN = 60, CONFIRM = 20;
+  const PROFILE_TEXT = { defensive: '방어적', aggressive: '공격적' };
+  const isNumber = (x) => typeof x === 'number' && Number.isFinite(x);
+  const usMood = (() => {
+    const h = (DATA.details && DATA.details.us && DATA.details.us.history) || [];
+    return { t: h.map((p) => p.t), v: h.map((p) => p.v) };
+  })();
+  function moodForBars(t, mood, sameDay, gmtoffsetSec) {
+    const out = new Array(t.length).fill(null);
+    if (!mood.t.length) return out;
+    const pts = mood.t.map((x, k) => ({ d: Math.floor(x / 86400000), v: isNumber(mood.v[k]) ? mood.v[k] : null })).sort((a, b) => a.d - b.d);
+    const dayOf = (x) => Math.floor((x / 1000 + (gmtoffsetSec || 0)) / 86400);
+    let j = -1;
+    for (let i = 0; i < t.length; i += 1) {
+      const d = dayOf(t[i]);
+      while (j + 1 < pts.length && (sameDay ? pts[j + 1].d <= d : pts[j + 1].d < d)) j += 1;
+      out[i] = j >= 0 && d - pts[j].d <= 5 ? pts[j].v : null;
+    }
+    return out;
+  }
+  function pctRank(values) {
+    const out = new Array(values.length).fill(null);
+    for (let i = 0; i < values.length; i += 1) {
+      const x = values[i];
+      if (!isNumber(x)) continue;
+      let n = 0, below = 0, eq = 0;
+      for (let k = Math.max(0, i - PCT_WIN + 1); k <= i; k += 1) {
+        const y = values[k];
+        if (!isNumber(y)) continue;
+        n += 1;
+        if (y < x) below += 1; else if (y === x) eq += 1;
       }
-      for(const setup of setups){
-        for(let i=setup.seenAt+1;i<=Math.min(setup.seenAt+6,m.n-1);i++){
-          const follows=setup.side==='up'?m.c[i]>m.h[i-1]:m.c[i]<m.l[i-1];
-          if(follows && m.st.dir[i]===setup.side){
-            confirmed.push({side:setup.side,seenAt:i});
-            break;
-          }
+      if (n >= PCT_MIN) out[i] = ((below + (eq - 1) / 2) / (n - 1)) * 100;
+    }
+    return out;
+  }
+  /** 그 봉까지의 거래량만으로 낸 OBV 오실레이터 — 거래량이 처음 빠진 봉부터는 없음 */
+  function causalObv(m) {
+    let f = m.v.findIndex((x) => !isNumber(x));
+    if (f < 0) f = m.n;
+    const out = new Array(m.n).fill(null);
+    if (f < 2) return out;
+    const pre = obvOsc(m.c.slice(0, f), m.v.slice(0, f));
+    if (pre.ok) for (let i = 0; i < f; i += 1) out[i] = isNumber(pre.osc[i]) ? pre.osc[i] : null;
+    return out;
+  }
+  const scoreCache = new WeakMap();
+  function scoreOf(m, d) {
+    if (scoreCache.has(m)) return scoreCache.get(m);
+    const parts = {
+      mood: moodForBars(m.t, usMood, d.tf === '1d' && d.market === 'us', d.gmtoffset),
+      gap: pctRank(m.c.map((c, i) => (isNumber(m.trend[i]) && m.trend[i] > 0 ? (c - m.trend[i]) / m.trend[i] : null))),
+      obv: pctRank(causalObv(m)),
+    };
+    const v = new Array(m.n).fill(null);
+    for (let i = 0; i < m.n; i += 1) {
+      const md = parts.mood[i];
+      if (!isNumber(md)) continue;
+      const have = ['gap', 'obv'].filter((k) => isNumber(parts[k][i]));
+      if (!have.length) continue;
+      // 둘 다 있으면 50 · 25 · 25, 하나만 있으면 시장 50 : 그 하나 50
+      v[i] = have.length === 2
+        ? (md * SCORE_W.mood + parts.gap[i] * SCORE_W.gap + parts.obv[i] * SCORE_W.obv) / (SCORE_W.mood + SCORE_W.gap + SCORE_W.obv)
+        : (md * SCORE_W.mood + parts[have[0]][i] * (SCORE_W.gap + SCORE_W.obv)) / (SCORE_W.mood + SCORE_W.gap + SCORE_W.obv);
+    }
+    const out = { v, parts };
+    scoreCache.set(m, out);
+    return out;
+  }
+  const WHY = {
+    up: { score: '종목 쫄탐 ' + SCORE_LOW + ' 이하', rsi: 'RSI 30 이하', div: '상승 다이버전스' },
+    down: { score: '종목 쫄탐 ' + SCORE_HIGH + ' 이상', rsi: 'RSI 80 이상', div: '하락 다이버전스' },
+  };
+  const signalCache = new WeakMap();
+  /** 표시할 봉 — { seenAt: 표시 봉, setup: 조건이 생긴 봉, side, why[], strong } 와 확인을 기다리는 조건(방어적) */
+  function tradeSignals(m, profile, d) {
+    const key = profile;
+    if (!signalCache.has(m)) signalCache.set(m, {});
+    const memo = signalCache.get(m);
+    if (memo[key]) return memo[key];
+    const S = scoreOf(m, d).v;
+    const aggressive = profile === 'aggressive';
+    const setups = [];
+    const tests = {
+      up: (i) => ({ score: isNumber(S[i]) && S[i] <= SCORE_LOW, rsi: isNumber(m.rsi[i]) && m.rsi[i] <= 30 }),
+      down: (i) => ({ score: isNumber(S[i]) && S[i] >= SCORE_HIGH, rsi: isNumber(m.rsi[i]) && m.rsi[i] >= 80 }),
+    };
+    for (const side of ['up', 'down']) {
+      let was = false;
+      for (let i = 0; i < m.n; i += 1) {
+        const t = tests[side](i);
+        const on = aggressive ? t.score || t.rsi : t.score && t.rsi;
+        if (on && !was) setups.push({ setup: i, rsiAt: i, side, why: ['score', 'rsi'].filter((k) => t[k]) });
+        was = on;
+      }
+    }
+    for (const dv of m.div) setups.push({ setup: dv.seenAt, rsiAt: dv.i, side: dv.kind === 'bull' ? 'up' : 'down', why: ['div'] });
+    setups.sort((a, b) => a.setup - b.setup);
+    const byKey = new Map();
+    let pending = null;
+    for (const st of setups) {
+      let at = st.setup;
+      if (!aggressive) {
+        at = -1;
+        for (let k = st.setup; k <= Math.min(m.n - 1, st.setup + CONFIRM); k += 1) if (m.st.dir[k] === st.side) { at = k; break; }
+        if (at < 0) {
+          if (st.setup + CONFIRM > m.n - 1 && (!pending || st.setup >= pending.setup)) pending = st;
+          continue;
         }
       }
-      const unique=list=>[...new Map(list.map(e=>[e.seenAt+':'+e.side,e])).values()].sort((a,b)=>a.seenAt-b.seenAt);
-      signalCache.set(m,{aggressive:unique(early),defensive:unique(confirmed)});
+      const r = m.rsi[st.rsiAt];
+      const strong = isNumber(r) && (st.side === 'up' ? r <= 20 : r >= 90);
+      const k = at + ':' + st.side;
+      const prev = byKey.get(k);
+      if (prev) { for (const w of st.why) if (!prev.why.includes(w)) prev.why.push(w); prev.strong = prev.strong || strong; }
+      else byKey.set(k, { seenAt: at, setup: st.setup, side: st.side, why: st.why.slice(), strong });
     }
-    return signalCache.get(m)[profile];
+    const list = [...byKey.values()].sort((a, b) => a.seenAt - b.seenAt);
+    if (pending && list.some((e) => e.seenAt >= pending.setup)) pending = null;
+    memo[key] = { list, pending };
+    return memo[key];
+  }
+  const whyText = (side, why) => ['score', 'rsi', 'div'].filter((k) => why.includes(k)).map((k) => WHY[side][k]).join(' + ');
+  /** 지금 줄 — 종목 쫄탐과 재료, 가장 최근 표시(최근 30봉) 또는 기다리는 조건 */
+  function nowLines(m, d, profile) {
+    const sc = scoreOf(m, d);
+    const i = m.n - 1;
+    const s = sc.v[i];
+    const p = sc.parts;
+    const r = (x) => (isNumber(x) ? String(Math.round(x)) : '없음');
+    const zone = !isNumber(s) ? '' : s <= SCORE_LOW ? ' · 공포 쪽 ▲' : s >= SCORE_HIGH ? ' · 탐욕 쪽 ▼' : ' · 중간';
+    const first = isNumber(s)
+      ? '지금 <strong>종목 쫄탐 ' + Math.round(s) + '</strong>' + zone + ' — 시장 ' + r(p.mood[i]) + ' · 1년선 ' + r(p.gap[i]) + ' · OBV ' + r(p.obv[i])
+      : '지금 <strong>종목 쫄탐 없음</strong> — ' + (isNumber(p.mood[i]) ? '1년선 · OBV 를 낼 봉이 모자랍니다' : '시장 쫄탐지수를 받지 못했습니다');
+    const sig = tradeSignals(m, profile, d);
+    const recent = sig.list.filter((e) => i - e.seenAt <= 30);
+    const last = recent[recent.length - 1];
+    const ago = (k) => (i - k === 0 ? '이번 봉' : (i - k) + '봉 전');
+    const pt = PROFILE_TEXT[profile];
+    let second;
+    if (last) {
+      // 가장 최근 표시의 조건 · 강함만 — 다른 봉의 조건을 합치면 한 봉에 함께 생긴 것처럼 읽힌다 (Codex 리뷰)
+      second = '<strong>' + (last.side === 'up' ? '상승 쪽 조건 충족 ▲' : '하락 쪽 조건 충족 ▼') + '</strong> · ' + pt + ' · ' + esc(whyText(last.side, last.why)) +
+        (profile === 'defensive' ? ' → 슈퍼트렌드 ' + (last.side === 'up' ? '상승' : '하락') + ' 확인' : '') + ' · ' + ago(last.seenAt) +
+        (last.strong ? ' · 강함' : '');
+    } else if (sig.pending) {
+      second = '<strong>' + (sig.pending.side === 'up' ? '상승' : '하락') + ' 쪽 조건 · 추세 확인 전</strong> · ' + pt + ' · ' + esc(whyText(sig.pending.side, sig.pending.why)) + ' ' + ago(sig.pending.setup) +
+        ' · 슈퍼트렌드가 ' + (sig.pending.side === 'up' ? '상승' : '하락') + '이 되면 표시합니다';
+    } else {
+      second = '<strong>기법 조건 없음</strong> · ' + pt + ' · 최근 30봉 안에 표시할 봉이 없습니다';
+    }
+    return first + '<br>' + second;
   }
   function drawRef() {
     const box = document.getElementById('ta-chart');
@@ -5338,10 +5469,11 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
     if (!box || !d) { refLayout = null; return; }
     const m = refModel(d);
     const w = refWindow(d, m);
-    const signals=tradeSignals(m,state.ref.profile).filter(e=>e.seenAt>=w.from&&e.seenAt<=w.to);
+    const signals=tradeSignals(m,state.ref.profile,d).list.filter(e=>e.seenAt>=w.from&&e.seenAt<=w.to);
     document.querySelector('#ta-chart-title small').textContent=taBarUnit(d.tf)+' · 봉 '+(w.to-w.from+1)+'개';
     const out = taChartHtml(m, {
       start:w.start, span:w.span, from: w.from, to: w.to, width: Math.floor(box.clientWidth), price: taPrice(d.precision), signals,
+      score: scoreOf(m, d).v, profileText: PROFILE_TEXT[state.ref.profile],
       date: taAxisDate(d.tf, w.to - w.from + 1, d.market), title: d.name + ' ' + taBarUnit(d.tf),
     });
     box.innerHTML = out.html;
@@ -5375,8 +5507,10 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
     const m = refModel(d);
     const shown = i === null ? refLayout.to : i;
     const rsi=m.rsi[shown], obv=m.obv.ok ? m.obv.osc[shown] : null;
-    box.querySelector('[data-ref-rsi]').textContent='RSI 14 · '+(Number.isFinite(rsi)?rsi.toFixed(1):'—');
-    box.querySelector('[data-ref-obv]').textContent='OBV 오실레이터 · '+(Number.isFinite(obv)?obvNumber.format(obv):'—');
+    const sc = scoreOf(m, d).v[shown];
+    const title = box.querySelector('[data-ref-sig]');
+    if (title) title.textContent='신호 · 쫄탐 '+(Number.isFinite(sc)?Math.round(sc):'—')+' · RSI '+(Number.isFinite(rsi)?rsi.toFixed(1):'—')+
+      ' · OBV '+(Number.isFinite(obv)?(obv>0?'＋':obv<0?'－':'0'):'—');
     const read = document.querySelector('.ta-read');
     if (read) read.innerHTML = candleQuote(m,shown,taPrice(d.precision),taStamp(d.tf,d.market));
   }
@@ -6834,16 +6968,6 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
   }
 
 
-  const climatePaths = {
-    ice: [50, 47, 39, 36, 25, 17, 8],
-    fire: [50, 54, 61, 65, 75, 84, 92]
-  };
-  function climatePreview() {
-    return '<section class="climate-preview" aria-label="지수 변동 시뮬레이션"><header><h2>급변 시뮬레이션</h2><span>가상 지수 · 7거래일</span></header><div class="climate-choices">' +
-      [['ice','급락','50 → 8점'],['fire','급등','50 → 92점']].map(([id,label,score]) =>
-        '<button type="button" data-play-climate="'+id+'" aria-label="'+label+' 시뮬레이션 재생"><small>'+score+'</small><strong>'+label+' 재생 <i aria-hidden="true">▷</i></strong></button>').join('')+
-      '</div><div class="climate-player" hidden></div></section>';
-  }
   function emberField(){
     const clip=document.getElementById('hearth-film').textContent.trim();
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6874,57 +6998,6 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
       (band<2?frostField():emberField())+'</div>';
   }
 
-  let climateFrame;
-  document.addEventListener('click',event=>{
-    const button=event.target.closest('[data-play-climate],[data-close-climate]');
-    if(!button)return;
-    cancelAnimationFrame(climateFrame);
-    const panel=button.closest('.climate-preview');
-    const player=panel.querySelector('.climate-player');
-    if(button.hasAttribute('data-close-climate')){
-      const trigger=panel.querySelector('[data-play-climate="'+player.dataset.kind+'"]');
-      player.querySelector('video')?.pause();
-      player.hidden=true;
-      delete panel.dataset.playing;
-      trigger.focus();
-      return;
-    }
-    const kind=button.dataset.playClimate;
-    const values=climatePaths[kind];
-    panel.dataset.playing=player.dataset.kind=kind;
-    player.hidden=false;
-    player.innerHTML='<div class="climate-scene"><div class="climate-photo"></div>'+(kind==='fire'?emberField():frostField())+'<div class="climate-metric"><small>가상 쫄탐지수</small><div><b></b><em></em></div><span></span></div></div>'+
-      '<div class="climate-track"><div><small>가상 지수 흐름</small><small class="sim-day"></small></div><svg viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="7거래일 가상 지수 흐름"><path d="M5 32H295" stroke="var(--border)" stroke-dasharray="3 4"/><polyline fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg></div>'+
-      '<footer><span role="status"></span><button type="button" data-close-climate>닫기</button></footer>';
-    const line=player.querySelector('polyline');
-    const svg=line.ownerSVGElement;
-    const pts=values.map((value,i)=>({x:5+i*290/6,y:60-value*.56,label:(i+1)+'거래일',value,unit:'점'}));
-    // A stable probe key allows both scenarios to be replayed without accumulating chart data.
-    svg.dataset.probe='climate-path';
-    svg.setAttribute('tabindex','0');
-    const start=performance.now();
-    function paint(now){
-      if(!player.isConnected || player.hidden)return;
-      const t=matchMedia('(prefers-reduced-motion: reduce)').matches ? 6 : Math.min(6,Math.max(0,(now-start)/800));
-      const day=Math.floor(t), next=Math.min(day+1,6);
-      const score=Math.round(values[day]+(values[next]-values[day])*(t-day));
-      const seen=pts.slice(0,day+1);
-      probeData.set('climate-path',seen);
-      const trail=seen.map(p=>p.x+','+p.y);
-      trail.push((5+t*290/6)+','+(60-score*.56));
-      line.setAttribute('points',trail.join(' '));
-      player.style.setProperty('--intensity',Math.abs(score-50)/50);
-      player.style.setProperty('--spread',Math.min(1,Math.abs(score-50)/42));
-      player.querySelector('.climate-metric b').textContent=score;
-      player.querySelector('.climate-metric em').textContent=stageOf(score).label;
-      player.querySelector('.climate-metric span').textContent='시작 50점 대비 '+(score>50?'+':'')+(score-50)+'점';
-      player.querySelector('.sim-day').textContent=(day+1)+' / 7거래일';
-      if(t<6) climateFrame=requestAnimationFrame(paint);
-      else player.querySelector('[role=status]').textContent='재생 완료 · '+(kind==='ice'?'42점 하락':'42점 상승');
-    }
-    paint(start);
-    player.scrollIntoView({block:'nearest'});
-  });
 
   function viewIndices() {
     const section = snap().sections.fng;
@@ -6953,7 +7026,7 @@ return { taChartHtml, taIndexAt, taXOf, taPrice, taAxisDate, taStamp, taSuggestH
       '<div class="market-scale" aria-hidden="true">'+(valid ? '<i></i>' : '')+'</div><div class="market-ends"><span>극단적 공포</span><span>극단적 탐욕</span></div>' +
       '<dl class="market-comps">'+comparison+'</dl></section><section class="market-history"><div class="market-chart-head"><h2>쫄탐지수 흐름</h2><span class="market-caption">최근 1년'+(section.status === 'stale' ? ' · 이전 값' : '')+'</span></div>'+chart+
       '<footer><span class="market-caption">'+(trend && isNum(trend.gapPct) ? esc(trend.name)+' · '+trend.maDays+'거래일 평균보다 '+Math.abs(trend.gapPct).toFixed(1)+'% '+(trend.above ? '위' : '아래') : '장기 평균 자료 부족')+'</span><button type="button" data-mood-fold="toggle" aria-expanded="'+showMoodFactors+'" aria-controls="home-factors">'+(showMoodFactors?'접기':'지수 분석 보기')+'</button></footer></section></div>' +
-      '<div id="home-factors">'+(showMoodFactors?moodFactors():'')+'</div>'+climatePreview()+'<h2 class="board-heading">시장별 시세</h2>'+marketIndexBoard()+'</section>';
+      '<div id="home-factors">'+(showMoodFactors?moodFactors():'')+'</div>'+'<h2 class="board-heading">시장별 시세</h2>'+marketIndexBoard()+'</section>';
   }
 
   function viewBasics() {
@@ -7738,30 +7811,8 @@ body:is([data-climate=flame],[data-climate=ember]){--scene-art:var(--hearth)}
 body[data-climate] .market-reading{color:#eff6ff;background:linear-gradient(95deg,#091320f5,#0b1724d6 42%,#09131e62),var(--scene-art,none) 65% 55%/cover,#152232}
 .market-reading .market-number,.market-reading h2{color:#fff}.market-reading .market-number small,.market-reading .market-ends,.market-reading .market-comps dt{color:#c9d3de}
 .market-stage{font-size:15px}.market-comps{border-top:1px solid #ffffff29;padding-top:12px}
-.climate-preview{margin:22px 0;padding:clamp(14px,2vw,24px);border-radius:20px;border:1px solid var(--border);background:var(--surface)}
-.climate-preview header,.climate-player footer,.climate-track>div{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.climate-preview header span,.climate-player footer span,.climate-track small{font-size:12px;color:var(--muted)}
-.climate-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 0}
-[data-play-climate=ice],.climate-player[data-kind=ice]{--picture:var(--glacier);--edge:#76dafe}
-[data-play-climate=fire],.climate-player[data-kind=fire]{--picture:var(--hearth);--edge:#ffac65}
-.climate-choices button{min-width:0;min-height:100px;text-align:left;display:grid;align-content:end;gap:5px;padding:16px;color:white;border-radius:13px;cursor:pointer;border:1px solid #ffffff24;background:linear-gradient(90deg,#080d16dd,#080d1630),var(--picture) center 62%/cover}
-.climate-choices button:hover,.climate-choices button:focus-visible{outline:2px solid var(--edge);outline-offset:2px}
-.climate-choices small{font-size:13px;color:#edf4ff}.climate-choices strong{font-size:20px}.climate-choices i{font:normal 15px sans-serif;color:var(--edge)}
-.climate-player:not([hidden]){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);overflow:hidden;border-radius:13px;margin-top:12px;border:1px solid var(--border)}
-.climate-scene{position:relative;isolation:isolate;overflow:hidden;background:#0b1422;color:white}
-.climate-photo{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#06101cdd,transparent),var(--picture) center 60%/cover;opacity:calc(.12 + var(--intensity)*1.03);transform:scale(calc(1 + var(--intensity)*.07))}
-.climate-metric,.climate-track{padding:16px 20px}.climate-metric b{font-size:46px;line-height:1.1;font-weight:650;letter-spacing:-.06em}.climate-metric em{font-style:normal;color:var(--edge);font-size:13px;margin-left:8px}
-.climate-metric small,.climate-metric span{display:block;font-size:12px;color:#d1dae3}
-.climate-track svg{display:block;width:100%;height:74px;color:color-mix(in srgb,var(--edge) 75%,var(--fg))}
-.climate-player footer{padding:6px 14px;grid-column:1/-1;border-top:1px solid var(--border)}
-.climate-player footer button{cursor:pointer;font:inherit;color:var(--fg);border:0;background:var(--surface-2);border-radius:6px;padding:5px 12px}
-@media(max-width:540px){.climate-choices{gap:7px}.climate-choices button{min-height:84px;padding:12px}.climate-preview header span{font-size:10px}.climate-player:not([hidden]){grid-template-columns:1fr}.climate-metric,.climate-track{padding:12px}.climate-track svg{height:52px}}
 </style>
 <style>
-.climate-player[data-kind=fire] .climate-scene{grid-column:1/-1;min-height:clamp(145px,19vw,208px);display:flex;align-items:flex-start;background:linear-gradient(175deg,#0e1521,#15121a 67%,#201510)}
-.climate-player[data-kind=fire] .climate-photo{opacity:.74;transform:none;background:var(--hearth) center 63%/cover;mask-image:radial-gradient(ellipse calc(1% + var(--spread)*108%) calc(1% + var(--spread)*126%) at 57% 99%,black 3%,#000b 52%,transparent 83%)}
-.climate-player[data-kind=fire] .climate-track{grid-column:1/-1}
-.climate-player[data-kind=fire] .climate-metric{position:relative;z-index:2;border-radius:0 0 16px 0;background:linear-gradient(120deg,#0c111cf2,#111521ab 76%,transparent);padding:18px 34px 16px 20px}
 .ember-field{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .fire-root,.spark-root{position:absolute;bottom:-2px;left:var(--x);width:6.2%;height:var(--height);margin-left:-3.1%;transform-origin:bottom center;transform:scale(clamp(0,(var(--spread)*1.4 - var(--distance))*3,1))}
 .fire-root svg{display:block;width:100%;height:100%;transform-origin:bottom center;animation:fire-sway var(--speed) ease-in-out var(--delay) infinite alternate}
@@ -7774,8 +7825,8 @@ body[data-climate] .market-reading{color:#eff6ff;background:linear-gradient(95de
 </style><style>
 @container app (max-width:480px){
 .market-summary{grid-template-columns:1fr}.market-reading{border-inline-end:0;border-bottom:1px solid var(--border)}
-.market-desk{padding:14px}.market-reading,.market-history,.climate-preview{padding:16px}
-.market-desk .idxgrid{grid-template-columns:minmax(0,1fr)}.climate-player:not([hidden]){grid-template-columns:1fr}
+.market-desk{padding:14px}.market-reading,.market-history{padding:16px}
+.market-desk .idxgrid{grid-template-columns:minmax(0,1fr)}
 }
 </style>
 <style>
@@ -7785,15 +7836,10 @@ body[data-climate] .market-reading{color:#eff6ff;background:linear-gradient(95de
 @keyframes weather-arrives{from{--spread:0}to{--spread:var(--extent)}}
 .frost-field{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;fill:none;stroke:#baf4ff;stroke-linecap:round;filter:drop-shadow(0 0 2px #7bd6f8)}
 .frost-field path{stroke-dasharray:1 1;stroke-dashoffset:calc(1 - clamp(0,(var(--spread) - var(--start))*var(--rate),1))}
-.climate-player[data-kind=ice] .climate-scene{grid-column:1/-1;min-height:clamp(145px,19vw,208px);background:#0a1826}
-.climate-player[data-kind=ice] .climate-track{grid-column:1/-1}
-.climate-player[data-kind=ice] .climate-photo{opacity:1;transform:none;mask-image:radial-gradient(ellipse calc(1% + var(--spread)*115%) calc(1% + var(--spread)*120%) at 61% 98%,black 12%,transparent 87%)}
-.climate-player[data-kind=ice] .climate-metric{position:relative;z-index:1;width:fit-content;background:linear-gradient(115deg,#0a1423ef,#0b1726bb 72%,transparent);padding-right:30px}
 @media(prefers-reduced-motion:reduce){.home-weather{animation:none}}
 </style><style>
 .hearth-window{position:absolute;inset:0;pointer-events:none;background:var(--film-still) center/cover;mask-image:radial-gradient(ellipse calc(1.8% + var(--spread)*135%) calc(2.5% + var(--spread)*152%) at 56% 88%,#000 55%,transparent 90%)}
 .hearth-window video{width:100%;height:100%;object-fit:cover}
-.climate-player[data-kind=fire] .climate-photo{display:none}
 .market-reading:has(.hearth-window){background:#101318!important}
 .ta-zones{font-size:12px;line-height:1.6;color:var(--muted);margin:0}.ta-zones strong{color:var(--fg)}
 :root{--film-still:url(data:image/webp;base64,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)}
@@ -7816,6 +7862,12 @@ body[data-climate] .market-reading{color:#eff6ff;background:linear-gradient(95de
 .ta .ta-horizontal,.ta .ta-cross{stroke:var(--fg);stroke-width:1;stroke-dasharray:4 3;opacity:.72}
 .ta .ta-chart>.ta-zones{border-top:1px solid var(--border);padding:8px;font-variant-numeric:tabular-nums}
 .ta .profile-buy,.ta .profile-sell{opacity:.14}
+/* 종목 쫄탐 (2026-11-28) */
+.ta-strip{fill:var(--surface-2)}
+.ta-strip-on{opacity:.32}
+.ta-strip-on.both{opacity:.8}
+.ta-sig{stroke:var(--surface);stroke-width:1}
+.ta-now{color:var(--fg);font-size:13px}
 </style><style>
 .ta-pan{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
 .ta-pan input{flex:1;min-width:0;accent-color:var(--accent);cursor:ew-resize}

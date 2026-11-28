@@ -58,7 +58,7 @@
 .ta-ranges button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ta-chart { position: relative; touch-action: pan-y; border-radius: var(--box-radius); background: var(--surface); padding: 8px 0 4px; }
 .ta-svg { display: block; max-width: 100%; height: auto; }
-.ta-read { margin: 0; min-height: 44px; font-size: 13.5px; color: var(--fg); font-variant-numeric: tabular-nums; word-break: keep-all; }
+.ta-read { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } /* 읽어 주기용 — 숫자는 차트 안 상자에 보인다 */
 .ta-legend { margin: 0 0 4px; padding: 0 8px; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted-fg); }
 .ta-legend li { display: inline-flex; align-items: center; gap: 4px; }
 .ta-legend i { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--fg); }
@@ -85,7 +85,7 @@
 .ta-rsi { stroke: var(--accent); }
 .ta-div { stroke-width: 1.5; stroke-dasharray: 4 3; }
 .ta-obv { opacity: .85; }
-.ta-cross { stroke: var(--fg); stroke-width: 1; opacity: .6; }
+.ta-cross { stroke: var(--fg); stroke-width: 1; opacity: .7; }
 .ta-note { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--muted-fg); word-break: keep-all; }
 
 /* 산출 방법 */
@@ -152,7 +152,7 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 .ta-tile { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: var(--box-radius); background: var(--surface); }
 .ta-tl { font-size: 12.5px; font-weight: 600; color: var(--muted-fg); }
 .ta-big { font-size: 28px; line-height: 1.1; font-weight: 800; color: var(--fg-strong); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; }
-.ta-tile[data-k="trsi"] .ta-big { font-size: 36px; }
+.ta-tile[data-k="rsi"] .ta-big { font-size: 40px; }
 .ta-cap { font-size: 12.5px; line-height: 1.45; color: var(--fg); word-break: keep-all; }
 .ta-rsibar { position: relative; display: flex; height: 8px; margin: 4px 0 2px; }
 .ta-rsibar i { display: block; height: 100%; }
@@ -162,3 +162,16 @@ button.ta-mood { width: 100%; border: 0; font: inherit; text-align: left; cursor
 .ta-rsibar .h { background: color-mix(in srgb, var(--ta-down) 40%, transparent); }
 .ta-rsibar .sh { border-radius: 0 99px 99px 0; background: color-mix(in srgb, var(--ta-down) 80%, transparent); }
 .ta-rsibar em { position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--fg-strong); box-shadow: 0 0 0 1.5px var(--surface); }
+
+/* 누른 봉의 숫자 (2026-11-27 "누르는 곳에 숫자 나오게") */
+.ta-cross-dot { fill: var(--fg-strong); stroke: var(--surface); stroke-width: 1.5; }
+.ta-cross-tag { fill: var(--fg-strong); }
+.ta-cross-tagt { fill: var(--bg); font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ta-tip { fill: color-mix(in srgb, var(--bg) 88%, transparent); stroke: var(--border-strong, var(--border)); stroke-width: 1; }
+.ta-tip-h { fill: var(--fg-strong); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ta-tip-l { fill: var(--muted-fg); font-size: 12.5px; }
+.ta-tip-v { fill: var(--fg-strong); font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* RSI · 다이버전스 한 칸 — 두 칸 너비 */
+.ta-tile[data-k="rsi"] { grid-column: 1 / -1; }
+.ta-sub { margin-top: 4px; font-size: 22px; line-height: 1.2; font-weight: 800; color: var(--fg-strong); }

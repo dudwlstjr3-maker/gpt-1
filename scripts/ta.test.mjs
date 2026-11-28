@@ -365,7 +365,7 @@ test('종목 찾기 — 코드 · 이름 앞부분 · 초성 · 이름 가운데
   assert.deepEqual(taSearch('없는것', list), []);
 });
 
-test('한눈에 — 결론 한 줄 + 큰 숫자 칸 여섯, 방향은 ▲ ▼ 와 말로', async () => {
+test('한눈에 — 결론 한 줄 + 큰 숫자 칸 다섯(RSI · 다이버전스 한 칸), 방향은 ▲ ▼ 와 말로', async () => {
   const { taBoardHtml } = await import('../src/lib/taChart.mjs');
   const bars = Array.from({ length: 300 }, (_, i) => {
     const c = 100 + i * 0.3 + Math.sin(i / 6) * 6;
@@ -373,31 +373,62 @@ test('한눈에 — 결론 한 줄 + 큰 숫자 칸 여섯, 방향은 ▲ ▼ �
   });
   const m = taModel({ tf: '4h', bars });
   const b = taBoard(m);
-  assert.deepEqual(b.tiles.map((t) => t.key), ['tdiv', 'trsi', 'st', 'ma', 'trend', 'obv']);
+  assert.deepEqual(b.tiles.map((t) => t.key), ['rsi', 'st', 'ma', 'trend', 'obv'], 'RSI 와 다이버전스는 한 칸');
   assert.deepEqual(b.mark, techNow(m).last ? { i: techNow(m).last.i, side: techNow(m).last.side } : null, '차트 표시는 결론에 쓴 조건과 같은 봉');
-  const rsi = b.tiles[1];
+  const rsi = b.tiles[0];
   assert.equal(rsi.big, m.rsi[m.n - 1].toFixed(1), 'RSI 는 숫자를 크게');
   assert.deepEqual(rsi.bands, [20, 30, 80, 90]);
+  assert.match(rsi.sub.big, /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/, '같은 칸 둘째 값이 다이버전스');
   for (const t of b.tiles) {
     if (t.dir) assert.match(t.big + t.cap, t.dir === 'up' ? /▲|＋/ : /▼|－/, `${t.key}: ${t.big} ${t.cap}`);
     assert.ok(t.big.length <= 8, `큰 값은 짧게 — ${t.key}: ${t.big}`);
   }
-  assert.match(b.tiles[4].big, /^[+−]?\d+\.\d%$/);
+  assert.match(b.tiles[3].big, /^[+−]?\d+\.\d%$/);
   const html = taBoardHtml(b);
   assert.match(html, /^<div class="ta-board"><div class="ta-verdict" data-side="(up|down|none)">/);
-  assert.equal((html.match(/class="ta-tile"/g) ?? []).length, 6);
+  assert.equal((html.match(/class="ta-tile"/g) ?? []).length, 5);
+  assert.match(html, /<div class="ta-tile" data-k="rsi"[^>]*>.*<b class="ta-sub"[^>]*>(▲ 상승|▼ 하락|다이버전스 없음)/);
   assert.match(html, /<div class="ta-rsibar" aria-hidden="true">(<i class="(sl|l|m|h|sh)" style="width:\d+%"><\/i>){5}<em style="left:[\d.]+%"><\/em><\/div>/);
-  assert.match(html, /aria-label="② RSI 14: [\d.]+, /);
+  assert.match(html, /aria-label="① RSI 14 · 다이버전스: [\d.]+, [^"]*\. (▲ 상승|▼ 하락|다이버전스 없음)/);
 });
 
 test('한눈에 — 값이 모자라면 "없음" 과 까닭, 지어내지 않는다', () => {
   const bars = Array.from({ length: 12 }, (_, i) => ({ t: i * 864e5, o: 10, h: 11, l: 9, c: 10 + i * 0.1, v: 0 }));
   const b = taBoard(taModel({ tf: '1d', bars }));
   const by = Object.fromEntries(b.tiles.map((t) => [t.key, t]));
-  assert.equal(by.trsi.big, '없음');
-  assert.equal(by.trsi.rsi, null);
+  assert.equal(by.rsi.big, '없음');
+  assert.equal(by.rsi.rsi, null);
+  assert.equal(by.rsi.sub.big, '다이버전스 없음');
   assert.equal(by.trend.big, '없음');
   assert.match(by.trend.cap, /252개/);
   assert.equal(by.obv.big, '없음');
   assert.match(by.obv.cap, /거래량/);
+});
+
+test('누른 봉의 숫자 — 세로선 · 종가와 RSI 꼬리표 · 숫자 상자(손가락 반대쪽), 없는 값은 "없음"', async () => {
+  const { taChartHtml, taCrossSvg } = await import('../src/lib/taChart.mjs');
+  const bars = Array.from({ length: 300 }, (_, i) => {
+    const c = 100 + i * 0.3 + Math.sin(i / 6) * 6;
+    return { t: Date.UTC(2026, 0, 1) + i * 864e5, o: c - 0.5, h: c + 1, l: c - 1, c, v: 1000 };
+  });
+  const m = taModel({ tf: '1d', bars });
+  const { html, layout } = taChartHtml(m, { from: 170, to: 299, width: 360 });
+  assert.match(html, /<g class="ta-crossg"><\/g>/, '처음에는 비어 있다');
+  assert.ok(!/class="ta-cross"/.test(html));
+  const price = (v) => v.toFixed(2);
+  const stamp = () => '1.1';
+  const right = taCrossSvg(m, layout, 290, { price, stamp });
+  assert.equal((right.match(/class="ta-cross"/g) ?? []).length, 1);
+  assert.equal((right.match(/class="ta-cross-tag"/g) ?? []).length, 2, '종가 · RSI 꼬리표');
+  assert.match(right, new RegExp(`>${m.c[290].toFixed(2)}</text>`));
+  assert.match(right, new RegExp(`>${m.rsi[290].toFixed(1)}</text>`));
+  for (const k of ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선']) assert.match(right, new RegExp(`class="ta-tip-l">${k}<`));
+  const boxX = (svg) => Number(svg.match(/<rect x="([\d.]+)" y="[\d.]+" width="[\d.]+" height="[\d.]+" rx="8" class="ta-tip"/)[1]);
+  assert.ok(boxX(right) < layout.W / 2, '오른쪽을 누르면 상자는 왼쪽');
+  assert.ok(boxX(taCrossSvg(m, layout, 175, { price, stamp })) > layout.L + 20, '왼쪽을 누르면 상자는 오른쪽');
+  assert.equal(taCrossSvg(m, layout, 100, { price, stamp }), '', '보이는 구간 밖은 그리지 않음');
+  // 1년선이 아직 없는 봉은 0 이 아니라 '없음'
+  const short = taModel({ tf: '1d', bars: bars.slice(0, 80) });
+  const s2 = taChartHtml(short, { from: 0, to: 79, width: 360 });
+  assert.match(taCrossSvg(short, s2.layout, 70, { price, stamp }), /class="ta-tip-l">1년선<\/text><text [^>]*class="ta-tip-v">없음</);
 });

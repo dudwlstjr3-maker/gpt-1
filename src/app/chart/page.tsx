@@ -22,7 +22,7 @@ import {
   TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT,
 } from '@/lib/ta.mjs';
 import {
-  taChartHtml, taIndexAt, taXOf, taBoardHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
+  taChartHtml, taIndexAt, taCrossSvg, taBoardHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
 } from '@/lib/taChart.mjs';
 import type { TaBarsResult, TaTf } from '@/types';
 
@@ -142,33 +142,60 @@ export default function ChartPage() {
           title: `${data.name} ${taBarUnit(data.tf)}`,
         })
       : null;
-    return { from, to, price, chart, board, stamp: taStamp(data.tf, data.market) };
+    return {
+      from,
+      to,
+      price,
+      chart,
+      board,
+      stamp: taStamp(data.tf, data.market),
+      // innerHTML 로 넣는 글은 한 번 만든 객체를 그대로 쓴다. 렌더마다 새 객체를 주면 React 가 그림을 통째로 다시 넣어
+      // 누른 봉의 숫자 상자(그림 안 '.ta-crossg')가 지워진다(실제로 겪었다).
+      chartInner: chart ? { __html: chart.html } : undefined,
+      boardInner: { __html: taBoardHtml(board) },
+    };
   }, [model, data, range, width]);
 
+  // 누른 봉의 숫자 — 세로선 · 숫자 상자 · 오른쪽 축 꼬리표를 그림 안 '.ta-crossg' 에 넣는다(taCrossSvg)
   const moveCross = useCallback(
     (i: number | null) => {
-      const line = boxRef.current?.querySelector<SVGLineElement>('.ta-cross');
-      if (!line || !view?.chart) return;
-      if (i === null) {
-        line.setAttribute('visibility', 'hidden');
-      } else {
-        const x = String(Math.round(taXOf(view.chart.layout, i) * 10) / 10);
-        line.setAttribute('x1', x);
-        line.setAttribute('x2', x);
-        line.setAttribute('visibility', 'visible');
-      }
+      const g = boxRef.current?.querySelector<SVGGElement>('.ta-crossg');
+      if (!g || !view?.chart || !model) return;
+      g.innerHTML = i === null ? '' : taCrossSvg(model, view.chart.layout, i, { price: view.price, stamp: view.stamp });
       setCursor(i);
     },
-    [view],
+    [view, model],
   );
 
-  const onPointer = (e: PointerEvent<HTMLDivElement>) => {
+  const indexAt = (e: PointerEvent<HTMLDivElement>) => {
     const svg = boxRef.current?.querySelector('svg');
-    if (!svg || !view?.chart) return;
+    if (!svg || !view?.chart) return null;
     const rect = svg.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) * view.chart.layout.W) / rect.width;
-    moveCross(taIndexAt(view.chart.layout, px));
+    return taIndexAt(view.chart.layout, ((e.clientX - rect.left) * view.chart.layout.W) / rect.width);
   };
+  // 손가락으로 같은 봉을 한 번 더 누르면 숫자 상자를 닫는다. 마우스는 올리면 보이고 차트 밖으로 나가면 닫힌다
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    const i = indexAt(e);
+    if (i === null) return;
+    moveCross(e.pointerType !== 'mouse' && i === cursor ? null : i);
+  };
+  const onPointerLeave = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') moveCross(null);
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!e.buttons && e.pointerType !== 'mouse') return;
+    const i = indexAt(e);
+    if (i !== null && i !== cursor) moveCross(i);
+  };
+
+  // 그림을 다시 그리면(폭 · 구간이 바뀌면) 짚어 둔 봉의 숫자를 다시 얹는다
+  useEffect(() => {
+    if (cursor === null || !view?.chart) return;
+    if (cursor >= view.from && cursor <= view.to) moveCross(cursor);
+    else setCursor(null);
+    // 그림이 바뀔 때만 — cursor 가 바뀔 때마다 돌면 moveCross 와 서로 부른다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!view) return;
@@ -298,7 +325,7 @@ export default function ChartPage() {
             <h2 id="ta-now-title">
               지금 상태 <small>마지막 {unit} 기준</small>
             </h2>
-            <div dangerouslySetInnerHTML={{ __html: taBoardHtml(view.board) }} />
+            <div dangerouslySetInnerHTML={view.boardInner} />
             <details className="ta-howto">
               <summary>{TA_TEXT.techTitle} — 보는 순서</summary>
               <ol>
@@ -329,10 +356,11 @@ export default function ChartPage() {
               className="ta-chart"
               tabIndex={0}
               aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."
-              onPointerDown={onPointer}
-              onPointerMove={(e) => { if (e.buttons || e.pointerType === 'mouse') onPointer(e); }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerLeave={onPointerLeave}
               onKeyDown={onKey}
-              dangerouslySetInnerHTML={view.chart ? { __html: view.chart.html } : undefined}
+              dangerouslySetInnerHTML={view.chartInner}
             />
             <p className="ta-note">{TA_TEXT.markNote}</p>
           </section>

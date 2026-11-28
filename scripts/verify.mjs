@@ -4221,14 +4221,27 @@ async function main() {
     check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
     // 2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게" — 결론 한 줄 + 큰 숫자 칸 여섯
     const board = ta.taBoard(m4);
-    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 여섯 (다이버전스 · RSI · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
-      board.tiles.map((t) => t.key).join(',') === 'tdiv,trsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8),
+    // 이어서 사용자: "rsi 는 다이버전스랑 같이 합쳐서" — RSI 칸 하나에 다이버전스를 둘째 값으로
+    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 다섯 (RSI · 다이버전스 한 칸 · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
+      board.tiles.map((t) => t.key).join(',') === 'rsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8) &&
+      /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/.test(board.tiles[0].sub?.big ?? ''),
       board.tiles.map((t) => t.big).join(' | '));
     const cssBig = await readFile('src/app/ta.css', 'utf8');
     const px = (sel) => Number((cssBig.match(new RegExp(sel.replace(/[.[\]"=]/g, (c) => '\\' + c) + '\\s*\\{[^}]*font-size:\\s*([\\d.]+)px')) ?? [])[1]);
     check('숫자는 크게 — 칸 값 28px 이상 · RSI 36px · 결론 22px · 가격 24px · 차트 축 13px',
-      px('.ta-big') >= 28 && px('.ta-tile[data-k="trsi"] .ta-big') >= 36 && px('.ta-vhead b') >= 22 && px('.ta-title .ta-last') >= 24 && px('.ta-axis') >= 13,
-      ['.ta-big', '.ta-tile[data-k="trsi"] .ta-big', '.ta-vhead b', '.ta-title .ta-last', '.ta-axis'].map(px).join(','));
+      px('.ta-big') >= 28 && px('.ta-tile[data-k="rsi"] .ta-big') >= 36 && px('.ta-vhead b') >= 22 && px('.ta-title .ta-last') >= 24 && px('.ta-axis') >= 13 &&
+      px('.ta-tip-v') >= 13 && px('.ta-cross-tagt') >= 13,
+      ['.ta-big', '.ta-tile[data-k="rsi"] .ta-big', '.ta-vhead b', '.ta-title .ta-last', '.ta-axis', '.ta-tip-v', '.ta-cross-tagt'].map(px).join(','));
+    // 이어서 사용자: "차트에서 그래프나 누르는 곳에 숫자 나오게" — 누른 봉의 숫자 상자 · 축 꼬리표
+    {
+      const tc = await import('../src/lib/taChart.mjs');
+      const out = tc.taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360 });
+      const tip = tc.taCrossSvg(m4, out.layout, m4.n - 3, { price: (v) => v.toFixed(2), stamp: () => '' });
+      check('차트를 누르면 그 봉의 숫자 — 세로선 · 종가 · RSI 꼬리표 · 상자(종가 · 시가 · 고저 · RSI · 슈퍼트렌드 · 20/60선 · 1년선)',
+        /<g class="ta-crossg"><\/g>/.test(out.html) && (tip.match(/class="ta-cross-tag"/g) ?? []).length === 2 &&
+        ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선'].every((k) => tip.includes(`class="ta-tip-l">${k}<`)) &&
+        tip.includes(`>${m4.c[m4.n - 3].toFixed(2)}</text>`));
+    }
 
     const rd = (f) => readFile(f, 'utf8');
     const [page, nav, tpl, build, css, lib, chart, route, live, demoA] = await Promise.all([
@@ -4244,6 +4257,9 @@ async function main() {
     check('앱 · 미리보기가 같은 마크업 — 찾기 · 자주 보는 종목 · 봉 단위 · 지금 상태(큰 숫자 칸) · 차트 · 구간',
       ['ta-search', 'ta-seg', 'ta-chart', 'ta-ranges', 'ta-read', 'ta-fold', 'ta-howto', 'ta-mood'].every((c) => page.includes(`"${c}"`) && vr.includes(`"${c}`)) &&
       ['taSuggestHtml(', 'taQuickHtml(', 'taBoardHtml(taBoard('].every((f) => page.includes(f.replace('taBoardHtml(taBoard(', 'taBoardHtml(')) && vr.includes(f)) &&
+      // 그림은 한 번 만든 innerHTML 객체를 다시 쓴다 — 렌더마다 새 객체면 누른 봉의 숫자 상자가 지워진다
+      /chartInner: chart \? \{ __html: chart\.html \}/.test(page) && /dangerouslySetInnerHTML=\{view\.chartInner\}/.test(page) &&
+      /taCrossSvg\(model, view\.chart\.layout, i/.test(page) && /taCrossSvg\(m, refLayout, i/.test(tpl) &&
       /const board = taBoard\(model\)/.test(page) &&
       /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /mark: taBoard\(m\)\.mark/.test(tpl) && /mark: board\.mark/.test(page));
     // 2026-11-27 사용자: "차트에서 왜 점 같은 거 있지? 너무 가독성이 떨어지는데" — 흩뿌린 점 · 흐린 ▲▼ 를 빼고 가장 최근 조건 하나만

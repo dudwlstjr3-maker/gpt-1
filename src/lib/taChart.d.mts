@@ -2,11 +2,17 @@ import type { TaModel, TaDir, TaBoardData } from './ta.mjs';
 
 export interface TaLayout {
   L: number;
+  R: number;
   step: number;
   from: number;
   to: number;
   W: number;
   H: number;
+  P: { top: number; h: number };
+  RS: { top: number; h: number };
+  OB: { top: number; h: number };
+  lo: number;
+  hi: number;
 }
 
 export function taChartHtml(
@@ -36,3 +42,9 @@ export function taStamp(tf: '1d' | '4h', market: 'us' | 'kr'): (t: number) => st
 export function taSuggestHtml(list: { id: string; name: string; code?: string | null }[], code: string | null): string;
 export function taQuickHtml(items: { id: string; name: string }[], current: string | null): string;
 export function taBoardHtml(board: TaBoardData): string;
+export function taCrossSvg(
+  m: TaModel,
+  layout: TaLayout,
+  i: number,
+  opt?: { price?: (v: number) => string; stamp?: (t: number) => string; up?: string; down?: string },
+): string;

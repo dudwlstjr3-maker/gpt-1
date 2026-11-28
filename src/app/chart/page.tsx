@@ -19,9 +19,7 @@ import { changeColor } from '@/lib/scale';
 import { taAssets, TA_DEFAULT_ASSET } from '@/lib/taAssets';
 import {
   taModel, taBoard, taReadout, taParseCode, taBarUnit, taLastChange, taSearch,
-  TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT, TA_PROFILES, TA_PROFILE_TEXT, TA_DEFAULT_PROFILE,
-  taWindow, taZoom, taPan,
-  type TaProfile,
+  TA_RANGES, TA_DEFAULT_RANGE, TA_DEFAULT_TF, TA_TEXT,
 } from '@/lib/ta.mjs';
 import {
   taChartHtml, taIndexAt, taCrossSvg, taBoardHtml, taSuggestHtml, taQuickHtml, taPrice, taAxisDate, taStamp,
@@ -36,7 +34,7 @@ interface Sel {
 /** 자주 보는 종목 — 검색 없이 한 번에 */
 const QUICK = ['spx', 'ndx', 'kospi', 'tsla', 'nvda', 'samsung'];
 
-function readQuery(): { sel: Sel; tf: TaTf; range: string | null; profile: TaProfile } {
+function readQuery(): { sel: Sel; tf: TaTf; range: string | null } {
   const sp = new URLSearchParams(window.location.search);
   const t = sp.get('tf');
   const tf: TaTf = t === '1d' || t === '4h' ? t : TA_DEFAULT_TF;
@@ -48,7 +46,6 @@ function readQuery(): { sel: Sel; tf: TaTf; range: string | null; profile: TaPro
     sel: parsed ? { a: null, code: parsed.code } : { a: ok ? a : TA_DEFAULT_ASSET, code: null },
     tf,
     range: sp.get('r'),
-    profile: (TA_PROFILES as string[]).includes(sp.get('p') ?? '') ? (sp.get('p') as TaProfile) : TA_DEFAULT_PROFILE,
   };
 }
 
@@ -58,8 +55,6 @@ export default function ChartPage() {
   const [sel, setSel] = useState<Sel | null>(null);
   const [tf, setTf] = useState<TaTf>(TA_DEFAULT_TF);
   const [range, setRange] = useState<string>(TA_DEFAULT_RANGE[TA_DEFAULT_TF]);
-  // 기법 성향 — 방어적(둘 다 + 슈퍼트렌드 확인) · 공격적(하나만 닿아도). 2026-11-28
-  const [profile, setProfile] = useState<TaProfile>(TA_DEFAULT_PROFILE);
   const [data, setData] = useState<TaBarsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,10 +62,7 @@ export default function ChartPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [width, setWidth] = useState(0);
   const [cursor, setCursor] = useState<number | null>(null);
-  // 확대 · 이동 (2026-11-28) — null 이면 고른 구간(1개월 · 3개월 …)을 최근 봉까지
-  const [zoom, setZoom] = useState<{ span: number; offset: number } | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
-  const drag = useRef<{ id: number; x0: number; w0: ReturnType<typeof taWindow>; moved: boolean } | null>(null);
 
   const list = useMemo(() => taAssets().map((x) => ({ id: x.id, name: x.name, code: x.symbol })), []);
   const quick = useMemo(() => QUICK.map((id) => list.find((x) => x.id === id)).filter((x): x is (typeof list)[number] => !!x), [list]);
@@ -81,7 +73,6 @@ export default function ChartPage() {
     setSel(r.sel);
     setTf(r.tf);
     setRange(r.range && TA_RANGES[r.tf].some(([k]) => k === r.range) ? r.range : TA_DEFAULT_RANGE[r.tf]);
-    setProfile(r.profile);
   }, []);
 
   useEffect(() => {
@@ -91,9 +82,8 @@ export default function ChartPage() {
     if (sel.code) qs.set('code', sel.code);
     qs.set('tf', tf);
     qs.set('r', range);
-    qs.set('p', profile);
     window.history.replaceState(null, '', `/chart?${qs.toString()}`);
-  }, [sel, tf, range, profile]);
+  }, [sel, tf, range]);
 
   useEffect(() => {
     if (!sel) return;
@@ -101,7 +91,6 @@ export default function ChartPage() {
     setLoading(true);
     setError(null);
     setCursor(null);
-    setZoom(null);
     const p = sel.a ? `a=${encodeURIComponent(sel.a)}` : `code=${encodeURIComponent(sel.code ?? '')}`;
     fetch(`/api/ta?${p}&tf=${tf}`, { signal: ctl.signal })
       .then(async (res) => {
@@ -131,20 +120,17 @@ export default function ChartPage() {
   }, [data]);
 
   const model = useMemo(
-    () =>
-      data
-        ? taModel({ tf: data.tf, bars: data.bars, daily: data.daily, gmtoffset: data.gmtoffset, market: data.market, mood: data.mood ?? null })
-        : null,
+    () => (data ? taModel({ tf: data.tf, bars: data.bars, daily: data.daily, gmtoffset: data.gmtoffset }) : null),
     [data],
   );
 
   const view = useMemo(() => {
     if (!model || !data || model.n === 0) return null;
     const want = TA_RANGES[data.tf].find(([k]) => k === range)?.[2] ?? TA_RANGES[data.tf][1][2];
-    const win = taWindow(model.n, zoom?.span ?? want, zoom?.offset ?? 0);
-    const { from, to } = win;
+    const to = model.n - 1;
+    const from = Math.max(0, to - want + 1);
     const price = taPrice(data.precision);
-    const board = taBoard(model, undefined, profile);
+    const board = taBoard(model);
     const chart = width
       ? taChartHtml(model, {
           from,
@@ -152,8 +138,6 @@ export default function ChartPage() {
           width,
           price,
           mark: board.mark,
-          signals: board.signals,
-          profileText: TA_PROFILE_TEXT[profile],
           date: taAxisDate(data.tf, to - from + 1, data.market),
           title: `${data.name} ${taBarUnit(data.tf)}`,
         })
@@ -161,7 +145,6 @@ export default function ChartPage() {
     return {
       from,
       to,
-      win,
       price,
       chart,
       board,
@@ -171,9 +154,7 @@ export default function ChartPage() {
       chartInner: chart ? { __html: chart.html } : undefined,
       boardInner: { __html: taBoardHtml(board) },
     };
-  }, [model, data, range, width, profile, zoom]);
-  const viewRef = useRef(view);
-  viewRef.current = view;
+  }, [model, data, range, width]);
 
   // 누른 봉의 숫자 — 세로선 · 숫자 상자 · 오른쪽 축 꼬리표를 그림 안 '.ta-crossg' 에 넣는다(taCrossSvg)
   const moveCross = useCallback(
@@ -192,71 +173,20 @@ export default function ChartPage() {
     const rect = svg.getBoundingClientRect();
     return taIndexAt(view.chart.layout, ((e.clientX - rect.left) * view.chart.layout.W) / rect.width);
   };
-  // 옆으로 끌면 이동(2026-11-28), 끌지 않고 떼면 그 봉의 숫자. 손가락으로 같은 봉을 한 번 더 누르면 숫자 상자를 닫는다.
-  // 마우스는 올리면 보이고 차트 밖으로 나가면 닫힌다
+  // 손가락으로 같은 봉을 한 번 더 누르면 숫자 상자를 닫는다. 마우스는 올리면 보이고 차트 밖으로 나가면 닫힌다
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (!view || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    drag.current = { id: e.pointerId, x0: e.clientX, w0: view.win, moved: false };
-  };
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d || d.id !== e.pointerId || d.moved) return;
     const i = indexAt(e);
     if (i === null) return;
     moveCross(e.pointerType !== 'mouse' && i === cursor ? null : i);
   };
   const onPointerLeave = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && !drag.current) moveCross(null);
+    if (e.pointerType === 'mouse') moveCross(null);
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (d && d.id === e.pointerId && model && view?.chart) {
-      const dx = e.clientX - d.x0;
-      if (!d.moved && Math.abs(dx) > 6) {
-        d.moved = true;
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-      }
-      if (d.moved) {
-        const svg = boxRef.current?.querySelector('svg');
-        const px = svg ? (svg.getBoundingClientRect().width / view.chart.layout.W) * view.chart.layout.step : 0;
-        if (px > 0) {
-          const w = taPan(model.n, d.w0, Math.round(dx / px));
-          setZoom({ span: w.span, offset: w.offset });
-        }
-        return;
-      }
-    }
-    if (e.pointerType !== 'mouse') return;
+    if (!e.buttons && e.pointerType !== 'mouse') return;
     const i = indexAt(e);
     if (i !== null && i !== cursor) moveCross(i);
   };
-  const zoomBy = (factor: number, anchor = 1) => {
-    const v = viewRef.current;
-    if (!v || !model) return;
-    const w = taZoom(model.n, v.win, factor, anchor);
-    setZoom({ span: w.span, offset: w.offset });
-  };
-  // 휠로 확대 · 축소 — 차트 위에서만, 마우스가 가리킨 봉이 그 자리에 머문다
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      const v = viewRef.current;
-      const svg = el.querySelector('svg');
-      if (!v?.chart || !svg || !model) return;
-      const delta = e.deltaY || e.deltaX;
-      if (!delta) return;
-      e.preventDefault();
-      const rect = svg.getBoundingClientRect();
-      const { L, step, W } = v.chart.layout;
-      const anchor = Math.max(0, Math.min(1, (((e.clientX - rect.left) * W) / rect.width - L) / (v.win.span * step)));
-      zoomBy(Math.exp(Math.max(-0.5, Math.min(0.5, delta * (e.deltaMode === 1 ? 16 : 1) * 0.003))), anchor);
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, model]);
 
   // 그림을 다시 그리면(폭 · 구간이 바뀌면) 짚어 둔 봉의 숫자를 다시 얹는다
   useEffect(() => {
@@ -395,17 +325,6 @@ export default function ChartPage() {
             <h2 id="ta-now-title">
               지금 상태 <small>마지막 {unit} 기준</small>
             </h2>
-            <div className="ta-row">
-              <div className="ta-seg" role="group" aria-label="기법 성향">
-                {TA_PROFILES.map((k) => (
-                  <button key={k} type="button" aria-pressed={profile === k} onClick={() => setProfile(k)}>
-                    {TA_PROFILE_TEXT[k]}
-                  </button>
-                ))}
-              </div>
-              <p className="ta-hint">{TA_TEXT.profileHint}</p>
-            </div>
-            {data.moodNote ? <p className="ta-note" role="status">{data.moodNote}</p> : null}
             <div dangerouslySetInnerHTML={view.boardInner} />
             <details className="ta-howto">
               <summary>{TA_TEXT.techTitle} — 보는 순서</summary>
@@ -424,15 +343,10 @@ export default function ChartPage() {
             </h2>
             <div className="ta-ranges" role="group" aria-label="보이는 구간">
               {TA_RANGES[data.tf].map(([k, label]) => (
-                <button key={k} type="button" aria-pressed={zoom === null && range === k} onClick={() => { setRange(k); setZoom(null); moveCross(null); }}>
+                <button key={k} type="button" aria-pressed={range === k} onClick={() => { setRange(k); moveCross(null); }}>
                   {label}
                 </button>
               ))}
-            </div>
-            <div className="ta-pan">
-              <button type="button" aria-label="차트 축소" onClick={() => zoomBy(1.25)}>−</button>
-              <button type="button" aria-label="차트 확대" onClick={() => zoomBy(0.8)}>＋</button>
-              <small>{TA_TEXT.panHint}</small>
             </div>
             <p className="ta-read" aria-live="polite">
               {shown !== null ? `${view.stamp(model.t[shown])} · ${taReadout(model, shown, view.price)}` : ''}
@@ -444,29 +358,10 @@ export default function ChartPage() {
               aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={() => { drag.current = null; }}
               onPointerLeave={onPointerLeave}
               onKeyDown={onKey}
               dangerouslySetInnerHTML={view.chartInner}
             />
-            <div className="ta-pan">
-              <label htmlFor="ta-position">시간 이동</label>
-              <input
-                id="ta-position"
-                type="range"
-                min={0}
-                max={view.win.maxOffset}
-                step={1}
-                value={view.win.maxOffset - view.win.offset}
-                disabled={view.win.maxOffset === 0}
-                aria-valuetext={`${view.stamp(model.t[view.from])}부터`}
-                onChange={(e) => setZoom({ span: view.win.span, offset: view.win.maxOffset - Number(e.target.value) })}
-              />
-              <button type="button" onClick={() => setZoom({ span: view.win.span, offset: 0 })} disabled={view.win.offset === 0}>
-                최근 봉
-              </button>
-            </div>
             <p className="ta-note">{TA_TEXT.markNote}</p>
           </section>
 

@@ -203,8 +203,6 @@ async function main() {
     for (const tf of ['1d', '4h']) {
       const r = await j(`/api/ta?a=${id}&tf=${tf}`);
       if (!r?.bars?.length) throw new Error(`종목 차트 봉이 비었습니다: ${id} ${tf}`);
-      // 종목 쫄탐의 재료(미국 쫄탐지수 일별) — 빠지면 점수가 비므로 조용히 넘기지 않는다
-      if (!r?.mood?.t?.length) throw new Error(`종목 차트에 시장 쫄탐지수가 없습니다: ${id} ${tf} (${r?.moodNote ?? '까닭 없음'})`);
       ta.bars[`${id}:${tf}`] = r;
       if (tf === '1d') ta.assets.push({ id, name: r.name, market: r.market, code: r.code });
     }

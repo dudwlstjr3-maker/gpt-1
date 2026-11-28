@@ -61,12 +61,11 @@ export function taChartHtml(m, opt) {
   const date = opt.date ?? ((t) => new Date(t).toISOString().slice(5, 10));
 
   // 패널 자리
-  // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리. 가격 아래 종목 쫄탐(2026-11-28) → RSI → OBV
+  // 가격 칸 위 24px 는 '최근 기법 조건' 꼬리표 자리
   const P = { top: 32, h: 220 };
-  // 2026-11-28 사용자: "밑에 보조 지표가 너무 꼴보기 싫은데 … 아래에는 한칸에다가 신호 표시만"
-  // → 종목 쫄탐 · RSI · OBV 칸을 걷고 가격 아래 신호 줄 하나. 숫자는 줄 제목 · 누른 봉 상자 · '지금 상태' 에 글로
-  const SG = { top: P.top + P.h + 26, h: 30 };
-  const H = SG.top + SG.h + 24;
+  const RS = { top: P.top + P.h + 26, h: 84 };
+  const OB = { top: RS.top + RS.h + 26, h: 64 };
+  const H = OB.top + OB.h + 24;
 
   /* ---------- 가격 패널 ---------- */
   let lo = Infinity;
@@ -139,20 +138,8 @@ export function taChartHtml(m, opt) {
     if (dDn) parts.push(`<path d="${dDn}" class="ta-line ta-st" style="stroke:${down}"/>`);
   }
 
-  // 고른 성향(방어적 · 공격적)의 기법 조건 봉 — 상승 쪽은 봉 아래 ▲, 하락 쪽은 봉 위 ▼ (2026-11-28).
-  // 점(●)은 읽기 어렵다는 의견(2026-11-27)이 있어 쓰지 않는다. 강함(RSI 20 이하 · 90 이상)은 테두리를 두른다.
-  const counts = { up: 0, down: 0 };
-  for (const sg of opt.signals ?? []) {
-    if (sg.i < from || sg.i > to || !fin(m.l[sg.i]) || !fin(m.h[sg.i])) continue;
-    counts[sg.side] += 1;
-    const xc = r1(x(sg.i));
-    const isUp = sg.side === 'up';
-    const yy = r1(isUp ? Math.min(P.top + P.h + 10, py(m.l[sg.i]) + 6) : Math.max(P.top - 2, py(m.h[sg.i]) - 6));
-    const d = isUp ? `M${xc} ${yy}l5 9h-10Z` : `M${xc} ${yy}l5 -9h-10Z`;
-    parts.push(`<path d="${d}" class="ta-sig${sg.strong ? ' ta-sig-strong' : ''}" style="fill:${isUp ? up : down}"/>`);
-  }
-
-  // 가장 최근 기법 조건 — 세로 점선 + 글자 꼬리표.
+  // 가장 최근 기법 조건 하나만 — 세로 점선 + 글자 꼬리표.
+  // 조건마다 점을 흩뿌리고 슈퍼트렌드 전환마다 ▲▼ 를 찍었더니 읽기 어렵다는 사용자 의견(2026-11-27)으로 하나만 남겼다.
   // 슈퍼트렌드 전환은 선 색이 바뀌는 자리로 보인다.
   let marked = false;
   {
@@ -161,7 +148,7 @@ export function taChartHtml(m, opt) {
       marked = true;
       const xc = r1(x(mk.i));
       const col = mk.side === 'up' ? up : down;
-      parts.push(`<line x1="${xc}" x2="${xc}" y1="${P.top - 4}" y2="${SG.top + SG.h}" class="ta-mark" style="stroke:${col}"/>`);
+      parts.push(`<line x1="${xc}" x2="${xc}" y1="${P.top - 4}" y2="${RS.top + RS.h}" class="ta-mark" style="stroke:${col}"/>`);
       const tw = 104;
       const tx = Math.max(L + tw / 2, Math.min(L + plotW - tw / 2, xc));
       parts.push(`<rect x="${r1(tx - tw / 2)}" y="4" width="${tw}" height="22" rx="11" style="fill:${col}"/>`);
@@ -179,46 +166,61 @@ export function taChartHtml(m, opt) {
     parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-lastval">${esc(price(last))}</text>`);
   }
 
-  /* ---------- 신호 줄 (2026-11-28) ---------- */
-  // 칠한 곳: 종목 쫄탐 20 이하 · RSI 30 이하(상승 쪽 색), 종목 쫄탐 80 이상 · RSI 80 이상(하락 쪽 색).
-  // 하나면 옅게, 둘 다면 진하게. ▲ ▼ 는 다이버전스(피벗 봉). 값이 없는 봉은 칠하지 않는다(0 으로 보지 않음).
-  const sv = m.score?.v ?? [];
-  const sLo = opt.scoreLow ?? 20;
-  const sHi = opt.scoreHigh ?? 80;
-  const rLo = opt.rsiLow ?? 30;
-  const rHi = opt.rsiHigh ?? 80;
-  const obvNow = m.obv.ok ? m.obv.osc[to] : null;
-  parts.push(`<text x="${L}" y="${SG.top - 8}" class="ta-ptitle">${esc(taSignalTitle(sv[to], m.rsi[to], obvNow))}</text>`);
-  parts.push(`<rect x="${L}" y="${SG.top}" width="${plotW}" height="${SG.h}" class="ta-strip"/>`);
-  {
-    const level = (i) => {
-      const sc = sv[i];
-      const r = m.rsi[i];
-      const u = (fin(sc) && sc <= sLo ? 1 : 0) + (fin(r) && r <= rLo ? 1 : 0);
-      const dn = (fin(sc) && sc >= sHi ? 1 : 0) + (fin(r) && r >= rHi ? 1 : 0);
-      return u > 0 ? `up${u}` : dn > 0 ? `down${dn}` : '';
-    };
-    let runStart = from;
-    let runKey = '';
-    const flush = (end) => {
-      if (!runKey) return;
-      const isUp = runKey.startsWith('up');
-      const x0 = Math.max(L, x(runStart) - step / 2);
-      const x1 = Math.min(L + plotW, x(end) + step / 2);
-      parts.push(`<rect x="${r1(x0)}" y="${SG.top}" width="${r1(Math.max(1, x1 - x0))}" height="${SG.h}" class="ta-strip-on${runKey.endsWith('2') ? ' both' : ''}" style="fill:${isUp ? up : down}"/>`);
-    };
-    for (let i = from; i <= to; i += 1) {
-      const k = level(i);
-      if (k !== runKey) { flush(i - 1); runStart = i; runKey = k; }
-    }
-    flush(to);
+  /* ---------- RSI 패널 ---------- */
+  const ry = (v) => RS.top + (1 - v / 100) * RS.h;
+  parts.push(`<text x="${L}" y="${RS.top - 8}" class="ta-ptitle">RSI 14${fin(m.rsi[to]) ? ` · ${m.rsi[to].toFixed(1)}` : ''}</text>`);
+  // 운영자 기준 — 80 과열 · 30 침체(글자), 90 · 20 강함(흐린 선)
+  const hiL = opt.rsiHigh ?? 80;
+  const loL = opt.rsiLow ?? 30;
+  parts.push(`<rect x="${L}" y="${r1(ry(hiL))}" width="${plotW}" height="${r1(ry(loL) - ry(hiL))}" class="ta-band"/>`);
+  for (const v of [opt.rsiStrongHigh ?? 90, opt.rsiStrongLow ?? 20]) {
+    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref ta-ref-strong"/>`);
   }
+  for (const v of [hiL, loL]) {
+    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(ry(v))}" y2="${r1(ry(v))}" class="ta-ref"/>`);
+    parts.push(`<text x="${W - 4}" y="${r1(ry(v)) + 4}" text-anchor="end" class="ta-axis">${v}</text>`);
+  }
+  {
+    const d = linePath(m.rsi, from, to, x, ry);
+    if (d) parts.push(`<path d="${d}" class="ta-line ta-rsi"/>`);
+  }
+  // 다이버전스 — 두 피벗을 잇는 점선과 ▲ / ▼
   let divCount = 0;
   for (const dv of m.div) {
-    if (dv.i < from || dv.i > to) continue;
+    if (dv.i < from || dv.from < from || dv.i > to) continue;
     divCount += 1;
     const col = dv.kind === 'bull' ? up : down;
-    parts.push(`<text x="${r1(x(dv.i))}" y="${r1(SG.top + SG.h / 2 + 5)}" text-anchor="middle" class="ta-flip" style="fill:${col}">${dv.kind === 'bull' ? '▲' : '▼'}</text>`);
+    parts.push(`<line x1="${r1(x(dv.from))}" y1="${r1(ry(m.rsi[dv.from]))}" x2="${r1(x(dv.i))}" y2="${r1(ry(m.rsi[dv.i]))}" class="ta-div" style="stroke:${col}"/>`);
+    const yy = dv.kind === 'bull' ? Math.min(RS.top + RS.h + 12, ry(m.rsi[dv.i]) + 14) : Math.max(RS.top - 1, ry(m.rsi[dv.i]) - 5);
+    parts.push(`<text x="${r1(x(dv.i))}" y="${r1(yy)}" text-anchor="middle" class="ta-flip" style="fill:${col}">${dv.kind === 'bull' ? '▲' : '▼'}</text>`);
+  }
+
+  /* ---------- OBV 패널 ---------- */
+  if (m.obv.ok) {
+    let amax = 0;
+    for (let i = from; i <= to; i += 1) { const v = m.obv.osc[i]; if (fin(v)) amax = Math.max(amax, Math.abs(v)); }
+    const oy = (v) => OB.top + OB.h / 2 - (amax ? (v / amax) * (OB.h / 2) : 0);
+    const now = m.obv.osc[to];
+    parts.push(`<text x="${L}" y="${OB.top - 8}" class="ta-ptitle">OBV 오실레이터${fin(now) ? ` · ${now > 0 ? '＋' : now < 0 ? '－' : '0'}` : ''}</text>`);
+    parts.push(`<line x1="${L}" x2="${L + plotW}" y1="${r1(oy(0))}" y2="${r1(oy(0))}" class="ta-ref"/>`);
+    parts.push(`<text x="${W - 4}" y="${r1(oy(0)) + 4}" text-anchor="end" class="ta-axis">0</text>`);
+    // 0 위 · 아래를 막대로 — 위는 오름 색, 아래는 내림 색. 부호는 제목의 ＋ / － 로도 적는다.
+    let pos = '';
+    let neg = '';
+    const ow = Math.max(1, step * 0.8);
+    for (let i = from; i <= to; i += 1) {
+      const v = m.obv.osc[i];
+      if (!fin(v) || v === 0) continue;
+      const y0 = oy(0);
+      const y1 = oy(v);
+      const seg = `M${r1(x(i) - ow / 2)} ${r1(Math.min(y0, y1))}h${r1(ow)}v${r1(Math.max(0.5, Math.abs(y1 - y0)))}h${r1(-ow)}Z`;
+      if (v > 0) pos += seg; else neg += seg;
+    }
+    if (pos) parts.push(`<path d="${pos}" style="fill:${up}" class="ta-obv"/>`);
+    if (neg) parts.push(`<path d="${neg}" style="fill:${down}" class="ta-obv"/>`);
+  } else {
+    parts.push(`<text x="${L}" y="${OB.top - 8}" class="ta-ptitle">OBV 오실레이터</text>`);
+    parts.push(`<text x="${L}" y="${OB.top + OB.h / 2 + 4}" class="ta-axis">${esc(m.obv.reason)}</text>`);
   }
 
   /* ---------- 날짜 ---------- */
@@ -234,7 +236,7 @@ export function taChartHtml(m, opt) {
   // 누른 자리 — 세로선 · 숫자 상자 · 축 꼬리표가 여기 들어간다(taCrossSvg). 처음에는 비어 있다
   parts.push('<g class="ta-crossg"></g>');
 
-  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. 기법 조건 상승 쪽 ${counts.up}번 · 하락 쪽 ${counts.down}번. 가격 아래 신호 줄은 종목 쫄탐 · RSI 가 기준에 닿은 구간을 칠함. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}. 같은 내용을 '지금 상태' 에서 글로 볼 수 있습니다.`;
+  const label = `${opt.title ?? '종목 차트'} — 봉 ${count}개. RSI 다이버전스 ${divCount}번${marked ? ', 가장 최근 기법 조건 자리 표시' : ''}. 같은 내용을 '지금 상태' 에서 글로 볼 수 있습니다.`;
   const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(label)}" class="ta-svg">${parts.join('')}</svg>`;
 
   const legend = [
@@ -243,22 +245,13 @@ export function taChartHtml(m, opt) {
     ['ta-k-ma2', `${m.ma[1]?.p ?? 60}선`],
     ['ta-k-trend', '1년선(추세선)'],
     ['ta-k-st', '슈퍼트렌드'],
-    ...(counts.up + counts.down ? [['ta-k-sig', `▲▼ = 기법 조건${opt.profileText ? ` (${opt.profileText})` : ''}`]] : []),
     ...(marked ? [['ta-k-mark', '세로 점선 = 최근 기법 조건']] : []),
   ].map(([k, t]) => `<li class="${k}"><i aria-hidden="true"></i>${esc(t)}</li>`).join('');
-  const countLine = `<p class="ta-count">보이는 구간${opt.profileText ? ` · ${esc(opt.profileText)}` : ''} · 상승 쪽 조건 ${counts.up}번 · 하락 쪽 조건 ${counts.down}번</p>` +
-    `<p class="ta-count ta-strip-key">신호 줄 — 옅게: 종목 쫄탐 ${sLo} 이하 · ${sHi} 이상 또는 RSI ${rLo} 이하 · ${rHi} 이상 하나, 진하게: 둘 다 · ▲▼ 다이버전스</p>`;
 
   return {
-    html: `<ul class="ta-legend">${legend}</ul>${svg}${countLine}`,
-    layout: { L, R, step, from, to, W, H, P, SG, lo, hi },
-    counts,
+    html: `<ul class="ta-legend">${legend}</ul>${svg}`,
+    layout: { L, R, step, from, to, W, H, P, RS, OB, lo, hi },
   };
-}
-
-/** 신호 줄 제목 — "신호 · 쫄탐 31 · RSI 53.8 · OBV ＋". 값이 없으면 '—' */
-export function taSignalTitle(score, rsiV, obvV) {
-  return `신호 · 쫄탐 ${fin(score) ? Math.round(score) : '—'} · RSI ${fin(rsiV) ? rsiV.toFixed(1) : '—'} · OBV ${fin(obvV) ? (obvV > 0 ? '＋' : obvV < 0 ? '－' : '0') : '—'}`;
 }
 
 /** 그림 위 x(px, 그림 왼쪽 기준) → 봉 번호 */
@@ -337,13 +330,12 @@ export function taBoardHtml(board) {
     const col = t.dir ? ` style="color:var(--ta-${t.dir === 'up' ? 'up' : 'down'})"` : '';
     const sub = t.sub;
     const scol = sub && sub.dir ? ` style="color:var(--ta-${sub.dir === 'up' ? 'up' : 'down'})"` : '';
-    const aria = `${t.label}: ${t.big}, ${t.cap}${sub ? `. ${sub.big}, ${sub.cap}` : ''}${t.note ? `. 재료 ${t.note}` : ''}`;
+    const aria = `${t.label}: ${t.big}, ${t.cap}${sub ? `. ${sub.big}, ${sub.cap}` : ''}`;
     return `<div class="ta-tile" data-k="${esc(t.key)}" role="group" aria-label="${esc(aria)}">` +
       `<span class="ta-tl">${esc(t.label)}</span><b class="ta-big"${col}>${esc(t.big)}</b>` +
       (fin(t.rsi) && t.bands ? rsiBar(t.rsi, t.bands) : '') +
       `<span class="ta-cap">${esc(t.cap)}</span>` +
-      (sub ? `<b class="ta-sub"${scol}>${esc(sub.big)}</b><span class="ta-cap">${esc(sub.cap)}</span>` : '') +
-      (t.note ? `<span class="ta-parts">${esc(t.note)}</span>` : '') + '</div>';
+      (sub ? `<b class="ta-sub"${scol}>${esc(sub.big)}</b><span class="ta-cap">${esc(sub.cap)}</span>` : '') + '</div>';
   };
   return `<div class="ta-board"><div class="ta-verdict" data-side="${v.side ?? 'none'}">` +
     `<p class="ta-vhead"><b${vc}>${esc(v.text)}</b>${v.strong ? '<span class="ta-strong">강함</span>' : ''}</p>` +
@@ -351,7 +343,7 @@ export function taBoardHtml(board) {
     `<div class="ta-tiles">${board.tiles.map(tile).join('')}</div></div>`;
 }
 
-/** RSI 막대 — 0 · 강한 침체 · 침체 · 중간 · 과열 · 강한 과열 · 100, 지금 값에 눈금. 종목 쫄탐은 20 · 80 두 경계만 쓴다 */
+/** RSI 막대 — 0 · 강한 침체 · 침체 · 중간 · 과열 · 강한 과열 · 100, 지금 값에 눈금 */
 function rsiBar(r, bands) {
   const [sl, l, h, sh] = bands;
   const seg = [['sl', sl], ['l', l - sl], ['m', h - l], ['h', sh - h], ['sh', 100 - sh]];
@@ -361,17 +353,17 @@ function rsiBar(r, bands) {
 }
 
 /**
- * 누른 봉의 숫자 — 세로선, 종가 자리의 작은 점과 오른쪽 축 꼬리표, 숫자 상자(손가락 반대쪽).
- * 2026-11-28 보조 칸을 신호 줄 하나로 줄이면서 종목 쫄탐 · RSI · OBV 는 상자의 줄로만 보인다.
+ * 누른 봉의 숫자 — 세로선, 종가 · RSI 자리의 작은 점과 오른쪽 축 꼬리표, 숫자 상자(손가락 반대쪽).
  * 2026-11-27 사용자: "차트에서 그래프나 누르는 곳에 숫자 나오게". 앱 · 미리보기가 '.ta-crossg' 에 그대로 넣는다.
  * 값이 없으면 0 이 아니라 '없음'.
  */
 export function taCrossSvg(m, layout, i, opt = {}) {
   if (!layout || !(i >= layout.from && i <= layout.to && i >= 0 && i < m.n)) return '';
-  const { L, R, step, from, W, P, SG, lo, hi } = layout;
+  const { L, R, step, from, W, P, RS, OB, lo, hi } = layout;
   const plotW = W - L - R;
   const x = r1(L + (i - from + 0.5) * step);
   const py = (v) => P.top + (1 - (v - lo) / (hi - lo)) * P.h;
+  const ry = (v) => RS.top + (1 - v / 100) * RS.h;
   const clampY = (y, top, h) => Math.max(top + 11, Math.min(top + h - 11, y));
   const price = opt.price ?? ((v) => String(v));
   const up = opt.up ?? 'var(--ta-up)';
@@ -379,7 +371,7 @@ export function taCrossSvg(m, layout, i, opt = {}) {
   const none = '없음';
   const parts = [];
 
-  parts.push(`<line x1="${x}" x2="${x}" y1="${P.top}" y2="${SG.top + SG.h}" class="ta-cross"/>`);
+  parts.push(`<line x1="${x}" x2="${x}" y1="${P.top}" y2="${OB.top + OB.h}" class="ta-cross"/>`);
 
   // 종가 — 점과 오른쪽 축 꼬리표
   const c = m.c[i];
@@ -389,9 +381,14 @@ export function taCrossSvg(m, layout, i, opt = {}) {
     parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" class="ta-cross-tag"/>`);
     parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-cross-tagt">${esc(price(c))}</text>`);
   }
-  const sc = m.score?.v[i];
+  // RSI — 점과 꼬리표
   const r = m.rsi[i];
-  const ob = m.obv.ok ? m.obv.osc[i] : null;
+  if (fin(r)) {
+    parts.push(`<circle cx="${x}" cy="${r1(ry(r))}" r="3.5" class="ta-cross-dot"/>`);
+    const yy = r1(clampY(ry(r), RS.top, RS.h));
+    parts.push(`<rect x="${L + plotW + 2}" y="${yy - 11}" width="${R - 4}" height="22" rx="4" class="ta-cross-tag"/>`);
+    parts.push(`<text x="${W - 5}" y="${yy + 5}" text-anchor="end" class="ta-cross-tagt">${r.toFixed(1)}</text>`);
+  }
 
   // 숫자 상자
   const pc = i > 0 ? m.c[i - 1] : null;
@@ -403,9 +400,7 @@ export function taCrossSvg(m, layout, i, opt = {}) {
     ['종가', `${val(c)}${chgText}`, chg > 0 ? up : chg < 0 ? down : null],
     ['시가', val(m.o[i]), null],
     ['고 · 저', `${val(m.h[i])} · ${val(m.l[i])}`, null],
-    ['종목 쫄탐', fin(sc) ? String(Math.round(sc)) : none, null],
     ['RSI', fin(r) ? r.toFixed(1) : none, null],
-    ['OBV', fin(ob) ? (ob > 0 ? '＋ 우세' : ob < 0 ? '－ 우세' : '0') : none, null],
     ['슈퍼트렌드', st ? `${st === 'up' ? '▲' : '▼'} ${val(m.st.line[i])}` : none, st === 'up' ? up : st === 'down' ? down : null],
     [`${m.ma[0]?.p ?? 20}선`, val(m.ma[0]?.v[i]), null],
     [`${m.ma[1]?.p ?? 60}선`, val(m.ma[1]?.v[i]), null],

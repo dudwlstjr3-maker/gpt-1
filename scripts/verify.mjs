@@ -4216,15 +4216,17 @@ async function main() {
       `${ev.length}개`);
     const now = ta.techNow(m4);
     check('기법 카드 — 다이버전스 · RSI · 슈퍼트렌드(후순위) 순서, 결론은 \'조건 충족\' 또는 \'없음\'',
-      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
+      // 2026-11-28 방어적은 조건 뒤 슈퍼트렌드를 기다리는 동안 '추세 확인 전' 이라고 적는다 ([8-47])
+      now.rows.map((r) => r.key).join(',') === 'tdiv,trsi,tst' && /^(상승 쪽 조건 충족 ▲|하락 쪽 조건 충족 ▼|(상승|하락) 쪽 조건 · 추세 확인 전|기법 조건 없음)$/.test(now.head.text) && /후순위/.test(now.rows[2].name),
       now.head.text);
     check('처음 여는 봉 단위는 4시간봉', ta.TA_DEFAULT_TF === '4h');
     // 2026-11-27 사용자: "지표를 좀 더 잘 보이게 간단하게, 숫자들은 크게" — 결론 한 줄 + 큰 숫자 칸 여섯
     const board = ta.taBoard(m4);
     // 이어서 사용자: "rsi 는 다이버전스랑 같이 합쳐서" — RSI 칸 하나에 다이버전스를 둘째 값으로
-    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 다섯 (RSI · 다이버전스 한 칸 · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
-      board.tiles.map((t) => t.key).join(',') === 'rsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8) &&
-      /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/.test(board.tiles[0].sub?.big ?? ''),
+    // 2026-11-28 맨 앞에 종목 쫄탐 칸 ([8-47])
+    check('지금 상태는 결론 한 줄 + 큰 숫자 칸 여섯 (종목 쫄탐 · RSI · 다이버전스 한 칸 · 슈퍼트렌드 · 20/60선 · 1년선 · OBV)',
+      board.tiles.map((t) => t.key).join(',') === 'score,rsi,st,ma,trend,obv' && board.tiles.every((t) => t.big.length <= 8) &&
+      /^(▲ 상승 다이버전스|▼ 하락 다이버전스|다이버전스 없음)$/.test(board.tiles[1].sub?.big ?? ''),
       board.tiles.map((t) => t.big).join(' | '));
     const cssBig = await readFile('src/app/ta.css', 'utf8');
     const px = (sel) => Number((cssBig.match(new RegExp(sel.replace(/[.[\]"=]/g, (c) => '\\' + c) + '\\s*\\{[^}]*font-size:\\s*([\\d.]+)px')) ?? [])[1]);
@@ -4237,8 +4239,9 @@ async function main() {
       const tc = await import('../src/lib/taChart.mjs');
       const out = tc.taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360 });
       const tip = tc.taCrossSvg(m4, out.layout, m4.n - 3, { price: (v) => v.toFixed(2), stamp: () => '' });
-      check('차트를 누르면 그 봉의 숫자 — 세로선 · 종가 · RSI 꼬리표 · 상자(종가 · 시가 · 고저 · RSI · 슈퍼트렌드 · 20/60선 · 1년선)',
-        /<g class="ta-crossg"><\/g>/.test(out.html) && (tip.match(/class="ta-cross-tag"/g) ?? []).length === 2 &&
+      // 2026-11-28 RSI 칸을 신호 줄로 바꾸며 오른쪽 꼬리표는 종가 하나, RSI 는 상자 줄로 ([8-47])
+      check('차트를 누르면 그 봉의 숫자 — 세로선 · 종가 꼬리표 · 상자(종가 · 시가 · 고저 · RSI · 슈퍼트렌드 · 20/60선 · 1년선)',
+        /<g class="ta-crossg"><\/g>/.test(out.html) && (tip.match(/class="ta-cross-tag"/g) ?? []).length === 1 &&
         ['종가', '시가', '고 · 저', 'RSI', '슈퍼트렌드', '20선', '60선', '1년선'].every((k) => tip.includes(`class="ta-tip-l">${k}<`)) &&
         tip.includes(`>${m4.c[m4.n - 3].toFixed(2)}</text>`));
     }
@@ -4260,8 +4263,9 @@ async function main() {
       // 그림은 한 번 만든 innerHTML 객체를 다시 쓴다 — 렌더마다 새 객체면 누른 봉의 숫자 상자가 지워진다
       /chartInner: chart \? \{ __html: chart\.html \}/.test(page) && /dangerouslySetInnerHTML=\{view\.chartInner\}/.test(page) &&
       /taCrossSvg\(model, view\.chart\.layout, i/.test(page) && /taCrossSvg\(m, refLayout, i/.test(tpl) &&
-      /const board = taBoard\(model\)/.test(page) &&
-      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /mark: taBoard\(m\)\.mark/.test(tpl) && /mark: board\.mark/.test(page));
+      /const board = taBoard\(model, undefined, profile\)/.test(page) &&
+      /taChartHtml\(/.test(page) && /taChartHtml\(/.test(tpl) && /const board = taBoard\(m, undefined, state\.ref\.profile\)/.test(tpl) &&
+      /mark: board\.mark/.test(tpl) && /mark: board\.mark/.test(page));
     // 2026-11-27 사용자: "차트에서 왜 점 같은 거 있지? 너무 가독성이 떨어지는데" — 흩뿌린 점 · 흐린 ▲▼ 를 빼고 가장 최근 조건 하나만
     const svgNow = (await import('../src/lib/taChart.mjs')).taChartHtml(m4, { from: Math.max(0, m4.n - 130), to: m4.n - 1, width: 360, mark: ta.taBoard(m4).mark }).html;
     check('차트에 점(●) · 흐린 슈퍼트렌드 ▲▼ 없음 — 최근 기법 조건만 세로 점선 하나와 꼬리표',
@@ -4284,6 +4288,169 @@ async function main() {
     check('/chart 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('종목 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
     const old = await fetch(`${BASE}/ref`, { redirect: 'manual' });
     check('옛 주소 /ref 는 남기지 않음 (이 PR 안에서 바뀐 이름)', old.status === 404, String(old.status));
+  }
+
+  console.log('\n[8-47] 종목 쫄탐 — 시장 쫄탐지수 + 1년선 · OBV 를 모은 0~100 · 방어적 / 공격적 · 신호 줄 · 확대 / 이동');
+  {
+    /*
+     * 2026-11-28 사용자: "매매기준은 기본적으로 쫄탐지수를 참고해서 차트에 표기해라, 내가 올려준 지표 4가지는 보조지표고,
+     * 아니면 그 모든 걸 고려해서 지수를 다시 짤까?" → 고른 것: 종목별 종합 점수(홈 쫄탐지수는 그대로, 재료 하나로),
+     * 문구는 '상승 쪽 조건'(규칙 1절 그대로), 기준은 RSI 30 · 80 · 쫄탐 20 · 80, 공격적은 하나만 · 방어적은 둘 다 + 슈퍼트렌드 확인.
+     */
+    const ta = await import('../src/lib/ta.mjs');
+    const tc = await import('../src/lib/taChart.mjs');
+    const mode = (await getJson('/api/health')).body?.mode;
+    const fng = (await getJson('/api/fng/us')).body?.detail;
+    const hist = fng?.history ?? [];
+    const dayKey = (t) => Math.floor(t / 86_400_000);
+    const moodByDay = new Map(hist.map((p) => [dayKey(p.t), p.v]));
+    const assets = [['spx', '1d'], ['spx', '4h'], ['tsla', '4h'], ['samsung', '4h'], ['kospi', '1d'], ['nvda', '1d']];
+    const got = [];
+    for (const [a, tf] of assets) got.push([a, tf, (await getJson(`/api/ta?a=${a}&tf=${tf}`)).body ?? {}]);
+
+    check('차트 응답에 미국 쫄탐지수 일별 값 — 같은 모드(섞지 않음) · 봉 범위만 · 오름차순',
+      got.every(([, , r]) => r.mode === mode && r.mood?.market === 'us' && r.mood.t.length > 20 && r.mood.t.length === r.mood.v.length &&
+        r.mood.t.every((t, i, arr) => i === 0 || arr[i - 1] < t) && r.mood.t[0] >= r.bars[0].t - 8 * 86_400_000 && r.moodNote === null),
+      got.map(([a, tf, r]) => `${a}:${tf} ${r.mood?.t?.length ?? '없음'}`).join(' · '));
+    check('차트의 시장 쫄탐 = 심리 상세의 쫄탐지수 (같은 엔진 · 같은 날 같은 값)',
+      got.every(([, , r]) => r.mood.t.every((t, i) => !moodByDay.has(dayKey(t)) || moodByDay.get(dayKey(t)) === r.mood.v[i])) &&
+      got[0][2].mood.v.at(-1) === hist.at(-1)?.v, `마지막 ${got[0][2].mood?.v?.at(-1)} / ${hist.at(-1)?.v}`);
+
+    const models = got.map(([a, tf, r]) => [a, tf, r, ta.taModel({ tf, bars: r.bars, daily: r.daily, gmtoffset: r.gmtoffset, market: r.market, mood: r.mood })]);
+    // 2026-11-28 처음에는 RSI 30 을 넣었는데 점수가 RSI 와 거의 같이 움직여(상관 0.77~0.94) 사용자 결정으로 뺐다
+    check('비중은 시장 쫄탐 50 · 1년선 괴리 25 · OBV 25 (RSI 는 점수에 넣지 않음), 기준은 20 · 80',
+      JSON.stringify(ta.TA_SCORE_W) === '{"mood":50,"gap":25,"obv":25}' && ta.TA_SCORE_LOW === 20 && ta.TA_SCORE_HIGH === 80 &&
+      ta.TA_RSI_LOW === 30 && ta.TA_RSI_HIGH === 80 && models.every(([, , , m]) => m.score.parts.rsi === undefined));
+    {
+      let bad = 0;
+      let seen = 0;
+      for (const [, , , m] of models) {
+        const p = m.score.parts;
+        for (let i = 0; i < m.n; i += 1) {
+          const v = m.score.v[i];
+          const g = p.gap[i];
+          const o = p.obv[i];
+          const can = Number.isFinite(p.mood[i]) && (Number.isFinite(g) || Number.isFinite(o));
+          if (v === null) { if (can) bad += 1; continue; }
+          seen += 1;
+          const want = Number.isFinite(g) && Number.isFinite(o)
+            ? (p.mood[i] * 50 + g * 25 + o * 25) / 100
+            : (p.mood[i] + (Number.isFinite(g) ? g : o)) / 2;
+          if (!can || !(v >= 0 && v <= 100) || Math.abs(v - want) > 1e-9) bad += 1;
+        }
+      }
+      check('종목 쫄탐 = 재료의 가중평균(0~100) — 1년선 · OBV 중 하나만 있으면 시장 50 : 그 하나 50, 둘 다 없으면 없음',
+        bad === 0 && seen > 1000, `${seen}봉 · 어긋남 ${bad}`);
+    }
+    {
+      // Codex 리뷰: obvOsc 는 거래량이 하나라도 빠지면 시리즈 전체를 내지 않아, 점수에 쓰면 뒤 봉 하나가 지난 점수를 모두 바꿨다
+      const [, , r, m] = models[1];
+      const more = [...r.bars, { t: r.bars.at(-1).t + 4 * 3600_000, o: 1, h: 1, l: 1, c: 1, v: null }];
+      const m2 = ta.taModel({ tf: r.tf, bars: more, daily: r.daily, gmtoffset: r.gmtoffset, market: r.market, mood: r.mood });
+      check('OBV 재료는 그 봉까지의 거래량만 — 뒤에 거래량이 빠진 봉이 붙어도 앞 점수가 그대로',
+        m2.score.v.slice(0, m.n).every((v, i) => v === m.score.v[i]) && m2.score.parts.obv[m.n] === null);
+    }
+    {
+      // 미리 당겨 쓰지 않는다 — 미국 일봉은 그날 값, 4시간봉 · 한국은 전날까지의 값
+      const dayOf = (t, off) => Math.floor((t / 1000 + off) / 86400);
+      const prevVal = (d, same) => { let best = null; let bd = -Infinity; for (const p of hist) { const k = dayKey(p.t); if ((same ? k <= d : k < d) && k > bd) { bd = k; best = p.v; } } return d - bd <= 5 ? best : null; };
+      let bad = 0;
+      for (const [, tf, r, m] of models) {
+        const same = tf === '1d' && r.market === 'us';
+        for (const i of [m.n - 1, m.n - 2, m.n - 7, Math.floor(m.n / 2)]) {
+          if (m.score.parts.mood[i] !== prevVal(dayOf(m.t[i], r.gmtoffset), same)) bad += 1;
+        }
+      }
+      check('시장 쫄탐은 봉이 끝날 때 이미 나온 값만 — 미국 일봉은 같은 날, 4시간봉 · 한국은 전날까지', bad === 0, `어긋남 ${bad}`);
+    }
+    {
+      let bad = 0;
+      let agg = 0;
+      let def = 0;
+      for (const [, , , m] of models) {
+        const A = ta.taSignals(m, 'aggressive').list;
+        const D = ta.taSignals(m, 'defensive').list;
+        agg += A.length; def += D.length;
+        for (const e of A) {
+          const r = m.rsi[e.setup];
+          const s = m.score.v[e.setup];
+          const ok = e.i === e.setup && (e.why.includes('div') ||
+            (e.side === 'up' ? (s !== null && s <= 20) || r <= 30 : (s !== null && s >= 80) || r >= 80));
+          if (!ok) bad += 1;
+        }
+        for (const e of D) {
+          const r = m.rsi[e.setup];
+          const s = m.score.v[e.setup];
+          const both = e.side === 'up' ? s !== null && s <= 20 && r <= 30 : s !== null && s >= 80 && r >= 80;
+          const ok = m.st.dir[e.i] === e.side && e.i >= e.setup && e.i <= e.setup + ta.TA_CONFIRM && (both || e.why.includes('div'));
+          if (!ok) bad += 1;
+        }
+      }
+      check('공격적 — 둘 중 하나가 시작된 봉에 바로 / 방어적 — 둘 다 닿은 뒤 슈퍼트렌드가 같은 쪽인 봉', bad === 0 && agg > def && def > 0,
+        `공격적 ${agg} · 방어적 ${def} · 어긋남 ${bad}`);
+    }
+    {
+      const texts = [];
+      for (const [, , , m] of models) for (const p of ta.TA_PROFILES) {
+        const b = ta.taBoard(m, undefined, p);
+        texts.push(b.verdict.text, b.verdict.sub, ...b.tiles.map((t) => `${t.label} ${t.big} ${t.cap} ${t.note ?? ''}`));
+      }
+      const pushy = texts.filter((t) => /매수|매도|사세요|파세요|진입|청산|목표가|손절|익절|추천/.test(t));
+      check('결론 · 칸 문구는 \'상승 쪽 · 하락 쪽 조건\' — 매수 · 매도 말 없음 (규칙 1절)', pushy.length === 0 &&
+        texts.some((t) => /^(상승|하락) 쪽 조건/.test(t)), `${texts.length}줄 중 ${pushy.length}`);
+    }
+    {
+      const [, , , m] = models[2];
+      const b = ta.taBoard(m, undefined, 'aggressive');
+      const out = tc.taChartHtml(m, { from: m.n - 130, to: m.n - 1, width: 360, signals: b.signals, mark: b.mark, profileText: '공격적' });
+      const inView = b.signals.filter((e) => e.i >= m.n - 130).length;
+      check('차트 — 표시 봉마다 ▲ ▼ (점 없음) · 개수 줄',
+        (out.html.match(/class="ta-sig( ta-sig-strong)?"/g) ?? []).length === inView && !/<circle /.test(out.html) &&
+        /<p class="ta-count">보이는 구간 · 공격적 · 상승 쪽 조건 \d+번 · 하락 쪽 조건 \d+번<\/p>/.test(out.html) &&
+        b.tiles[0].key === 'score' && /^\d+$/.test(b.tiles[0].big),
+        `표시 ${inView}`);
+      // 2026-11-28 사용자: "밑에 보조 지표가 너무 꼴보기 싫은데 … 아래에는 한칸에다가 신호 표시만"
+      const sTo = m.score.v[m.n - 1];
+      const strips = [...out.html.matchAll(/class="ta-strip-on( both)?"/g)];
+      check('가격 아래는 신호 줄 하나 — 종목 쫄탐 · RSI · OBV 칸 없음, 줄 제목에 숫자, 기준에 닿은 구간만 칠함',
+        /<rect [^>]*class="ta-strip"\/>/.test(out.html) && !/RSI 14 ·|OBV 오실레이터|class="ta-ptitle">종목 쫄탐/.test(out.html) &&
+        out.html.includes(`신호 · 쫄탐 ${Math.round(sTo)} · RSI ${m.rsi[m.n - 1].toFixed(1)} · OBV `) &&
+        out.layout.SG && !out.layout.RS && strips.length > 0 &&
+        /신호 줄 — 옅게: 종목 쫄탐 20 이하 · 80 이상 또는 RSI 30 이하 · 80 이상 하나, 진하게: 둘 다 · ▲▼ 다이버전스/.test(out.html),
+        `칠한 구간 ${strips.length}`);
+      const tip = tc.taCrossSvg(m, out.layout, m.n - 3, { price: (v) => v.toFixed(2), stamp: () => '' });
+      check('누른 봉의 숫자 상자에 종목 쫄탐 · RSI · OBV 줄 (오른쪽 꼬리표는 종가 하나)',
+        ['종목 쫄탐', 'RSI', 'OBV'].every((k) => tip.includes(`class="ta-tip-l">${k}<`)) &&
+        (tip.match(/class="ta-cross-tag"/g) ?? []).length === 1 && tip.includes(`>${Math.round(m.score.v[m.n - 3])}</text>`));
+      // 확대 · 이동 — 앱과 미리보기가 같은 taWindow · taZoom · taPan
+      const n = m.n;
+      const w0 = ta.taWindow(n, 130, 0);
+      const zin = ta.taZoom(n, w0, 0.5, 1);
+      const left = ta.taPan(n, w0, 10_000);
+      check('확대 · 이동 — 구간은 데이터 안에서만, 확대해도 20봉 아래로 안 감, 끝에서 멈춤',
+        w0.to === n - 1 && w0.span === 130 && zin.span === 65 && zin.to === n - 1 && left.from === 0 &&
+        ta.taPan(n, w0, -5).offset === 0 && ta.taZoom(n, w0, 0.01).span === ta.TA_MIN_SPAN && ta.taZoom(n, w0, 1000).span === n);
+    }
+    const [page, tpl, build, css] = await Promise.all(['src/app/chart/page.tsx', 'tools/preview/template.html', 'tools/preview/build.mjs', 'src/app/ta.css'].map((f) => readFile(f, 'utf8')));
+    const vr = tpl.slice(tpl.indexOf('  function viewRef() {'), tpl.indexOf('\n  function drawRef()'));
+    check('앱 · 미리보기 같은 성향 고르기 — 방어적이 처음, 주소 ?p= 로 이어짐',
+      ta.TA_DEFAULT_PROFILE === 'defensive' && /aria-label="기법 성향"/.test(page) && /aria-label="기법 성향"/.test(vr) &&
+      /TA_PROFILES\.map/.test(page) && /data-ta-profile="/.test(vr) && /qs\.set\('p', profile\)/.test(page) &&
+      /profile: 'defensive'/.test(tpl) && /if \(d\.taProfile\)/.test(tpl) && /TA_TEXT\.profileHint/.test(page) && /TA_TEXT\.profileHint/.test(vr) &&
+      /signals: board\.signals/.test(page) && /signals: board\.signals/.test(tpl) &&
+      /mood: data\.mood \?\? null/.test(page) && /mood: d\.mood \|\| null/.test(tpl));
+    check('미리보기 빌드는 시장 쫄탐이 빠지면 멈춤 (조용히 비우지 않음)', /종목 차트에 시장 쫄탐지수가 없습니다/.test(build));
+    check('앱 · 미리보기 같은 확대 · 이동 — ＋ − 단추 · 휠 · 끌기 · 시간 이동 슬라이더 · 최근 봉',
+      /taWindow\(model\.n/.test(page) && /taZoom\(model\.n/.test(page) && /taPan\(model\.n/.test(page) &&
+      /aria-label="차트 확대"/.test(page) && /aria-label="차트 축소"/.test(page) && /addEventListener\('wheel'/.test(page) &&
+      /id="ta-position"/.test(page) && /최근 봉/.test(page) && /onPointerUp=\{onPointerUp\}/.test(page) &&
+      /taWindow\(m\.n/.test(tpl) && /taZoom\(r?m\.n/.test(tpl) && /taPan\(refModel\(rd\)\.n/.test(tpl) &&
+      /data-ta-zoom="in" aria-label="차트 확대"/.test(vr) && /data-ta-zoom="out" aria-label="차트 축소"/.test(vr) &&
+      /addEventListener\('wheel'/.test(tpl) && /id="ta-position"/.test(vr) && /data-ta-latest/.test(vr) && /TA_TEXT\.panHint/.test(page) && /TA_TEXT\.panHint/.test(vr));
+    check('시장 쫄탐을 못 받은 까닭(moodNote)을 앱 · 미리보기가 화면에 적음',
+      /data\.moodNote \? <p className="ta-note" role="status">\{data\.moodNote\}<\/p>/.test(page) &&
+      /d\.moodNote \? '<p class="ta-note" role="status">' \+ esc\(d\.moodNote\)/.test(vr));
+    check('종목 쫄탐 숫자도 크게 (36px 이상)', Number((css.match(/\.ta-tile\[data-k="score"\] \.ta-big \{ font-size: (\d+)px/) ?? [])[1]) >= 36);
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

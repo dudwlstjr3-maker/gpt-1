@@ -2759,13 +2759,12 @@ async function main() {
       scores[0].size === scores[100].size && homeMood(null, 0) === null);
     const moodSnapshot = (score, status = 'ok') => ({ sections: { fng: { status, data: [{ market: 'us', score }] } } });
     const plazaView = await readFile('src/app/plaza/page.tsx', 'utf8');
-    // 2026-11-28 토스증권 느낌으로 바꾸며 홈 바탕의 단계 색 빛 번짐은 걷었다 — 이제 광장 눈금만 이 계산을 쓴다 ([8-46])
-    check('광장 눈금은 미국 계기판의 다섯 구간을 따르고 산출 불가 상태를 구분함',
+    check('홈 배경과 광장 눈금은 미국 계기판의 다섯 구간을 따르고 산출 불가 상태를 구분함',
       scores.every((m, n) => snapshotMood(moodSnapshot(n)).band === m.band) &&
       [null, -1, 101].every((n) => snapshotMood(moodSnapshot(n)) === null) &&
       ['loading', 'empty', 'error'].every((status) => snapshotMood(moodSnapshot(50, status)) === null) &&
       ['partial', 'stale'].every((status) => snapshotMood(moodSnapshot(0, status)).score === 0) &&
-      [plazaView, tpl16].every((src) => src.includes('snapshotMood(') && src.includes('--mood-position')) &&
+      [homeSrc, plazaView, tpl16].every((src) => src.includes('snapshotMood(') && src.includes('--mood-position')) &&
       [plazaView, tpl16].every((src) => src.includes('pz-mood-track') && src.includes('이전 값')));
 
     check('계기판 왼쪽·정상·오른쪽과 모든 중간 각도', scores.every((m, n) =>
@@ -4285,64 +4284,6 @@ async function main() {
     check('/chart 화면이 열림 · 하단 고지가 있음', pr.status === 200 && prText.includes('종목 차트') && prText.includes('본 서비스는 정보 제공 목적이며 투자 조언이 아닙니다'));
     const old = await fetch(`${BASE}/ref`, { redirect: 'manual' });
     check('옛 주소 /ref 는 남기지 않음 (이 PR 안에서 바뀐 이름)', old.status === 404, String(old.status));
-  }
-
-  console.log('\n[8-46] 토스증권 느낌 — 홈 1면 · 종목 차트 (평평한 카드 · 큰 숫자 · 목록 줄)');
-  {
-    /*
-     * 2026-11-28 사용자: "다른 공탐지수나 주식 거래 사이트 참고해서 디자인 바꿔보자" → 홈 + 차트, 토스증권 느낌.
-     * 다른 곳의 로고 · 상표 색은 쓰지 않고 구조와 느낌만 — 빛 번짐 · 그러데이션 · 테두리를 걷고,
-     * 숫자 하나를 크게, 곁들이는 값은 목록 줄로, 고른 것은 뒤집은 색으로.
-     * 계산 · 문구는 하나도 바꾸지 않았다. 지수 탭 · 심리 상세가 같이 쓰는 계기판은 그대로 둔다.
-     */
-    const rd = (f) => readFile(f, 'utf8');
-    const [homeCss, taCss, homePage, homeCard, chartPage, tpl] = await Promise.all([
-      'src/app/home-mood.css', 'src/app/ta.css', 'src/app/page.tsx', 'src/components/market/HomeMoodCard.tsx',
-      'src/app/chart/page.tsx', 'tools/preview/template.html'].map(rd));
-    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const rule = (css, sel) => (css.match(new RegExp('(?:^|\\n)' + esc(sel) + '\\s*\\{([^}]*)\\}')) ?? [])[1] ?? '';
-    const fs = (body) => Number((body.match(/font-size:\s*([\d.]+)px/) ?? [])[1]);
-    const vh = tpl.slice(tpl.indexOf('  function viewHome() {'), tpl.indexOf('\n  }\n', tpl.indexOf('  function viewHome() {')));
-    const hc = tpl.slice(tpl.indexOf('  function homeMoodCard(f) {'), tpl.indexOf('  function fngCard('));
-    const vr = tpl.slice(tpl.indexOf('  function viewRef() {'), tpl.indexOf('\n  function drawRef()'));
-    const cover = rule(homeCss, '.mood-home .card.mood-cover');
-    check('홈 바탕 · 1면 카드에 빛 번짐 · 그러데이션 · 테두리 없음 (앱 · 미리보기)',
-      rule(homeCss, '.mood-home').trim() === 'display: flow-root;' && /border: 0/.test(cover) && /background: var\(--surface\)/.test(cover) &&
-      !/gradient/.test(cover) && /content: none/.test(rule(homeCss, '.mood-home .mood-cover::before')) &&
-      ![homePage, vh].some((t) => /--mood-ink|--mood-position/.test(t)));
-    check('홈 카드 안쪽 여백은 CSS 한 곳 (앱 p-3 · 미리보기 padding:12px 를 뺌)',
-      /padding: 20px/.test(cover) && /className="card mood-cover" style=\{style\}/.test(homeCard) &&
-      /'<article class="card mood-cover" style="--ink:'/.test(hc));
-    check('홈 점수는 크게(56px 이상) 계기판 위에 — 홈에서만 순서를 바꿈',
-      fs(rule(homeCss, '.mood-home .mood-score')) >= 56 && /flex-direction: column/.test(rule(homeCss, '.mood-home .mood-gauge')) &&
-      /order: -2/.test(rule(homeCss, '.mood-home .mood-reading')) && /order: -1/.test(rule(homeCss, '.mood-home .mood-change')) &&
-      /max-width: 320px/.test(rule(homeCss, '.mood-gauge')));
-    check('전일 변화는 알약 대신 보통 글자 · 단계 색을 입히지 않음 (등락 색 설정과 엇갈리지 않게)',
-      /background: none/.test(rule(homeCss, '.mood-home .mood-delta')) && !/var\(--ink\)/.test(rule(homeCss, '.mood-home .mood-delta')) &&
-      !/var\(--ink\)/.test(rule(homeCss, '.mood-home .mood-change b')));
-    check('홈 칩은 목록 줄 — 이름 왼쪽 · 값 오른쪽 · 줄 사이 선, 누를 자리 44px 그대로',
-      /grid-template-columns: 1fr auto/.test(rule(homeCss, '.mood-home .mood-chips')) &&
-      /border-top: 1px solid var\(--border\)/.test(rule(homeCss, '.mood-home .mood-chip + .mood-chip')) &&
-      /min-height: 44px/.test(rule(homeCss, '.mood-chips')) && !/var\(--ink\)/.test(rule(homeCss, '.mood-home .mood-chip')));
-    check('이유 보기는 카드 폭 버튼(52px) · 홈 접힌 두 절은 넓은 줄(56px) · 펼치기/접기를 말로',
-      /min-height: 52px/.test(rule(homeCss, '.mood-home .mood-cover footer :is(a,button)')) &&
-      /min-height: 56px/.test(homeCss.match(/\.home-fold > summary \{[^}]*\}/)?.[0] ?? '') &&
-      /content: '펼치기 ▾'/.test(homeCss) && /content: '접기 ▴'/.test(homeCss) && /::-webkit-details-marker \{ display: none; \}/.test(homeCss));
-    check('지수 탭 · 심리 상세는 그대로 — 바뀐 계기판 · 카드 규칙은 모두 .mood-home 아래',
-      /radial-gradient/.test(rule(homeCss, '.card.mood-cover')) && !/[\s;{]order:/.test(homeCss.replace(/\.mood-home [^{]*\{[^}]*\}/g, '')));
-    check('차트 — 가격은 한 줄 크게(36px) · 결론 24px · 절 제목 20px',
-      fs(rule(taCss, '.ta-title .ta-last')) >= 36 && /flex-basis: 100%/.test(rule(taCss, '.ta-title .ta-last')) &&
-      fs(rule(taCss, '.ta-vhead b')) >= 24 && fs(rule(taCss, '.ta-sec > h2')) >= 20);
-    const inverted = (sel) => /background: var\(--fg-strong\)/.test(rule(taCss, sel)) && /color: var\(--bg\)/.test(rule(taCss, sel));
-    check('차트 — 고른 것은 뒤집은 색 (자주 보는 종목 · 봉 단위 · 구간 · 찾기 버튼)',
-      ['.ta-quick button[aria-pressed="true"]', '.ta-seg button[aria-pressed="true"]', '.ta-ranges button[aria-pressed="true"]', '.ta-search button'].every(inverted));
-    check('차트 — 찾기 칸 48px 둥근 모양 · 결론 칸 테두리 없음 (글자색 · ▲▼ · 말로)',
-      /min-height: 48px/.test(rule(taCss, '.ta-search input')) && /border-radius: 99px/.test(rule(taCss, '.ta-search input')) &&
-      !/ta-verdict\[data-side/.test(taCss) && !/box-shadow/.test(rule(taCss, '.ta-verdict')));
-    check('보이는 구간은 차트 바로 아래 (앱 · 미리보기 같은 순서)',
-      chartPage.indexOf('className="ta-chart"') > -1 && chartPage.indexOf('className="ta-chart"') < chartPage.indexOf('className="ta-ranges"') &&
-      vr.indexOf('class="ta-chart"') > -1 && vr.indexOf('class="ta-chart"') < vr.indexOf('class="ta-ranges"'));
-    check('홈 · 차트 CSS 에 12px 아래 글자 없음', !/font-size:\s*(1[01](\.\d+)?|\d(\.\d+)?)px/.test(homeCss + taCss));
   }
 
   const { status: hs, body: health } = await getJson('/api/health');

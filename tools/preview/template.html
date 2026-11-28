@@ -1933,7 +1933,7 @@ __TA_CSS__
 
   function homeMoodCard(f) {
     const mood = homeMood(f.score, f.deltaDay);
-    return '<article class="card mood-cover" style="--ink:' + scoreColor(mood && mood.score) + '" aria-label="미국 쫄탐지수">' +
+    return '<article class="card mood-cover" style="padding:12px;--ink:' + scoreColor(mood && mood.score) + '" aria-label="미국 쫄탐지수">' +
       '<header><h3>미국 쫄탐지수</h3>' + modeBadge() + '</header>' +
       moodGauge(f.score, f.deltaDay) +
       (mood ? '' : '<p class="mood-na-why">' + esc(f.unavailableReason || '점수를 계산할 데이터가 부족합니다.') + '</p>') +
@@ -3372,11 +3372,10 @@ __TA_CSS__
       '<details class="ta-howto"><summary>' + esc(TA_TEXT.techTitle) + ' — 보는 순서</summary><ol>' + TA_TEXT.techSteps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol></details>' +
       '<p class="ta-note">' + esc(TA_TEXT.techNote) + '</p></section>' +
       '<section class="ta-sec" aria-labelledby="ta-chart-title"><h2 id="ta-chart-title">차트 <small>' + unit + ' · 봉 ' + (w.to - w.from + 1) + '개</small></h2>' +
-      '<p class="ta-read" aria-live="polite">' + esc(stamp(m.t[shown]) + ' · ' + taReadout(m, shown, price)) + '</p>' +
-      '<div class="ta-chart" id="ta-chart" tabindex="0" aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."></div>' +
-      /* 보이는 구간은 차트 바로 아래 (2026-11-28 토스증권 느낌 · 앱과 같은 순서) */
       '<div class="ta-ranges" role="group" aria-label="보이는 구간">' + TA_RANGES[d.tf].map((r) =>
         '<button type="button" data-ta-range="' + r[0] + '" aria-pressed="' + (st.range === r[0]) + '">' + r[1] + '</button>').join('') + '</div>' +
+      '<p class="ta-read" aria-live="polite">' + esc(stamp(m.t[shown]) + ' · ' + taReadout(m, shown, price)) + '</p>' +
+      '<div class="ta-chart" id="ta-chart" tabindex="0" aria-label="차트 — 눌러서 봉을 짚습니다. 왼쪽 · 오른쪽 화살표로 옮깁니다."></div>' +
       '<p class="ta-note">' + esc(TA_TEXT.markNote) + '</p></section>' +
       '<details class="ta-fold"><summary>산출 방법</summary><dl>' + TA_TEXT.methods.map((x) => '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('') +
       '</dl><p class="ta-note">' + esc(TA_TEXT.notIncluded) + '</p></details></div>';
@@ -3506,7 +3505,8 @@ __TA_CSS__
   function viewHome() {
     const s = snap();
     const fng = s.sections.fng.data || [];
-    // 2026-11-28 토스증권 느낌 — 단계 색 빛 번짐을 걷어 바탕은 평평하다 (앱 page.tsx 와 같이)
+    const mood = snapshotMood(s);
+    const moodStyle = mood ? ' style="--mood-ink:' + scoreColor(mood.score) + ';--mood-position:' + mood.score + '%"' : '';
     const quotes = s.sections.quotes.data || {};
     const all = new Map();
     const marketOf = new Map();
@@ -3536,7 +3536,7 @@ __TA_CSS__
     const SUM = { fact: ['사실', 'b-neutral', '▪'], interpretation: ['해석', 'b-accent', '▸'], insufficient: ['근거 부족', 'b-warn', '?'] };
 
     return (
-      '<div class="mood-home"><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
+      '<div class="mood-home"' + moodStyle + '><h1 class="sr">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>' +
       '<section class="block" style="padding-inline:0">' +
       '<h2 class="sr">오늘의 쫄탐</h2>' +
       (() => {

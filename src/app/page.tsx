@@ -1,6 +1,9 @@
 'use client';
 
 import { useData } from '@/components/providers/DataProvider';
+import type { CSSProperties } from 'react';
+import { snapshotMood } from '@/lib/homeMood.mjs';
+import { scoreColor } from '@/lib/scale';
 import { FngSection } from '@/components/market/FngSection';
 import { RegimeBoardCard } from '@/components/market/RegimeBoard';
 import { HomePrices } from '@/components/market/HomePrices';
@@ -38,9 +41,14 @@ export default function HomePage() {
     );
   }
 
-  // 2026-11-28 토스증권 느낌 — 단계 색 빛 번짐을 걷어 바탕은 평평하다. 단계 색은 카드 안 계기판에만
+  const mood = snapshotMood(snapshot);
+  const style = mood ? {
+    '--mood-ink': scoreColor(mood.score),
+    '--mood-position': `${mood.score}%`,
+  } as CSSProperties : undefined;
+
   return (
-    <div className="mood-home pt-2">
+    <div className="mood-home pt-2" style={style}>
       <h1 className="sr-only">쫄탐일보 홈 — 미국·한국 투자심리 요약</h1>
       <FngSection />
       <RiskAlertLine />
